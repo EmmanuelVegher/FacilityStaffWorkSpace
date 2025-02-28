@@ -1,43 +1,4 @@
 {
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "attendanceapp-a6853",
-          "appId": "1:670103320817:android:9340aefadc7c7c25b19150",
-          "fileOutput": "android/app/google-services.json"
-        }
-      },
-      "ios": {
-        "default": {
-          "projectId": "attendanceapp-a6853",
-          "appId": "1:670103320817:ios:8fa93bd8729ff42bb19150",
-          "uploadDebugSymbols": false,
-          "fileOutput": "ios/Runner/GoogleService-Info.plist"
-        }
-      },
-      "macos": {
-        "default": {
-          "projectId": "attendanceapp-a6853",
-          "appId": "1:670103320817:ios:8fa93bd8729ff42bb19150",
-          "uploadDebugSymbols": false,
-          "fileOutput": "macos/Runner/GoogleService-Info.plist"
-        }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "attendanceapp-a6853",
-          "configurations": {
-            "android": "1:670103320817:android:9340aefadc7c7c25b19150",
-            "ios": "1:670103320817:ios:8fa93bd8729ff42bb19150",
-            "macos": "1:670103320817:ios:8fa93bd8729ff42bb19150",
-            "web": "1:670103320817:web:333da70eb18dc952b19150",
-            "windows": "1:670103320817:web:03678acef1bcce7fb19150"
-          }
-        }
-      }
-    }
-  },
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -51,8 +12,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "database": {
-    "rules": "database.rules.json"
   }
 }
