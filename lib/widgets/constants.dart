@@ -1,0 +1,18 @@
+String emailAddressConstant = "";
+String passwordConstant = "";
+String roleConstant = "";
+String departmentConstant = "";
+String designationConstant = "";
+String firstNameConstant = "";
+String lastNameConstant = "";
+String locationConstant = "";
+String mobileConstant = "";
+String projectConstant = "";
+String staffCategoryConstant = "";
+String stateConstant = "";
+var firebaseAuthIdConstant;
+String appVersionConstant = "Version 1.5";
+bool ifLatestVersionConstant = true;
+bool isSyncedConstant = true;
+String supervisorConstant = "Emmanuel Vegher";
+String supervisorEmailConstant = "";

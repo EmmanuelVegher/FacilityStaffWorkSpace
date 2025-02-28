@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "670103320817",
+    "project_id": "attendanceapp-a6853",
+    "storage_bucket": "attendanceapp-a6853.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:670103320817:android:9340aefadc7c7c25b19150",
+        "android_client_info": {
+          "package_name": "com.terkage.attendanceapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARe4jhXum6mu5R7P7CTbhd5Gj4H0QOzeY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

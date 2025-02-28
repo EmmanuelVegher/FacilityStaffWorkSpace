@@ -1,0 +1,14 @@
+Row(
+  mainAxisAlignment: MainAxisAlignment.end,
+  children: [
+    ElevatedButton(
+      onPressed: exportToExcel,
+      child: Text('Export to Excel'),
+    ),
+    SizedBox(width: 10),
+    ElevatedButton(
+      onPressed: exportToPDF,
+      child: Text('Export to PDF'),
+    ),
+  ],
+),
