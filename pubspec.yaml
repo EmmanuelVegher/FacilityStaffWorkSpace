@@ -129,6 +129,11 @@ dependencies:
   #bcrypt: ^1.1.3
   video_player:
   flutter_facebook_auth: ^7.1.1
+  camera:
+  google_ml_kit:
+  js:
+
+
 
 dev_dependencies:
   flutter_test:
@@ -159,6 +164,7 @@ flutter:
     - assets/db/attendance.json
     - assets/config/
     - assets/geocordinates/
+    - web/models/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

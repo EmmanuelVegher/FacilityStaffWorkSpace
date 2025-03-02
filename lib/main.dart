@@ -5,13 +5,21 @@ import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:js/js.dart';
+
+// Declare the JS function from face_recognition.js
+@JS('loadModels')
+external Future<void> loadModels();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
- // usePathUrlStrategy();
+
+  // Load face-api.js models via Dart-JS interop from face_recognition.js
+  await loadModels();
+
   runApp(const MyApp());
 }
 
@@ -24,7 +32,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
@@ -38,4 +45,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

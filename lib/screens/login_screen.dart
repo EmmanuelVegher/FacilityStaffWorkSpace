@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 // Import your DashboardPage
 import 'admin_dashboard.dart';
 import 'dashboard.dart';
+import 'facial_recognition/Facial_recognition_page.dart';
 import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -71,7 +72,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         // ),
 
         MaterialPageRoute(
-          builder: (context) => UserDashboardPage(), // Pass the UID
+          builder: (context) => FacialRecognitionPage(), // Pass the UID
         ),
       );
     } catch (error) {
