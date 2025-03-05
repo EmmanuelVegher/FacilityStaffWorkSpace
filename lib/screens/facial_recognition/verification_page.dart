@@ -10,7 +10,7 @@ import 'dart:io';
 class VerificationPage extends StatefulWidget {
   final String userId;
 
-  VerificationPage({required this.userId});
+  const VerificationPage({super.key, required this.userId});
 
   @override
   _VerificationPageState createState() => _VerificationPageState();
@@ -89,10 +89,10 @@ class _VerificationPageState extends State<VerificationPage> {
   @override
   Widget build(BuildContext context) {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
     return Scaffold(
-      appBar: AppBar(title: Text('Verification')),
+      appBar: AppBar(title: const Text('Verification')),
       body: Column(
         children: [
           Expanded(

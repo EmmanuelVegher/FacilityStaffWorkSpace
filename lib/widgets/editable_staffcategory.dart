@@ -8,13 +8,13 @@ class EditableStaffCategoryTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchStaffCategory;
 
   const EditableStaffCategoryTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchStaffCategory,
-  }) : super(key: key);
+    required this.fetchStaffCategory, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableStaffCategoryTileState createState() => _EditableStaffCategoryTileState();

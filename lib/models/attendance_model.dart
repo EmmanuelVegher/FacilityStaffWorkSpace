@@ -61,6 +61,51 @@ class AttendanceModel {
     };
   }
 
+  factory AttendanceModel.fromJson(json) {
+    return AttendanceModel(
+        clockIn: json['clockIn'],
+        clockOut: json['clockOut'],
+        clockInLocation: json['clockInLocation'],
+        clockOutLocation: json['clockOutLocation'],
+        date: json['date'],
+        isSynced: json['isSynced'],
+        clockInLatitude: json['clockInLatitude'],
+        clockInLongitude: json['clockInLongitude'],
+        clockOutLatitude: json['clockOutLatitude'],
+        clockOutLongitude: json['clockOutLongitude'],
+        voided: json['voided'],
+        isUpdated: json['isUpdated'],
+        offDay: json['offDay'],
+        noOfHours: json['noOfHours'],
+        durationWorked: json['durationWorked'],
+        month: json['month'],
+        comments:json['comments']
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'clockIn': clockIn,
+      'clockOut': clockOut,
+      'clockInLocation': clockInLocation,
+      'clockOutLocation': clockOutLocation,
+      'date': date,
+      'isSynced': isSynced,
+      'clockInLatitude': clockInLatitude,
+      'clockInLongitude': clockInLongitude,
+      'clockOutLatitude': clockOutLatitude,
+      'clockOutLongitude': clockOutLongitude,
+      'voided': voided,
+      'isUpdated': isUpdated,
+      'offDay': offDay,
+      'noOfHours': noOfHours,
+      'durationWorked': durationWorked,
+      'month': month,
+      'comments':comments
+    };
+  }
+
   factory AttendanceModel.fromMap(Map<String, dynamic> map) {
     return AttendanceModel(
       clockIn: map['clockIn'] as String?,

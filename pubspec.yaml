@@ -132,6 +132,8 @@ dependencies:
   camera:
   google_ml_kit:
   js:
+  universal_html:
+
 
 
 

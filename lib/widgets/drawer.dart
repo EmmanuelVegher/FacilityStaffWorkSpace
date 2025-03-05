@@ -3,9 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:isar/isar.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
+import '../screens/activity_monitoring/activity_monitoring_page.dart';
+import '../screens/components/clock_attendance.dart';
+import '../screens/forgot_password_page.dart';
+import '../screens/leave_request/leave_request.dart';
+import '../screens/login_screen.dart';
+import '../screens/pending_approvals.dart';
+import '../screens/profile_page.dart';
+import '../screens/staff_dashboard.dart';
+import '../screens/timesheet/timesheet.dart';
+import '../screens/timesheet/upload_signature.dart';
+import '../team_survey/team_survey.dart';
 import 'app_button.dart';
 
 
@@ -31,6 +41,8 @@ Widget drawer(
             0.0,
             1.0
           ],
+
+
               colors: [
             Colors.white,
             Colors.white,
@@ -40,7 +52,7 @@ Widget drawer(
           // Row(children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: Get.isDarkMode ? Colors.white : Colors.black,
+              color: Get.isDarkMode ? Colors.white : Colors.white,
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -76,6 +88,8 @@ Widget drawer(
                         ),
                         child: RefreshableWidget<List<Uint8List>?>(
                           refreshCall: () async {
+                            return null;
+                          
                            // return await _readImagesFromDatabase();
                           },
                           refreshRate: const Duration(seconds: 1),
@@ -117,15 +131,15 @@ Widget drawer(
                     color: Get.isDarkMode ? Colors.white : Colors.brown),
               ),
               onTap: () async {
-                //onTap();
-                // await _dataBaseService.loadDB();
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(
-                //       builder: (context) => UserDashBoard(
-                //             service: IsarService(),
-                //           )),
-                // );
+              //  onTap();
+               // await _dataBaseService.loadDB();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const UserDashboardApp(
+
+                          )),
+                );
               }),
           const Divider(
             color: Colors.grey,
@@ -140,13 +154,11 @@ Widget drawer(
             ),
             onTap: () {
               // _taskController.getTasks();
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => AttendanceHomeScreen(
-              //             service: IsarService(),
-              //           )),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const ClockAttendanceWeb()),
+              );
             },
           ),
 
@@ -164,10 +176,10 @@ Widget drawer(
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => PendingApprovalsPage(service: IsarService(),)),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
+              );
             },
           ),
 
@@ -180,16 +192,16 @@ Widget drawer(
             leading: Icon(Icons.holiday_village_sharp,
                 size: drawerIconSize, color: Colors.red),
             title: Text(
-              'Out of Office Leave Request',
+              'Leave Request',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => LeaveRequestsPage1(service: IsarService(),)),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LeaveRequestsPageWeb()),
+              );
             },
           ),
 
@@ -213,60 +225,6 @@ Widget drawer(
           //     );
           //   },
           // ),
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.local_post_office,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Team Work Survey',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => const TeamSurveyPage(
-              //
-              //       )),
-              // );
-            },
-          ),
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-          ListTile(
-            leading: Icon(
-              Icons.local_post_office,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Psychological Survey',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => PsychologicalMetricsPage(
-              //         isar: isar,
-              //
-              //       )),
-              // );
-            },
-          ),
 
           const Divider(
             color: Colors.grey,
@@ -280,23 +238,21 @@ Widget drawer(
               color: Colors.blue,
             ),
             title: Text(
-              'Metrics Evaluation',
+              'Team Survey',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => const BestPlayerChartPage(
-              //
-              //       )),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PsychologicalMetricsPage(
+
+                    )),
+              );
             },
           ),
-
-
 
           const Divider(
             color: Colors.grey,
@@ -305,7 +261,7 @@ Widget drawer(
 
           ListTile(
             leading: Icon(
-              Icons.access_time,
+              Icons.task,
               size: drawerIconSize,
               color: Colors.blue,
             ),
@@ -316,12 +272,12 @@ Widget drawer(
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => const DailyActivityMonitoringPage()),
-              //     //builder: (context) => TaskManagerHomePage()),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const DailyActivityMonitoringPage()),
+
+              );
             },
           ),
           const Divider(
@@ -341,11 +297,11 @@ Widget drawer(
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => const TimesheetScreen()),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const TimesheetScreen()),
+              );
             },
           ),
 
@@ -391,40 +347,10 @@ Widget drawer(
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
-              //  // MaterialPageRoute(builder: (context) => MyFlutterApp()),
-              // );
-            },
-          ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.login,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Super-User Login',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => LoginPageSuperUser(
-              //             service: IsarService(),
-              //           )),
-              // );
-
-              //_showBottomSheet2(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+              );
             },
           ),
 
@@ -445,15 +371,35 @@ Widget drawer(
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //       builder: (context) => const UploadSignaturePage(
-              //
-              //       )),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const UploadSignaturePage(
 
-              //_showBottomSheet2(context);
+                    )),
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.person,
+              size: drawerIconSize,
+              color: Colors.red,
+            ),
+            title: Text(
+              'Profile Page',
+              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
             },
           ),
 
@@ -472,7 +418,10 @@ Widget drawer(
               style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
             ),
             onTap: () {
-              _displayDialog(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
             },
           ),
         ],

@@ -6,7 +6,7 @@ class MySlideAction extends StatefulWidget {
   final VoidCallback onSubmit;
 
 
-  const MySlideAction({Key? key, required this.text, required this.onSubmit}) : super(key: key);
+  const MySlideAction({super.key, required this.text, required this.onSubmit});
 
   @override
   _MySlideActionState createState() => _MySlideActionState();

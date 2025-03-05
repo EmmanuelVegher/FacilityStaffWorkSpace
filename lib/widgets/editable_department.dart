@@ -8,13 +8,13 @@ class EditableDepartmentTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchDepartments;
 
   const EditableDepartmentTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchDepartments,
-  }) : super(key: key);
+    required this.fetchDepartments, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableDepartmentTileState createState() => _EditableDepartmentTileState();

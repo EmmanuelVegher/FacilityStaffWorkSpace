@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
+  const ForgotPasswordPage({super.key});
+
   @override
   _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
 }
@@ -21,7 +23,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
     // Initialize animation controller for fade effect
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
     );
 
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
@@ -35,15 +37,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Password Reset Email Sent'),
-          content: Text('Please check your email to reset your password.'),
+          title: const Text('Password Reset Email Sent'),
+          content: const Text('Please check your email to reset your password.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         ),
@@ -83,11 +85,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
             child: SingleChildScrollView(
               child: Container(
                 width: 400,
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.black26,
                       blurRadius: 10,
@@ -102,8 +104,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
                       'assets/image/caritaslogo1.png',
                       height: 80,
                     ),
-                    SizedBox(height: 16),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
                       "Reset Your Password",
                       style: TextStyle(
                         fontSize: 26,
@@ -112,7 +114,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Enter your email address to receive a password reset link.',
                       style: TextStyle(
@@ -121,40 +123,40 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
                         labelText: 'Email',
-                        prefixIcon: Icon(Icons.email, color: Colors.black54),
+                        prefixIcon: const Icon(Icons.email, color: Colors.black54),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       keyboardType: TextInputType.emailAddress,
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _errorMessage.isNotEmpty
                         ? Text(
                       _errorMessage,
-                      style: TextStyle(color: Colors.red),
+                      style: const TextStyle(color: Colors.red),
                     )
-                        : SizedBox.shrink(),
-                    SizedBox(height: 20),
+                        : const SizedBox.shrink(),
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _resetPassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.shade700,
-                          padding: EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                         child: _isLoading
-                            ? CircularProgressIndicator(color: Colors.white)
-                            : Text(
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
                           'Send Reset Link',
                           style: TextStyle(
                             fontSize: 18,
@@ -163,12 +165,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
                       },
-                      child: Text(
+                      child: const Text(
                         'Back to Login',
                         style: TextStyle(color: Colors.redAccent),
                       ),

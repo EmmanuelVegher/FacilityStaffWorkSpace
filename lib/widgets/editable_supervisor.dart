@@ -8,13 +8,13 @@ class EditableSupervisorTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchSupervisor;
 
   const EditableSupervisorTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchSupervisor,
-  }) : super(key: key);
+    required this.fetchSupervisor, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableSupervisorTileState createState() => _EditableSupervisorTileState();

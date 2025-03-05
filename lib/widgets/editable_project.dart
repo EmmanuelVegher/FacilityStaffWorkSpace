@@ -8,13 +8,13 @@ class EditableProjectTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchProjects;
 
   const EditableProjectTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchProjects,
-  }) : super(key: key);
+    required this.fetchProjects, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableProjectTileState createState() => _EditableProjectTileState();

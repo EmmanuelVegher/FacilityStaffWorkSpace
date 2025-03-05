@@ -8,13 +8,13 @@ class EditableLocationTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchLocations;
 
   const EditableLocationTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchLocations,
-  }) : super(key: key);
+    required this.fetchLocations, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableLocationTileState createState() => _EditableLocationTileState();

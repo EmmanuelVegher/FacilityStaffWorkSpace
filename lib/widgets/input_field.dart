@@ -7,7 +7,7 @@ class MyInputField extends StatelessWidget {
   final Widget? widget;
 
   const MyInputField({
-    Key? key,
+    super.key,
     required this.title,
     required this.hint,
     this.controller,
@@ -15,7 +15,7 @@ class MyInputField extends StatelessWidget {
     TextInputType? keyboardType,
     String? Function(dynamic value)? validator,
     IconData? icon,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

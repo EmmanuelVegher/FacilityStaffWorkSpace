@@ -12,10 +12,10 @@ import '../utils/constants.dart'; // Your constants file
 class AttendanceAPI {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ... (Methods for fetching data from Firestore)
+
 
   Future<List<AttendanceRecord>> getWeeklyRecords(String userId, DateTime startDate) async {
-    final endDate = startDate.add(Duration(days: 6));
+    final endDate = startDate.add(const Duration(days: 6));
     final records = <AttendanceRecord>[];
 
     try {
@@ -297,16 +297,16 @@ class AttendanceAPI {
 
   ${records.map((record) {
       final date = record.date;
-      final clockInTime = record.clockInTime ?? '';
-      final clockOutTime = record.clockOutTime ?? '';
-      final clockInLocation = record.clockInLocation ?? '';
-      final clockOutLocation = record.clockOutLocation ?? '';
-      final comments = record.comments ?? '';
-      final durationWorked = record.durationWorked ?? '';
+      final clockInTime = record.clockInTime;
+      final clockOutTime = record.clockOutTime;
+      final clockInLocation = record.clockInLocation;
+      final clockOutLocation = record.clockOutLocation;
+      final comments = record.comments;
+      final durationWorked = record.durationWorked;
 
       // Parse clock-in time from string to DateTime
       DateTime? clockInDateTime;
-      if (clockInTime != null && clockInTime.isNotEmpty) {
+      if (clockInTime.isNotEmpty) {
         try {
           clockInDateTime = DateFormat("HH:mm").parse(clockInTime);
         } catch (e) {
@@ -329,7 +329,7 @@ class AttendanceAPI {
   
   <br><br>
 
-  &nbsp;&nbsp;&nbsp;&nbsp;☐ Early Clock-ins (Number of Clock-Ins done before 8:00AM): $earlyClockInsCount/${totalClockIns} day(s) (${(earlyClockInsCount / totalClockIns * 100).toStringAsFixed(2)}%)
+  &nbsp;&nbsp;&nbsp;&nbsp;☐ Early Clock-ins (Number of Clock-Ins done before 8:00AM): $earlyClockInsCount/$totalClockIns day(s) (${(earlyClockInsCount / totalClockIns * 100).toStringAsFixed(2)}%)
 
 
        <br><br>

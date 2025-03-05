@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:developer';
+import 'dart:developer' as dev;
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,10 +17,8 @@ import 'package:location/location.dart' as locationPkg;
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 
 
-import '../../models/user_model.dart';
 import '../../services/location_services.dart';
 import '../../widgets/drawer.dart';
-import '../../widgets/drawer2.dart';
 import '../../widgets/geo_utils.dart';
 import '../../widgets/header_widget.dart';
 
@@ -28,16 +27,40 @@ class GeofenceModel {
   final double latitude;
   final double longitude;
   final double radius;
+  final String category;
+  final String stateName; // Added stateName
 
   GeofenceModel({
     required this.name,
     required this.latitude,
     required this.longitude,
     required this.radius,
+    required this.category,
+    required this.stateName, // Added stateName
   });
+
+  factory GeofenceModel.fromFirestore(Map<String, dynamic> firestoreData, String stateName) { // Modified factory
+    return GeofenceModel(
+      name: firestoreData['LocationName'] ?? 'Unknown Location',
+      latitude: GeofenceModel._parseNum(firestoreData['Latitude'])?.toDouble() ?? 0.0,
+      longitude: GeofenceModel._parseNum(firestoreData['Longitude'])?.toDouble() ?? 0.0,
+      radius: GeofenceModel._parseNum(firestoreData['Radius'])?.toDouble() ?? 100.0,
+      category: firestoreData['category'] ?? 'General',
+      stateName: stateName, // Passing stateName here
+    );
+  }
+
+  static num? _parseNum(dynamic value) {
+    if (value is num) {
+      return value;
+    } else if (value is String) {
+      return num.tryParse(value);
+    }
+    return null;
+  }
 }
 
-// Firestore Service to handle database interactions
+
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -83,39 +106,98 @@ class FirestoreService {
         .doc(date)
         .update(data);
   }
+
+
+  Future<String?> getUserState() async {
+    DocumentSnapshot userSnapshot = await _firestore.collection('Staff').doc(getUserId()).get();
+    if (userSnapshot.exists) {
+      Map<String, dynamic>? userData = userSnapshot.data() as Map<String, dynamic>?;
+      return userData?['state'] as String?;
+    }
+    return null;
+  }
+
+  Future<List<String>> getAllStates() async {
+    List<String> states = [];
+    try {
+      QuerySnapshot locationSnapshot = await _firestore.collection('Location').get();
+      for (var doc in locationSnapshot.docs) {
+        states.add(doc.id);
+      }
+    } catch (e) {
+      dev.log("Error fetching states: $e");
+    }
+    return states;
+  }
+
+
+  Future<List<GeofenceModel>> getGeofencesForState(String state) async {
+    List<GeofenceModel> geofenceLocations = [];
+    try {
+      QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
+          .collection('Location')
+          .doc(state)
+          .collection(state)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        geofenceLocations.add(GeofenceModel.fromFirestore(doc.data(), state)); // Passing state name here
+      }
+      dev.log("geofenceLocations =$geofenceLocations");
+    } catch (e) {
+      dev.log("Error fetching geofences for state $state: $e");
+    }
+    return geofenceLocations;
+  }
+
+
+  Future<List<GeofenceModel>> getGeofencesForAllStatesExceptCurrent(String currentState) async {
+    List<GeofenceModel> allGeofences = [];
+    List<String> allStates = await getAllStates();
+
+    for (String state in allStates) {
+      if (state != currentState) {
+        allGeofences.addAll(await getGeofencesForState(state));
+      }
+    }
+    return allGeofences;
+  }
 }
 
 
 class ClockAttendanceWeb extends StatelessWidget {
-  final FirestoreService firestoreService;
 
-  const ClockAttendanceWeb({Key? key, required this.firestoreService, required ClockAttendanceWebController controller})
-      : super(key: key);
+
+  const ClockAttendanceWeb({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final ClockAttendanceWebController controller = Get.put(ClockAttendanceWebController(firestoreService));
+    final ClockAttendanceWebController controller = Get.put(ClockAttendanceWebController(FirestoreService()));
+    controller.onRefreshPage(); // Call onRefreshPage here to refresh location on every build
+    final ResponsiveSizes sizes = ResponsiveSizes(context);
 
     return Scaffold(
-      drawer: drawer(context),
+      drawer: drawer(context), // Added drawer here
+      appBar: AppBar(
+        title: const Text('Attendance'),
+      ),
       body: SafeArea(
         child: Center(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              double screenWidth = constraints.maxWidth;
-              bool isMobile = screenWidth < 600;
+              ScreenSize screenSize = sizes.getScreenSize(constraints.maxWidth);
               return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05, vertical: screenWidth * 0.02),
+                padding: EdgeInsets.symmetric(horizontal: sizes.horizontalPadding, vertical: sizes.verticalPadding),
                 child: Column(
                   children: [
-                    SizedBox(height: screenWidth * 0.02),
-                    HeaderWidget(screenWidth * 0.08, false, Icons.house_rounded),
-                    SizedBox(height: screenWidth * 0.05),
-                    _buildWelcomeHeader(context, controller, screenWidth, isMobile),
-                    SizedBox(height: screenWidth * 0.05),
-                    _buildStatusCard(context, controller, screenWidth, isMobile),
-                    SizedBox(height: screenWidth * 0.05),
-                    _buildAttendanceCard(context, controller, screenWidth, isMobile),
+                    SizedBox(height: sizes.verticalSpacing),
+                    HeaderWidget(sizes.headerIconSize, false, Icons.house_rounded), // Added HeaderWidget
+                    SizedBox(height: sizes.sectionSpacing),
+                    _buildWelcomeHeader(context, controller, screenSize, sizes),
+                    SizedBox(height: sizes.sectionSpacing),
+                    _buildStatusCard(context, controller, screenSize, sizes),
+                    SizedBox(height: sizes.sectionSpacing),
+                    _buildAttendanceCard(context, controller, screenSize, sizes),
                   ],
                 ),
               );
@@ -127,7 +209,7 @@ class ClockAttendanceWeb extends StatelessWidget {
   }
 
 
-  Widget _buildWelcomeHeader(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildWelcomeHeader(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -142,14 +224,14 @@ class ClockAttendanceWeb extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black54,
                   fontFamily: "NexaLight",
-                  fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03,
+                  fontSize: sizes.welcomeHeaderTextSize,
                 ),
               ),
             ),
             Image(
               image: const AssetImage("./assets/image/ccfn_logo.png"),
-              width: screenWidth / (isMobile ? 8 : 18),
-              height: screenWidth / (isMobile ? 8 : 18),
+              width: sizes.logoSize,
+              height: sizes.logoSize,
             ),
           ],
         ),
@@ -158,14 +240,14 @@ class ClockAttendanceWeb extends StatelessWidget {
           style: TextStyle(
             color: Colors.black54,
             fontFamily: "NexaBold",
-            fontSize: isMobile ? screenWidth * 0.06 : screenWidth * 0.04,
+            fontSize: sizes.usernameHeaderTextSize,
           ),
         )),
       ],
     );
   }
 
-  Widget _buildStatusCard(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildStatusCard(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Container(
       alignment: Alignment.centerLeft,
       child: Column(
@@ -175,23 +257,25 @@ class ClockAttendanceWeb extends StatelessWidget {
             "Today's Status:",
             style: TextStyle(
               fontFamily: "NexaBold",
-              fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03,
+              fontSize: sizes.cardHeaderTextSize,
             ),
           ),
-          SizedBox(height: screenWidth * 0.02),
+          SizedBox(height: sizes.cardInnerSpacing),
           Obx(() => Card(
             elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(sizes.cardBorderRadius)),
             child: Container(
+              width:MediaQuery.of(context).size.width*1,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [Colors.red.shade100, Colors.white, Colors.black12],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(sizes.cardBorderRadius),
               ),
-              padding: EdgeInsets.all(screenWidth * 0.04),
+              padding: EdgeInsets.all(sizes.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -199,22 +283,22 @@ class ClockAttendanceWeb extends StatelessWidget {
                     "Geo-Coordinates Information:",
                     style: TextStyle(
                       fontFamily: "NexaBold",
-                      fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.025,
+                      fontSize: sizes.subCardHeaderTextSize,
                       color: Colors.blueGrey,
                     ),
                   ),
-                  SizedBox(height: screenWidth * 0.02),
-                  _buildStatusText("GPS is:", controller.isGpsEnabled.value ? 'On' : 'Off', screenWidth, isMobile),
-                  _buildStatusText("Current Latitude:", controller.lati.value.toStringAsFixed(6), screenWidth, isMobile),
-                  _buildStatusText("Current Longitude:", controller.longi.value.toStringAsFixed(6), screenWidth, isMobile),
-                  _buildStatusText("Coordinates Accuracy:", controller.accuracy.value.toString(), screenWidth, isMobile),
-                  _buildStatusText("Altitude:", controller.altitude.value.toString(), screenWidth, isMobile),
-                  _buildStatusText("Speed:", controller.speed.value.toString(), screenWidth, isMobile),
-                  _buildStatusText("Speed Accuracy:", controller.speedAccuracy.value.toString(), screenWidth, isMobile),
-                  _buildStatusText("Location Data Timestamp:", DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(controller.time.value.toInt())), screenWidth, isMobile),
-                  _buildStatusText("Is Location Mocked?:", controller.isMock.value.toString(), screenWidth, isMobile),
-                  _buildStatusText("Current State:", controller.administrativeArea.value, screenWidth, isMobile),
-                  _buildStatusText("Current Location:", controller.location.value, screenWidth, isMobile),
+                  SizedBox(height: sizes.cardInnerSpacing),
+                  _buildStatusText("GPS is:", controller.isGpsEnabled.value ? 'On' : 'Off', screenSize, sizes),
+                  _buildStatusText("Current Latitude:", controller.lati.value.toStringAsFixed(6), screenSize, sizes),
+                  _buildStatusText("Current Longitude:", controller.longi.value.toStringAsFixed(6), screenSize, sizes),
+                  _buildStatusText("Coordinates Accuracy:", controller.accuracy.value.toString(), screenSize, sizes),
+                  _buildStatusText("Altitude:", controller.altitude.value.toString(), screenSize, sizes),
+                  _buildStatusText("Speed:", controller.speed.value.toString(), screenSize, sizes),
+                  _buildStatusText("Speed Accuracy:", controller.speedAccuracy.value.toString(), screenSize, sizes),
+                  _buildStatusText("Location Data Timestamp:", DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(controller.time.value.toInt())), screenSize, sizes),
+                  _buildStatusText("Is Location Mocked?:", controller.isMock.value.toString(), screenSize, sizes),
+                  _buildStatusText("Current State:", controller.currentStateDisplay.value, screenSize, sizes), // Updated to use currentStateDisplay
+                  _buildStatusText("Current Location:", controller.location.value, screenSize, sizes),
                 ],
               ),
             ),
@@ -224,14 +308,14 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusText(String label, String value, double screenWidth, bool isMobile) {
+  Widget _buildStatusText(String label, String value, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: screenWidth * 0.005),
+      padding: EdgeInsets.symmetric(vertical: sizes.statusTextVerticalPadding),
       child: RichText(
         text: TextSpan(
           style: TextStyle(
             fontFamily: "NexaBold",
-            fontSize: isMobile ? screenWidth * 0.04 : screenWidth * 0.023,
+            fontSize: sizes.statusTextSize,
             color: Colors.black87,
           ),
           children: <TextSpan>[
@@ -243,7 +327,7 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildAttendanceCard(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildAttendanceCard(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       future: controller.getLastAttendanceForDateFirestore(DateFormat('dd-MMMM-yyyy').format(DateTime.now())).get(),
       builder: (context, snapshot) {
@@ -256,116 +340,122 @@ class ClockAttendanceWeb extends StatelessWidget {
           if (attendanceData != null) {
             final lastAttendance = AttendanceModelFirestore.fromMap(attendanceData);
             if (lastAttendance.clockIn != "--/--" && lastAttendance.clockOut == "--/--") {
-              return _buildClockOutSection(context, controller, lastAttendance, screenWidth, isMobile);
+              return _buildClockOutSection(context, controller, lastAttendance, screenSize, sizes);
             } else if (lastAttendance.clockIn != "--/--" && lastAttendance.clockOut != "--/--") {
-              return _buildDayCompletedSection(context, controller, lastAttendance, screenWidth, isMobile);
+              return _buildDayCompletedSection(context, controller, lastAttendance, screenSize, sizes);
             } else {
-              return _buildClockInSection(context, controller, screenWidth, isMobile, lastAttendance);
+              return _buildClockInSection(context, controller, screenSize, lastAttendance, sizes);
             }
           } else {
-            return _buildClockInSection(context, controller, screenWidth, isMobile, null);
+            return _buildClockInSection(context, controller, screenSize, null, sizes);
           }
         } else {
-          return _buildClockInSection(context, controller, screenWidth, isMobile, null);
+          return _buildClockInSection(context, controller, screenSize, null, sizes);
         }
       },
     );
   }
 
 
-  Widget _buildClockInSection(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile, AttendanceModelFirestore? lastAttendance) {
+  Widget _buildClockInSection(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, AttendanceModelFirestore? lastAttendance, ResponsiveSizes sizes) {
     return Column(
       children: [
-        _buildClockInOutDisplay(context, controller, screenWidth, isMobile), // Modified to use StreamBuilder inside
-        SizedBox(height: screenWidth * 0.02),
-        _buildDateAndStream(screenWidth, isMobile),
-        SizedBox(height: screenWidth * 0.05),
-        _buildClockInImageButton(context, controller, screenWidth, isMobile), // Replaced Slider with Image Button
-        SizedBox(height: screenWidth * 0.02),
-        _buildOutOfOfficeButton(context, controller, screenWidth, isMobile),
-        SizedBox(height: screenWidth * 0.02),
-        _buildLocationStatusCard(context, controller, screenWidth, isMobile),
+        _buildClockInOutDisplay(context, controller, screenSize, sizes),
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildDateAndTime(screenSize, sizes),
+        SizedBox(height: sizes.sectionSpacing),
+        _buildClockInImageButton(context, controller, screenSize, sizes), // Show clock-in button initially
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildOutOfOfficeButton(context, controller, screenSize, sizes),
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildLocationStatusCard(context, controller, screenSize, sizes),
       ],
     );
   }
 
-  Widget _buildClockOutSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModelFirestore? lastAttendance, double screenWidth, bool isMobile) {
+  Widget _buildClockOutSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModelFirestore? lastAttendance, ScreenSize screenSize, sizes) {
     return Column(
       children: [
-        _buildClockInOutDisplay(context, controller, screenWidth, isMobile), // Modified to use StreamBuilder inside
-        SizedBox(height: screenWidth * 0.02),
-        _buildDateAndStream(screenWidth, isMobile),
-        SizedBox(height: screenWidth * 0.05),
-        _buildClockOutImageButton(context, controller, screenWidth, isMobile), // Replaced Slider with Image Button
-        SizedBox(height: screenWidth * 0.02),
-        _buildLocationStatusCard(context, controller, screenWidth, isMobile),
+        _buildClockInOutDisplay(context, controller, screenSize, sizes),
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildDateAndTime(screenSize, sizes),
+        SizedBox(height: sizes.sectionSpacing),
+        _buildClockOutImageButton(context, controller, screenSize, sizes), // Show clock-out button if clocked in
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildLocationStatusCard(context, controller, screenSize, sizes),
       ],
     );
   }
 
 
-  Widget _buildDayCompletedSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModelFirestore? lastAttendance, double screenWidth, bool isMobile) {
-    final TextEditingController commentsController = TextEditingController();
+  Widget _buildDayCompletedSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModelFirestore? lastAttendance, ScreenSize screenSize, sizes) {
+    final TextEditingController commentsController = TextEditingController(text: lastAttendance?.comments != "No Comment" ? lastAttendance?.comments : ""); // Initialize with existing comments
     return Column(
       children: [
-        _buildClockInOutDisplay(context, controller, screenWidth, isMobile), // Modified to use StreamBuilder inside
-        SizedBox(height: screenWidth * 0.02),
-        _buildDateAndStream(screenWidth, isMobile),
-        SizedBox(height: screenWidth * 0.03),
+        _buildClockInOutDisplay(context, controller, screenSize, sizes),
+        SizedBox(height: sizes.cardInnerSpacing),
+        _buildDateAndTime(screenSize, sizes),
+        SizedBox(height: sizes.cardInnerSpacing),
         Text(
           "You have completed this day!!!",
           style: TextStyle(
             fontFamily: "NexaLight",
-            fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03,
+            fontSize: sizes.dayCompletedTextSize,
             color: Colors.black54,
           ),
         ),
-        SizedBox(height: screenWidth * 0.02),
+        SizedBox(height: sizes.cardInnerSpacing),
         Obx(() => Text(
           "Duration Worked: ${controller.durationWorked.value}",
           style: TextStyle(
             fontFamily: "NexaLight",
-            fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03,
+            fontSize: sizes.dayCompletedTextSize,
             color: Colors.black54,
           ),
         )),
-        SizedBox(height: screenWidth * 0.02),
+        SizedBox(height: sizes.cardInnerSpacing),
         Obx(() => Text(
           "Comment(s): ${controller.comments.value}",
           style: TextStyle(
             fontFamily: "NexaLight",
-            fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03,
+            fontSize: sizes.dayCompletedTextSize,
             color: Colors.black54,
           ),
         )),
-        SizedBox(height: screenWidth * 0.03),
+
+        // Comment Input Section Start
+        SizedBox(height: sizes.cardInnerSpacing),
         TextField(
           controller: commentsController,
           maxLines: 3,
           decoration: InputDecoration(
-            hintText: "Comments (If Any)",
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15.0)),
+            hintText: "Add Comment (Optional)",
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(sizes.textFieldBorderRadius)),
+            contentPadding: EdgeInsets.all(sizes.textFieldPadding),
           ),
+          style: TextStyle(fontSize: sizes.textFieldInputTextSize),
         ),
-        SizedBox(height: screenWidth * 0.02),
-        Obx(() => controller.comments.value == "No Comment" ? _buildAddCommentButton(context, commentsController, screenWidth, isMobile) : const SizedBox(height: 0)),
-        SizedBox(height: screenWidth * 0.02),
-        _buildLocationStatusCard(context, controller, screenWidth, isMobile),
-        SizedBox(height: screenWidth * 0.02),
+        SizedBox(height: sizes.cardInnerSpacing),
+        Obx(() => controller.comments.value == "No Comment" || controller.comments.value.isEmpty ? _buildAddCommentButton(context, commentsController, screenSize, sizes) : const SizedBox(height: 0)),
+        SizedBox(height: sizes.cardInnerSpacing),
+        // Comment Input Section End
+
+        _buildLocationStatusCard(context, controller, screenSize, sizes), // Location Card is placed after comment section
+        SizedBox(height: sizes.cardInnerSpacing),
       ],
     );
   }
 
 
-  Widget _buildClockInOutDisplay(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildClockInOutDisplay(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Container(
-      margin: EdgeInsets.only(top: screenWidth * 0.02, bottom: screenWidth * 0.05),
+      margin: EdgeInsets.only(top: sizes.clockDisplayTopMargin, bottom: sizes.clockDisplayBottomMargin),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(2, 2)),
+          BoxShadow(color: Colors.black26, blurRadius: sizes.clockDisplayShadowBlurRadius, offset: const Offset(2, 2)),
         ],
-        borderRadius: BorderRadius.all(Radius.circular(screenWidth * 0.04)),
+        borderRadius: BorderRadius.all(Radius.circular(sizes.clockDisplayBorderRadius)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -375,14 +465,14 @@ class ClockAttendanceWeb extends StatelessWidget {
               stream: controller.clockInStream,
               initialData: controller.clockIn.value,
               builder: (context, snapshot) {
-                return _buildClockTimeColumn("Clock In", snapshot.data ?? "--/--", screenWidth, isMobile);
+                return _buildClockTimeColumn("Clock In", snapshot.data ?? "--/--", screenSize, sizes);
               }
           ),
           StreamBuilder<String>(
               stream: controller.clockOutStream,
               initialData: controller.clockOut.value,
               builder: (context, snapshot) {
-                return _buildClockTimeColumn("Clock Out", snapshot.data ?? "--/--", screenWidth, isMobile);
+                return _buildClockTimeColumn("Clock Out", snapshot.data ?? "--/--", screenSize, sizes);
               }
           ),
         ],
@@ -390,10 +480,10 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildClockTimeColumn(String title, String time, double screenWidth, bool isMobile) {
+  Widget _buildClockTimeColumn(String title, String time, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Expanded(
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03),
+        padding: EdgeInsets.symmetric(vertical: sizes.clockTimeColumnVerticalPadding),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -402,7 +492,7 @@ class ClockAttendanceWeb extends StatelessWidget {
               title,
               style: TextStyle(
                 fontFamily: "NexaLight",
-                fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03,
+                fontSize: sizes.clockTimeColumnTitleFontSize,
                 color: Colors.black54,
               ),
             ),
@@ -410,7 +500,7 @@ class ClockAttendanceWeb extends StatelessWidget {
               time,
               style: TextStyle(
                 fontFamily: "NexaBold",
-                fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035,
+                fontSize: sizes.clockTimeColumnTimeFontSize,
               ),
             ),
           ],
@@ -419,7 +509,7 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildDateAndStream(double screenWidth, bool isMobile) {
+  Widget _buildDateAndTime(ScreenSize screenSize, ResponsiveSizes sizes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -428,7 +518,7 @@ class ClockAttendanceWeb extends StatelessWidget {
             text: DateTime.now().day.toString(),
             style: TextStyle(
               color: Colors.red,
-              fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035,
+              fontSize: sizes.dateTextSize,
               fontFamily: "NexaBold",
             ),
             children: [
@@ -436,7 +526,7 @@ class ClockAttendanceWeb extends StatelessWidget {
                 text: DateFormat(" MMMM yyyy").format(DateTime.now()),
                 style: TextStyle(
                   color: Colors.black,
-                  fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035,
+                  fontSize: sizes.dateTextSize,
                   fontFamily: "NexaBold",
                 ),
               ),
@@ -450,7 +540,7 @@ class ClockAttendanceWeb extends StatelessWidget {
               DateFormat("hh:mm:ss a").format(DateTime.now()),
               style: TextStyle(
                 fontFamily: "NexaLight",
-                fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03,
+                fontSize: sizes.timeTextSize,
                 color: Colors.black54,
               ),
             );
@@ -461,51 +551,51 @@ class ClockAttendanceWeb extends StatelessWidget {
   }
 
 
-  Widget _buildClockInImageButton(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildClockInImageButton(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () async {
         await controller.clockInUpdated(controller.lati.value, controller.longi.value, controller.location.value);
       },
-      child: Container(
-        width: screenWidth * 0.8, // Adjust width as needed
-        height: screenWidth * 0.25, // Adjust height as needed to maintain aspect ratio
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width*1,
+        height: sizes.clockButtonHeight,
         child: Image.asset(
-          'assets/image/clockin9.jpg', // Path to your clock-in image
-          fit: BoxFit.contain, // or BoxFit.fill, BoxFit.cover, etc.
+          'assets/image/clockin9.jpg',
+          fit: BoxFit.contain,
         ),
       ),
     );
   }
 
 
-  Widget _buildClockOutImageButton(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildClockOutImageButton(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () async {
         await controller.clockOutUpdated(controller.lati.value, controller.longi.value, controller.location.value);
       },
-      child: Container(
-        width: screenWidth * 0.8, // Adjust width as needed
-        height: screenWidth * 0.25, // Adjust height as needed to maintain aspect ratio
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width*1,
+        height: sizes.clockButtonHeight,
         child: Image.asset(
-          'assets/image/clockout8.jpg', // Path to your clock-out image
-          fit: BoxFit.contain, // or BoxFit.fill, BoxFit.cover, etc.
+          'assets/image/clockout8.jpg',
+          fit: BoxFit.contain,
         ),
       ),
     );
   }
 
 
-  Widget _buildOutOfOfficeButton(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildOutOfOfficeButton(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Padding(
-        padding: EdgeInsets.symmetric(vertical: screenWidth * 0.02),
+        padding: EdgeInsets.symmetric(vertical: sizes.outOfOfficeButtonVerticalPadding),
         child: GestureDetector(
           onTap: (){
             controller.showBottomSheet3(context);
           },
           child: Container(
-            width: screenWidth * 0.70,
-            height: screenWidth * 0.08,
-            padding: const EdgeInsets.only(left: 20.0, bottom: 0.0),
+            width: sizes.outOfOfficeButtonWidth,
+            height: sizes.outOfOfficeButtonHeight,
+            padding: EdgeInsets.only(left: sizes.outOfOfficeButtonLeftPadding, bottom: 0.0),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -525,9 +615,9 @@ class ClockAttendanceWeb extends StatelessWidget {
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: isMobile ? screenWidth * 0.04 : screenWidth * 0.03),
+                        fontSize: sizes.outOfOfficeButtonTextSize),
                   ),
-                  SizedBox(width:screenWidth * 0.02),
+                  SizedBox(width:sizes.outOfOfficeButtonIconSpacing),
                   const Icon(
                     Icons.arrow_forward,
                     size: 16,
@@ -540,37 +630,37 @@ class ClockAttendanceWeb extends StatelessWidget {
   }
 
 
-  Widget _buildLocationStatusCard(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildLocationStatusCard(BuildContext context, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Container(
-      width: screenWidth * 0.9,
-      margin: EdgeInsets.all(screenWidth * 0.02),
+      width: MediaQuery.of(context).size.width*1,
+      margin: EdgeInsets.all(sizes.locationCardMargin),
       decoration: const BoxDecoration(
         gradient: LinearGradient(colors: [Colors.red, Colors.black]),
         borderRadius: BorderRadius.all(Radius.circular(24)),
       ),
-      padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03, horizontal: screenWidth * 0.02),
+      padding: EdgeInsets.symmetric(vertical: sizes.locationCardVerticalPadding, horizontal: sizes.locationCardHorizontalPadding),
       child: Column(
         children: [
           Text(
             "Location Status",
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035,
+              fontSize: sizes.locationCardHeaderTextSize,
               fontFamily: "NexaBold",
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: screenWidth * 0.02),
+          SizedBox(height: sizes.cardInnerSpacing),
           SizedBox(
-            width: screenWidth * 0.7,
+            width: sizes.locationInnerContentWidth,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildClockInLocationColumn("Clock-In Location", controller, screenWidth, isMobile),
-                SizedBox(width: screenWidth * 0.01),
-                _buildClockOutLocationColumn("Clock-Out Location", controller, screenWidth, isMobile),
+                _buildClockInLocationColumn("Clock-In Location", controller, screenSize, sizes),
+                SizedBox(width: sizes.locationColumnSpacing),
+                _buildClockOutLocationColumn("Clock-Out Location", controller, screenSize, sizes),
               ],
             ),
           ),
@@ -579,7 +669,7 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildClockInLocationColumn(String title, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildClockInLocationColumn(String title, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Expanded(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -589,18 +679,18 @@ class ClockAttendanceWeb extends StatelessWidget {
             title,
             style: TextStyle(
               fontFamily: "NexaLight",
-              fontSize: isMobile ? screenWidth * 0.035 : screenWidth * 0.025,
+              fontSize: sizes.locationColumnTitleTextSize,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: screenWidth * 0.01),
+          SizedBox(height: sizes.cardInnerSpacing),
           StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: controller.firestoreService.streamAttendanceRecord(controller.firestoreService.getUserId()!, DateFormat('dd-MMMM-yyyy').format(DateTime.now())), // Use stream from FirestoreService
+            stream: controller.firestoreService.streamAttendanceRecord(controller.firestoreService.getUserId()!, DateFormat('dd-MMMM-yyyy').format(DateTime.now())),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const CircularProgressIndicator(); // Loading indicator
+                return const CircularProgressIndicator();
               } else if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.white)); // Error text
+                return Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white));
               } else if (snapshot.hasData && snapshot.data!.exists) {
                 final attendanceData = snapshot.data!.data();
                 final lastAttendance = AttendanceModelFirestore.fromMap(attendanceData!);
@@ -609,16 +699,16 @@ class ClockAttendanceWeb extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: "NexaBold",
-                    fontSize: isMobile ? screenWidth * 0.03 : screenWidth * 0.02,
+                    fontSize: sizes.locationColumnLocationTextSize,
                     color: Colors.white,
                   ),
                 );
               } else {
-                return Text("",  // No data available
+                return Text("",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: "NexaBold",
-                    fontSize: isMobile ? screenWidth * 0.03 : screenWidth * 0.02,
+                    fontSize: sizes.locationColumnLocationTextSize,
                     color: Colors.white,
                   ),);
               }
@@ -629,7 +719,7 @@ class ClockAttendanceWeb extends StatelessWidget {
     );
   }
 
-  Widget _buildClockOutLocationColumn(String title, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
+  Widget _buildClockOutLocationColumn(String title, ClockAttendanceWebController controller, ScreenSize screenSize, ResponsiveSizes sizes) {
     return Expanded(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -639,36 +729,36 @@ class ClockAttendanceWeb extends StatelessWidget {
             title,
             style: TextStyle(
               fontFamily: "NexaLight",
-              fontSize: isMobile ? screenWidth * 0.035 : screenWidth * 0.025,
+              fontSize: sizes.locationColumnTitleTextSize,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: screenWidth * 0.01),
+          SizedBox(height: sizes.cardInnerSpacing),
           StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: controller.firestoreService.streamAttendanceRecord(controller.firestoreService.getUserId()!, DateFormat('dd-MMMM-yyyy').format(DateTime.now())), // Use stream from FirestoreService
+            stream: controller.firestoreService.streamAttendanceRecord(controller.firestoreService.getUserId()!, DateFormat('dd-MMMM-yyyy').format(DateTime.now())),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const CircularProgressIndicator(); // Loading indicator
+                return const CircularProgressIndicator();
               } else if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.white)); // Error text
+                return Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white));
               } else if (snapshot.hasData && snapshot.data!.exists) {
                 final attendanceData = snapshot.data!.data();
                 final lastAttendance = AttendanceModelFirestore.fromMap(attendanceData!);
                 return Text(
-                  lastAttendance.clockOutLocation ?? "--/--",
+                  lastAttendance.clockOutLocation ?? "",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: "NexaBold",
-                    fontSize: isMobile ? screenWidth * 0.03 : screenWidth * 0.02,
+                    fontSize: sizes.locationColumnLocationTextSize,
                     color: Colors.white,
                   ),
                 );
               } else {
-                return Text("--/--", // No data available
+                return Text("",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: "NexaBold",
-                    fontSize: isMobile ? screenWidth * 0.03 : screenWidth * 0.02,
+                    fontSize: sizes.locationColumnLocationTextSize,
                     color: Colors.white,
                   ),);
               }
@@ -680,23 +770,23 @@ class ClockAttendanceWeb extends StatelessWidget {
   }
 
 
-  Widget _buildAddCommentButton(BuildContext context, TextEditingController commentsController, double screenWidth, bool isMobile) {
+  Widget _buildAddCommentButton(BuildContext context, TextEditingController commentsController, ScreenSize screenSize, ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () => Get.find<ClockAttendanceWebController>().handleAddComments(context, commentsController.text),
       child: Container(
-        width: screenWidth * 0.40,
-        height: screenWidth * 0.08,
+        width: sizes.commentButtonWidth,
+        height: sizes.commentButtonHeight,
         decoration: const BoxDecoration(
           gradient: LinearGradient(colors: [Colors.red, Colors.black]),
           borderRadius: BorderRadius.all(Radius.circular(20)),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
             "Add Comment",
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: sizes.commentButtonTextSize,
             ),
           ),
         ),
@@ -706,21 +796,18 @@ class ClockAttendanceWeb extends StatelessWidget {
 }
 
 
-// AttendanceModelFirestore and ClockAttendanceWebController are updated as below.
-
-// AttendanceModelFirestore for web
 class AttendanceModelFirestore {
-  int? id;
+  int? Offline_DB_id;
   String? clockIn;
   String? clockOut;
   String? clockInLocation;
   String? clockOutLocation;
   String? date;
-  int? isSynced;
-  String? clockInLatitude;
-  String? clockInLongitude;
-  String? clockOutLatitude;
-  String? clockOutLongitude;
+  bool? isSynced;
+  double? clockInLatitude;
+  double? clockInLongitude;
+  double? clockOutLatitude;
+  double? clockOutLongitude;
   String? durationWorked;
   double? noOfHours;
   bool? voided;
@@ -731,7 +818,7 @@ class AttendanceModelFirestore {
 
 
   AttendanceModelFirestore({
-    this.id,
+    this.Offline_DB_id,
     this.clockIn,
     this.clockOut,
     this.clockInLocation,
@@ -753,17 +840,17 @@ class AttendanceModelFirestore {
 
   factory AttendanceModelFirestore.fromMap(Map<String, dynamic> map) {
     return AttendanceModelFirestore(
-      id: map['id'] as int?,
+      Offline_DB_id: map['Offline_DB_id'] as int?,
       clockIn: map['clockIn'] as String?,
       clockOut: map['clockOut'] as String?,
       clockInLocation: map['clockInLocation'] as String?,
       clockOutLocation: map['clockOutLocation'] as String?,
       date: map['date'] as String?,
-      isSynced: map['isSynced'] as int?,
-      clockInLatitude: map['clockInLatitude'] as String?,
-      clockInLongitude: map['clockInLongitude'] as String?,
-      clockOutLatitude: map['clockOutLatitude'] as String?,
-      clockOutLongitude: map['clockOutLongitude'] as String?,
+      isSynced: map['isSynced'] as bool?,
+      clockInLatitude: map['clockInLatitude'] as double?,
+      clockInLongitude: map['clockInLongitude'] as double?,
+      clockOutLatitude: map['clockOutLatitude'] as double?,
+      clockOutLongitude: map['clockOutLongitude'] as double?,
       durationWorked: map['durationWorked'] as String?,
       noOfHours: map['noOfHours'] as double?,
       voided: map['voided'] as bool?,
@@ -776,7 +863,7 @@ class AttendanceModelFirestore {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
+      'Offline_DB_id': Offline_DB_id,
       'clockIn': clockIn,
       'clockOut': clockOut,
       'clockInLocation': clockInLocation,
@@ -799,9 +886,11 @@ class AttendanceModelFirestore {
 }
 
 
-// ClockAttendanceWebController (clock_attendance_controller.dart)
+
 class ClockAttendanceWebController extends GetxController {
   final FirestoreService firestoreService;
+  late List<GeofenceModel> geofenceList = <GeofenceModel>[].obs;
+  List<GeofenceModel> cachedGeofences = []; // Cache for geofences
 
   ClockAttendanceWebController(this.firestoreService) {
     _init();
@@ -853,9 +942,11 @@ class ClockAttendanceWebController extends GetxController {
   RxDouble elapsedRealtimeUncertaintyNanos = 0.0.obs;
   RxBool isLoading = false.obs;
   RxBool isSliderEnabled = true.obs;
+  RxBool isClockedIn = false.obs; // Track clock-in state
 
 
   RxString administrativeArea = "".obs;
+  RxString currentStateDisplay = "".obs; // New RxString for displaying current state (geofence or administrativeArea)
   RxBool isLocationTurnedOn = false.obs;
   Rx<LocationPermission> isLocationPermissionGranted =
       LocationPermission.denied.obs;
@@ -893,7 +984,14 @@ class ClockAttendanceWebController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _init();
+    _loadInitialData();
+    //_init();
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    _init(); // Call _init again in onReady to refresh location on page refresh
   }
 
   @override
@@ -906,21 +1004,25 @@ class ClockAttendanceWebController extends GetxController {
     super.onClose();
   }
 
-  void _init() async {
+  Future<void> onRefreshPage() async {
+    await _init(); // Call _init again to refresh location
+  }
+
+  Future<void> _loadInitialData() async {
     await _loadNTPTime();
     await _getAttendanceSummary();
     await _getUserDetail();
-    _getUserLocation();
+    await _fetchGeofenceLocations(); // Fetch and cache geofences
+    await checkInternetConnection();
+  }
 
+  Future<void> _init() async {
 
     await getLocationStatus().then((_) async {
       await getPermissionStatus().then((_) async {
         await _startLocationService();
       });
     });
-
-    await checkInternetConnection();
-
   }
 
 
@@ -935,14 +1037,69 @@ class ClockAttendanceWebController extends GetxController {
 
 
   Future<void> _updateLocationUsingGeofencing() async {
-
-    if (lati.value != 0.0 && location.value == "") {
-      print("Geofencing is skipped for web in this example");
+    if (lati.value != 0.0) {
+      String geofencedLocationName = await _determineGeofenceLocation(lati.value, longi.value);
+      if (geofencedLocationName.isNotEmpty) {
+        location.value = geofencedLocationName;
+        //currentStateDisplay.value = geofencedLocationName; // Set currentStateDisplay to geofence name - now handled in _determineGeofenceLocation
+        isInsideAnyGeofence.value = true;
+      } else {
+        isInsideAnyGeofence.value = false;
+        currentStateDisplay.value = administrativeArea.value; // Fallback to administrativeArea if no geofence
+      }
     }
   }
 
+
   Future<void> _updateLocationUsingGeofencing2(double latitde, double longitde) async {
     print("_updateLocationUsingGeofencing2 is skipped for web in this example");
+  }
+
+  Future<String> _determineGeofenceLocation(double latitude, double longitude) async {
+    String geofenceName = "";
+    String? userState = await firestoreService.getUserState();
+
+    for (GeofenceModel geofence in cachedGeofences) {
+      double distance = GeoUtils.haversine(latitude, longitude, geofence.latitude, geofence.longitude);
+      if (distance <= geofence.radius) {
+        if (geofence.stateName == userState) {
+          currentStateDisplay.value = geofence.name; // Update with geofence name if in current state
+        } else {
+          currentStateDisplay.value = geofence.stateName; // Update with other state name if from another state
+        }
+        return geofence.name; // Return geofence name if inside
+      }
+    }
+    if(userState != null) {
+      currentStateDisplay.value = userState; // Default to user state if not in any geofence of cached states and user state is known
+    } else {
+      currentStateDisplay.value = administrativeArea.value.isNotEmpty ? administrativeArea.value : "State Unknown"; // Fallback to administrativeArea or "State Unknown"
+    }
+
+    return geofenceName; // Return empty string if not in any geofence
+  }
+
+
+  Future<void> _fetchGeofenceLocations() async {
+    String? userState = await firestoreService.getUserState();
+    if (userState != null) {
+      dev.log("User state found==$userState");
+      List<GeofenceModel> currentStateGeofences = await firestoreService.getGeofencesForState(userState);
+      cachedGeofences.addAll(currentStateGeofences); // Add current state geofences to cache
+
+      List<GeofenceModel> otherStatesGeofences = await firestoreService.getGeofencesForAllStatesExceptCurrent(userState);
+      cachedGeofences.addAll(otherStatesGeofences); // Add geofences from other states to cache
+
+      dev.log("cachedGeofences count==${cachedGeofences.length}");
+    } else {
+      dev.log("User state not found, geofencing might not work correctly.");
+      // Optionally fetch all geofences if state is unknown for a broader check
+      List<String> allStates = await firestoreService.getAllStates();
+      for (String state in allStates) {
+        List<GeofenceModel> stateGeofences = await firestoreService.getGeofencesForState(state);
+        cachedGeofences.addAll(stateGeofences);
+      }
+    }
   }
 
 
@@ -950,7 +1107,7 @@ class ClockAttendanceWebController extends GetxController {
     try {
       ntpTime = await NTP.now(lookUpAddress: "pool.ntp.org");
     } catch (e) {
-      log("Error getting NTP time: ${e.toString()}");
+      dev.log("Error getting NTP time: ${e.toString()}");
 
       ntpTime = DateTime.now();
     }
@@ -961,9 +1118,10 @@ class ClockAttendanceWebController extends GetxController {
     if (user != null) {
       firebaseAuthId.value = user.uid;
       emailAddress.value = user.email ?? "";
+      dev.log("_getUserDetail ==$user");
 
 
-      firstName.value = "Web User";
+      firstName.value = user.displayName ?? "";
       lastName.value = "";
       role.value = "User";
 
@@ -983,6 +1141,7 @@ class ClockAttendanceWebController extends GetxController {
         clockOutLocation.value = lastAttendance.clockOutLocation ?? "";
         durationWorked.value = lastAttendance.durationWorked ?? "";
         comments.value = lastAttendance.comments ?? "No Comment";
+        isClockedIn.value = lastAttendance.clockIn != "--/--" && lastAttendance.clockOut == "--/--"; // Update clock-in status
 
         _clockInStreamController.add(clockIn.value);
         _clockOutStreamController.add(clockOut.value);
@@ -996,6 +1155,7 @@ class ClockAttendanceWebController extends GetxController {
         clockOutLocation.value = "";
         durationWorked.value = "";
         comments.value = "No Comment";
+        isClockedIn.value = false; // Not clocked in
 
         _clockInStreamController.add(clockIn.value);
         _clockOutStreamController.add(clockOut.value);
@@ -1003,7 +1163,7 @@ class ClockAttendanceWebController extends GetxController {
         _clockOutLocationStreamController.add(clockOutLocation.value);
       }
     } catch (e) {
-      log("Error in _getAttendanceSummary: ${e.toString()}");
+      dev.log("Error in _getAttendanceSummary: ${e.toString()}");
     }
   }
 
@@ -1056,7 +1216,9 @@ class ClockAttendanceWebController extends GetxController {
     }
 
 
-    return await geolocator.Geolocator.getCurrentPosition();
+    return await geolocator.Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.low // Reduced accuracy for faster updates
+    );
   }
 
   void _getUserLocation1() async {
@@ -1137,7 +1299,7 @@ class ClockAttendanceWebController extends GetxController {
       }
       else{
 
-        log('Error getting location: $e');
+        dev.log('Error getting location: $e');
         Fluttertoast.showToast(
           msg: "Error getting location: $e",
           toastLength: Toast.LENGTH_LONG,
@@ -1182,19 +1344,15 @@ class ClockAttendanceWebController extends GetxController {
       print("There is nooooooo internet to get location data");
       try {
         geolocator.Position? position = await geolocator.Geolocator.getCurrentPosition(
-          desiredAccuracy: geolocator.LocationAccuracy.best,
+          desiredAccuracy: geolocator.LocationAccuracy.low, // Reduced accuracy for faster updates
           forceAndroidLocationManager: true,
         );
 
-        if (position != null && position.latitude != null && position.longitude != null) {
-          lati.value = position.latitude!;
-          longi.value = position.longitude!;
-          print("locationData.latitude == ${position.latitude}");
-          _updateLocation();
-        } else {
-          print("_getLocation2: getCurrentPosition returned null position");
-        }
-      } catch (geolocatorError) {
+        lati.value = position.latitude;
+        longi.value = position.longitude;
+        print("locationData.latitude == ${position.latitude}");
+        _updateLocation();
+            } catch (geolocatorError) {
         print("_getLocation2: Error getting location from geolocator: $geolocatorError");
       }
     }
@@ -1224,36 +1382,20 @@ class ClockAttendanceWebController extends GetxController {
       }
 
 
-      if (administrativeArea.value != '') {
-        isInsideAnyGeofence.value = false;
-
-
-        if (!isInsideAnyGeofence.value) {
-          List<Placemark> placemark = await placemarkFromCoordinates(
-              lati.value, longi.value);
-
-          location.value =
-          "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
-
-          print("Location from map === ${location.value}");
-          isCircularProgressBarOn.value = false;
-        }
-      }
-      else if(administrativeArea.value == '' && location.value != 0.0){
-
-        await _updateLocationUsingGeofencing();
+      String geofenceLocationName = await _determineGeofenceLocation(lati.value, longi.value);
+      if (geofenceLocationName.isNotEmpty) {
+        location.value = geofenceLocationName;
+        // currentStateDisplay.value = geofenceLocationName; // Display geofence name - now handled in _determineGeofenceLocation
+        isInsideAnyGeofence.value = true;
       } else {
-        List<Placemark> placemark = await placemarkFromCoordinates(
-            lati.value, longi.value);
-
-        location.value =
-        "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
-
-        print("Unable to get administrative area. Using default location.");
-        isCircularProgressBarOn.value = false;
+        isInsideAnyGeofence.value = false;
+        currentStateDisplay.value = administrativeArea.value.isNotEmpty ? administrativeArea.value : "State Unknown"; // Display administrativeArea or "State Unknown"
       }
+      isCircularProgressBarOn.value = false;
+
 
     }catch(e){
+      currentStateDisplay.value = administrativeArea.value.isNotEmpty ? administrativeArea.value : "State Unknown"; // Fallback even on error
       if(lati.value != 0.0 && administrativeArea.value == ''){
 
         await _updateLocationUsingGeofencing();
@@ -1267,7 +1409,7 @@ class ClockAttendanceWebController extends GetxController {
         });
       }
       else{
-        log("$e");
+        dev.log("$e");
         Fluttertoast.showToast(
           msg: "Error: $e",
           toastLength: Toast.LENGTH_LONG,
@@ -1297,19 +1439,13 @@ class ClockAttendanceWebController extends GetxController {
   Future<void> getPermissionStatus() async {
     LocationPermission? permission = await geolocator.Geolocator.checkPermission();
 
-    if (permission != null) {
-      isLocationPermissionGranted.value = permission;
+    isLocationPermissionGranted.value = permission;
 
-      if (isLocationPermissionGranted.value == LocationPermission.denied ||
-          isLocationPermissionGranted.value == LocationPermission.deniedForever) {
-        isAlertSet2.value = true;
-      }
-    } else {
-      print("Error: Geolocator.checkPermission() returned null");
-      isLocationPermissionGranted.value = LocationPermission.denied;
+    if (isLocationPermissionGranted.value == LocationPermission.denied ||
+        isLocationPermissionGranted.value == LocationPermission.deniedForever) {
       isAlertSet2.value = true;
     }
-  }
+    }
 
   Future<void> checkInternetConnection() async {
 
@@ -1322,7 +1458,7 @@ class ClockAttendanceWebController extends GetxController {
 
     try {
 
-      final attendanceResult = await getLastAttendanceForDateFirestore(DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
+      final attendanceResult = getLastAttendanceForDateFirestore(DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
       final attendanceData = await attendanceResult.get();
 
       if (attendanceData.exists) {
@@ -1334,7 +1470,7 @@ class ClockAttendanceWebController extends GetxController {
 
 
     } catch (e) {
-      log("Attendance Comment Error ====== ${e.toString()}");
+      dev.log("Attendance Comment Error ====== ${e.toString()}");
 
     }
 
@@ -1381,6 +1517,7 @@ class ClockAttendanceWebController extends GetxController {
 
           currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
           String? userId = firestoreService.getUserId();
+
           if (userId == null) {
             return;
           }
@@ -1391,16 +1528,17 @@ class ClockAttendanceWebController extends GetxController {
           if (!attendanceData.exists) {
             if (newlatitude != 0.0) {
               final attendance = AttendanceModelFirestore(
+                Offline_DB_id: Random().nextInt(300) + 1, // Insert random number here
                 clockIn: DateFormat('hh:mm a').format(DateTime.now()),
                 date: currentDate,
-                clockInLatitude: newlatitude.toString(),
+                clockInLatitude: newlatitude,
                 clockInLocation: newlocation,
-                clockInLongitude: newlongitude.toString(),
+                clockInLongitude: newlongitude,
                 clockOut: "--/--",
-                clockOutLatitude: "0.0",
+                clockOutLatitude: 0.0,
                 clockOutLocation: '',
-                clockOutLongitude: "0.0",
-                isSynced: 0,
+                clockOutLongitude: 0.0,
+                isSynced: true,
                 voided: false,
                 isUpdated: false,
                 durationWorked: "0 hours 0 minutes",
@@ -1412,9 +1550,12 @@ class ClockAttendanceWebController extends GetxController {
 
               await firestoreService.createAttendanceRecord(userId, currentDate, attendance);
 
-              _clockInStreamController.add(
-                  DateFormat('hh:mm a').format(DateTime.now()));
+              clockIn.value = DateFormat('hh:mm a').format(DateTime.now()); // Update clockIn value
+              clockInLocation.value = location.value; // Update clockInLocation value
+              isClockedIn.value = true; // Set clocked in status to true
+              _clockInStreamController.add(clockIn.value);
               _clockInLocationStreamController.add(location.value);
+
               Fluttertoast.showToast(
                 msg: "Clocking-In..",
                 toastLength: Toast.LENGTH_LONG,
@@ -1482,16 +1623,17 @@ class ClockAttendanceWebController extends GetxController {
                 else {
                   if (newlatitude != 0.0) {
                     final attendance = AttendanceModelFirestore(
+                      Offline_DB_id: Random().nextInt(300) + 1, // Insert random number here
                       clockIn: DateFormat('hh:mm a').format(DateTime.now()),
                       date: currentDate,
-                      clockInLatitude: newlatitude.toString(),
+                      clockInLatitude: newlatitude,
                       clockInLocation: newlocation,
-                      clockInLongitude: newlongitude.toString(),
+                      clockInLongitude: newlongitude,
                       clockOut: "--/--",
-                      clockOutLatitude: "0.0",
+                      clockOutLatitude: 0.0,
                       clockOutLocation: '',
-                      clockOutLongitude: "0.0",
-                      isSynced: 0,
+                      clockOutLongitude: 0.0,
+                      isSynced: true,
                       voided: false,
                       isUpdated: false,
                       durationWorked: "0 hours 0 minutes",
@@ -1502,6 +1644,9 @@ class ClockAttendanceWebController extends GetxController {
                     ).toMap();
 
                     await firestoreService.createAttendanceRecord(userId, currentDate, attendance);
+                    clockIn.value = DateFormat('hh:mm a').format(DateTime.now()); // Update clockIn value
+                    clockInLocation.value = location.value; // Update clockInLocation value
+                    isClockedIn.value = true; // Set clocked in status to true
 
                     _clockInStreamController.add(
                         DateFormat('hh:mm a').format(DateTime.now()));
@@ -1622,8 +1767,8 @@ class ClockAttendanceWebController extends GetxController {
 
                     Map<String, dynamic> updateData = {
                       'clockOut': DateFormat('hh:mm a').format(DateTime.now()),
-                      'clockOutLatitude': newlatitude.toString(),
-                      'clockOutLongitude': newlongitude.toString(),
+                      'clockOutLatitude': newlatitude,
+                      'clockOutLongitude': newlongitude,
                       'clockOutLocation': newlocation,
                       'isUpdated': true,
                       'durationWorked': _diffClockInOut(
@@ -1640,6 +1785,9 @@ class ClockAttendanceWebController extends GetxController {
                       updateData,
                     );
 
+                    clockOut.value = DateFormat('hh:mm a').format(DateTime.now()); // Update clockOut value
+                    clockOutLocation.value = location.value; // Update clockOutLocation value
+                    isClockedIn.value = false; // Set clocked in status to false
 
                     _clockOutStreamController.add(DateFormat('hh:mm a').format(DateTime.now()));
                     _clockOutLocationStreamController.add(location.value);
@@ -1731,7 +1879,7 @@ class ClockAttendanceWebController extends GetxController {
       final hours = diff.inHours;
       final minutes = diff.inMinutes % 60;
 
-      log('$hours hours $minutes minute');
+      dev.log('$hours hours $minutes minute');
       return ('$hours hour(s) $minutes minute(s)');
     }catch(e){
       return "0 hour(s) 0 minute(s)";
@@ -1756,7 +1904,7 @@ class ClockAttendanceWebController extends GetxController {
       double roundedMinDouble = double.parse(inStringMin);
       final totalTime = hours + roundedMinDouble;
 
-      log('$hours hours $minutes minutes');
+      dev.log('$hours hours $minutes minutes');
       return totalTime;
     }catch(e){
       return 0.0;
@@ -1764,7 +1912,6 @@ class ClockAttendanceWebController extends GetxController {
   }
 
 
-  // Helper function to get the last attendance record for the current date from Firestore
   DocumentReference<Map<String, dynamic>> getLastAttendanceForDateFirestore(String date) {
     String? userId = firestoreService.getUserId();
     if (userId == null) {
@@ -1776,8 +1923,6 @@ class ClockAttendanceWebController extends GetxController {
         .collection('Record')
         .doc(date);
   }
-
-
   void showBottomSheet3(BuildContext context) {
     double screenHeight = MediaQuery.of(context).size.height;
     double screenWidth = MediaQuery.of(context).size.width;
@@ -1814,7 +1959,7 @@ class ClockAttendanceWebController extends GetxController {
                   )),
                   const SizedBox(height: 10),
                   Obx(() => Text(
-                    "Current State: ${controller.administrativeArea.value}",
+                    "Current State: ${controller.currentStateDisplay.value}", // Updated to use currentStateDisplay
                     style: TextStyle(
                       fontFamily: "NexaBold",
                       fontSize: screenWidth / 23,
@@ -1948,7 +2093,7 @@ class ClockAttendanceWebController extends GetxController {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(hint, style: TextStyle(color: Colors.grey)),
+                  child: Text(hint, style: const TextStyle(color: Colors.grey)),
                 ),
                 widget,
               ],
@@ -1979,7 +2124,7 @@ class ClockAttendanceWebController extends GetxController {
                 Expanded(
                   child: DropdownButton<String>(
                     value: hint.isNotEmpty ? hint : null,
-                    hint: Text(hint.isEmpty ? "Select Reason" : hint, style: TextStyle(color: Colors.grey)),
+                    hint: Text(hint.isEmpty ? "Select Reason" : hint, style: const TextStyle(color: Colors.grey)),
                     icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
                     iconSize: 32,
                     elevation: 4,
@@ -2075,7 +2220,7 @@ class ClockAttendanceWebController extends GetxController {
   Future<void> _getUserLocation() async {
     try {
       geolocator.Position position = await geolocator.Geolocator.getCurrentPosition(
-          desiredAccuracy: geolocator.LocationAccuracy.high);
+          desiredAccuracy: geolocator.LocationAccuracy.low); // Reduced accuracy here as well
 
       lati.value = position.latitude;
       longi.value = position.longitude;
@@ -2088,14 +2233,95 @@ class ClockAttendanceWebController extends GetxController {
       isMock.value = position.isMocked;
 
 
-      List<Placemark> placemark = await placemarkFromCoordinates(position.latitude, position.longitude);
+      List<Placemark> placemark = await placemarkFromCoordinates(position.latitude, position.longitude,); // Specify locale for potentially faster geocoding
       if (placemark.isNotEmpty) {
         location.value =
         "${placemark[0].street}, ${placemark[0].subLocality}, ${placemark[0].subAdministrativeArea}, ${placemark[0].locality}, ${placemark[0].administrativeArea}, ${placemark[0].postalCode}, ${placemark[0].country}";
         administrativeArea.value = placemark[0].administrativeArea ?? "";
       }
+      await _updateLocationUsingGeofencing();
     } catch (e) {
-      log("Location Error: ${e.toString()}");
+      dev.log("Location Error: ${e.toString()}");
+    }
+  }
+}
+
+
+enum ScreenSize { mobile, tablet, desktop }
+
+class ResponsiveSizes {
+  final BuildContext context;
+  late ScreenSize screenSize;
+  late double screenWidth;
+
+  ResponsiveSizes(this.context) {
+    screenWidth = MediaQuery.of(context).size.width;
+    screenSize = getScreenSize(screenWidth);
+  }
+
+  ScreenSize getScreenSize(double width) {
+    if (width < 600) return ScreenSize.mobile;
+    if (width < 992) return ScreenSize.tablet;
+    return ScreenSize.desktop;
+  }
+
+  double get horizontalPadding => _scaleFactor(mobile: 0.025, tablet: 0.05, desktop: 0.10) * screenWidth;
+  double get verticalPadding => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get verticalSpacing => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get sectionSpacing => _scaleFactor(mobile: 0.025, tablet: 0.015, desktop: 0.01) * screenWidth;
+  double get headerIconSize => _scaleFactor(mobile: 0.04, tablet: 0.03, desktop: 0.02) * screenWidth;
+  double get welcomeHeaderTextSize => _scaleFactor(mobile: 0.025, tablet: 0.017, desktop: 0.0125) * screenWidth;
+  double get usernameHeaderTextSize => _scaleFactor(mobile: 0.03, tablet: 0.022, desktop: 0.017) * screenWidth;
+  double get logoSize => _scaleFactor(mobile: 1/16, tablet: 1/24, desktop: 1/40) * screenWidth;
+  double get cardHeaderTextSize => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get subCardHeaderTextSize => _scaleFactor(mobile: 0.022, tablet: 0.015, desktop: 0.010) * screenWidth;
+  double get cardBorderRadius => _scaleFactor(mobile: 6.0, tablet: 7.5, desktop: 9.0);
+  double get cardPadding => _scaleFactor(mobile: 0.02, tablet: 0.015, desktop: 0.01) * screenWidth;
+  double get cardInnerSpacing => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get statusTextSize => _scaleFactor(mobile: 0.02, tablet: 0.015, desktop: 0.012) * screenWidth;
+  double get statusTextVerticalPadding => _scaleFactor(mobile: 0.0025, tablet: 0.002, desktop: 0.0015) * screenWidth;
+  double get dayCompletedTextSize => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get textFieldBorderRadius => _scaleFactor(mobile: 7.5, tablet: 9.0, desktop: 10.0);
+  double get textFieldPadding => _scaleFactor(mobile: 0.04, tablet: 0.03, desktop: 0.02) * screenWidth;
+  double get textFieldHintTextSize => _scaleFactor(mobile: 0.02, tablet: 0.015, desktop: 0.012) * screenWidth;
+  double get textFieldInputTextSize => _scaleFactor(mobile: 0.022, tablet: 0.017, desktop: 0.014) * screenWidth;
+  double get clockDisplayTopMargin => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get clockDisplayBottomMargin => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get clockDisplayShadowBlurRadius => _scaleFactor(mobile: 5.0, tablet: 4.0, desktop: 3.0);
+  double get clockDisplayBorderRadius => _scaleFactor(mobile: 0.02, tablet: 0.015, desktop: 0.01) * screenWidth;
+  double get clockTimeColumnVerticalPadding => _scaleFactor(mobile: 0.015, tablet: 0.0175, desktop: 0.01) * screenWidth;
+  double get clockTimeColumnTitleFontSize => _scaleFactor(mobile: 0.022, tablet: 0.017, desktop: 0.012) * screenWidth;
+  double get clockTimeColumnTimeFontSize => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get dateTextSize => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get timeTextSize => _scaleFactor(mobile: 0.022, tablet: 0.017, desktop: 0.012) * screenWidth;
+  double get clockButtonWidth => _scaleFactor(mobile: 0.4, tablet: 0.3, desktop: 0.2) * screenWidth;
+  double get clockButtonHeight => _scaleFactor(mobile: 0.25, tablet: 0.25, desktop: 0.25) * screenWidth;
+  double get outOfOfficeButtonVerticalPadding => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get outOfOfficeButtonWidth => _scaleFactor(mobile: 0.35, tablet: 0.25, desktop: 0.17) * screenWidth;
+  double get outOfOfficeButtonHeight => _scaleFactor(mobile: 0.04, tablet: 0.03, desktop: 0.02) * screenWidth;
+  double get outOfOfficeButtonLeftPadding => _scaleFactor(mobile: 10.0, tablet: 7.5, desktop: 5.0);
+  double get outOfOfficeButtonTextSize => _scaleFactor(mobile: 0.02, tablet: 0.015, desktop: 0.01) * screenWidth;
+  double get outOfOfficeButtonIconSpacing => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get locationCardWidth => _scaleFactor(mobile: 0.45, tablet: 0.35, desktop: 0.25) * screenWidth;
+  double get locationCardMargin => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get locationCardVerticalPadding => _scaleFactor(mobile: 0.015, tablet: 0.012, desktop: 0.01) * screenWidth;
+  double get locationCardHorizontalPadding => _scaleFactor(mobile: 0.01, tablet: 0.007, desktop: 0.005) * screenWidth;
+  double get locationCardHeaderTextSize => _scaleFactor(mobile: 0.025, tablet: 0.02, desktop: 0.015) * screenWidth;
+  double get locationInnerContentWidth => _scaleFactor(mobile: 0.35, tablet: 0.3, desktop: 0.2) * screenWidth;
+  double get locationColumnSpacing => _scaleFactor(mobile: 0.005, tablet: 0.004, desktop: 0.003) * screenWidth;
+  double get locationColumnTitleTextSize => _scaleFactor(mobile: 0.017, tablet: 0.014, desktop: 0.010) * screenWidth;
+  double get locationColumnLocationTextSize => _scaleFactor(mobile: 0.015, tablet: 0.012, desktop: 0.009) * screenWidth;
+  double get commentButtonWidth => _scaleFactor(mobile: 0.20, tablet: 0.15, desktop: 0.10) * screenWidth;
+  double get commentButtonHeight => _scaleFactor(mobile: 0.04, tablet: 0.03, desktop: 0.02) * screenWidth;
+  double get commentButtonTextSize => _scaleFactor(mobile: 8.0, tablet: 7.0, desktop: 6.0);
+
+
+  double _scaleFactor({required double mobile, required double tablet, required double desktop}) {
+    switch (screenSize) {
+      case ScreenSize.mobile: return mobile;
+      case ScreenSize.tablet: return tablet;
+      case ScreenSize.desktop: return desktop;
+      default: return mobile;
     }
   }
 }

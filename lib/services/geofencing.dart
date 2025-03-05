@@ -19,7 +19,7 @@ class GeofenceModel {
 }
 
 class GeoFencing extends StatefulWidget {
-  const GeoFencing({Key? key}) : super(key: key);
+  const GeoFencing({super.key});
 
   @override
   State<GeoFencing> createState() => _GeoFencingState();

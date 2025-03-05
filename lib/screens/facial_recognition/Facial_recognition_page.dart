@@ -1,195 +1,412 @@
-// FacialRecognitionPage.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:html' as html;
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 import 'package:js/js.dart';
 import 'dart:js_util' as js_util;
+import 'package:fluttertoast/fluttertoast.dart';
 
 import '../staff_dashboard.dart';
 
-// JS interop declarations for functions defined in face_recognition.js
+// JS interop: functions defined in face_recognition.js
 @JS('captureDescriptorFromVideo')
 external Future<dynamic> captureDescriptorFromVideo(String videoElementId);
 
 @JS('compareFaceFromVideo')
-external Future<bool> compareFaceFromVideo(String videoElementId, dynamic trainingDescriptor, num threshold);
+external Future<dynamic> compareFaceFromVideo(String videoElementId, dynamic trainingDescriptor, num threshold);
 
 class FacialRecognitionPage extends StatefulWidget {
+  const FacialRecognitionPage({Key? key}) : super(key: key);
+
   @override
   _FacialRecognitionPageState createState() => _FacialRecognitionPageState();
 }
 
 class _FacialRecognitionPageState extends State<FacialRecognitionPage> {
-  String _resultText = 'Checking training status...';
-  bool _isTraining = false; // true if no face embedding exists for this user
-  List<double>? _storedDescriptor;
+  String _statusMessage = 'Checking training status...';
+  bool _isTrainingRequired = false;
+  bool _isLoading = false;
+  List<double>? _storedFaceDescriptor;
+  html.MediaStream? _videoStream;
 
   @override
   void initState() {
     super.initState();
     _registerCameraView();
-    _checkTrainingStatus();
+    _fetchTrainingStatus();
   }
 
-// Register a view factory for the camera feed.
   void _registerCameraView() {
-// ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory('webCamera', (int viewId) {
-      final video = html.VideoElement()
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory('webCamera', (int viewId) {
+      final videoElement = html.VideoElement()
         ..id = 'webCamera'
         ..autoplay = true
         ..muted = true;
-      // Use setAttribute to set playsinline
-      video.setAttribute('playsinline', 'true');
-      video.style.width = '320px';
-      video.style.height = '240px';
-      // Request camera access
-      html.window.navigator.getUserMedia(video: true).then((stream) {
-        video.srcObject = stream;
-      }).catchError((e) {
-        print("Error accessing camera: $e");
+      videoElement.setAttribute('playsinline', 'true');
+      videoElement.style.width = '320px';
+      videoElement.style.height = '240px';
+      // Request camera access and save the stream.
+      html.window.navigator.mediaDevices?.getUserMedia({'video': true}).then((stream) {
+        _videoStream = stream;
+        videoElement.srcObject = stream;
+      }).catchError((error) {
+        print("Error accessing camera: $error");
+        Fluttertoast.showToast(
+          msg: "Error accessing camera: $error",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
       });
-      return video;
+      return videoElement;
     });
   }
 
+  void _stopCamera() {
+    if (_videoStream != null) {
+      _videoStream!.getTracks().forEach((track) {
+        track.stop();
+      });
+      _videoStream = null;
+    }
+  }
 
-  // Checks the "Staff" collection for the current user's document and the field "faceEmbedding".
-  Future<void> _checkTrainingStatus() async {
+  Future<void> _fetchTrainingStatus() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() {
-        _resultText = 'User not logged in';
+        _statusMessage = 'User not logged in';
       });
       return;
     }
-    final docSnapshot =
+    final snapshot =
     await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
-    if (docSnapshot.exists && docSnapshot.data()!.containsKey('faceEmbedding')) {
-      final embedding = docSnapshot.data()!['faceEmbedding'];
-      // Convert the stored embedding (assumed to be a List<dynamic>) to List<double>
-      _storedDescriptor =
-      List<double>.from(embedding.map((e) => (e as num).toDouble()));
-      setState(() {
-        _isTraining = false;
-        _resultText = 'Face data found. Ready for verification.';
-      });
+    if (snapshot.exists && snapshot.data()!.containsKey('faceEmbedding')) {
+      final embedding = snapshot.data()!['faceEmbedding'];
+      // Check if the faceEmbedding is empty.
+      if (embedding == null || (embedding as List).isEmpty) {
+        setState(() {
+          _isTrainingRequired = true;
+          _statusMessage = 'No face data found. Please train your face.';
+        });
+      } else {
+        _storedFaceDescriptor = List<double>.from(
+            (embedding as List).map((e) => (e as num).toDouble()));
+        print("Dart: _fetchTrainingStatus - _storedFaceDescriptor (from Firestore): $_storedFaceDescriptor");
+        setState(() {
+          _isTrainingRequired = false;
+          _statusMessage = 'Face data found. Ready for verification.';
+        });
+      }
     } else {
       setState(() {
-        _isTraining = true;
-        _resultText = 'No face data found. Please train your face.';
+        _isTrainingRequired = true;
+        _statusMessage = 'No face data found. Please train your face.';
       });
     }
   }
 
-  List<double> _convertJsDescriptor(dynamic descriptor) {
-    try {
-      // Convert the descriptor to a string. For a typed array this should be comma-separated numbers.
-      String descriptorStr = js_util.callMethod(descriptor, "toString", []);
-      List<String> parts = descriptorStr.split(",");
-      return parts.map((s) => double.parse(s.trim())).toList();
-    } catch (e) {
-      print("Error converting descriptor: $e");
-      return [];
-    }
-  }
 
-
-
-
-// Captures a face descriptor using the web camera and saves it to Firestore.
   Future<void> _captureAndTrain() async {
-    // Capture face descriptor from video element with id "webCamera"
-    final descriptor = await captureDescriptorFromVideo("webCamera");
-    if (descriptor == null) {
-      setState(() {
-        _resultText = 'No face detected. Please try again.';
-      });
-      return;
-    }
-    // If the descriptor is a Promise, unwrap it.
-    dynamic resolvedDescriptor = descriptor;
+    setState(() => _isLoading = true);
     try {
-      resolvedDescriptor = await js_util.promiseToFuture(descriptor);
-    } catch (e) {
-      print("Descriptor is not a Promise: $e");
-    }
-    // Now convert the resolved descriptor into a Dart List<double>
-    List<double> faceDescriptor = _convertJsDescriptor(resolvedDescriptor);
+      final descriptorPromise = captureDescriptorFromVideo("webCamera");
+      final jsDescriptor = await js_util.promiseToFuture(descriptorPromise); // Get the raw JS descriptor
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance.collection('Staff').doc(user.uid).set({
-        'faceEmbedding': faceDescriptor,
-      }, SetOptions(merge: true));
+      if (jsDescriptor == null) {
+        setState(() {
+          _statusMessage = 'No face detected. Please try again.';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(
+          msg: "No face detected. Please ensure your face is clearly visible.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orangeAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        return;
+      }
+
+      // Convert JS descriptor (which should be a Float32Array or JS array) to Dart List<double>
+      List<double> faceDescriptor = [];
+      if (jsDescriptor != null) {
+        if (jsDescriptor is List) { // Check if it's already a List (unlikely for Float32Array, but safe check)
+          faceDescriptor = (jsDescriptor as List).cast<double>(); // Assuming it's already List<double> or can be cast
+        } else {
+          // Handle as JsObject (no need to cast, just use jsDescriptor directly)
+          final jsArray = jsDescriptor; // No casting needed anymore
+          if (js_util.hasProperty(jsArray, 'length')) {
+            final length = js_util.getProperty(jsArray, 'length') as int;
+            for (int i = 0; i < length; i++) {
+              final value = js_util.getProperty(jsArray, i.toString());
+              if (value is num) {
+                faceDescriptor.add(value.toDouble());
+              } else {
+                print("Warning: Non-numeric value found in descriptor at index $i: $value");
+                faceDescriptor.add(0.0); // Default to 0 or handle error as needed.
+              }
+            }
+          } else {
+            print("Warning: jsDescriptor does not have 'length' property, cannot convert to List<double>.");
+          }
+        }
+      }
+
+
+      // Check if the captured faceDescriptor is empty before saving.
+      if (faceDescriptor.isEmpty) {
+        setState(() {
+          _statusMessage = 'Empty face embedding detected. Please try again.';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(
+          msg: "Empty face embedding captured. Please ensure your face is clearly visible.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orangeAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        return;
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('Staff')
+            .doc(user.uid)
+            .set({'faceEmbedding': faceDescriptor}, SetOptions(merge: true));
+        setState(() {
+          _isTrainingRequired = false;
+          _storedFaceDescriptor = faceDescriptor;
+          _statusMessage = 'Training successful! Proceed to verification.';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(
+          msg: "Face training successful!",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Error capturing face for training: $e");
       setState(() {
-        _isTraining = false;
-        _storedDescriptor = faceDescriptor;
-        _resultText = 'Training successful! Proceed to verification.';
+        _statusMessage = 'Error capturing face. Please try again.';
+        _isLoading = false;
       });
+      Fluttertoast.showToast(
+        msg: "Error during face training. Please try again.",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
     }
   }
 
-
-// Captures a live face and compares it to the stored training descriptor.
   Future<void> _verifyFace() async {
-    if (_storedDescriptor == null) {
+    if (_storedFaceDescriptor == null || _storedFaceDescriptor!.isEmpty) {
       setState(() {
-        _resultText = 'No training data available. Please train first.';
+        _statusMessage = 'No training data available. Please train first.';
       });
       return;
     }
-    bool isMatch = await compareFaceFromVideo("webCamera", _storedDescriptor, 0.6);
-    if (isMatch) {
+    setState(() => _isLoading = true);
+    dynamic verificationResult;
+    try {
+      final verificationResultPromise = compareFaceFromVideo(
+          "webCamera", _storedFaceDescriptor, 0.4);
+      verificationResult =
+      await js_util.promiseToFuture(verificationResultPromise);
+      print("Dart: _verifyFace - verificationResult (resolved) from JS: $verificationResult, type: ${verificationResult.runtimeType}");
+      if (verificationResult == null) {
+        setState(() {
+          _statusMessage = 'No face detected in video feed. Please try again.';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(
+          msg: "No face detected in video feed.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orangeAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      } else if (verificationResult == false) {
+        setState(() {
+          _statusMessage = 'Face Not Verified. Face does not match.';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(
+          msg: "Face verification failed. Face does not match.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      } else if (verificationResult == true) {
+        setState(() {
+          _statusMessage = 'Face Verified';
+        });
+        _stopCamera();
+        Fluttertoast.showToast(
+          msg: "Face Verified! Logging you in...",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const UserDashboardPage()),
+        );
+      }
+    } catch (e) {
+      print("Error verifying face: $e");
       setState(() {
-        _resultText = 'Face Verified';
+        _statusMessage = 'Error verifying face. Please try again.';
+        _isLoading = false;
       });
-      // Navigate to the UserDashboardPage after a successful verification.
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => UserDashboardPage()),
+      Fluttertoast.showToast(
+        msg: "Error during face verification.",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
       );
-    } else {
-      setState(() {
-        _resultText = 'Face Not Verified';
-      });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Facial Recognition'),
-      ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              // Display the live camera feed
-              Container(
-                width: 320,
-                height: 240,
-                color: Colors.black12,
-                child: HtmlElementView(viewType: 'webCamera'),
-              ),
-              SizedBox(height: 20),
-              Text(_resultText),
-              SizedBox(height: 20),
-              _isTraining
-                  ? ElevatedButton(
-                onPressed: _captureAndTrain,
-                child: Text('Capture Face for Training'),
-              )
-                  : ElevatedButton(
-                onPressed: _verifyFace,
-                child: Text('Verify Face'),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.red.shade600,
+              Colors.black87,
+              Colors.white,
+              Colors.yellow.shade600,
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              width: 400,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 320,
+                    height: 240,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
+                        )
+                      ],
+                      color: Colors.black12,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: const HtmlElementView(viewType: 'webCamera'),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _statusMessage,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  _isTrainingRequired
+                      ? ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _captureAndTrain,
+                    icon: _isLoading
+                        ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Icon(Icons.camera_alt, color: Colors.white),
+                    label: const Text('Capture Face for Training'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
+                      backgroundColor: Colors.red.shade700,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(fontSize: 16),
+                    ),
+                  )
+                      : ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _verifyFace,
+                    icon: _isLoading
+                        ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Icon(Icons.verified_user, color: Colors.white),
+                    label: const Text('Verify Face'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
+                      backgroundColor: Colors.green.shade700,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

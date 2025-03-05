@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Cloud Firestore
-import 'package:attendanceappmailtool/screens/registration_page.dart';
 
 import '../utils/my_input_field.dart';
 
 class RegistrationPage extends StatefulWidget {
+  const RegistrationPage({super.key});
+
   @override
   _RegistrationPageState createState() => _RegistrationPageState();
 }
@@ -60,7 +61,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       future: _fetchFirestoreData(collection, whereField: whereField, whereValue: whereValue),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return CircularProgressIndicator();
+          return const CircularProgressIndicator();
         }
         if (snapshot.hasError) {
           return Text('Error: ${snapshot.error}');
@@ -162,7 +163,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               elevation: 8,
               child: Container(
                 width: 400,
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(15),
@@ -174,8 +175,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       'assets/image/caritaslogo1.png',
                       height: 80,
                     ),
-                    SizedBox(height: 16),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
                       'Registration',
                       style: TextStyle(
                         fontSize: 26,
@@ -184,7 +185,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Create your account',
                       style: TextStyle(
@@ -192,18 +193,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         color: Colors.grey.shade600,
                       ),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     // First Name
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "First Name",
                           style: TextStyle(color: Colors.black87, fontSize: 15),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black26,
@@ -216,7 +217,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             controller: _firstNameController,
                             decoration: InputDecoration(
                               labelText: "Enter your First Name",
-                              prefixIcon: Icon(Icons.person, color: Colors.black54),
+                              prefixIcon: const Icon(Icons.person, color: Colors.black54),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -225,18 +226,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     // Last Name
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "Last Name",
                           style: TextStyle(color: Colors.black87, fontSize: 15),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black26,
@@ -249,7 +250,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             controller: _lastNameController,
                             decoration: InputDecoration(
                               labelText: "Enter your Last Name",
-                              prefixIcon: Icon(Icons.person, color: Colors.black54),
+                              prefixIcon: const Icon(Icons.person, color: Colors.black54),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -258,18 +259,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     // Email Address
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "Email Address",
                           style: TextStyle(color: Colors.black87, fontSize: 15),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black26,
@@ -282,7 +283,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             controller: _emailController,
                             decoration: InputDecoration(
                               labelText: "Enter your email",
-                              prefixIcon: Icon(Icons.email, color: Colors.black54),
+                              prefixIcon: const Icon(Icons.email, color: Colors.black54),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -292,18 +293,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     // Mobile Number
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "Mobile Number",
                           style: TextStyle(color: Colors.black87, fontSize: 15),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black26,
@@ -316,7 +317,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             controller: _mobileNumberController,
                             decoration: InputDecoration(
                               labelText: "Enter your Mobile Number",
-                              prefixIcon: Icon(Icons.phone_android, color: Colors.black54),
+                              prefixIcon: const Icon(Icons.phone_android, color: Colors.black54),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -326,7 +327,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     // Staff Category Dropdown
                     FutureBuilder<List<String>>(
                       future: _fetchStaffCategoryFromFirestore(),
@@ -334,15 +335,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         if (snapshot.hasError) {
                           return Text('Error: ${snapshot.error}');
                         } else if (snapshot.connectionState == ConnectionState.waiting) {
-                          return CircularProgressIndicator();
+                          return const CircularProgressIndicator();
                         } else if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Staff Category", style: TextStyle(color: Colors.black87, fontSize: 15)),
-                              SizedBox(height: 10),
+                              const Text("Staff Category", style: TextStyle(color: Colors.black87, fontSize: 15)),
+                              const SizedBox(height: 10),
                               Container(
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black26,
@@ -354,7 +355,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 child: DropdownButtonFormField<String>(
                                   decoration: InputDecoration(
                                     hintText: "Select Staff Category",
-                                    prefixIcon: Icon(Icons.category, color: Colors.black54),
+                                    prefixIcon: const Icon(Icons.category, color: Colors.black54),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -377,12 +378,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             ],
                           );
                         } else {
-                          return Text('No categories available.');
+                          return const Text('No categories available.');
                         }
                       },
                     ),
 
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     //// Container that displays State of Implementation,Location,Department and designation based on staff category selection
 
                     Container(
@@ -468,15 +469,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         if (snapshot.hasError) {
                           return Text('Error: ${snapshot.error}');
                         } else if (snapshot.connectionState == ConnectionState.waiting) {
-                          return CircularProgressIndicator();
+                          return const CircularProgressIndicator();
                         } else if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Project", style: TextStyle(color: Colors.black87, fontSize: 15)),
-                              SizedBox(height: 10),
+                              const Text("Project", style: TextStyle(color: Colors.black87, fontSize: 15)),
+                              const SizedBox(height: 10),
                               Container(
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black26,
@@ -488,7 +489,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 child: DropdownButtonFormField<String>(
                                   decoration: InputDecoration(
                                     hintText: "Select Project Category",
-                                    prefixIcon: Icon(Icons.category, color: Colors.black54),
+                                    prefixIcon: const Icon(Icons.category, color: Colors.black54),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -511,33 +512,33 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             ],
                           );
                         } else {
-                          return Text('No project available.');
+                          return const Text('No project available.');
                         }
                       },
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _errorMessage.isNotEmpty
                         ? Text(
                       _errorMessage,
-                      style: TextStyle(color: Colors.red),
+                      style: const TextStyle(color: Colors.red),
                     )
-                        : SizedBox.shrink(),
-                    SizedBox(height: 20),
+                        : const SizedBox.shrink(),
+                    const SizedBox(height: 20),
                     // Register Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _isCategorySelected ? _register : null,
                         style: ButtonStyle(
-                          backgroundColor: MaterialStateProperty.all(Colors.orange.shade700),
-                          padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 15)),
-                          shape: MaterialStateProperty.all(RoundedRectangleBorder(
+                          backgroundColor: WidgetStateProperty.all(Colors.orange.shade700),
+                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 15)),
+                          shape: WidgetStateProperty.all(RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           )),
                         ),
                         child: _isLoading
-                            ? CircularProgressIndicator(color: Colors.white)
-                            : Text('Register', style: TextStyle(fontSize: 18)),
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Register', style: TextStyle(fontSize: 18)),
                       ),
                     ),
                   ],

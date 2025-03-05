@@ -8,7 +8,7 @@ class DashboardPage extends StatelessWidget {
   final String staffID; // Accept staffID as a parameter
 
   // Constructor
-  DashboardPage({required this.staffID});
+  const DashboardPage({super.key, required this.staffID});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,11 +23,11 @@ class DashboardPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Dashboard Title
-              Text(
+              const Text(
                 "Dashboard Overview",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text('Welcome, your staff ID is: $staffID'),
 
               // Analytics Row
@@ -40,14 +40,14 @@ class DashboardPage extends StatelessWidget {
                 ],
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Attendance Chart
-              Text(
+              const Text(
                 "Attendance Over Time",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 200,
                 child: LineChart(
@@ -55,41 +55,41 @@ class DashboardPage extends StatelessWidget {
                     lineBarsData: [
                       LineChartBarData(
                         spots: [
-                          FlSpot(1, 1),
-                          FlSpot(2, 2),
-                          FlSpot(3, 1.5),
-                          FlSpot(4, 2.2),
-                          FlSpot(5, 1.8),
-                          FlSpot(6, 2.8),
+                          const FlSpot(1, 1),
+                          const FlSpot(2, 2),
+                          const FlSpot(3, 1.5),
+                          const FlSpot(4, 2.2),
+                          const FlSpot(5, 1.8),
+                          const FlSpot(6, 2.8),
                         ],
                         isCurved: true,
                         color: Colors.red,
-                        dotData: FlDotData(show: false),
+                        dotData: const FlDotData(show: false),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Map Section
-              Text(
+              const Text(
                 "Map Highlight",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Container(
                 height: 250,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
                 ),
                 child: FutureBuilder<DocumentSnapshot>(
                   future: FirebaseFirestore.instance.collection('Staff').doc(staffID).get(),
                   builder: (context, staffSnapshot) {
                     if (staffSnapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
+                      return const Center(child: CircularProgressIndicator());
                     }
 
                     if (staffSnapshot.hasError) {
@@ -97,7 +97,7 @@ class DashboardPage extends StatelessWidget {
                     }
 
                     if (!staffSnapshot.hasData || !staffSnapshot.data!.exists) {
-                      return Center(child: Text("No staff data found"));
+                      return const Center(child: Text("No staff data found"));
                     }
 
                     // Staff data retrieved
@@ -111,7 +111,7 @@ class DashboardPage extends StatelessWidget {
                           .get(),
                       builder: (context, locationSnapshot) {
                         if (locationSnapshot.connectionState == ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
                         }
 
                         if (locationSnapshot.hasError) {
@@ -119,7 +119,7 @@ class DashboardPage extends StatelessWidget {
                         }
 
                         if (!locationSnapshot.hasData || locationSnapshot.data!.docs.isEmpty) {
-                          return Center(child: Text("No matching location found"));
+                          return const Center(child: Text("No matching location found"));
                         }
 
                         // Get latitude and longitude from the matched location
@@ -136,7 +136,7 @@ class DashboardPage extends StatelessWidget {
                           children: [
                             TileLayer(
                               urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                              subdomains: ['a', 'b', 'c'],
+                              subdomains: const ['a', 'b', 'c'],
                             ),
                             MarkerLayer(
                               markers: [
@@ -144,7 +144,7 @@ class DashboardPage extends StatelessWidget {
                                   width: 80.0,
                                   height: 80.0,
                                   point: LatLng(latitude, longitude),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.location_on,
                                     color: Colors.red,
                                     size: 40,
@@ -169,23 +169,23 @@ class DashboardPage extends StatelessWidget {
   Widget _buildAnalyticsCard(String title, IconData icon, Color color) {
     return Container(
       width: 100,
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 36),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             title,
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 4),
-          Text(
+          const SizedBox(height: 4),
+          const Text(
             "100+", // Placeholder for dynamic data
             style: TextStyle(fontSize: 16, color: Colors.black54),
             textAlign: TextAlign.center,

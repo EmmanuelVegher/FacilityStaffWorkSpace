@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 
 class PendingTimesheetsScreen extends StatefulWidget {
+  const PendingTimesheetsScreen({super.key});
+
   @override
   _PendingTimesheetsScreenState createState() => _PendingTimesheetsScreenState();
 }
@@ -15,7 +17,7 @@ class _PendingTimesheetsScreenState extends State<PendingTimesheetsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Pending Timesheets'),
+        title: const Text('Pending Timesheets'),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -25,11 +27,11 @@ class _PendingTimesheetsScreenState extends State<PendingTimesheetsScreen> {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No pending timesheets.'));
+            return const Center(child: Text('No pending timesheets.'));
           } else {
             return ListView.builder(
               itemCount: snapshot.data!.docs.length,
@@ -73,7 +75,7 @@ class TimesheetDetailsScreen extends StatelessWidget {
   final String timesheetId;
   final String staffId;
 
-  TimesheetDetailsScreen({
+  const TimesheetDetailsScreen({super.key, 
     required this.timesheetData,
     required this.timesheetId,
     required this.staffId,
@@ -85,7 +87,7 @@ class TimesheetDetailsScreen extends StatelessWidget {
     DateTime endDate = DateTime(timesheetDate.year, timesheetDate.month, 20);
 
     List<DateTime> days = [];
-    for (DateTime date = startDate; date.isBefore(endDate); date = date.add(Duration(days: 1))) {
+    for (DateTime date = startDate; date.isBefore(endDate); date = date.add(const Duration(days: 1))) {
       days.add(date);
     }
     return days;
@@ -183,7 +185,7 @@ class TimesheetDetailsScreen extends StatelessWidget {
     return Container(
       width: 100,
       alignment: Alignment.center,
-      padding: EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8.0),
       color: backgroundColor,
       child: Text(text, style: TextStyle(color: color, fontWeight: fontWeight)),
     );
@@ -303,7 +305,7 @@ class TimesheetDetailsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Timesheet Details'),
+        title: const Text('Timesheet Details'),
       ),
       body: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -318,21 +320,21 @@ class TimesheetDetailsScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(8.0),
                     child: Row(
                       children: [
-                        Text(
+                        const Text(
                           'Month of Timesheet:',
                           style: TextStyle(fontWeight: FontWeight.bold,fontSize:12),
                         ),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
 
                         Text(
                           monthYear,
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
 
                       ],
                     ),
                   ),
-                  Divider(),
+                  const Divider(),
                   //  buildProjectRow(projectName, daysInRange),
                   Column(
                     children: [
@@ -342,9 +344,9 @@ class TimesheetDetailsScreen extends StatelessWidget {
                           Container(
                             width: 150, // Set a width for the "Project Name" header
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.blue.shade100,
-                            child: Text(
+                            child: const Text(
                               'Project Name',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
@@ -353,20 +355,20 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             return Container(
                               width: 100,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: isWeekend(date) ? Colors.grey.shade300 : Colors.blue.shade100,
                               child: Text(
                                 DateFormat('dd MMM').format(date),
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                             );
-                          }).toList(),
+                          }),
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.blue.shade100,
-                            child: Text(
+                            child: const Text(
                               'Total Hours',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
@@ -374,22 +376,22 @@ class TimesheetDetailsScreen extends StatelessWidget {
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.blue.shade100,
-                            child: Text(
+                            child: const Text(
                               'Percentage',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
-                      Divider(),
+                      const Divider(),
                       Row(
                         children: [
                           Container(
                             width: 150, // Keep the fixed width if you need it
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
                             child: Text(projectName),
                           ),
@@ -406,21 +408,21 @@ class TimesheetDetailsScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   weekend
-                                      ? SizedBox.shrink() // No hours on weekends
+                                      ? const SizedBox.shrink() // No hours on weekends
                                       : Text(
-                                    '${hours}', // Placeholder, replace with Isar data
-                                    style: TextStyle(color: Colors.blueAccent),
+                                    hours, // Placeholder, replace with Isar data
+                                    style: const TextStyle(color: Colors.blueAccent),
                                   ),
                                 ],
                               ),
                             );
-                          }).toList(),
+                          }),
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               'hrs',
                               style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
                             ),
@@ -428,25 +430,25 @@ class TimesheetDetailsScreen extends StatelessWidget {
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               '%',
                               style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
-                      Divider(),
+                      const Divider(),
                       // "Out-of-office" Header Row
                       Row(
                         children: [
                           Container(
                             width: 150,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               'Out-of-office',
                               style: TextStyle(fontWeight: FontWeight.bold,fontSize:18),
                             ),
@@ -455,28 +457,28 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             return Container(
                               width: 100,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: Colors.white,
-                              child: Text(
+                              child: const Text(
                                 '', // Placeholder for out-of-office data, can be replaced later
                               ),
                             );
-                          }).toList(),
+                          }),
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               '', // Placeholder for total hours
                             ),
                           ),
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               '', // Placeholder for percentage
                             ),
                           ),
@@ -491,16 +493,16 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             Container(
                               width: 150,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: Colors.white,
                               child: Text(
                                 category,
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
                             ...daysInRange2.map((date) {
                               bool weekend = isWeekend(date);
-                              String offDayHours = _getDurationForDate(date, projectName, category!,timesheetData['timesheetEntries'].cast<Map<String, dynamic>>() );
+                              String offDayHours = _getDurationForDate(date, projectName, category,timesheetData['timesheetEntries'].cast<Map<String, dynamic>>() );
 
 
                               return Container(
@@ -513,22 +515,22 @@ class TimesheetDetailsScreen extends StatelessWidget {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     weekend
-                                        ? SizedBox.shrink() // No hours on weekends
+                                        ? const SizedBox.shrink() // No hours on weekends
                                         : Text(
                                       offDayHours, // Placeholder, replace with Isar data
-                                      style: TextStyle(color: Colors.blueAccent),
+                                      style: const TextStyle(color: Colors.blueAccent),
                                     ),
                                   ],
                                 ),
                               );
 
-                            }).toList(),
+                            }),
                             Container(
                               width: 100,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: Colors.white,
-                              child: Text(
+                              child: const Text(
                                 //'${outOfOfficeHours.toStringAsFixed(2)} hrs',
                                 'hrs',
                                 style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
@@ -537,9 +539,9 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             Container(
                               width: 100,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: Colors.white,
-                              child: Text(
+                              child: const Text(
                                 //'${outOfOfficePercentage.toStringAsFixed(2)}%',
                                 '%',
                                 style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
@@ -547,7 +549,7 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             ),
                           ],
                         );
-                      }).toList(),
+                      }),
                       // // Attendance Rows
                       //
                       Row(
@@ -555,9 +557,9 @@ class TimesheetDetailsScreen extends StatelessWidget {
                           Container(
                             width: 150,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               'Total',
                               style: TextStyle(fontWeight: FontWeight.bold,fontSize:20),
                             ),
@@ -566,19 +568,19 @@ class TimesheetDetailsScreen extends StatelessWidget {
                             return Container(
                               width: 100,
                               alignment: Alignment.center,
-                              padding: EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8.0),
                               color: Colors.white,
-                              child: Text(
+                              child: const Text(
                                 '', // Placeholder for out-of-office data, can be replaced later
                               ),
                             );
-                          }).toList(),
+                          }),
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               'hrs',
                               //'$totalGrandHours hrs',
                               style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
@@ -587,9 +589,9 @@ class TimesheetDetailsScreen extends StatelessWidget {
                           Container(
                             width: 100,
                             alignment: Alignment.center,
-                            padding: EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(8.0),
                             color: Colors.white,
-                            child: Text(
+                            child: const Text(
                               '%',
 
                               // '${grandPercentageWorked.toStringAsFixed(2)}%',
@@ -604,18 +606,18 @@ class TimesheetDetailsScreen extends StatelessWidget {
 
                     ],
                   ),
-                  Divider(),
+                  const Divider(),
                   // buildCategoryRows(projectName, daysInRange),
                   Row(
                     children: [
                       _buildTableCell('Grand Total', Colors.grey, fontWeight: FontWeight.bold),
-                      ...List.generate(daysInRange.length, (_) => SizedBox(width: 100)),
+                      ...List.generate(daysInRange.length, (_) => const SizedBox(width: 100)),
                       _buildTableCell('$grandTotalHours hrs', Colors.grey, fontWeight: FontWeight.bold),
                       _buildTableCell('100%', Colors.grey, fontWeight: FontWeight.bold),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Text('Staff Signature:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Staff Signature:', style: TextStyle(fontWeight: FontWeight.bold)),
                   if (staffSignature != null)
                     Image.memory(staffSignature)
                   else

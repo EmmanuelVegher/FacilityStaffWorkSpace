@@ -53,7 +53,7 @@ class _TimesheetTableState extends State<TimesheetTable> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-        )).toList(),
+        )),
       ],
     );
   }
@@ -68,7 +68,7 @@ class _TimesheetTableState extends State<TimesheetTable> {
               DateFormat.d().format(date), // Display day number
             ),
           ),
-        )).toList(),
+        )),
       ],
     );
   }
@@ -80,7 +80,7 @@ class _TimesheetTableState extends State<TimesheetTable> {
           const TableCell(child: Text('Project from Bio', textAlign: TextAlign.center)),
           ...dates.map((date) => TableCell(
             child: _buildHourCell(date),
-          )).toList(),
+          )),
         ],
       ),
     ];

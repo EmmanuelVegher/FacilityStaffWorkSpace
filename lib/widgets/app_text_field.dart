@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 class AppTextField extends StatelessWidget {
   const AppTextField(
-      {Key? key,
+      {super.key,
       required this.labelText,
       required this.controller,
       this.keyboardType = TextInputType.text,
       this.autofocus = false,
-      this.isPassword = false})
-      : super(key: key);
+      this.isPassword = false});
 
   final String labelText;
   final TextEditingController controller;

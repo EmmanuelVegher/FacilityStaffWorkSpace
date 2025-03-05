@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 
-import 'analytics_screen.dart';
 import 'attendance_report.dart';
 
 class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Attendance App'),
+        title: const Text('Attendance App'),
       ),
       body: Center(
         child: Column(
@@ -28,10 +29,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AttendanceReportScreen()),
+                  MaterialPageRoute(builder: (context) => const AttendanceReportScreen()),
                 );
               },
-              child: Text('View Analytics Report'),
+              child: const Text('View Analytics Report'),
             ),
           ]
         ),

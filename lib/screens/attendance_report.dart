@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:ui';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -11,23 +9,23 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../api/attendance_api.dart';
 import '../models/attendance_record.dart';
 import '../utils/constants.dart';
 import '../utils/date_helper.dart';
-import 'package:path/path.dart' as path;
-import 'package:image/image.dart' as img; // Import the image package
+// Import the image package
 
 class AttendanceReportScreen extends StatefulWidget {
+  const AttendanceReportScreen({super.key});
+
   @override
   _AttendanceReportScreenState createState() => _AttendanceReportScreenState();
 }
 
 class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
-  DateTime _startDate = DateTime.now().subtract(Duration(days: 7));
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now();
   String? formattedMonth;
   String _reportMessage = '';
@@ -58,11 +56,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Attendance Report'),
+        title: const Text('Attendance Report'),
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -79,17 +77,17 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               }),
               ElevatedButton(
                 onPressed: _generateReport,
-                child: Text('Generate Report'),
+                child: const Text('Generate Report'),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               Text(_reportMessage),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _fetchAttendanceData,
-                child: Text('Generate Analytics'),
+                child: const Text('Generate Analytics'),
               ),
               _isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null
                   ? Center(child: Text(_errorMessage!))
                   : _buildAnalyticsDashboard(),
@@ -232,10 +230,8 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     Map<String, int> locationCounts = {};
     for (var record in attendanceData) {
       final location = record.clockInLocation;
-      if (location != null) {
-        locationCounts.update(location, (value) => value + 1, ifAbsent: () => 1);
-      }
-    }
+      locationCounts.update(location, (value) => value + 1, ifAbsent: () => 1);
+        }
     return locationCounts.entries
         .map((entry) => LocationRecord(location: entry.key, attendanceCount: entry.value))
         .toList();
@@ -272,48 +268,48 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
   Widget _buildAnalyticsDashboard() {
     return SingleChildScrollView(
       child: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildSummaryCard(),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
           //  _buildClockInOutTrendsChart(),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
            // _buildDurationWorkedDistributionChart(),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
            // _buildAttendanceByLocationChart(),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
            //_buildEarlyLateClockInsChart(),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
                 _renderChartAsImage(_clockInOutTrendsChartKey); // Pass the chart key you want to export
               },
-              child: Text('Export Clock-In/Out Trends Chart'),
+              child: const Text('Export Clock-In/Out Trends Chart'),
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
                 _renderChartAsImage(_durationWorkedDistributionChartKey);
               },
-              child: Text('Export Duration Worked Distribution Chart'),
+              child: const Text('Export Duration Worked Distribution Chart'),
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
                 _renderChartAsImage(_attendanceByLocationChartKey);
               },
-              child: Text('Export Attendance by Location Chart'),
+              child: const Text('Export Attendance by Location Chart'),
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
                 _renderChartAsImage(_earlyLateClockInsChartKey);
               },
-              child: Text('Export Early/Late Clock-Ins Chart'),
+              child: const Text('Export Early/Late Clock-Ins Chart'),
             ),
 
 
@@ -332,11 +328,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Weekly Summary',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             // Example Summary Data (Replace with your logic)
             Text('Total Hours Worked: ${_calculateTotalHoursWorked()}'),
             Text('Average Clock-In Time: ${_calculateAverageClockInTime()}'),
@@ -585,7 +581,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => Scaffold(
-                  appBar: AppBar(title: Text('Chart Image')),
+                  appBar: AppBar(title: const Text('Chart Image')),
                   body: Center(
                     child: Image.memory(imageBytes),
                   ),
@@ -617,7 +613,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => Scaffold(
-                  appBar: AppBar(title: Text('Chart Image')),
+                  appBar: AppBar(title: const Text('Chart Image')),
                   body: Center(
                     child: Image.memory(imageBytes),
                   ),
@@ -991,14 +987,14 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       elevation: 3,
       child: Container(
         height: 300,
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: SfCartesianChart(
-          title: ChartTitle(text: 'Clock-In and Clock-Out Trends (When People Clock In (Green) and Clock Out (Red))',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), ),
-          primaryXAxis: CategoryAxis(
+          title: const ChartTitle(text: 'Clock-In and Clock-Out Trends (When People Clock In (Green) and Clock Out (Red))',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), ),
+          primaryXAxis: const CategoryAxis(
             labelStyle: TextStyle(fontSize: 20),
               title: AxisTitle(text: 'Days of the Week',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),) // Add X-axis title
           ),
-          primaryYAxis: NumericAxis(
+          primaryYAxis: const NumericAxis(
             labelStyle: TextStyle(fontSize: 20), // Style for Y-axis labels
               title: AxisTitle(text: 'Time of the Day',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)
 
@@ -1022,11 +1018,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               dataLabelSettings: DataLabelSettings(
                 isVisible: true,
                 labelAlignment: ChartDataLabelAlignment.middle,
-                  textStyle: TextStyle(fontSize: 20, color: Colors.black),
+                  textStyle: const TextStyle(fontSize: 20, color: Colors.black),
                   builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
                     return Text(
                         timeFormat.format(timeFormat.parse(data.clockInTime)),
-                      style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
                     );
                   }
 
@@ -1046,11 +1042,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               dataLabelSettings: DataLabelSettings(
                 isVisible: true,
                 labelAlignment: ChartDataLabelAlignment.middle,
-                  textStyle: TextStyle(fontSize: 20, color: Colors.black),
+                  textStyle: const TextStyle(fontSize: 20, color: Colors.black),
                   builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
                     return Text(
                         timeFormat.format(timeFormat.parse(data.clockOutTime)),
-                      style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
                     );
                   }
 
@@ -1067,15 +1063,15 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       elevation: 3,
       child: Container(
         height: 300,
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: SfCartesianChart(
          // key: _durationWorkedDistributionChartKey,
-          title: ChartTitle(text: 'Distribution of Hours Worked (How Many Hours You Worked (For example, if you see a "2" on top of a bar between 8 and 9, it means you worked between 8 and 9 hours two times.)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
-          primaryXAxis: NumericAxis(
+          title: const ChartTitle(text: 'Distribution of Hours Worked (How Many Hours You Worked (For example, if you see a "2" on top of a bar between 8 and 9, it means you worked between 8 and 9 hours two times.)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
+          primaryXAxis: const NumericAxis(
               labelStyle: TextStyle(fontSize: 20),
               title: AxisTitle(text: 'Duration of Hours Worked (Grouped By Hours)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),) // Add X-axis title
           ),
-          primaryYAxis: NumericAxis(
+          primaryYAxis: const NumericAxis(
               labelStyle: TextStyle(fontSize: 20), // Style for Y-axis labels
               title: AxisTitle(text: 'Frequency',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)
 
@@ -1088,7 +1084,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               binInterval: 1,
               color: Colors.purple,
               // Add data label settings here
-              dataLabelSettings: DataLabelSettings(
+              dataLabelSettings: const DataLabelSettings(
                 isVisible: true,
                 // Customize appearance (optional):
                 textStyle: TextStyle(fontSize: 20, color: Colors.black,fontWeight: FontWeight.bold),
@@ -1102,23 +1098,23 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
   }
 
   Widget _buildAttendanceByLocationChartForEmail(List<AttendanceRecord> attendanceData){
-    List<LocationRecord> _locationData1 = _getLocationData(attendanceData);
+    List<LocationRecord> locationData1 = _getLocationData(attendanceData);
     return Card(
       elevation: 3,
       child: Container(
         height: 300,
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: SfCircularChart(
           //key: _attendanceByLocationChartKey,
-          title: ChartTitle(text: 'Where you Clocked In (Attendance by Location)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
+          title: const ChartTitle(text: 'Where you Clocked In (Attendance by Location)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
 
-          legend: Legend(isVisible: true,textStyle: TextStyle(fontSize: 20),), // Style for legend text),
+          legend: const Legend(isVisible: true,textStyle: TextStyle(fontSize: 20),), // Style for legend text),
           series: <CircularSeries>[
             PieSeries<LocationRecord, String>(
-              dataSource: _locationData1,
+              dataSource: locationData1,
               xValueMapper: (LocationRecord data, _) => data.location,
               yValueMapper: (LocationRecord data, _) => data.attendanceCount,
-              dataLabelSettings: DataLabelSettings(
+              dataLabelSettings: const DataLabelSettings(
                   isVisible: true,
                // labelAlignment: ChartDataLabelAlignment.middle,
                 textStyle: TextStyle(fontSize: 18, color: Colors.black,fontWeight: FontWeight.bold),
@@ -1150,17 +1146,17 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       elevation: 3,
       child: Container(
         height: 300,
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: SfCartesianChart(
          // key: _earlyLateClockInsChartKey,
-          title: ChartTitle(text: 'Did You Clock In Early or Late? (Green = Early, Red = Late, 0 = On Time)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
-          primaryXAxis: CategoryAxis(labelStyle: TextStyle(fontSize: 20),
+          title: const ChartTitle(text: 'Did You Clock In Early or Late? (Green = Early, Red = Late, 0 = On Time)',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
+          primaryXAxis: const CategoryAxis(labelStyle: TextStyle(fontSize: 20),
               title: AxisTitle(text: 'Days Of the Week',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)
           ),
           primaryYAxis: NumericAxis(
-              title: AxisTitle(text: 'Number of minutes before ,on or after 8:00 AM',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
+              title: const AxisTitle(text: 'Number of minutes before ,on or after 8:00 AM',textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
             // Center the Y-axis around zero
-            labelStyle: TextStyle(fontSize: 20),
+            labelStyle: const TextStyle(fontSize: 20),
             minimum: chartData.map((data) => data['earlyLateMinutes'] as int).reduce((a, b) => a < b ? a : b) < 0
                 ? chartData.map((data) => data['earlyLateMinutes'] as int).reduce((a, b) => a < b ? a : b).toDouble()
                 : null,
@@ -1188,10 +1184,10 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                   // Display clock-in time and early/late minutes in brackets
                   return Text(
                       '${data['clockInTime']} (${data['earlyLateMinutes']} mins)',
-                    style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
                   );
                 },
-                textStyle: TextStyle(fontSize: 20, color: Colors.black,fontWeight: FontWeight.bold), // Adjust label text style
+                textStyle: const TextStyle(fontSize: 20, color: Colors.black,fontWeight: FontWeight.bold), // Adjust label text style
 
               ),
             ),
@@ -1214,7 +1210,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       for (var staffDoc in staffSnapshot.docs) {
         final userId = staffDoc.id;
 
-        for (var date = startDate; date.isBefore(endDate.add(Duration(days: 1))); date = date.add(Duration(days: 1))) {
+        for (var date = startDate; date.isBefore(endDate.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
           final formattedDate = DateFormat('dd-MMMM-yyyy').format(date);
           final recordSnapshot = await _firestore
               .collection('Staff')
@@ -1429,7 +1425,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     );
     Overlay.of(context).insert(overlayEntry);
     await chartReadyCompleter.future;
-    await Future.delayed(Duration(milliseconds: 4000));
+    await Future.delayed(const Duration(milliseconds: 4000));
 
     try {
       RenderRepaintBoundary boundary = chartKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
@@ -1534,7 +1530,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
 
       // Parse clock-in time from string to DateTime
       DateTime? clockInDateTime;
-      if (clockInTime != null && clockInTime.isNotEmpty) {
+      if (clockInTime.isNotEmpty) {
         try {
           clockInDateTime = DateFormat("HH:mm").parse(clockInTime);
         } catch (e) {
@@ -1561,7 +1557,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     <h3>2) Location Summary:</h3>
 
     <ul>
-      <li>Early Clock-ins (Number of Clock-Ins done on or before 8:00AM): $earlyClockInsCount/${totalClockIns} day(s) (${(earlyClockInsCount / totalClockIns * 100).toStringAsFixed(2)}%)</li></ul>
+      <li>Early Clock-ins (Number of Clock-Ins done on or before 8:00AM): $earlyClockInsCount/$totalClockIns day(s) (${(earlyClockInsCount / totalClockIns * 100).toStringAsFixed(2)}%)</li></ul>
       <br>
       ${chartImageUrls[3] != null ? '<img src="${chartImageUrls[3]}" alt="Early/Late Clock-Ins" style="max-width: 600px; height: auto;"><br>' : ''}
       <br><br>

@@ -5,7 +5,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MyFlutterApp extends StatefulWidget {
-  const MyFlutterApp({Key? key}) : super(key: key);
+  const MyFlutterApp({super.key});
 
   @override
   State<MyFlutterApp> createState() => _MyFlutterAppState();
@@ -78,7 +78,7 @@ class _MyFlutterAppState extends State<MyFlutterApp> {
 }
 
 class LogView extends StatefulWidget {
-  const LogView({Key? key}) : super(key: key);
+  const LogView({super.key});
 
   @override
   State<LogView> createState() => _LogViewState();

@@ -40,7 +40,7 @@ class AttendanceRecord {
       date = DateFormat('dd-MMMM-yyyy').parse(data['date'] as String);
     } else {
       // Handle other data types or throw an error
-      throw FormatException('Invalid date format in Firestore document');
+      throw const FormatException('Invalid date format in Firestore document');
     }
 
     return AttendanceRecord(

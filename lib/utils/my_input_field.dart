@@ -5,17 +5,17 @@ class MyInputField extends StatelessWidget {
   final String hint;
   final Widget widget; // This will hold the DropdownButtonFormField
 
-  const MyInputField({Key? key, required this.title, required this.hint, required this.widget}) : super(key: key);
+  const MyInputField({super.key, required this.title, required this.hint, required this.widget});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(color: Colors.black87, fontSize: 15)),
-        SizedBox(height: 10),
+        Text(title, style: const TextStyle(color: Colors.black87, fontSize: 15)),
+        const SizedBox(height: 10),
         Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             boxShadow: [
               BoxShadow(
                 color: Colors.black26,

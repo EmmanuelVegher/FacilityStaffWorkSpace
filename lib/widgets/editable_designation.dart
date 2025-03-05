@@ -8,13 +8,13 @@ class EditableDesignationTile extends StatefulWidget {
   final Future<List<DropdownMenuItem<String>>> Function() fetchDesignations;
 
   const EditableDesignationTile({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.initialValue,
     required this.onSave,
-    required this.fetchDesignations,
-  }) : super(key: key);
+    required this.fetchDesignations, required double fontSizeTitle, required double fontSizeSubtitle,
+  });
 
   @override
   _EditableDesignationTileState createState() => _EditableDesignationTileState();

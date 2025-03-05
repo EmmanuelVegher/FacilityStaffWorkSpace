@@ -1,4 +1,3 @@
-import 'package:attendanceappmailtool/screens/dashboard.dart';
 import 'package:attendanceappmailtool/screens/home_screen.dart';
 import 'package:attendanceappmailtool/screens/login_screen.dart';
 import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
@@ -35,12 +34,14 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      debugShowCheckedModeBanner: false,
       //home: HomeScreen(),
       initialRoute: '/login',
       routes: {
-        '/login': (context) => LoginPage(),
-        '/home': (context) => HomeScreen(),
-        '/dashboard': (context) => UserDashboardApp(),
+        '/login': (context) => const LoginPage(),
+        '/home': (context) => const HomeScreen(),
+        '/dashboard': (context) => const UserDashboardApp(),
+
       },
     );
   }
