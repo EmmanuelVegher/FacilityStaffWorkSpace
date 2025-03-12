@@ -3,185 +3,434 @@ import 'dart:math';
 import 'package:animated_reorderable_list/animated_reorderable_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/bio_model.dart';
-import '../models/facility_staff_model.dart';
-import '../models/survey_result_model.dart';
-import 'best_player_chart_page.dart'; // For web local storage
+import '../screens/staff_dashboard.dart';
+import 'best_player_chart_page.dart';
+
+// BioModel definition (plain Dart class) - No changes needed
+class BioModel {
+  String? id;
+  String? firstName;
+  String? lastName;
+  String? maritalStatus;
+  String? gender;
+  String? staffCategory;
+  String? designation;
+  String? password;
+  String? state;
+  String? emailAddress;
+  String? role;
+  String? location;
+  String? firebaseAuthId;
+  String? department;
+  String? mobile;
+  String? project;
+  bool? isSynced;
+  String? supervisor;
+  String? supervisorEmail;
+  String? version;
+  bool? isRemoteDelete;
+  bool? isRemoteUpdate;
+  DateTime? lastUpdateDate;
+  String? signatureLink;
+
+  BioModel({
+    this.id,
+    this.firstName,
+    this.lastName,
+    this.staffCategory,
+    this.designation,
+    this.password,
+    this.state,
+    this.emailAddress,
+    this.role,
+    this.location,
+    this.firebaseAuthId,
+    this.department,
+    this.mobile,
+    this.project,
+    this.isSynced,
+    this.supervisor,
+    this.supervisorEmail,
+    this.version,
+    this.isRemoteDelete,
+    this.isRemoteUpdate,
+    this.lastUpdateDate,
+    this.signatureLink,
+    this.maritalStatus,
+    this.gender,
+  });
+
+  factory BioModel.fromJson(Map<String, dynamic> json) {
+    return BioModel(
+        id: json['id'] as String?,
+        firstName: json['firstName'] as String?,
+        lastName: json['lastName'] as String?,
+        staffCategory: json['staffCategory'] as String?,
+        designation: json['designation'] as String?,
+        password: json['password'] as String?,
+        state: json['state'] as String?,
+        emailAddress: json['emailAddress'] as String?,
+        role: json['role'] as String?,
+        location: json['location'] as String?,
+        firebaseAuthId: json['firebaseAuthId'] as String?,
+        department: json['department'] as String?,
+        mobile: json['mobile'] as String?,
+        project: json['project'] as String?,
+        isSynced: json['isSynced'] as bool?,
+        supervisor: json['supervisor'] as String?,
+        supervisorEmail: json['supervisorEmail'] as String?,
+        version: json['version'] as String?,
+        isRemoteDelete: json['isRemoteDelete'] as bool?,
+        isRemoteUpdate: json['isRemoteUpdate'] as bool?,
+        lastUpdateDate: json['lastUpdateDate'] == null
+            ? null
+            : (json['lastUpdateDate'] as Timestamp).toDate(),
+        signatureLink: json['signatureLink'] as String?,
+        maritalStatus: json['maritalStatus'] as String?,
+        gender: json['gender'] as String?);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'firstName': firstName,
+      'lastName': lastName,
+      'staffCategory': staffCategory,
+      'designation': designation,
+      'password': password,
+      'state': state,
+      'emailAddress': emailAddress,
+      'role': role,
+      'location': location,
+      'firebaseAuthId': firebaseAuthId,
+      'department': department,
+      'mobile': mobile,
+      'project': project,
+      'isSynced': isSynced,
+      'supervisor': supervisor,
+      'supervisorEmail': supervisorEmail,
+      'version': version,
+      'isRemoteDelete': isRemoteDelete,
+      'isRemoteUpdate': isRemoteUpdate,
+      'lastUpdateDate': lastUpdateDate,
+      'signatureLink': signatureLink,
+      'maritalStatus': maritalStatus,
+      'gender': gender,
+    };
+  }
+
+  static BioModel fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
+    return BioModel.fromJson(data!)..id = snapshot.id;
+  }
+}
+
+// FacilityStaffModel definition (plain Dart class) - No changes needed
+class FacilityStaffModel {
+  String? id;
+  String? name;
+  String? state;
+  String? facilityName;
+  String? userId;
+  String? designation;
+
+  FacilityStaffModel({
+    this.id,
+    this.name,
+    this.state,
+    this.facilityName,
+    this.userId,
+    this.designation,
+  });
+
+  factory FacilityStaffModel.fromJson(Map<String, dynamic> json) {
+    String? firstName = json['firstName'] as String?;
+    String? lastName = json['lastName'] as String?;
+    String? fullName;
+
+    if (firstName != null && lastName != null) {
+      fullName = '$firstName $lastName';
+    } else if (firstName != null) {
+      fullName = firstName;
+    } else if (lastName != null) {
+      fullName = lastName;
+    } else {
+      fullName = null;
+    }
+
+    return FacilityStaffModel(
+      id: json['id'] as String?,
+      name: fullName,
+      state: json['state'] as String?,
+      facilityName: json['location'] as String?,
+      userId: json['id'] as String?,
+      designation: json['designation'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'name': name,
+      'state': state,
+      'facilityName': facilityName,
+      'userId': userId,
+      'designation': designation,
+    };
+  }
+
+  static FacilityStaffModel fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
+    return FacilityStaffModel.fromJson(data!)..id = snapshot.id;
+  }
+}
 
 
-//import '../../services/isar_service.dart'; // Removed isar_service
+// SurveyResultModel definition (plain Dart class) - No changes needed
+class SurveyResultModel {
+  String? id;
+  DateTime? date;
+  String? name;
+  String? uuid;
+  String? emailAddress;
+  String? phoneNumber;
+  String? staffCategory;
+  String? state;
+  String? facilityName;
+  bool? isSynced;
+  late String staffJson;
+
+  SurveyResultModel({
+    this.id,
+    this.date,
+    this.name,
+    this.uuid,
+    this.emailAddress,
+    this.phoneNumber,
+    this.staffCategory,
+    this.state,
+    this.facilityName,
+    this.isSynced,
+    required this.staffJson,
+  });
+
+  List<FacilityStaffModel>? get staff {
+    if (staffJson.isNotEmpty) {
+      return (jsonDecode(staffJson) as List)
+          .map((data) => FacilityStaffModel.fromJson(data))
+          .toList();
+    }
+    return null;
+  }
+
+  set staff(List<FacilityStaffModel>? value) {
+    staffJson = jsonEncode(value?.map((e) => e.toJson()).toList() ?? []);
+  }
+
+  factory SurveyResultModel.fromJson(Map<String, dynamic> json) {
+    return SurveyResultModel(
+      id: json['id'] as String?,
+      date: json['date'] == null
+          ? null
+          : (json['date'] as Timestamp).toDate(),
+      name: json['name'] as String?,
+      uuid: json['uuid'] as String?,
+      emailAddress: json['emailAddress'] as String?,
+      phoneNumber: json['phoneNumber'] as String?,
+      staffCategory: json['staffCategory'] as String?,
+      state: json['state'] as String?,
+      facilityName: json['facilityName'] as String?,
+      isSynced: json['isSynced'] as bool?,
+      staffJson: json['staffJson'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'date': date,
+      'name': name,
+      'uuid': uuid,
+      'emailAddress': emailAddress,
+      'phoneNumber': phoneNumber,
+      'staffCategory': staffCategory,
+      'state': state,
+      'facilityName': facilityName,
+      'isSynced': isSynced,
+      'staffJson': staffJson,
+    };
+  }
+
+  static SurveyResultModel fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
+    return SurveyResultModel.fromJson(data!)..id = snapshot.id;
+  }
+}
 
 
 class PsychologicalMetricsPage extends StatefulWidget {
-  //final Isar isar; // Removed isar
-
-  const PsychologicalMetricsPage({super.key, /*required this.isar*/}); // Removed isar
+  const PsychologicalMetricsPage({super.key});
 
   @override
-  _PsychologicalMetricsPageState createState() =>
-      _PsychologicalMetricsPageState();
+  _PsychologicalMetricsPageState createState() => _PsychologicalMetricsPageState();
 }
 
 class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
   Map<String, List<Map<String, String>>> _sections = {};
   final Map<String, dynamic> _responses = {};
-  List<FacilityStaffModel> _reorderableItems = []; // For storing shuffled staff list
-  List<FacilityStaffModel> _staffList = []; // Use your FacilityStaffModel
-  bool _isLoadingStaffList = true; // Track loading state
+  List<FacilityStaffModel> _reorderableItems = [];
+  List<FacilityStaffModel> _staffList = [];
+  bool _isLoadingStaffList = true;
   bool isLoading = true;
-  String? BioState;
-  String? BioName;
-  String? BioUUID;
-  String? BioEmailAddress;
-  String? BioPhoneNumber;
-  String? BioStaffCategory;
-  String? BioLocation;
+  String? bioState;
+  String? bioName;
+  String? bioUUID;
+  String? bioEmailAddress;
+  String? bioPhoneNumber;
+  String? bioStaffCategory;
+  String? bioLocation;
   BioModel? bioData;
 
   @override
   void initState() {
     super.initState();
     _loadPsychologicalMetricsData();
-    _loadBioData();
-    _loadStaffList(); // Load the staff list when the page initializes
+    _loadBioData().then((_) {
+      _loadStaffList();
+    });
   }
 
   Future<void> _loadBioData() async {
-    // Replace IsarService with Firestore or SharedPreferences for web
-    final prefs = await SharedPreferences.getInstance();
-    String? bioDataString = prefs.getString('bioData'); // Try to load from shared_preferences
+    try {
+      final userUUID = FirebaseAuth.instance.currentUser?.uid;
+      if (userUUID == null) {
+        print("No user logged in.");
+        return;
+      }
 
-    if (bioDataString != null) {
-      Map<String, dynamic> bioDataMap = jsonDecode(bioDataString) as Map<String, dynamic>;
-      bioData = BioModel.fromJson(bioDataMap);
-      if (bioData != null) {
-        String fullName = "${bioData!.firstName!} ${bioData!.lastName!}";
+      DocumentSnapshot<Map<String, dynamic>> bioDataSnapshot =
+      await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(userUUID)
+          .get();
+
+      if (bioDataSnapshot.exists) {
+        bioData = BioModel.fromFirestore(bioDataSnapshot);
+        String fullName = "${bioData!.firstName} ${bioData!.lastName}";
+        print("BioLocation ==${bioData!.location}");
+        print("BioState ==${bioData!.state}");
         setState(() {
-          BioState = bioData!.state;
-          BioLocation = bioData!.location;
-          BioName = fullName;
-          BioUUID = bioData!.firebaseAuthId;
-          BioEmailAddress = bioData!.emailAddress;
-          BioPhoneNumber = bioData!.mobile;
-          BioStaffCategory = bioData!.staffCategory;
+          bioState = bioData!.state;
+          bioLocation = bioData!.location;
+          bioName = fullName;
+          bioUUID = userUUID;
+          bioEmailAddress = bioData!.emailAddress;
+          bioPhoneNumber = bioData!.mobile;
+          bioStaffCategory = bioData!.staffCategory;
         });
-      }
-    } else {
-      // If not in shared_preferences, fetch from Firestore (assuming user is logged in and we have UUID)
-      if (BioUUID != null) { // Assuming BioUUID is available from auth context in web app. If not, you need to get it.
-        try {
-          DocumentSnapshot bioDoc = await FirebaseFirestore.instance.collection('Staff').doc(BioUUID).get();
-          if (bioDoc.exists) {
-            Map<String, dynamic> data = bioDoc.data() as Map<String, dynamic>;
-            bioData = BioModel.fromJson(data);
-            if (bioData != null) {
-              String fullName = "${bioData!.firstName!} ${bioData!.lastName!}";
-              setState(() {
-                BioState = bioData!.state;
-                BioLocation = bioData!.location;
-                BioName = fullName;
-                BioUUID = bioData!.firebaseAuthId;
-                BioEmailAddress = bioData!.emailAddress;
-                BioPhoneNumber = bioData!.mobile;
-                BioStaffCategory = bioData!.staffCategory;
-              });
-              // Save to shared_preferences for faster subsequent loads (optional, but good for web)
-              await prefs.setString('bioData', jsonEncode(bioData!.toJson()));
-            }
-          } else {
-            print("Bio data not found in Firestore for UUID: $BioUUID");
-          }
-        } catch (e) {
-          print("Error loading bio data from Firestore: $e");
-        }
       } else {
-        print("No bio data found locally or remotely and BioUUID is null.");
+        print("No bio data found for UUID: $userUUID");
       }
+    } catch (e) {
+      print("Error loading bio data: $e");
     }
   }
-
 
   Future<void> _loadStaffList() async {
     setState(() {
       _isLoadingStaffList = true;
     });
     try {
-      if (BioLocation == null || BioState == null) {
-        print("BioLocation or BioState is null, cannot fetch staff list.");
+      if (bioLocation == null || bioState == null) {
+        print("BioLocation or BioState is null, cannot load staff list.");
         setState(() {
           _isLoadingStaffList = false;
         });
         return;
       }
 
-      QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .where('location', isEqualTo: BioLocation)
-          .where('state', isEqualTo: BioState)
-      //.where('department', isEqualTo: BioDepartment) // if you have department in bioData
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid; // Get current user ID
+      if (currentUserId == null) {
+        print("Current user ID is null, cannot exclude from staff list.");
+        setState(() {
+          _isLoadingStaffList = false;
+        });
+        return;
+      }
+
+      QuerySnapshot<Map<String, dynamic>> staffSnapshot =
+      await FirebaseFirestore.instance
+          .collection("Staff")
+          .where("location", isEqualTo: bioLocation)
+          .where("state", isEqualTo: bioState)
+          .where("staffCategory", isEqualTo: "Facility Staff")
+          .where(FieldPath.documentId,
+          isNotEqualTo: currentUserId) // Exclude current user ID
           .get();
 
-      List<FacilityStaffModel> staff = staffSnapshot.docs.map((doc) {
-        return FacilityStaffModel.fromJson(doc.data() as Map<String, dynamic>);
+      List<FacilityStaffModel> staffList = staffSnapshot.docs.map((doc) {
+        return FacilityStaffModel.fromFirestore(doc);
       }).toList();
 
-
-      // Remove current user from staff list if needed. Assuming BioEmailAddress is unique staff identifier.
-      staff.removeWhere((s) => s.emailAddress == BioEmailAddress);
+      Set<String?> userIds = staffList.map((staff) => staff.userId).toSet();
+      if (userIds.length < staffList.length) {
+        print("WARNING: Duplicate userIds found in staff list!");
+        print("Staff List: $staffList");
+      }
+      print("Loaded Staff List (excluding current user): ${staffList.map((s) => '${s.name} - ${s.userId}').toList()}");
 
 
       setState(() {
-        _staffList = staff;
+        _staffList = staffList;
         _staffList.shuffle();
-        _reorderableItems = List.from(_staffList); // Store shuffled list
+        _reorderableItems = List.from(_staffList);
         _isLoadingStaffList = false;
       });
     } catch (error) {
-      print('Error loading staff list from Firestore: $error');
+      print('Error loading staff list: $error');
       setState(() {
         _isLoadingStaffList = false;
       });
     }
   }
 
+
   Future<void> _loadPsychologicalMetricsData() async {
     try {
-      DocumentSnapshot metricsSnapshot = await FirebaseFirestore.instance
-          .collection('PsychologicalMetrics')
-          .doc('metrics_doc_id') // Replace 'metrics_doc_id' with your actual document ID
+      DocumentSnapshot<Map<String, dynamic>> metricsSnapshot =
+      await FirebaseFirestore.instance
+          .collection("PsychologicalMetrics")
+          .doc("PsychologicalMetrics")
           .get();
 
       if (metricsSnapshot.exists) {
-        Map<String, dynamic> metricsData = metricsSnapshot.data() as Map<String, dynamic>;
-        String sectionsJson = metricsData['sectionsJson'] as String? ?? '[]'; // Assuming field name is 'sectionsJson'
-
-        final decodedSections = (jsonDecode(sectionsJson) as List<dynamic>)
-            .fold<Map<String, List<Map<String, String>>>>({}, (map, section) {
-          final entry = section as Map<String, dynamic>;
-          entry.forEach((key, value) {
-            var questions = List<Map<String, String>>.from(
-                (value as List<dynamic>).map((item) =>
-                Map<String, String>.from(item as Map<String, dynamic>)));
-
-            map[key] = questions;
-          });
-          return map;
+        final data = metricsSnapshot.data()!;
+        Map<String, List<Map<String, String>>> decodedSections = {};
+        data.forEach((sectionName, questionsList) {
+          if (questionsList is List) {
+            decodedSections[sectionName] = List<Map<String, String>>.from(
+              questionsList.map((item) =>
+              Map<String, String>.from(item.cast<String, dynamic>())),
+            );
+          }
         });
 
         setState(() {
           _sections = decodedSections;
         });
       } else {
-        print('Psychological metrics data not found in Firestore.');
+        print("PsychologicalMetrics document not found.");
       }
     } catch (e) {
-      print('Error fetching psychological metrics data from Firestore: $e');
+      print('Error fetching psychological metrics data: $e');
     }
   }
 
@@ -189,7 +438,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Facility Weekly Review'),
+        title: const Text('We would Love to hear from you!'),
         centerTitle: true,
         elevation: 4.0,
       ),
@@ -204,7 +453,8 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: _sections.entries
                     .map((entry) => _buildSection(
-                  title: _capitalize(entry.key.replaceAll('_', ' ')),
+                  title: _capitalize(
+                      entry.key.replaceAll('_', ' ')),
                   questions: entry.value,
                 ))
                     .toList(),
@@ -215,7 +465,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton(
               onPressed: _submitAndSyncOrNavigate,
-              child: const Text('Submit Weekly Survey Review'),
+              child: const Text('Submit Your Review'),
             ),
           ),
         ],
@@ -225,109 +475,130 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
 
   Future<void> _submitAndSyncOrNavigate() async {
     try {
-      await _submitResponses(); // Submit responses to local storage first
-
-      final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult != ConnectivityResult.none) {
-        try {
-          await syncDataToFirestore();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const BestPlayerChartPage()),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Data saved locally, but Firestore sync failed. Will sync later.'))
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const BestPlayerChartPage()),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection. Data saved locally.'))
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const BestPlayerChartPage()),
-        );
-      }
-    } catch (submissionError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit data.')),
+      await _submitResponses(); // Validate responses first
+      await syncDataToFirestore(); // If validations pass, sync to Firestore
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (context) => const UserDashboardPage()),
       );
+    } catch (submissionError) {
+      // Errors are handled within _submitResponses and syncDataToFirestore
+      // No need to handle them again here, just ensure navigation doesn't happen on error.
     }
   }
+
 
   Future<void> syncDataToFirestore() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      final prefs = await SharedPreferences.getInstance();
-      String? surveyResultString = prefs.getString('surveyResult');
+      final dataToSync = await _prepareDataForFirestore();
+      if (dataToSync == null) return; // _prepareDataForFirestore will handle errors and null returns
 
-      if (surveyResultString != null) {
-        SurveyResultModel metric = SurveyResultModel.fromJson(jsonDecode(surveyResultString) as Map<String, dynamic>);
-        final data = jsonDecode(metric.staffJson!) as Map<String, dynamic>;
-        final staffData = data['staff'] as List;
-        List<Map<String, dynamic>> firestoreDataList = [];
+      final formattedDate = DateFormat('yyyy-MM-dd').format(dataToSync['date']);
+      final formattedMonthYear =
+      DateFormat('MMMM yyyy').format(dataToSync['date']);
 
-        for (var section in staffData) {
-          for (var key in section.keys) {
-            final sectionData = section[key] as List;
-            for (var questionData in sectionData) {
-              Map<String, dynamic> firestoreData = {};
-              for (var questionKey in questionData.keys) {
-                firestoreData['section'] = key;
-                if (questionKey == 'For the current week, who is the best team player in your facility') {
-                  final bestTeamPlayerList = questionData[questionKey];
-                  firestoreData[questionKey] = jsonEncode(bestTeamPlayerList);
-                } else {
-                  firestoreData[questionKey] = questionData[questionKey];
-                }
-              }
-              firestoreDataList.add(firestoreData);
-            }
-          }
-        }
+      final docRef = firestore.collection('Staff').doc(bioUUID);
 
-        final formattedDate = DateFormat('yyyy-MM-dd').format(metric.date!);
-        final docRef = firestore.collection('Staff').doc(BioUUID);
-        final dateTime = DateFormat('yyyy-MM-dd').parse(data['date']);
-        final formattedMonthYear = DateFormat('MMMM yyyy').format(dateTime);
+      await docRef.collection('SurveyResponses').doc(formattedDate).set({
+        'surveyData': dataToSync['surveyData'],
+        'syncedAt': DateTime.now(),
+        'SubmittedBy': bioName,
+        'FacilityName': bioLocation,
+        'State': bioState,
+        'StaffUUID': bioUUID,
+        'StaffEmailAddress': bioEmailAddress,
+        'StaffPhoneNumber': bioPhoneNumber,
+        'StaffCategory': bioStaffCategory,
+        //'date': DateFormat('yyyy-MM-dd').format(dataToSync['date']),
+        'date': DateTime.now(),
+        'month_year': formattedMonthYear,
+      });
 
-        await docRef.collection('SurveyResponses').doc(formattedDate).set({
-          'surveyData': firestoreDataList,
-          'syncedAt': DateTime.now(),
-          'SubmittedBy': metric.name,
-          'FacilityName': metric.facilityName,
-          'State': metric.state,
-          'StaffUUID': metric.uuid,
-          'StaffEmailAddress': metric.emailAddress,
-          'StaffPhoneNumber': metric.phoneNumber,
-          'StaffCategory': metric.staffCategory,
-          'date': data['date'],
-          'month_year': formattedMonthYear
-        });
+      print("Data synced successfully to Firestore!");
+      Fluttertoast.showToast(
+        msg: 'Survey submitted and synced successfully!',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+      );
 
-        // Clear local storage after successful sync (optional, or you can mark as synced)
-        await prefs.remove('surveyResult'); // or set a flag in shared preferences
-        print("Data synced successfully!");
-      } else {
-        print("No survey data found in local storage to sync.");
-      }
     } catch (error) {
       print("Error syncing data to Firestore: $error");
-      rethrow; // Re-throw to be caught in _submitAndSyncOrNavigate
+      Fluttertoast.showToast(
+        msg: 'Failed to submit survey. Please check your internet connection and try again.',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.CENTER,
+        timeInSecForIosWeb: 5,
+      );
+      throw error; // Re-throw error to prevent navigation in _submitAndSyncOrNavigate
     }
   }
 
 
+  Future<Map<String, dynamic>?> _prepareDataForFirestore() async {
+    List<Map<String, dynamic>> firestoreDataList = [];
+    SurveyResultModel surveyResultModel = SurveyResultModel(
+      date: DateTime.now(),
+      name: bioName,
+      uuid: bioUUID,
+      emailAddress: bioEmailAddress,
+      phoneNumber: bioPhoneNumber,
+      staffCategory: bioStaffCategory,
+      state: bioState,
+      facilityName: bioLocation,
+      isSynced: false,
+      staffJson: '',
+    );
+
+    for (var sectionEntry in _sections.entries) {
+      String sectionName = sectionEntry.key;
+      List<Map<String, String>> questions = sectionEntry.value;
+
+      for (var questionData in questions) {
+        Map<String, dynamic> firestoreData = {};
+        String questionText = questionData['question'] ?? '';
+        dynamic answer = _responses[questionText];
+
+        firestoreData['section'] = sectionName;
+
+        if (questionText ==
+            'For the current week, who is the best team player in your facility') {
+          if (answer is List<FacilityStaffModel>) {
+            firestoreData[questionText] = answer.map((staff) => {
+              "id": staff.userId,
+              "name": staff.name,
+              "state": staff.state,
+              "facilityName": staff.facilityName,
+              "designation": staff.designation,
+            }).toList();
+          } else {
+            firestoreData[questionText] = answer;
+          }
+        } else {
+          firestoreData[questionText] = answer;
+        }
+        firestoreDataList.add(firestoreData);
+      }
+    }
+
+    surveyResultModel.staffJson =
+        jsonEncode(firestoreDataList);
+
+    return {
+      'surveyData': firestoreDataList,
+      'date': surveyResultModel.date!,
+    };
+  }
+
   Widget _buildCard(int index, FacilityStaffModel staff) {
     Color cardBackgroundColor = (index % 2 == 0) ? Colors.grey[100]! : Colors.white;
 
+    print("Building Card for: ${staff.name}, userId: ${staff.userId}, index: $index");
+
     return Card(
-      key: ValueKey(staff.id),
+      key: ValueKey(staff.userId),
       elevation: 3,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -362,7 +633,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
           children: [
             Icon(Icons.drag_indicator, color: Colors.grey),
             Text(
-              'Press & Hold & Drag up or down to Rearrange',
+              'Press & Hold & Drag to Rearrange',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
@@ -370,6 +641,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
       ),
     );
   }
+
 
   Widget _buildSection({
     required String title,
@@ -389,90 +661,105 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
         const SizedBox(height: 8.0),
         ...questions.asMap().entries.map((entry) {
           int index = entry.key + 1;
-          return _buildQuestionTile(entry.value, index);
+          return _buildQuestionTile(
+            questionData: entry.value,
+            index: index,
+          );
         }),
         const SizedBox(height: 24.0),
       ],
     );
   }
 
-  Widget _buildQuestionTile(Map<String, String> questionData, int index) {
+  Widget _buildQuestionTile({
+    required Map<String, String> questionData,
+    required int index,
+  }) {
     final question = questionData['question'] ?? '';
     final type = questionData['type'] ?? '';
 
     if (type == 'tick_box') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$index. $question',
-            style: const TextStyle(fontSize: 16),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('Yes'),
-                  value: 'Yes',
-                  groupValue: _responses[question],
-                  onChanged: (value) {
-                    setState(() {
-                      _responses[question] = value!;
-                    });
-                  },
-                ),
-              ),
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('No'),
-                  value: 'No',
-                  groupValue: _responses[question],
-                  onChanged: (value) {
-                    setState(() {
-                      _responses[question] = value!;
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
+      return _buildTickBoxQuestion(question: question, index: index);
     } else if (type == 'list') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$index. $question', style: const TextStyle(fontSize: 16)),
-          ExpansionTile(
-            title: const Text("Instructions: Click HERE to expand the list of all staff member in your facility (Excluding yourself).From the list, Press and Hold and Drag the cards either Upward or Downward to re-arrange the Best team player from top to down", style: TextStyle(fontWeight: FontWeight.bold)),
-            children: [
-              _isLoadingStaffList
-                  ? const Center(child: CircularProgressIndicator())
-                  : AnimatedReorderableListView(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                items: _staffList,
-                isSameItem: (oldItem, newItem) => oldItem.id == newItem.id,
-                itemBuilder: (context, index) => _buildCard(index, _staffList[index]),
-                onReorder: (int oldIndex, int newIndex) {
-                  setState(() {
-                    final staffMember = _staffList.removeAt(oldIndex);
-                    _staffList.insert(newIndex, staffMember);
-                    _responses[question] = _staffList;
-                  });
-                },
-                proxyDecorator: (child, index, animation) => Material(
-                  elevation: 5,
-                  shadowColor: Colors.black,
-                  child: child,
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
+      return _buildListQuestion(question: question, index: index);
     }
     return const SizedBox.shrink();
+  }
+
+
+  Widget _buildTickBoxQuestion({required String question, required int index}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$index. $question',
+          style: const TextStyle(fontSize: 16),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text('Yes'),
+                value: 'Yes',
+                groupValue: _responses[question],
+                onChanged: (value) {
+                  setState(() {
+                    _responses[question] = value;
+                  });
+                },
+              ),
+            ),
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text('No'),
+                value: 'No',
+                groupValue: _responses[question],
+                onChanged: (value) {
+                  setState(() {
+                    _responses[question] = value;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildListQuestion({required String question, required int index}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$index. $question', style: const TextStyle(fontSize: 16)),
+        ExpansionTile(
+          title: const Text(
+              "Instructions: Click HERE to expand the list of all staff member in your facility (Excluding yourself).From the list, Press and Hold the '=' icon ,and and Drag the cards either Upward or Downward to re-arrange the Best team player from top to down",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          children: [
+            _isLoadingStaffList
+                ? const Center(child: CircularProgressIndicator())
+                : AnimatedReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              items: _staffList,
+              isSameItem: (oldItem, newItem) =>
+              oldItem.userId == newItem.userId,
+              itemBuilder: (context, index) =>
+                  _buildCard(index, _staffList[index]),
+              onReorder: (int oldIndex, int newIndex) {
+                setState(() {
+                  final staffMember = _staffList.removeAt(oldIndex);
+                  _staffList.insert(newIndex, staffMember);
+                  _responses[question] = _staffList;
+                });
+              },
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
 
@@ -480,144 +767,92 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
     try {
       if (listEquals(_staffList, _reorderableItems)) {
         Fluttertoast.showToast(
-          msg: 'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
+          msg:
+          'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.CENTER,
           timeInSecForIosWeb: 8,
         );
-        return;
+        throw Exception('Best team player question not answered'); // Prevent Firestore save
       } else {
         for (var entry in _sections.entries) {
           final sectionTitle = entry.key;
           final questions = entry.value;
+
           for (var questionData in questions) {
             final question = questionData['question'] ?? '';
-            if (question == 'For the current week, who is the best team player in your facility') {
+            if (question ==
+                'For the current week, who is the best team player in your facility') {
               continue;
             }
-            if (!_responses.containsKey(question) || _responses[question] == null) {
+            if (!_responses.containsKey(question) ||
+                _responses[question] == null) {
               Fluttertoast.showToast(
-                msg: 'Please answer all questions in the "${_capitalize(sectionTitle.replaceAll('_', ' '))}" section before submitting.',
+                msg:
+                'Please answer all questions in the "${_capitalize(sectionTitle.replaceAll('_', ' '))}" section before submitting.',
                 toastLength: Toast.LENGTH_LONG,
                 gravity: ToastGravity.CENTER,
                 timeInSecForIosWeb: 8,
               );
-              return;
+              throw Exception('Incomplete survey answers'); // Prevent Firestore save
             }
           }
         }
       }
 
-      String collaborationResponse = _responses['Is there good collaboration among your team members?'];
-      String supportResponse = _responses['Do you get good support from your team members?'];
-      String challengeResponse = _responses['Do you have any challenge carrying out your duties?'];
-      String neededMaterialsResponse = _responses['Do you have the needed materials to do your job?'];
+      String collaborationResponse =
+      _responses['Is there good collaboration among your team members?'];
+      String supportResponse =
+      _responses['Do you get good support from your team members?'];
+      String challengeResponse =
+      _responses['Do you have any challenge carrying out your duties?'];
+      String neededMaterialsResponse =
+      _responses['Do you have the needed materials to do your job?'];
 
       if (collaborationResponse != supportResponse) {
         if (collaborationResponse == "Yes" && supportResponse == "No") {
           Fluttertoast.showToast(
-            msg: 'You responded that there is good collaboration among your team members BUT Do you get good support from your team members. Please review your answers.',
+            msg:
+            'You responded that there is good collaboration among your team members BUT Do you get good support from your team members. Please review your answers.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.CENTER,
             timeInSecForIosWeb: 8,
           );
-          return;
+          throw Exception('Inconsistent Team Spirit responses'); // Prevent Firestore save
         } else {
           Fluttertoast.showToast(
-            msg: 'You responded that there is NO good collaboration among your team members BUT you get good support from your team members. Please review your answers.',
+            msg:
+            'You responded that there is NO good collaboration among your team members BUT you get good support from your team members. Please review your answers.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.CENTER,
             timeInSecForIosWeb: 8,
           );
-          return;
+          throw Exception('Inconsistent Team Spirit responses'); // Prevent Firestore save
         }
       }
 
       if (challengeResponse == neededMaterialsResponse) {
         if (challengeResponse == "No" && neededMaterialsResponse == "No") {
           Fluttertoast.showToast(
-            msg: 'You responded that you DO NOT HAVE any challenge carrying out your duties BUT YOU ALSO DO NOT HAVE the needed materials to do your job.Not having the needed materials is also a challenge. Please review your answers.',
+            msg:
+            'You responded that you DO NOT HAVE any challenge carrying out your duties BUT YOU ALSO DO NOT HAVE the needed materials to do your job.Not having the needed materials is also a challenge. Please review your answers.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.CENTER,
             timeInSecForIosWeb: 8,
           );
-          return;
+          throw Exception('Inconsistent Attitude to Work responses'); // Prevent Firestore save
         }
       }
 
-      final now = DateTime.now();
-      final dateOnly = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final dateOnly1 = DateTime(now.year, now.month, now.day);
+      print('User Responses Validated: $_responses');
+      // If all validations pass, proceed to syncDataToFirestore which is called in _submitAndSyncOrNavigate
 
-      final formattedResponses1 = {
-        "id": Random().nextInt(1000),
-        "date": dateOnly,
-        "state": BioState,
-        "facilityName": BioLocation,
-        "staff": _sections.entries.map((entry) {
-          final sectionTitle = entry.key;
-          final questions = entry.value;
-
-          return {
-            sectionTitle: questions.map((question) {
-              final questionText = question['question'] ?? '';
-              final answer = _responses[questionText];
-
-              if (questionText == 'For the current week, who is the best team player in your facility') {
-                return {
-                  questionText: (answer as List<FacilityStaffModel>).map((staff) => {
-                    "id": staff.id,
-                    "name": staff.name,
-                    "state": staff.state,
-                    "facilityName": staff.facilityName,
-                    "userId": staff.userId,
-                    "designation": staff.designation,
-                  }).toList(),
-                };
-              } else {
-                return {questionText: answer};
-              }
-            }).toList(),
-          };
-        }).toList(),
-      };
-
-
-      final surveyResult = SurveyResultModel()
-        ..date = dateOnly1
-        ..emailAddress = BioEmailAddress
-        ..isSynced = false
-        ..name = BioName
-        ..phoneNumber = BioPhoneNumber
-        ..staffCategory = BioStaffCategory
-        ..uuid = BioUUID
-        ..state = BioState
-        ..facilityName = BioLocation
-        ..staffJson = jsonEncode(formattedResponses1);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('surveyResult', jsonEncode(surveyResult.toJson()));
-
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Survey submitted successfully!')),
-      );
     } catch (error) {
-      print('Error submitting responses: $error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit responses.')),
-      );
+      print('Validation Error: $error');
+      // Error messages are already shown via Fluttertoast in validations.
+      // No need to show another general error here, just re-throw to stop submission process
+      throw error; // Re-throw to prevent Firestore submission in _submitAndSyncOrNavigate
     }
-  }
-
-
-  String _getSectionForQuestion(String question) {
-    for (var entry in _sections.entries) {
-      if (entry.value.any((q) => q['question'] == question)) {
-        return _capitalize(entry.key.replaceAll('_', ' '));
-      }
-    }
-    return 'Unknown';
   }
 
 

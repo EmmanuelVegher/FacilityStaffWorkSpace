@@ -6,7 +6,10 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
+import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/components/clock_attendance.dart';
+import '../screens/dashboard/state_ofice_dashboard.dart';
+import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
 import '../screens/leave_request/leave_request.dart';
 import '../screens/login_screen.dart';
@@ -15,6 +18,7 @@ import '../screens/profile_page.dart';
 import '../screens/staff_dashboard.dart';
 import '../screens/timesheet/timesheet.dart';
 import '../screens/timesheet/upload_signature.dart';
+import '../team_survey/best_player_chart_page.dart';
 import '../team_survey/team_survey.dart';
 import 'app_button.dart';
 
@@ -157,31 +161,31 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const ClockAttendanceWeb()),
+                    builder: (context) => const FacialRecognitionPage()),
               );
             },
           ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(Icons.pending,
-                size: drawerIconSize, color: Colors.red),
-            title: Text(
-              'Pending Approval',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
-              );
-            },
-          ),
+          // const Divider(
+          //   color: Colors.grey,
+          //   height: 1,
+          // ),
+          // ListTile(
+          //   leading: Icon(Icons.pending,
+          //       size: drawerIconSize, color: Colors.red),
+          //   title: Text(
+          //     'Pending Approval',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
+          //     );
+          //   },
+          // ),
 
 
           const Divider(
@@ -200,7 +204,7 @@ Widget drawer(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const LeaveRequestsPageWeb()),
+                MaterialPageRoute(builder: (context) => const LeaveRequestsPage1()),
               );
             },
           ),
@@ -213,7 +217,7 @@ Widget drawer(
           //   leading: Icon(Icons.task,
           //       size: drawerIconSize, color: Colors.brown),
           //   title: Text(
-          //     'Task Management',
+          //     'State Office Dashboard',
           //     style: TextStyle(
           //         fontSize: drawerFontSize,
           //         color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -221,38 +225,66 @@ Widget drawer(
           //   onTap: () {
           //     Navigator.push(
           //       context,
-          //       MaterialPageRoute(builder: (context) => const TaskManagerHomePage()),
+          //       MaterialPageRoute(builder: (context) => const DashboardScreen()),
           //     );
           //   },
           // ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-          ListTile(
-            leading: Icon(
-              Icons.local_post_office,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Team Survey',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const PsychologicalMetricsPage(
-
-                    )),
-              );
-            },
-          ),
+          // const Divider(
+          //   color: Colors.grey,
+          //   height: 1,
+          // ),
+          //
+          // ListTile(
+          //   leading: Icon(
+          //     Icons.local_post_office,
+          //     size: drawerIconSize,
+          //     color: Colors.blue,
+          //   ),
+          //   title: Text(
+          //     'Team Survey',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //           builder: (context) => const PsychologicalMetricsPage(
+          //
+          //           )),
+          //     );
+          //   },
+          // ),
+          //
+          // const Divider(
+          //   color: Colors.grey,
+          //   height: 1,
+          // ),
+          //
+          // ListTile(
+          //   leading: Icon(
+          //     Icons.local_post_office,
+          //     size: drawerIconSize,
+          //     color: Colors.blue,
+          //   ),
+          //   title: Text(
+          //     'Best Team player',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //           builder: (context) => const BestPlayerChartPage(
+          //
+          //           )),
+          //     );
+          //   },
+          // ),
 
           const Divider(
             color: Colors.grey,
@@ -266,7 +298,7 @@ Widget drawer(
               color: Colors.blue,
             ),
             title: Text(
-              'Activity Monitoring Page',
+              'Task Management',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -280,6 +312,34 @@ Widget drawer(
               );
             },
           ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          // ListTile(
+          //   leading: Icon(
+          //     Icons.task,
+          //     size: drawerIconSize,
+          //     color: Colors.blue,
+          //   ),
+          //   title: Text(
+          //     'Create Activity',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //           builder: (context) => const CreateActivityPage()),
+          //
+          //     );
+          //   },
+          // ),
+
           const Divider(
             color: Colors.grey,
             height: 1,

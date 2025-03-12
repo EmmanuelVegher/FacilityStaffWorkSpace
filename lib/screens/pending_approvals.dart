@@ -1,9 +1,15 @@
+import 'dart:developer';
+
+import 'package:attendanceappmailtool/screens/staff_timesheet.dart';
+import 'package:attendanceappmailtool/screens/timesheet/approval_timesheetpage.dart';
+import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../widgets/drawer.dart';
+import '../widgets/drawer2.dart';
 
 // Bio Model (Assuming this is your BioModel class definition)
 class BioModel {
@@ -329,7 +335,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                   );
                 }
               },
-              child: const Text("Reject", style: TextStyle(color: wineColor)),
+              child: const Text("Returned", style: TextStyle(color: wineColor)),
             ),
           ],
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
@@ -345,6 +351,27 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     double fontSizeTitle = screenWidth > 600 ? 22.0 : 20.0;
     double fontSizeRegularBold = screenWidth > 600 ? 18.0 : 16.0;
     double fontSizeRegular = screenWidth > 600 ? 16.0 : 14.0;
+
+    // Handle date formatting safely
+    String startDateFormatted = 'N/A';
+    String endDateFormatted = 'N/A';
+
+    if (leave['startDate'] != null) {
+      if (leave['startDate'] is String) {
+        startDateFormatted = DateFormat('yyyy-MM-dd').format(DateTime.parse(leave['startDate']));
+      } else if (leave['startDate'] is Timestamp) {
+        startDateFormatted = DateFormat('yyyy-MM-dd').format((leave['startDate'] as Timestamp).toDate());
+      }
+    }
+
+    if (leave['endDate'] != null) {
+      if (leave['endDate'] is String) {
+        endDateFormatted = DateFormat('yyyy-MM-dd').format(DateTime.parse(leave['endDate']));
+      } else if (leave['endDate'] is Timestamp) {
+        endDateFormatted = DateFormat('yyyy-MM-dd').format((leave['endDate'] as Timestamp).toDate());
+      }
+    }
+
 
     return Container(
       width: cardWidth,
@@ -373,7 +400,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
             SizedBox(height: paddingValue / 2),
             _buildDetailRow("Leave Type", leave['type'], fontSizeRegularBold, fontSizeRegular),
             SizedBox(height: paddingValue / 2),
-            _buildDetailRow("Duration", "${DateFormat('yyyy-MM-dd').format(leave['startDate'].toDate())} - ${DateFormat('yyyy-MM-dd').format(leave['endDate'].toDate())}", fontSizeRegularBold, fontSizeRegular),
+            _buildDetailRow("Duration", "$startDateFormatted - $endDateFormatted", fontSizeRegularBold, fontSizeRegular),
             SizedBox(height: paddingValue / 2),
             _buildDetailRow("Department", leave['staffDepartment'], fontSizeRegularBold, fontSizeRegular),
             SizedBox(height: paddingValue / 2),
@@ -518,15 +545,17 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                     backgroundColor: wineColor,
                   ),
                   onPressed: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) => TimesheetDetailsScreen(
-                    //       timesheetData: doc,
-                    //       staffId: doc['staffId'],
-                    //     ),
-                    //   ),
-                    // );
+                    log("doc['staffId'] ==${doc['staffId']}");
+                    log("doc['staffId'] ==${doc}");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TimesheetDetailsScreen2(
+                          timesheetData: doc,
+                          staffId: doc['staffId'],
+                        ),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -555,9 +584,10 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        drawer: drawer(context), // No IsarService needed now
+        drawer: drawer2(context), // No IsarService needed now
         appBar: AppBar(
           title: const Text('Pending Approvals', style: TextStyle(color: Colors.white)),
+          iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),

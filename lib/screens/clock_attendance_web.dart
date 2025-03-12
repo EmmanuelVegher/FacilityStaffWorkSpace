@@ -1,515 +1,851 @@
 // import 'dart:async';
-// import 'dart:developer';
-//
+// import 'dart:convert';
+// import 'dart:math';
+// import 'package:rxdart/rxdart.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 // import 'package:flutter/material.dart';
-// import 'package:fluttertoast/fluttertoast.dart';
-// import 'package:geocoding/geocoding.dart';
-// import 'package:geolocator/geolocator.dart' as geolocator;
-// import 'package:get/get.dart';
 // import 'package:intl/intl.dart';
-// import 'package:ntp/ntp.dart';
-// import 'package:slide_to_act/slide_to_act.dart';
-// import 'package:synchronized/synchronized.dart';
-// import 'package:location/location.dart' as locationPkg;
+// import 'package:syncfusion_flutter_charts/charts.dart';
+// import 'package:syncfusion_flutter_gauges/gauges.dart';
 //
-// import '../../widgets/header_widget.dart';
+// import '../../models/facility_staff_model.dart';
+// import '../../utils/date_helper.dart';
+// import '../login_screen.dart';
 //
-// class GeofenceModel {
-//   final String name;
-//   final double latitude;
-//   final double longitude;
-//   final double radius;
+// class DashboardScreen extends StatefulWidget {
+//   const DashboardScreen({super.key});
 //
-//   GeofenceModel({
-//     required this.name,
-//     required this.latitude,
-//     required this.longitude,
-//     required this.radius,
-//   });
+//   @override
+//   DashboardScreenState createState() => DashboardScreenState();
 // }
 //
-// class ClockAttendanceWeb1 extends StatelessWidget {
-//   ClockAttendanceWeb1({Key? key}) : super(key: key);
+// class DashboardScreenState extends State<DashboardScreen> {
+//   DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+//   DateTime _endDate = DateTime.now();
+//   bool _isLoading = false;
+//
+//   late List<AttendanceData> attendanceData = [];
+//   late List<WeeklyTrendData> weeklyTrendData = [];
+//   late List<TaskCompletionData> taskCompletionData = [];
+//   late List<GeolocationComplianceData> geolocationComplianceData = [];
+//   late List<LeaveRequestData> pendingLeaveRequests = [];
+//   late List<LeaveRequestData> upcomingLeaves = [];
+//   late List<TaskData> taskStatusData = [];
+//
+//   String? _currentUserState;
+//   String? _currentUserLocation;
+//   String? _currentUserStaffCategory;
+//   Timer? _logoutTimer;
+//   static const int _logoutAfterMinutes = 5;
+//
+//   Map<String, int> _firestoreBestPlayerCounts = {};
+//   FacilityStaffModel? _bestPlayerOfWeek;
+//   int _totalSurveysCountedForBestPlayer = 0;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initializeData();
+//     _startLogoutTimer();
+//   }
+//
+//   void _resetLogoutTimer() {
+//     _logoutTimer?.cancel();
+//     _startLogoutTimer();
+//   }
+//
+//   void _startLogoutTimer() {
+//     _logoutTimer = Timer(const Duration(minutes: _logoutAfterMinutes), _logoutUser);
+//   }
+//
+//   void _logoutUser() {
+//     print('User logged out due to inactivity.');
+//     Navigator.of(context).pushReplacement(
+//       MaterialPageRoute(builder: (context) => const LoginPage()),
+//     );
+//   }
+//
+//   Future<void> _initializeData() async {
+//     setState(() {
+//       _isLoading = true;
+//     });
+//     await _loadCurrentUserBioData();
+//     await _fetchDashboardData();
+//     setState(() {
+//       _isLoading = false;
+//     });
+//   }
+//
+//   Future<void> _loadCurrentUserBioData() async {
+//     try {
+//       final userUUID = FirebaseAuth.instance.currentUser?.uid;
+//       if (userUUID == null) {
+//         print("No user logged in.");
+//         return;
+//       }
+//
+//       DocumentSnapshot<Map<String, dynamic>> bioDataSnapshot =
+//       await FirebaseFirestore.instance.collection("Staff").doc(userUUID).get();
+//
+//       if (bioDataSnapshot.exists) {
+//         final bioData = bioDataSnapshot.data();
+//         if (bioData != null) {
+//           setState(() {
+//             _currentUserState = bioData['state'] as String?;
+//             _currentUserLocation = bioData['location'] as String?;
+//             _currentUserStaffCategory = bioData['staffCategory'] as String?;
+//           });
+//           print(
+//               "Current User State: $_currentUserState, Location: $_currentUserLocation");
+//         } else {
+//           print("Bio data is null for UUID: $userUUID");
+//         }
+//       } else {
+//         print("No bio data found for UUID: $userUUID");
+//       }
+//     } catch (e) {
+//       print("Error loading bio data: $e");
+//     }
+//   }
+//
+//   Future<void> _fetchDashboardData() async {
+//     if (_currentUserState == null) return;
+//
+//     DateTime currentDate = DateTime.now();
+//     String currentDateFormatted = DateFormat('dd-MMMM-yyyy').format(currentDate);
+//     String currentMonthYearFormatted = DateFormat('MMMM-yyyy').format(currentDate);
+//
+//     attendanceData = await _getAttendanceChartData(currentDateFormatted);
+//     weeklyTrendData = await _getWeeklyTrendChartData(_startDate, _endDate);
+//     taskCompletionData = getTaskCompletionData(); // Sample Data - Replace with Firestore data if needed
+//     geolocationComplianceData = getGeolocationComplianceData(); // Sample Data - Replace with Firestore data if needed
+//     pendingLeaveRequests = await _getPendingLeaveRequests();
+//     upcomingLeaves = await _getUpcomingLeaves();
+//     taskStatusData = getTaskStatusData(); // Sample Data - Replace with Firestore data if needed
+//   }
+//
+//   Future<List<AttendanceData>> _getAttendanceChartData(String currentDateFormatted) async {
+//     int totalStaffs = 0;
+//     int clockedInStaffs = 0;
+//     int presentMale = 0;
+//     int presentFemale = 0;
+//     int absentMale = 0;
+//     int absentFemale = 0;
+//     int lateMale = 0;
+//     int lateFemale = 0;
+//     int onLeaveCount = 0;
+//
+//     QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
+//         .collection('Staff')
+//         .where('state', isEqualTo: _currentUserState)
+//         .get();
+//     totalStaffs = staffSnapshot.docs.length;
+//
+//     for (DocumentSnapshot staffDoc in staffSnapshot.docs) {
+//       String staffId = staffDoc.id;
+//       DocumentSnapshot recordSnapshot = await FirebaseFirestore.instance
+//           .collection('Staff')
+//           .doc(staffId)
+//           .collection('Record')
+//           .doc(currentDateFormatted)
+//           .get();
+//
+//       if (recordSnapshot.exists) {
+//         clockedInStaffs++;
+//         Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>;
+//         String? clockInTime = recordData['clockIn'] as String?;
+//         // Check if 'gender' field exists before accessing it
+//         String gender = staffDoc.data() != null && (staffDoc.data() as Map<String, dynamic>?)?.containsKey('gender') == true
+//             ? staffDoc['gender'] as String? ?? 'Other'
+//             : 'Other';
+//
+//         if (clockInTime != null && clockInTime != 'N/A') {
+//           if (DateHelper.calculateEarlyLateTime(clockInTime) > 0) {
+//             if (gender == 'Male') lateMale++; else lateFemale++;
+//           } else {
+//             if (gender == 'Male') presentMale++; else presentFemale++;
+//           }
+//         }
+//       } else {
+//         // Check if 'gender' field exists before accessing it
+//         String gender = staffDoc.data() != null && (staffDoc.data() as Map<String, dynamic>?)?.containsKey('gender') == true
+//             ? staffDoc['gender'] as String? ?? 'Other'
+//             : 'Other';
+//         if (gender == 'Male') absentMale++; else absentFemale++;
+//       }
+//     }
+//
+//     onLeaveCount = await _getOnLeaveCount(currentDateFormatted);
+//
+//     return [
+//       AttendanceData('Present', presentMale + presentFemale),
+//       AttendanceData('Absent', absentMale + absentFemale),
+//       AttendanceData('Late', lateMale + lateFemale),
+//       AttendanceData('On Leave', onLeaveCount),
+//     ];
+//   }
+//
+//   Future<int> _getOnLeaveCount(String currentDateFormatted) async {
+//     int onLeaveCount = 0;
+//     QuerySnapshot leaveSnapshot = await FirebaseFirestore.instance
+//         .collectionGroup('LeaveRequests')
+//         .where('state', isEqualTo: _currentUserState)
+//         .where('status', isEqualTo: 'Approved')
+//         .where('startDate', isLessThanOrEqualTo: DateTime.parse(DateFormat('yyyy-MM-dd').format(DateTime.now())))
+//         .where('endDate', isGreaterThanOrEqualTo: DateTime.parse(DateFormat('yyyy-MM-dd').format(DateTime.now())))
+//         .get();
+//
+//     onLeaveCount = leaveSnapshot.docs.length;
+//     return onLeaveCount;
+//   }
+//
+//
+//   Future<List<WeeklyTrendData>> _getWeeklyTrendChartData(DateTime startDate, DateTime endDate) async {
+//     Map<String, int> dailyClockInCounts = {};
+//     DateTime currentDate = startDate;
+//     while (currentDate.isBefore(endDate.add(const Duration(days: 1)))) {
+//       String formattedDate = DateFormat('dd-MMMM-yyyy').format(currentDate);
+//       dailyClockInCounts[DateFormat('E').format(currentDate)] = 0; // Initialize count for each day
+//       currentDate = currentDate.add(const Duration(days: 1));
+//     }
+//
+//     QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
+//         .collection('Staff')
+//         .where('state', isEqualTo: _currentUserState)
+//         .get();
+//
+//     for (DocumentSnapshot staffDoc in staffSnapshot.docs) {
+//       String staffId = staffDoc.id;
+//       DateTime date = startDate;
+//       while (date.isBefore(endDate.add(const Duration(days: 1)))) {
+//         String formattedDate = DateFormat('dd-MMMM-yyyy').format(date);
+//         DocumentSnapshot recordSnapshot = await FirebaseFirestore.instance
+//             .collection('Staff')
+//             .doc(staffId)
+//             .collection('Record')
+//             .doc(formattedDate)
+//             .get();
+//
+//         if (recordSnapshot.exists) {
+//           String dayName = DateFormat('E').format(date);
+//           dailyClockInCounts[dayName] = (dailyClockInCounts[dayName] ?? 0) + 1;
+//         }
+//         date = date.add(const Duration(days: 1));
+//       }
+//     }
+//
+//     List<WeeklyTrendData> weeklyTrendData = [];
+//     dailyClockInCounts.forEach((day, count) {
+//       weeklyTrendData.add(WeeklyTrendData(day, count.toDouble()));
+//     });
+//     return weeklyTrendData;
+//   }
+//
+//   Future<List<LeaveRequestData>> _getPendingLeaveRequests() async {
+//     List<LeaveRequestData> pendingRequests = [];
+//     QuerySnapshot leaveSnapshot = await FirebaseFirestore.instance
+//         .collectionGroup('LeaveRequests')
+//         .where('state', isEqualTo: _currentUserState)
+//         .where('status', isEqualTo: 'Pending')
+//         .limit(5)
+//         .get();
+//
+//     for (DocumentSnapshot doc in leaveSnapshot.docs) {
+//       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+//       DocumentSnapshot staffDoc = await FirebaseFirestore.instance.collection('Staff').doc(data['staffId']).get();
+//       String employeeName = '${staffDoc['firstName']} ${staffDoc['lastName']}';
+//       pendingRequests.add(LeaveRequestData(
+//         employeeName,
+//         data['leaveType'] ?? 'N/A',
+//         DateFormat('yyyy-MM-dd').format((data['startDate'] as Timestamp).toDate()),
+//       ));
+//     }
+//     return pendingRequests;
+//   }
+//
+//   Future<List<LeaveRequestData>> _getUpcomingLeaves() async {
+//     List<LeaveRequestData> upcomingLeavesList = [];
+//     QuerySnapshot leaveSnapshot = await FirebaseFirestore.instance
+//         .collectionGroup('LeaveRequests')
+//         .where('state', isEqualTo: _currentUserState)
+//         .where('status', isEqualTo: 'Approved')
+//         .where('startDate', isGreaterThan: DateTime.now())
+//         .orderBy('startDate')
+//         .limit(5)
+//         .get();
+//
+//     for (DocumentSnapshot doc in leaveSnapshot.docs) {
+//       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+//       DocumentSnapshot staffDoc = await FirebaseFirestore.instance.collection('Staff').doc(data['staffId']).get();
+//       String employeeName = '${staffDoc['firstName']} ${staffDoc['lastName']}';
+//       upcomingLeavesList.add(LeaveRequestData(
+//         employeeName,
+//         data['leaveType'] ?? 'N/A',
+//         DateFormat('yyyy-MM-dd').format((data['startDate'] as Timestamp).toDate()),
+//       ));
+//     }
+//     return upcomingLeavesList;
+//   }
+//
+//
+//   @override
+//   void dispose() {
+//     _logoutTimer?.cancel();
+//     super.dispose();
+//   }
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     final ClockAttendanceWebController controller = Get.put(ClockAttendanceWebController());
-//     return Scaffold(
-//       body: SafeArea( // Use SafeArea to avoid overlapping with system UI
-//         child: Center(
-//           child: LayoutBuilder( // Use LayoutBuilder for responsiveness
-//             builder: (context, constraints) {
-//               double screenWidth = constraints.maxWidth;
-//               bool isMobile = screenWidth < 600; // Define mobile breakpoint
-//               return SingleChildScrollView(
-//                 padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05, vertical: screenWidth * 0.02), // Responsive padding
-//                 child: Column(
-//                   children: [
-//                     SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//                     HeaderWidget(screenWidth * 0.08, false, Icons.house_rounded), // Responsive header size
-//                     SizedBox(height: screenWidth * 0.05), // Responsive spacing
-//                     _buildWelcomeHeader(context, controller, screenWidth, isMobile),
-//                     SizedBox(height: screenWidth * 0.05), // Responsive spacing
-//                     _buildStatusCard(context, controller, screenWidth, isMobile),
-//                     SizedBox(height: screenWidth * 0.05), // Responsive spacing
-//                     _buildAttendanceCard(context, controller, screenWidth, isMobile),
-//                   ],
-//                 ),
-//               );
-//             },
-//           ),
-//         ),
-//       ),
-//     );
-//   }
+//     final screenWidth = MediaQuery.of(context).size.width;
+//     final screenHeight = MediaQuery.of(context).size.height;
 //
-//   Widget _buildWelcomeHeader(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.center, // Center content
-//       children: [
-//         Row(
-//           mainAxisAlignment: MainAxisAlignment.center, // Center items horizontally
-//           crossAxisAlignment: CrossAxisAlignment.center,
-//           children: [
-//             Expanded( // Use Expanded for text to take available space
-//               child: Text(
-//                 "Welcome",
-//                 textAlign: TextAlign.start, // Align text to start within the expanded space
-//                 style: TextStyle(
-//                   color: Colors.black54,
-//                   fontFamily: "NexaLight",
-//                   fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03, // Responsive font size
-//                 ),
+//     double appBarHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+//     double titleFontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double cardPaddingFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double cardMarginFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double fontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double iconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double chartHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+//     double gridSpacingFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double appBarIconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double chartLegendFontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double summaryCardHeightFactor = screenWidth > 800 ? 1.0 : screenWidth > 800 ? 1.0 : 0.8;
+//     double otherCardHeightFactor = max(1.0, min(1.5, screenHeight / 800));
+//     double generateAnalyticsButtonPaddingFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double chartCardVerticalPaddingFactor = max(0.8, min(1.2, screenHeight / 800));
+//     double cardHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+//
+//     int crossAxisCount = screenWidth > 1200 ? 4 : screenWidth > 800 ? 3 : 2;
+//     double childAspectRatio = screenWidth > 1200 ? 2.0 / 1.2 : screenWidth > 800 ? 1.8 / 1.2 : 1.5 / 1.0;
+//
+//
+//     return Listener(
+//       onPointerDown: (_) => _resetLogoutTimer(),
+//       onPointerMove: (_) => _resetLogoutTimer(),
+//       onPointerUp: (_) => _resetLogoutTimer(),
+//       onPointerCancel: (_) => _resetLogoutTimer(),
+//       onPointerSignal: (_) => _resetLogoutTimer(),
+//       behavior: HitTestBehavior.translucent,
+//       child: Scaffold(
+//         appBar: AppBar(
+//           iconTheme: const IconThemeData(color: Colors.white),
+//           title: Row(
+//             mainAxisAlignment: MainAxisAlignment.start,
+//             children: [
+//               Image.asset(
+//                 'assets/image/ccfn_logo.png',
+//                 fit: BoxFit.contain,
+//                 height: 40 * appBarHeightFactor,
 //               ),
-//             ),
-//             Image(
-//               image: const AssetImage("./assets/image/ccfn_logo.png"),
-//               width: screenWidth / (isMobile ? 8 : 18), // Responsive logo size
-//               height: screenWidth / (isMobile ? 8 : 18),
-//             ),
-//           ],
-//         ),
-//         Obx(() => Text(
-//           "${controller.firstName.value.toString().toUpperCase()} ${controller.lastName.value.toString().toUpperCase()}",
-//           style: TextStyle(
-//             color: Colors.black54,
-//             fontFamily: "NexaBold",
-//             fontSize: isMobile ? screenWidth * 0.06 : screenWidth * 0.04, // Responsive font size
-//           ),
-//         )),
-//       ],
-//     );
-//   }
-//
-//
-//   Widget _buildStatusCard(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Container(
-//       alignment: Alignment.centerLeft,
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Text(
-//             "Today's Status:",
-//             style: TextStyle(
-//               fontFamily: "NexaBold",
-//               fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03, // Responsive font size
-//             ),
-//           ),
-//           SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//           Obx(() => Card(
-//             elevation: 4,
-//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//             child: Container(
-//               decoration: BoxDecoration(
-//                 gradient: LinearGradient(
-//                   begin: Alignment.topLeft,
-//                   end: Alignment.bottomRight,
-//                   colors: [Colors.red.shade100, Colors.white, Colors.black12],
-//                 ),
-//                 borderRadius: BorderRadius.circular(12),
-//               ),
-//               padding: EdgeInsets.all(screenWidth * 0.04), // Responsive padding
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   Text(
-//                     "Geo-Coordinates Information:",
-//                     style: TextStyle(
-//                       fontFamily: "NexaBold",
-//                       fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.025, // Responsive font size
-//                       color: Colors.blueGrey,
-//                     ),
+//               Padding(
+//                 padding: EdgeInsets.only(left: 10 * cardMarginFactor),
+//                 child: Text(
+//                   'State Office Dashboard',
+//                   style: TextStyle(
+//                     color: Colors.white,
+//                     fontSize: 20 * titleFontSizeFactor,
 //                   ),
-//                   SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//                   _buildStatusText("GPS is:", controller.isGpsEnabled.value ? 'On' : 'Off', screenWidth, isMobile),
-//                   _buildStatusText("Current Latitude:", controller.lati.value.toStringAsFixed(6), screenWidth, isMobile),
-//                   _buildStatusText("Current Longitude:", controller.longi.value.toStringAsFixed(6), screenWidth, isMobile),
-//                   _buildStatusText("Coordinates Accuracy:", controller.accuracy.value.toString(), screenWidth, isMobile),
-//                   _buildStatusText("Altitude:", controller.altitude.value.toString(), screenWidth, isMobile),
-//                   _buildStatusText("Speed:", controller.speed.value.toString(), screenWidth, isMobile),
-//                   _buildStatusText("Speed Accuracy:", controller.speedAccuracy.value.toString(), screenWidth, isMobile),
-//                   _buildStatusText("Location Data Timestamp:", DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(controller.time.value.toInt())), screenWidth, isMobile),
-//                   _buildStatusText("Is Location Mocked?:", controller.isMock.value.toString(), screenWidth, isMobile),
-//                   _buildStatusText("Current State:", controller.administrativeArea.value, screenWidth, isMobile),
-//                   _buildStatusText("Current Location:", controller.location.value, screenWidth, isMobile),
-//                 ],
+//                 ),
 //               ),
+//             ],
+//           ),
+//           backgroundColor: const Color(0xFF800018),
+//           toolbarHeight: 80 * appBarHeightFactor,
+//           bottom: PreferredSize(
+//             preferredSize: Size.fromHeight(60 * appBarHeightFactor),
+//             child: Padding(
+//               padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor),
+//               child: buildFilterBarInAppBar(
+//                   context,
+//                   cardPaddingFactor,
+//                   cardMarginFactor,
+//                   fontSizeFactor,
+//                   appBarHeightFactor,
+//                   generateAnalyticsButtonPaddingFactor),
 //             ),
-//           )),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _buildStatusText(String label, String value, double screenWidth, bool isMobile) {
-//     return Padding(
-//       padding: EdgeInsets.symmetric(vertical: screenWidth * 0.005), // Responsive vertical padding
-//       child: RichText(
-//         text: TextSpan(
-//           style: TextStyle(
-//             fontFamily: "NexaBold",
-//             fontSize: isMobile ? screenWidth * 0.04 : screenWidth * 0.023, // Responsive font size
-//             color: Colors.black87,
 //           ),
-//           children: <TextSpan>[
-//             TextSpan(text: '$label ', style: const TextStyle(color: Colors.blueGrey)),
-//             TextSpan(text: value),
-//           ],
+//         ),
+//         body: _isLoading
+//             ? const Center(child: CircularProgressIndicator())
+//             : Padding(
+//           padding: EdgeInsets.all(16.0 * cardPaddingFactor),
+//           child: GridView.count(
+//             crossAxisCount: crossAxisCount,
+//             crossAxisSpacing: 20 * gridSpacingFactor,
+//             mainAxisSpacing: 20 * gridSpacingFactor,
+//             childAspectRatio: childAspectRatio,
+//             children: [
+//               _buildCard('Attendance Overview', _buildAttendanceChart(), cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildCard('Weekly Trends - Staff Clock-Ins', _buildWeeklyTrendChart(cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor, screenWidth), cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildCard('Performance Gauge', _buildPerformanceGauge(cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor, screenWidth), cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildCard('Late Arrivals & Geolocation Compliance Trends', _buildTaskCompletionChart(cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor, screenWidth), cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildCard('Facility Clock-In (Live Feed) - Today', _buildFacilityClockInCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, otherCardHeightFactor), cardPaddingFactor, cardMarginFactor, fontSizeFactor), // Replaced Monthly Summary
+//               _buildTimesheetStatusCard(cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildLeaveRequestsCard(cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//               _buildTaskManagementCard(cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor, screenWidth),
+//             ],
+//           ),
 //         ),
 //       ),
 //     );
 //   }
 //
-//
-//   Widget _buildAttendanceCard(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return FutureBuilder<AttendanceModel?>(
-//       future: controller.getLastAttendanceFordate(DateFormat('dd-MMMM-yyyy').format(DateTime.now())),
-//       builder: (context, snapshot) {
-//         if (snapshot.connectionState == ConnectionState.waiting) {
-//           return const CircularProgressIndicator();
-//         } else if (snapshot.hasError) {
-//           return Text('Error: ${snapshot.error}');
-//         } else if (snapshot.hasData) {
-//           final lastAttendance = snapshot.data;
-//           if (lastAttendance?.clockIn != "--/--" && lastAttendance?.clockOut == "--/--") {
-//             return _buildClockOutSection(context, controller, lastAttendance, screenWidth, isMobile);
-//           } else if (lastAttendance?.clockIn != "--/--" && lastAttendance?.clockOut != "--/--") {
-//             return _buildDayCompletedSection(context, controller, lastAttendance, screenWidth, isMobile);
-//           } else {
-//             return _buildClockInSection(context, controller, screenWidth, isMobile);
-//           }
-//         } else {
-//           return _buildClockInSection(context, controller, screenWidth, isMobile); // Default to clock-in section if no data
-//         }
-//       },
-//     );
-//   }
-//
-//   Widget _buildClockInSection(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Column(
+//   Widget buildFilterBarInAppBar(
+//       BuildContext context,
+//       double cardPaddingFactor,
+//       double cardMarginFactor,
+//       double fontSizeFactor,
+//       double appBarHeightFactor,
+//       double generateAnalyticsButtonPaddingFactor) {
+//     return Row(
+//       mainAxisAlignment: MainAxisAlignment.end,
 //       children: [
-//         _buildClockInOutDisplay(context, "--/--", "--/--", screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildDateAndStream(screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.05), // Responsive spacing
-//         _buildClockInSlider(context, controller, screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildOutOfOfficeButton(context, controller, screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildLocationStatusCard(context, controller, "--/--", "--/--", screenWidth, isMobile), // Initial location status
-//       ],
-//     );
-//   }
-//
-//   Widget _buildClockOutSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModel? lastAttendance, double screenWidth, bool isMobile) {
-//     return Column(
-//       children: [
-//         _buildClockInOutDisplay(context, lastAttendance?.clockIn ?? "--/--", lastAttendance?.clockOut ?? "--/--", screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildDateAndStream(screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.05), // Responsive spacing
-//         _buildClockOutSlider(context, controller, screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildLocationStatusCard(context, controller, lastAttendance?.clockInLocation ?? "--/--", lastAttendance?.clockOutLocation ?? "--/--", screenWidth, isMobile),
-//       ],
-//     );
-//   }
-//
-//   Widget _buildDayCompletedSection(BuildContext context, ClockAttendanceWebController controller, AttendanceModel? lastAttendance, double screenWidth, bool isMobile) {
-//     final TextEditingController commentsController = TextEditingController();
-//     return Column(
-//       children: [
-//         _buildClockInOutDisplay(context, lastAttendance?.clockIn ?? "--/--", lastAttendance?.clockOut ?? "--/--", screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildDateAndStream(screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.03), // Responsive spacing
-//         Text(
-//           "You have completed this day!!!",
-//           style: TextStyle(
-//             fontFamily: "NexaLight",
-//             fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03, // Responsive font size
-//             color: Colors.black54,
+//         SizedBox(width: 8 * cardMarginFactor),
+//         _buildDatePickerInAppBar('Start Date', _startDate, (date) {
+//           setState(() {
+//             _startDate = date;
+//             _resetLogoutTimer();
+//           });
+//         }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//         SizedBox(width: 8 * cardMarginFactor),
+//         _buildDatePickerInAppBar('End Date', _endDate, (date) {
+//           setState(() {
+//             _endDate = date;
+//             _resetLogoutTimer();
+//           });
+//         }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+//         SizedBox(width: 12 * cardMarginFactor),
+//         ElevatedButton(
+//           onPressed: () {
+//             _initializeData();
+//             _resetLogoutTimer();
+//           },
+//           style: ElevatedButton.styleFrom(
+//             padding: EdgeInsets.symmetric(
+//                 horizontal:
+//                 15 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor,
+//                 vertical:
+//                 10 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor),
+//           ),
+//           child: Text(
+//             'Generate Analytics',
+//             style: TextStyle(
+//                 fontSize: 14 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
 //           ),
 //         ),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         Obx(() => Text(
-//           "Duration Worked: ${controller.durationWorked.value}",
-//           style: TextStyle(
-//             fontFamily: "NexaLight",
-//             fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03, // Responsive font size
-//             color: Colors.black54,
-//           ),
-//         )),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         Obx(() => Text(
-//           "Comment(s): ${controller.comments.value}",
-//           style: TextStyle(
-//             fontFamily: "NexaLight",
-//             fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.03, // Responsive font size
-//             color: Colors.black54,
-//           ),
-//         )),
-//         SizedBox(height: screenWidth * 0.03), // Responsive spacing
-//         TextField(
-//           controller: commentsController,
-//           maxLines: 3,
-//           decoration: InputDecoration(
-//             hintText: "Comments (If Any)",
-//             border: OutlineInputBorder(borderRadius: BorderRadius.circular(15.0)),
-//           ),
-//         ),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         controller.comments.value == "No Comment" ? _buildAddCommentButton(context, commentsController, screenWidth, isMobile) : const SizedBox(height: 0),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//         _buildLocationStatusCard(context, controller, lastAttendance?.clockInLocation ?? "--/--", lastAttendance?.clockOutLocation ?? "--/--", screenWidth, isMobile),
-//         SizedBox(height: screenWidth * 0.02), // Responsive spacing
 //       ],
 //     );
 //   }
 //
-//   Widget _buildClockInOutDisplay(BuildContext context, String clockInTime, String clockOutTime, double screenWidth, bool isMobile) {
-//     return Container(
-//       margin: EdgeInsets.only(top: screenWidth * 0.02, bottom: screenWidth * 0.05), // Responsive margins
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         boxShadow: [
-//           BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(2, 2)),
-//         ],
-//         borderRadius: BorderRadius.all(Radius.circular(screenWidth * 0.04)), // Responsive border radius
-//       ),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         crossAxisAlignment: CrossAxisAlignment.center,
-//         children: [
-//           _buildClockTimeColumn("Clock In", clockInTime, screenWidth, isMobile),
-//           _buildClockTimeColumn("Clock Out", clockOutTime, screenWidth, isMobile),
-//         ],
-//       ),
+//   Widget _buildDatePickerInAppBar(
+//       String label,
+//       DateTime initialDate,
+//       Function(DateTime) onDateSelected,
+//       double cardPaddingFactor,
+//       double cardMarginFactor,
+//       double fontSizeFactor) {
+//     return Row(
+//       children: [
+//         Text('$label: ',
+//             style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white)),
+//         TextButton(
+//           onPressed: () async {
+//             final selectedDate = await showDatePicker(
+//               context: context,
+//               initialDate: initialDate,
+//               firstDate: DateTime(2020),
+//               lastDate: DateTime.now(),
+//             );
+//             if (selectedDate != null) {
+//               onDateSelected(selectedDate);
+//               _resetLogoutTimer();
+//             }
+//           },
+//           child: Text(DateFormat('dd-MM-yyyy').format(initialDate),
+//               style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white)),
+//         ),
+//       ],
 //     );
 //   }
 //
-//   Widget _buildClockTimeColumn(String title, String time, double screenWidth, bool isMobile) {
-//     return Expanded(
+//
+//   Widget _buildCard(String title, Widget child, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor) {
+//     return Card(
+//       elevation: 4,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
 //       child: Padding(
-//         padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03), // Responsive padding
+//         padding: EdgeInsets.all(16.0 * cardPaddingFactor),
 //         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           crossAxisAlignment: CrossAxisAlignment.center,
+//           crossAxisAlignment: CrossAxisAlignment.start,
 //           children: [
 //             Text(
 //               title,
-//               style: TextStyle(
-//                 fontFamily: "NexaLight",
-//                 fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03, // Responsive font size
-//                 color: Colors.black54,
-//               ),
+//               style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
 //             ),
-//             Text(
-//               time,
-//               style: TextStyle(
-//                 fontFamily: "NexaBold",
-//                 fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035, // Responsive font size
-//               ),
-//             ),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Expanded(child: child),
 //           ],
 //         ),
 //       ),
 //     );
 //   }
 //
-//
-//   Widget _buildDateAndStream(double screenWidth, bool isMobile) {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
+//   Widget _buildAttendanceChart() {
+//     final screenWidth = MediaQuery.of(context).size.width;
+//     double cardMarginFactor = max(0.8, min(1.2, screenWidth / 800));
+//     double fontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+//     return Row(
 //       children: [
-//         RichText(
-//           text: TextSpan(
-//             text: DateTime.now().day.toString(),
-//             style: TextStyle(
-//               color: Colors.red,
-//               fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035, // Responsive font size
-//               fontFamily: "NexaBold",
+//         Expanded(
+//           flex: 4,
+//           child: Padding(
+//             padding: EdgeInsets.all(8.0 * cardMarginFactor),
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 ClipOval(
+//                   child: Image.asset(
+//                     'assets/image/headshot.png',
+//                     fit: BoxFit.cover,
+//                     height: 100 * cardMarginFactor,
+//                     width: 100 * cardMarginFactor,
+//                   ),
+//                 ),
+//                 SizedBox(height: 8 * cardMarginFactor),
+//                 Text(
+//                   "Punctuality Champion",
+//                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor),
+//                   textAlign: TextAlign.center,
+//                 ),
+//                 Text(
+//                   "Emmanuel Vegher",
+//                   textAlign: TextAlign.center,
+//                   style: TextStyle(fontSize: 12 * fontSizeFactor),
+//                 ),
+//               ],
 //             ),
-//             children: [
-//               TextSpan(
-//                 text: DateFormat(" MMMM yyyy").format(DateTime.now()),
-//                 style: TextStyle(
-//                   color: Colors.black,
-//                   fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035, // Responsive font size
-//                   fontFamily: "NexaBold",
+//           ),
+//         ),
+//         Expanded(
+//           flex: 3,
+//           child: Padding(
+//             padding: EdgeInsets.symmetric(horizontal: 16.0 * cardMarginFactor),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               mainAxisAlignment: MainAxisAlignment.center,
+//               children: [
+//                 Text(
+//                   'Dis-Aggregated Data',
+//                   style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.bold, color: Colors.black54),
+//                 ),
+//                 SizedBox(height: 20 * cardMarginFactor),
+//                 Row(
+//                   children: [
+//                     Expanded(
+//                       child: _buildAttendanceGenderSummary('Male', attendanceData, fontSizeFactor),
+//                     ),
+//                     Expanded(
+//                       child: _buildAttendanceGenderSummary('Female', attendanceData, fontSizeFactor),
+//                     ),
+//                   ],
+//                 ),
+//                 SizedBox(height: 20 * cardMarginFactor),
+//                 Row(
+//                   children: [
+//                     _buildLegendItem(Colors.orange.shade400, 'Total Staffs', fontSizeFactor),
+//                     SizedBox(width: 16 * cardMarginFactor),
+//                     _buildLegendItem(Colors.green.shade400, '% Clocked-In', fontSizeFactor),
+//                   ],
+//                 )
+//               ],
+//             ),
+//           ),
+//         ),
+//         Expanded(
+//           flex: 3,
+//           child: SfCircularChart(
+//             series: <CircularSeries<AttendanceData, String>>[
+//               DoughnutSeries<AttendanceData, String>(
+//                 dataSource: attendanceData,
+//                 xValueMapper: (AttendanceData data, _) => data.status,
+//                 yValueMapper: (AttendanceData data, _) => data.count,
+//                 dataLabelSettings: const DataLabelSettings(isVisible: false),
+//                 enableTooltip: true,
+//                 strokeWidth: 2,
+//                 strokeColor: Colors.white,
+//                 innerRadius: '70%',
+//                 pointColorMapper: (AttendanceData data, _) {
+//                   if (data.status == 'Present') return Colors.green.shade400;
+//                   if (data.status == 'Absent') return Colors.orange.shade400;
+//                   if (data.status == 'Late') return Colors.red.shade400;
+//                   if (data.status == 'On Leave') return Colors.grey.shade400;
+//                   return Colors.grey.shade400;
+//                 },
+//               )
+//             ],
+//             annotations: <CircularChartAnnotation>[
+//               CircularChartAnnotation(
+//                 widget: Column(
+//                   mainAxisAlignment: MainAxisAlignment.center,
+//                   children: [
+//                     Text(
+//                       _calculateTotalStaffs().toString(),
+//                       style: TextStyle(fontSize: 24 * fontSizeFactor, fontWeight: FontWeight.bold),
+//                     ),
+//                     Text(
+//                       '${_calculateClockedInPercentage()}% Clocked-In',
+//                       style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.grey.shade600),
+//                       textAlign: TextAlign.center,
+//                     ),
+//                   ],
 //                 ),
 //               ),
 //             ],
 //           ),
 //         ),
-//         StreamBuilder(
-//           stream: Stream.periodic(const Duration(seconds: 1)),
-//           builder: (context, snapshot) {
-//             return Text(
-//               DateFormat("hh:mm:ss a").format(DateTime.now()),
-//               style: TextStyle(
-//                 fontFamily: "NexaLight",
-//                 fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03, // Responsive font size
-//                 color: Colors.black54,
-//               ),
-//             );
-//           },
-//         ),
+//       ],
+//     );
+//   }
+//
+//   int _calculateTotalStaffs() {
+//     int totalStaffs = 0;
+//     if (attendanceData.isNotEmpty) {
+//       totalStaffs = attendanceData.fold(0, (sum, data) => sum + data.count);
+//     }
+//     return totalStaffs;
+//   }
+//
+//   double _calculateClockedInPercentage() {
+//     int totalPresent = 0;
+//     int totalStaffs = _calculateTotalStaffs();
+//     if (attendanceData.isNotEmpty) {
+//       totalPresent = attendanceData.firstWhere((data) => data.status == 'Present', orElse: () => AttendanceData('Present', 0)).count;
+//     }
+//     return totalStaffs > 0 ? double.parse(((totalPresent / totalStaffs) * 100).toStringAsFixed(1)) : 0.0;
+//   }
+//
+//
+//   Widget _buildAttendanceGenderSummary(String gender, List<AttendanceData> data, double fontSizeFactor) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Text(gender, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//         SizedBox(height: 8 * fontSizeFactor),
+//         ..._buildAttendanceSummary(gender, data, fontSizeFactor),
 //       ],
 //     );
 //   }
 //
 //
-//   Widget _buildClockInSlider(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Container(
-//       margin: EdgeInsets.only(top: screenWidth * 0.03, bottom: screenWidth * 0.03), // Responsive margins
-//       child: Builder(
-//         builder: (context) {
-//           final GlobalKey<SlideActionState> key = GlobalKey();
-//           return Obx(() => SlideAction(
-//             text: "Slide to Clock In",
-//             animationDuration: const Duration(milliseconds: 300),
-//             submittedIcon: controller.isLoading.value ? const CircularProgressIndicator() : const Icon(Icons.done),
-//             textStyle: TextStyle(
-//               color: Colors.black54,
-//               fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03, // Responsive font size
-//               fontFamily: "NexaLight",
-//             ),
-//             outerColor: Colors.white,
-//             innerColor: Colors.red,
-//             key: key,
-//             onSubmit: controller.isLoading.value ? null : () async {
-//               await controller.clockInUpdated(controller.lati.value, controller.longi.value, controller.location.value);
-//             },
-//             sliderButtonIcon: controller.isLoading.value ? const CircularProgressIndicator(strokeWidth: 2) : const Icon(Icons.arrow_forward_ios_rounded),
-//           ));
-//         },
-//       ),
-//     );
-//   }
+//   List<Widget> _buildAttendanceSummary(String gender, List<AttendanceData> data, double fontSizeFactor) {
+//     return data.where((item) => item.status != 'On Leave').map((item) {
+//       Color color;
+//       if (item.status == 'Present') color = Colors.green.shade400;
+//       else if (item.status == 'Absent') color = Colors.orange.shade400;
+//       else if (item.status == 'Late') color = Colors.red.shade400;
+//       else color = Colors.grey.shade400;
 //
-//   Widget _buildClockOutSlider(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Container(
-//       margin: EdgeInsets.only(top: screenWidth * 0.03, bottom: screenWidth * 0.03), // Responsive margins
-//       child: Builder(
-//         builder: (context) {
-//           final GlobalKey<SlideActionState> key = GlobalKey();
-//           return Obx(() => SlideAction(
-//             text: "Slide to Clock Out",
-//             animationDuration: const Duration(milliseconds: 300),
-//             submittedIcon: controller.isLoading.value ? const CircularProgressIndicator() : const Icon(Icons.done),
-//             textStyle: TextStyle(
-//               color: Colors.black54,
-//               fontSize: isMobile ? screenWidth * 0.045 : screenWidth * 0.03, // Responsive font size
-//               fontFamily: "NexaLight",
-//             ),
-//             outerColor: Colors.white,
-//             innerColor: Colors.red,
-//             key: key,
-//             onSubmit: controller.isLoading.value ? null : () async {
-//               await controller.clockOutUpdated(controller.lati.value, controller.longi.value, controller.location.value);
-//             },
-//             sliderButtonIcon: controller.isLoading.value ? const CircularProgressIndicator(strokeWidth: 2) : const Icon(Icons.arrow_forward_ios_rounded),
-//           ));
-//         },
-//       ),
-//     );
-//   }
+//       String statusText = '';
+//       if (item.status == 'Present') statusText = 'Present';
+//       else if (item.status == 'Absent') statusText = 'Absent';
+//       else if (item.status == 'Late') statusText = 'Late';
+//       else statusText = item.status;
 //
-//   Widget _buildOutOfOfficeButton(BuildContext context, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return StreamBuilder<String>(
-//       stream: controller.clockInStream,
-//       builder: (context, snapshot) {
-//         if (snapshot.hasData) {
-//           return const SizedBox.shrink();
-//         } else {
-//           return GestureDetector(
-//             onTap: () {
-//               controller.showBottomSheet3(context);
-//             },
-//             child: Container(
-//               width: screenWidth * 0.70,
-//               height: screenWidth * 0.08, // Responsive button height
-//               padding: const EdgeInsets.only(left: 20.0, bottom: 0.0),
+//
+//       return Padding(
+//         padding: EdgeInsets.symmetric(vertical: 4 * fontSizeFactor),
+//         child: Row(
+//           children: [
+//             Container(
+//               width: 30 * fontSizeFactor,
+//               height: 30 * fontSizeFactor,
 //               decoration: const BoxDecoration(
-//                 gradient: LinearGradient(colors: [Colors.red, Colors.black]),
-//                 borderRadius: BorderRadius.all(Radius.circular(20)),
+//                 shape: BoxShape.circle,
 //               ),
-//               child: Row(
-//                 mainAxisAlignment: MainAxisAlignment.center, // Center content
-//                 children: [
-//                   Text(
-//                     "Out Of Office? CLICK HERE",
-//                     style: TextStyle(
-//                       color: Colors.white,
-//                       fontWeight: FontWeight.bold,
-//                       fontSize: isMobile ? screenWidth * 0.04 : screenWidth * 0.03, // Responsive font size
-//                     ),
-//                   ),
-//                   SizedBox(width: screenWidth * 0.02), // Responsive spacing
-//                   const Icon(Icons.arrow_forward, size: 16, color: Colors.white),
-//                 ],
+//               child: Center(
+//                 child: Icon(Icons.person, size: 20 * fontSizeFactor, color: color),
 //               ),
 //             ),
-//           );
-//         }
-//       },
+//             SizedBox(width: 8 * fontSizeFactor),
+//             Text(statusText, style: TextStyle(fontSize: 12 * fontSizeFactor)),
+//           ],
+//         ),
+//       );
+//     }).toList();
+//   }
+//
+//
+//   Widget _buildLegendItem(Color color, String text, double fontSizeFactor) {
+//     return Row(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         Container(
+//           width: 12 * fontSizeFactor,
+//           height: 12 * fontSizeFactor,
+//           color: color,
+//         ),
+//         SizedBox(width: 5 * fontSizeFactor),
+//         Text(text, style: TextStyle(fontSize: 12 * fontSizeFactor)),
+//       ],
 //     );
 //   }
 //
-//   Widget _buildLocationStatusCard(BuildContext context, ClockAttendanceWebController controller, String clockInLocation, String clockOutLocation, double screenWidth, bool isMobile) {
-//     return Container(
-//       width: screenWidth * 0.9,
-//       margin: EdgeInsets.all(screenWidth * 0.02), // Responsive margins
-//       decoration: const BoxDecoration(
-//         gradient: LinearGradient(colors: [Colors.red, Colors.black]),
-//         borderRadius: BorderRadius.all(Radius.circular(24)),
+//
+//   Widget _buildWeeklyTrendChart(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor, double screenWidth) {
+//     return SfCartesianChart(
+//       primaryXAxis: CategoryAxis(),
+//       primaryYAxis: NumericAxis(title: AxisTitle(text: 'Number of Staff')),
+//       title: ChartTitle(text: 'Weekly Staff Clock-In Trend'),
+//       series: <LineSeries<WeeklyTrendData, String>>[
+//         LineSeries<WeeklyTrendData, String>(
+//           dataSource: weeklyTrendData,
+//           xValueMapper: (WeeklyTrendData data, _) => data.day,
+//           yValueMapper: (WeeklyTrendData data, _) => data.percentage,
+//           dataLabelSettings: const DataLabelSettings(isVisible: true),
+//         )
+//       ],
+//     );
+//   }
+//
+//   Widget _buildPerformanceGauge(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor, double screenWidth) {
+//     return SfRadialGauge(
+//       title: GaugeTitle(text: 'Overall Performance', textStyle: TextStyle(fontSize: 16 * fontSizeFactor)),
+//       axes: [
+//         RadialAxis(minimum: 0, maximum: 100,
+//             pointers: [
+//               NeedlePointer(value: 75)
+//             ],
+//             annotations: <GaugeAnnotation>[
+//               GaugeAnnotation(widget: Text('75%', style: TextStyle(fontSize: 24 * fontSizeFactor, fontWeight: FontWeight.bold)),
+//                   angle: 90, positionFactor: 0.5)
+//             ])
+//       ],
+//     );
+//   }
+//
+//   Widget _buildTaskCompletionChart(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor, double screenWidth) {
+//     return SfCartesianChart(
+//       title: ChartTitle(text: 'Late Arrivals & Geolocation Compliance Trends'),
+//       primaryXAxis: CategoryAxis(
+//         title: AxisTitle(text: 'Hour'),
+//         labelIntersectAction: AxisLabelIntersectAction.multipleRows,
 //       ),
-//       padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03, horizontal: screenWidth * 0.02), // Responsive padding
+//       primaryYAxis: NumericAxis(
+//         title: AxisTitle(text: 'Percentage'),
+//         minimum: 0,
+//         maximum: 100,
+//         interval: 20,
+//       ),
+//       legend: Legend(isVisible: true, position: LegendPosition.bottom),
+//       series: <AreaSeries<GeolocationComplianceData, String>>[
+//         AreaSeries<GeolocationComplianceData, String>(
+//           dataSource: geolocationComplianceData,
+//           xValueMapper: (GeolocationComplianceData data, _) => data.hour,
+//           yValueMapper: (GeolocationComplianceData data, _) => data.locationCompliance,
+//           name: 'Location compliance',
+//           color: const Color(0xFF24B3A8),
+//         ),
+//         AreaSeries<GeolocationComplianceData, String>(
+//           dataSource: geolocationComplianceData,
+//           xValueMapper: (GeolocationComplianceData data, _) => data.hour,
+//           yValueMapper: (GeolocationComplianceData data, _) => data.other,
+//           name: 'Late Arrivals (Other)',
+//           color: const Color(0xFFD9E3EA),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _buildFacilityClockInCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
+//     return Container(
+//       padding: EdgeInsets.all(15 * cardPaddingFactor * otherCardHeightFactor),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+//       ),
 //       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         mainAxisSize: MainAxisSize.min,
 //         children: [
-//           Text(
-//             "Location Status",
-//             textAlign: TextAlign.center,
-//             style: TextStyle(
-//               fontSize: isMobile ? screenWidth * 0.05 : screenWidth * 0.035, // Responsive font size
-//               fontFamily: "NexaBold",
-//               color: Colors.white,
-//               fontWeight: FontWeight.bold,
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               Text(
+//                 'All Facility Clock-In (Live Feed) - Today',
+//                 style: TextStyle(
+//                   fontWeight: FontWeight.bold,
+//                   color: Colors.black87,
+//                   fontSize: 16 * fontSizeFactor,
+//                 ),
+//               ),
+//               IconButton(onPressed: () {}, icon: Icon(Icons.more_vert, size: 24 * iconSizeFactor)),
+//             ],
+//           ),
+//           Divider(height: 10 * cardMarginFactor,),
+//           Padding(
+//             padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor, vertical: 4.0 * cardPaddingFactor),
+//             child: Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text("Name & Date", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
+//                 Text("Clock-In Time", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
+//               ],
 //             ),
 //           ),
-//           SizedBox(height: screenWidth * 0.02), // Responsive spacing
-//           SizedBox(
-//             width: screenWidth * 0.7,
-//             child: Row(
-//               mainAxisAlignment: MainAxisAlignment.center,
-//               crossAxisAlignment: CrossAxisAlignment.center,
-//               children: [
-//                 _buildLocationColumn("Clock-In Location", clockInLocation, controller, screenWidth, isMobile),
-//                 SizedBox(width: screenWidth * 0.01), // Responsive spacing
-//                 _buildLocationColumn("Clock-Out Location", clockOutLocation, controller, screenWidth, isMobile),
-//               ],
+//           Expanded(
+//             child: StreamBuilder<List<Map<String, dynamic>>>(
+//               stream: _facilityClockInDataStream(),
+//               builder: (context, snapshot) {
+//                 if (snapshot.connectionState == ConnectionState.waiting) {
+//                   return const Center(child: CircularProgressIndicator());
+//                 }
+//                 if (snapshot.hasError) {
+//                   return Center(child: Text('Error: ${snapshot.error}'));
+//                 }
+//                 List<Map<String, dynamic>> facilityClockInData = snapshot.data ?? [];
+//
+//                 facilityClockInData.sort((a, b) {
+//                   final timeFormat = DateFormat('hh:mm a');
+//                   DateTime? timeA, timeB;
+//                   try {
+//                     timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM');
+//                   } catch (e) {
+//                     timeA = DateTime(0);
+//                   }
+//                   try {
+//                     timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM');
+//                   } catch (e) {
+//                     timeB = DateTime(0);
+//                   }
+//
+//                   if (a['clockIn'] == 'N/A' && b['clockIn'] == 'N/A') return 0;
+//                   if (a['clockIn'] == 'N/A') return 1;
+//                   if (b['clockIn'] == 'N/A') return -1;
+//
+//                   return timeA!.compareTo(timeB!);
+//                 });
+//
+//
+//                 if (facilityClockInData.isEmpty) {
+//                   return Center(child: Text("No Clock-Ins Today", style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
+//                 }
+//                 return SingleChildScrollView(
+//                   scrollDirection: Axis.vertical,
+//                   child: Column(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: facilityClockInData.map((data) => _buildClockInListItem(
+//                       data['fullName'] ?? 'Unknown Staff',
+//                       data['date'] ?? 'N/A',
+//                       data['clockIn'] ?? 'N/A',
+//                       data['clockOut'] ?? '--/--',
+//                       fontSizeFactor,
+//                       cardMarginFactor,
+//                       cardPaddingFactor,
+//                     )).toList(),
+//                   ),
+//                 );
+//               },
 //             ),
 //           ),
 //         ],
@@ -517,1114 +853,442 @@
 //     );
 //   }
 //
-//   Widget _buildLocationColumn(String title, String initialLocation, ClockAttendanceWebController controller, double screenWidth, bool isMobile) {
-//     return Expanded(
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
+//   Widget _buildClockInListItem(String title, String date, String clockInTime, String clockOutTime, double fontSizeFactor, double cardMarginFactor, double cardPaddingFactor) {
+//     return Padding(
+//       padding: EdgeInsets.symmetric(vertical: 8.0 * cardMarginFactor, horizontal: 8.0 * cardPaddingFactor),
+//       child: Row(
+//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //         crossAxisAlignment: CrossAxisAlignment.center,
 //         children: [
-//           Text(
-//             title,
-//             style: TextStyle(
-//               fontFamily: "NexaLight",
-//               fontSize: isMobile ? screenWidth * 0.035 : screenWidth * 0.025, // Responsive font size
-//               color: Colors.white,
+//           Expanded(
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(
+//                   title,
+//                   style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 14 * fontSizeFactor),
+//                 ),
+//                 Text(
+//                   date,
+//                   style: TextStyle(color: Colors.black54, fontSize: 12 * fontSizeFactor),
+//                 ),
+//               ],
 //             ),
 //           ),
-//           SizedBox(height: screenWidth * 0.01), // Responsive spacing
-//           StreamBuilder<AttendanceModel?>(
-//             stream: controller.watchLastAttendance(DateFormat('MMMM').format(DateTime.now())),
-//             builder: (context, snapshot) {
-//               String location = initialLocation; // Default location
-//               if (snapshot.hasData && snapshot.data != null) {
-//                 if (title == "Clock-In Location") {
-//                   location = snapshot.data!.clockInLocation ?? "--/--";
-//                 } else if (title == "Clock-Out Location") {
-//                   location = snapshot.data!.clockOutLocation ?? "--/--";
-//                 }
-//               }
-//               return Text(
-//                 location,
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontFamily: "NexaBold",
-//                   fontSize: isMobile ? screenWidth * 0.03 : screenWidth * 0.02, // Responsive font size
-//                   color: Colors.white,
-//                 ),
-//               );
-//             },
+//           Row(
+//             mainAxisSize: MainAxisSize.min,
+//             crossAxisAlignment: CrossAxisAlignment.center,
+//             children: [
+//               Text(
+//                 clockInTime,
+//                 style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor),
+//               ),
+//               SizedBox(width: 5 * cardMarginFactor),
+//               if (clockInTime != 'N/A' && clockOutTime == '--/--')
+//                 Column(
+//                   children: [
+//                     Icon(Icons.check, color: Colors.orange, size: 16 * fontSizeFactor),
+//                     SizedBox(width: 3 * cardMarginFactor),
+//                     Text("Clocked-In,Yet to Clock Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.orange),)
+//                   ],
+//                 )
+//               else if (clockInTime != 'N/A' && clockOutTime != '--/--')
+//                 Column(
+//                   children: [
+//                     Icon(Icons.check_circle, color: Colors.green, size: 16 * fontSizeFactor),
+//                     SizedBox(width: 3 * cardMarginFactor),
+//                     Text("Clocked-In and Clocked Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.green),)
+//                   ],
+//                 )
+//               else
+//                 const SizedBox.shrink(),
+//             ],
 //           ),
 //         ],
 //       ),
 //     );
 //   }
 //
-//   Widget _buildAddCommentButton(BuildContext context, TextEditingController commentsController, double screenWidth, bool isMobile) {
-//     return GestureDetector(
-//       onTap: () => _handleAddComments(context, commentsController.text),
-//       child: Container(
-//         width: screenWidth * 0.40,
-//         height: screenWidth * 0.08, // Responsive button height
-//         decoration: const BoxDecoration(
-//           gradient: LinearGradient(colors: [Colors.red, Colors.black]),
-//           borderRadius: BorderRadius.all(Radius.circular(20)),
-//         ),
-//         child: const Center(
-//           child: Text(
-//             "Add Comment",
-//             style: TextStyle(
-//               color: Colors.white,
-//               fontWeight: FontWeight.bold,
-//               fontSize: 16,
-//             ),
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-//
-//
-//   Future<void> _handleAddComments(BuildContext context, String? commentsForAttendance) async {
-//     try {
-//       final lastAttend = await Get.find<ClockAttendanceWebController>().getLastAttendanceFordate(
-//           DateFormat("dd-MMMM-yyyy").format(DateTime.now()).toString());
-//
-//       if (lastAttend?.date == DateFormat('dd-MMMM-yyyy').format(DateTime.now())) {
-//         List<AttendanceModel> attendanceResult = await Get.find<ClockAttendanceWebController>()
-//             .getAttendanceForDate(DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
-//         final bioInfoForUser = await Get.find<ClockAttendanceWebController>().getUserDetail();
-//
-//         await _addComments(attendanceResult[0].id!, bioInfoForUser, attendanceResult, commentsForAttendance!);
-//       }
-//     } catch (e) {
-//       log("Attendance Comment Error ====== ${e.toString()}");
+//   Stream<List<Map<String, dynamic>>> _facilityClockInDataStream() {
+//     final currentUserUUID = FirebaseAuth.instance.currentUser?.uid;
+//     if (currentUserUUID == null || _currentUserState == null || _currentUserLocation == null || _currentUserStaffCategory == null) {
+//       print("Could not retrieve user info to load facility clock-in data stream.");
+//       return Stream.value([]);
 //     }
-//   }
 //
-//   Future<void> _addComments(
-//       int attendanceId,
-//       UserModel? bioInfoForUser,
-//       List<AttendanceModel> attendanceResult,
-//       String commentsForAttendance
-//       ) async {
+//     final currentDateFormatted = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
 //
-//     await Get.find<ClockAttendanceWebController>().updateAttendanceWithComment(
-//         attendanceId,
-//         AttendanceModel(),
-//         commentsForAttendance
-//     );
-//     Fluttertoast.showToast(
-//       msg: "Adding Comments..",
-//       toastLength: Toast.LENGTH_LONG,
-//       backgroundColor: Colors.black54,
-//       gravity: ToastGravity.BOTTOM,
-//       timeInSecForIosWeb: 1,
-//       textColor: Colors.white,
-//       fontSize: 16.0,
-//     );
-//   }
-// }
-//
-//
-// class ClockAttendanceWebController extends GetxController {
-//   final CollectionReference staffCollection = FirebaseFirestore.instance.collection('staff');
-//  // final String? _currentUserId = 'testUserID';
-//   // Replace with actual user ID retrieval logic for web
-//   final String? _currentUserId = 'F2tJh8tU2cTDCzwp0hL3HaamBS52';
-//
-//   ClockAttendanceWebController() {
-//     _init();
-//   }
-//
-//   final _clockInOutLock = Lock();
-//   var isCircularProgressBarOn = true.obs;
-//
-//   final _clockInStreamController = StreamController<String>.broadcast();
-//   Stream<String> get clockInStream => _clockInStreamController.stream;
-//
-//   final _clockOutStreamController = StreamController<String>.broadcast();
-//   Stream<String> get clockOutStream => _clockOutStreamController.stream;
-//
-//   final _clockInLocationStreamController = StreamController<String>.broadcast();
-//   Stream<String> get clockInLocationStream => _clockInLocationStreamController.stream;
-//
-//   final _clockOutLocationStreamController = StreamController<String>.broadcast();
-//   Stream<String> get clockOutLocationStream => _clockOutLocationStreamController.stream;
-//
-//   final _fullNameStreamController = StreamController<String>.broadcast();
-//   Stream<String> get fullNameStream => _fullNameStreamController.stream;
-//
-//   RxString clockIn = "--/--".obs;
-//   RxString clockOut = "--/--".obs;
-//   RxString durationWorked = "".obs;
-//   RxString location = "".obs;
-//   RxString comments = "No Comment".obs;
-//   RxString clockInLocation = "".obs;
-//   RxString clockOutLocation = "".obs;
-//   RxString role = "".obs;
-//   RxString firstName = "".obs;
-//   RxString lastName = "".obs;
-//   RxString emailAddress = "".obs;
-//   RxString firebaseAuthId = "".obs;
-//   RxDouble lati = 0.0.obs;
-//   RxDouble longi = 0.0.obs;
-//   RxDouble accuracy = 0.0.obs;
-//   RxDouble altitude = 0.0.obs;
-//   RxDouble speed = 0.0.obs;
-//   RxDouble speedAccuracy = 0.0.obs;
-//   RxDouble heading = 0.0.obs;
-//   RxDouble time = 0.0.obs;
-//   RxBool isMock = false.obs;
-//   RxDouble verticalAccuracy = 0.0.obs;
-//   RxDouble headingAccuracy = 0.0.obs;
-//   RxDouble elapsedRealtimeNanos = 0.0.obs;
-//   RxDouble elapsedRealtimeUncertaintyNanos = 0.0.obs;
-//   RxBool isLoading = false.obs;
-//   RxBool isSliderEnabled = true.obs;
-//   RxString administrativeArea = "".obs;
-//   RxBool isLocationTurnedOn = false.obs;
-//   Rx<geolocator.LocationPermission> isLocationPermissionGranted = geolocator.LocationPermission.denied.obs;
-//   RxBool isAlertSet = false.obs;
-//   RxBool isAlertSet2 = false.obs;
-//   RxBool isInsideAnyGeofence = false.obs;
-//   RxBool isInternetConnected = false.obs;
-//   RxBool isGpsEnabled = false.obs;
-//
-//   String currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
-//   DateTime ntpTime = DateTime.now();
-//   DateTime _selectedDate = DateTime.now();
-//   String _endTime = "11:59 PM";
-//   String _startTime = DateFormat("hh:mm a").format(DateTime.now()).toString();
-//   String _reasons = "";
-//   int _selectedColor = 0;
-//   var isDeviceConnected = false;
-//   List<String> reasonsForDayOff = [
-//     "Holiday",
-//     "Annual Leave",
-//     "Sick Leave",
-//     "Other Leaves",
-//     "Absent",
-//     "Travel",
-//     "Remote Working",
-//     "Security Crisis"
-//   ];
-//
-//   locationPkg.Location locationService = locationPkg.Location();
-//   Timer? _locationTimer;
-//
-//
-//   @override
-//   void onInit() {
-//     super.onInit();
-//     _init();
-//   }
-//
-//   @override
-//   void onClose() {
-//     _locationTimer?.cancel();
-//     _clockInStreamController.close();
-//     _clockOutStreamController.close();
-//     _clockInLocationStreamController.close();
-//     _clockOutLocationStreamController.close();
-//     _fullNameStreamController.close();
-//     super.onClose();
-//   }
-//
-//   void _init() async {
-//     await _loadNTPTime();
-//     await _getAttendanceSummary();
-//     await _getUserDetail();
-//     _getUserLocation();
-//   }
-//
-//   Future<void> _loadNTPTime() async {
-//     try {
-//       ntpTime = await NTP.now(lookUpAddress: "pool.ntp.org");
-//     } catch (e) {
-//       log("Error getting NTP time: ${e.toString()}");
-//       ntpTime = DateTime.now();
-//     }
-//   }
-//
-//   Future<UserModel?> getUserDetail() async {
-//     if (_currentUserId != null) {
-//       try {
-//         CollectionReference<Map<String, dynamic>> correctlyTypedStaffCollection = FirebaseFirestore.instance.collection('staff');
-//         DocumentSnapshot<Map<String, dynamic>> snapshot = await correctlyTypedStaffCollection.doc(_currentUserId!).get();
-//         if (snapshot.exists && snapshot.data() != null) {
-//           Map<String, dynamic>? userData = snapshot.data();
-//           return UserModel.fromMap(userData!);
-//         } else {
-//           print('User data not found for ID: $_currentUserId');
-//           return null;
-//         }
-//       } catch (error) {
-//         print('Error fetching user details from Firestore: $error');
-//         return null;
-//       }
-//     } else {
-//       print('No user ID available.');
-//       return null;
-//     }
-//   }
-//
-//   Future<void> _getUserDetail() async {
-//     UserModel? userDetail = await getUserDetail();
-//     if (userDetail != null && !isClosed) {
-//       firebaseAuthId.value = userDetail.firebaseAuthId ?? "";
-//       firstName.value = userDetail.firstName ?? "";
-//       lastName.value = userDetail.lastName ?? "";
-//       emailAddress.value = userDetail.emailAddress ?? "";
-//       role.value = userDetail.role ?? "";
-//       _fullNameStreamController.add("${userDetail.firstName ?? ""} ${userDetail.lastName ?? ""}");
-//     }
-//   }
-//
-//   Stream<AttendanceModel?> watchLastAttendance(String month) {
-//     if (_currentUserId == null) {
-//       return Stream.value(null);
-//     }
-//     return staffCollection
-//         .doc(_currentUserId)
+//     Stream<DocumentSnapshot> currentUserRecordStream = FirebaseFirestore.instance
+//         .collection('Staff')
+//         .doc(currentUserUUID)
 //         .collection('Record')
-//         .where('month', isEqualTo: month)
-//         .orderBy('clockIn', descending: true)
-//         .limit(1)
-//         .snapshots()
-//         .map((snapshot) {
-//       if (snapshot.docs.isNotEmpty) {
-//         return AttendanceModel.fromMap(snapshot.docs.first.data()!)..id = snapshot.docs.first.id.hashCode;
-//       } else {
-//         return null;
-//       }
-//     });
-//   }
+//         .doc(currentDateFormatted)
+//         .snapshots();
+//
+//     Stream<QuerySnapshot> facilityStaffRecordsStream = FirebaseFirestore.instance
+//         .collection('Staff')
+//         .where('state', isEqualTo: _currentUserState)
+//         .where('location', isEqualTo: _currentUserLocation)
+//         .snapshots();
 //
 //
-//   Future<AttendanceModel?> getLastAttendanceFordate(String date) async {
-//     if (_currentUserId != null) {
-//       try {
-//         // IMPORTANT: Ensure you have created the composite index in Firebase Console as per the error message.
-//         // The index should be on 'date' (ascending), 'clockIn' (ascending), and '__name__' (ascending) in the 'attendance' collection group.
-//         QuerySnapshot<Map<String, dynamic>> querySnapshot = await staffCollection
-//             .doc(_currentUserId)
-//             .collection('Record')
-//             .where('date', isEqualTo: date)
-//             .orderBy('clockIn', descending: true)
-//             .limit(1)
-//             .get();
+//     return Rx.combineLatest2(
+//       currentUserRecordStream,
+//       facilityStaffRecordsStream,
+//           (currentUserRecordSnapshot, facilityStaffSnapshot) async* {
+//         List<Map<String, dynamic>> clockInData = [];
 //
-//         if (querySnapshot.docs.isNotEmpty) {
-//           DocumentSnapshot<Map<String, dynamic>> lastAttendanceDoc = querySnapshot.docs.first;
-//           return AttendanceModel.fromMap(lastAttendanceDoc.data()!)..id = lastAttendanceDoc.id.hashCode;
-//         } else {
-//           return null;
+//         if (currentUserRecordSnapshot.exists) {
+//           Map<String, dynamic> recordData = currentUserRecordSnapshot.data() as Map<String, dynamic>? ?? {};
+//           DocumentSnapshot staffDataSnapshot = await FirebaseFirestore.instance.collection('Staff').doc(currentUserUUID).get();
+//           Map<String, dynamic> staffData = staffDataSnapshot.data() as Map<String, dynamic>? ?? {};
+//
+//           clockInData.add({
+//             'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
+//             'date': recordData['date'] ?? 'N/A',
+//             'clockIn': recordData['clockIn'] ?? 'N/A',
+//             'clockOut': recordData['clockOut'] ?? '--/--',
+//           });
 //         }
-//       } catch (error) {
-//         print('Error fetching last attendance from Firestore: $error');
-//         return null;
-//       }
-//     }
-//     return null;
-//   }
 //
+//         for (var staffDoc in facilityStaffSnapshot.docs) {
+//           if (staffDoc.id == currentUserUUID) continue;
 //
-//   Future<List<AttendanceModel>> getAttendanceForDate(String date) async {
-//     List<AttendanceModel> attendanceList = [];
-//     if (_currentUserId != null) {
-//       try {
-//         QuerySnapshot<Map<String, dynamic>> querySnapshot = await staffCollection
-//             .doc(_currentUserId)
-//             .collection('Record')
-//             .where('date', isEqualTo: date)
-//             .get();
+//           DocumentSnapshot recordSnapshot = await staffDoc.reference
+//               .collection('Record')
+//               .doc(currentDateFormatted)
+//               .get();
 //
-//         querySnapshot.docs.forEach((doc) {
-//           attendanceList.add(AttendanceModel.fromMap(doc.data())..id = doc.id.hashCode);
-//         });
-//       } catch (error) {
-//         print('Error fetching attendance for date from Firestore: $error');
-//       }
-//     }
-//     return attendanceList;
-//   }
+//           if (recordSnapshot.exists) {
+//             Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>? ?? {};
+//             Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>? ?? {};
 //
-//
-//   Future<void> _getAttendanceSummary() async {
-//     try {
-//       final attendanceLast = await getLastAttendanceFordate(DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
-//
-//       if (attendanceLast?.date == currentDate) {
-//         clockIn.value = attendanceLast?.clockIn ?? "--/--";
-//         clockOut.value = attendanceLast?.clockOut ?? "--/--";
-//         clockInLocation.value = attendanceLast?.clockInLocation ?? "";
-//         clockOutLocation.value = attendanceLast?.clockOutLocation ?? "";
-//         durationWorked.value = attendanceLast?.durationWorked ?? "";
-//         comments.value = attendanceLast?.comments ?? "No Comment";
-//         _clockInStreamController.add(clockIn.value);
-//         _clockOutStreamController.add(clockOut.value);
-//         _clockInLocationStreamController.add(clockInLocation.value);
-//         _clockOutLocationStreamController.add(clockOutLocation.value);
-//       } else {
-//         final attendanceResult = await getAttendanceForDate(DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
-//         if (attendanceResult.isNotEmpty) {
-//           clockIn.value = attendanceResult[0].clockIn ?? "--/--";
-//           clockOut.value = attendanceResult[0].clockOut ?? "--/--";
-//           clockInLocation.value = attendanceResult[0].clockInLocation ?? "";
-//           clockOutLocation.value = attendanceResult[0].clockOutLocation ?? "";
-//           durationWorked.value = attendanceResult[0].durationWorked ?? "";
-//           comments.value = attendanceResult[0].comments ?? "No Comment";
-//           _clockInStreamController.add(clockIn.value);
-//           _clockOutStreamController.add(clockOut.value);
-//           _clockInLocationStreamController.add(clockInLocation.value);
-//           _clockOutLocationStreamController.add(clockOutLocation.value);
-//         } else {
-//           clockIn.value = "--/--";
-//           clockOut.value = "--/--";
-//           clockInLocation.value = "";
-//           clockOutLocation.value = "";
-//           durationWorked.value = "";
-//           comments.value = "No Comment";
-//           _clockInStreamController.add(clockIn.value);
-//           _clockOutStreamController.add(clockOut.value);
-//           _clockInLocationStreamController.add(clockInLocation.value);
-//           _clockOutLocationStreamController.add(clockOutLocation.value);
-//         }
-//       }
-//     } catch (e) {
-//       log(e.toString());
-//     }
-//   }
-//
-//
-//   Future<void> updateAttendanceWithComment(
-//       int attendanceId,
-//       AttendanceModel attendanceModel,
-//       String commentsForAttendance
-//       ) async {
-//     final updatedAttendance = {'comments': commentsForAttendance};
-//     if (_currentUserId != null) {
-//       DocumentReference attendanceRef = staffCollection.doc(_currentUserId).collection('Record').doc(attendanceId.toString());
-//       await attendanceRef.update(updatedAttendance);
-//     } else {
-//       Fluttertoast.showToast(
-//         msg: "User ID not available.",
-//         toastLength: Toast.LENGTH_LONG,
-//         backgroundColor: Colors.black54,
-//         gravity: ToastGravity.BOTTOM,
-//         timeInSecForIosWeb: 1,
-//         textColor: Colors.white,
-//         fontSize: 16.0,
-//       );
-//     }
-//   }
-//
-//
-//   Future<void> clockInUpdated(double newlatitude, double newlongitude, String newlocation) async {
-//     print("clockInUpdated Web Firestore");
-//     if (!isLoading.value) {
-//       await _clockInOutLock.synchronized(() async {
-//         try {
-//           currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
-//           final lastAttend = await getLastAttendanceFordate(currentDate);
-//
-//           if (lastAttend == null || lastAttend.date != currentDate) {
-//             if (newlatitude != 0.0) {
-//               final attendance = AttendanceModel(
-//                 clockIn: DateFormat('hh:mm a').format(DateTime.now()),
-//                 date: currentDate,
-//                 clockInLatitude: newlatitude,
-//                 clockInLocation: newlocation,
-//                 clockInLongitude: newlongitude,
-//                 clockOut: "--/--",
-//                 clockOutLatitude: 0.0,
-//                 clockOutLocation: '',
-//                 clockOutLongitude: 0.0,
-//                 isSynced: false,
-//                 voided: false,
-//                 isUpdated: false,
-//                 durationWorked: "0 hours 0 minutes",
-//                 noOfHours: 0.0,
-//                 offDay: false,
-//                 month: DateFormat('MMMM yyyy').format(DateTime.now()),
-//                 comments: "No Comment",
-//               ).toMap();
-//
-//               if (_currentUserId != null) {
-//                 DocumentReference newAttendanceRef = staffCollection.doc(_currentUserId).collection('Record').doc();
-//                 await newAttendanceRef.set(attendance);
-//                 _clockInStreamController.add(DateFormat('hh:mm a').format(DateTime.now()));
-//                 _clockInLocationStreamController.add(location.value);
-//                 Fluttertoast.showToast(msg: "Clocking-In..", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//                 Get.off(() => ClockAttendanceWeb());
-//               } else {
-//                 Fluttertoast.showToast(msg: "User ID not available.", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//               }
-//             } else {
-//               Fluttertoast.showToast(msg: "Latitude and Longitude cannot be 0.0..", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//             }
-//           } else if (lastAttend != null && lastAttend.date == currentDate) {
-//             Fluttertoast.showToast(
-//                 msg: "You have already clocked In Today",
-//                 toastLength: Toast.LENGTH_LONG,
-//                 backgroundColor: Colors.black54,
-//                 gravity: ToastGravity.BOTTOM,
-//                 timeInSecForIosWeb: 1,
-//                 textColor: Colors.white,
-//                 fontSize: 16.0
-//             );
+//             clockInData.add({
+//               'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
+//               'date': recordData['date'] ?? 'N/A',
+//               'clockIn': recordData['clockIn'] ?? 'N/A',
+//               'clockOut': recordData['clockOut'] ?? '--/--',
+//             });
 //           }
-//         } catch (e) {
-//           Fluttertoast.showToast(msg: "Error from clock in: $e", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
 //         }
-//       });
-//     }
+//         yield clockInData;
+//       },
+//     ).asyncMap((stream) async => await stream.first);
 //   }
 //
 //
-//   Future<void> clockOutUpdated(double newlatitude, double newlongitude, String newlocation) async {
-//     print("clockOutUpdated Web Firestore");
-//
-//     if (!isLoading.value) {
-//       await _clockInOutLock.synchronized(() async {
-//         try {
-//           currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
-//           final lastAttend = await getLastAttendanceFordate(currentDate);
-//
-//           if (lastAttend?.date == currentDate && lastAttend?.clockOut == "--/--") {
-//             final clockInDateTime = DateFormat('dd-MMMM-yyyy hh:mm a').parse('${lastAttend!.date} ${lastAttend.clockIn}');
-//             final now = DateTime.now();
-//             final difference = now.difference(clockInDateTime);
-//
-//             if (difference < const Duration(hours: 1)) {
-//               Fluttertoast.showToast(msg: "You can clock out after 1 hour", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//               isLoading.value = false;
-//             } else {
-//               if (lastAttend.clockIn == DateFormat('hh:mm a').format(DateTime.now())) {
-//                 Fluttertoast.showToast(msg: "You cannot clock in and clock out the same time", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//                 isLoading.value = false;
-//               } else {
-//                 final attendanceResult = await getAttendanceForDate(currentDate);
-//                 if (newlatitude != 0.0) {
-//                   final updatedAttendance = {
-//                     'clockOut': DateFormat('hh:mm a').format(DateTime.now()),
-//                     'clockOutLatitude': newlatitude,
-//                     'clockOutLongitude': newlongitude,
-//                     'clockOutLocation': newlocation,
-//                     'isUpdated': true,
-//                     'durationWorked': _diffClockInOut(attendanceResult[0].clockIn.toString(), DateFormat('h:mm a').format(DateTime.now())),
-//                     'noOfHours': _diffHoursWorked(attendanceResult[0].clockIn.toString(), DateFormat('h:mm a').format(DateTime.now())),
-//                   };
-//                   if (_currentUserId != null) {
-//                     DocumentReference attendanceRef = staffCollection.doc(_currentUserId).collection('Record').doc(attendanceResult[0].id.toString());
-//                     await attendanceRef.update(updatedAttendance);
-//                     _clockOutStreamController.add(DateFormat('hh:mm a').format(DateTime.now()));
-//                     _clockOutLocationStreamController.add(location.value);
-//                     Fluttertoast.showToast(msg: "Clocking-Out..", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//                     UserModel? bioInfoForUser = await getUserDetail();
-//                     // Get.off(() => bioInfoForUser!.role == "User" ? UserDashBoard(service: null) : AdminDashBoard(service: null));
-//                   } else {
-//                     Fluttertoast.showToast(msg: "User ID not available.", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//                   }
-//                 } else {
-//                   Fluttertoast.showToast(msg: "Latitude and Longitude cannot be 0.0..", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//                 }
-//               }
-//             }
-//           } else  if (lastAttend?.clockOut != "--/--"){
-//             Fluttertoast.showToast(
-//                 msg: "You have already clocked Out Today",
-//                 toastLength: Toast.LENGTH_LONG,
-//                 backgroundColor: Colors.black54,
-//                 gravity: ToastGravity.BOTTOM,
-//                 timeInSecForIosWeb: 1,
-//                 textColor: Colors.white,
-//                 fontSize: 16.0
-//             );
-//           }
-//
-//
-//           await _getAttendanceSummary();
-//
-//         } catch (e) {
-//           Fluttertoast.showToast(msg: "Error: $e", toastLength: Toast.LENGTH_LONG, backgroundColor: Colors.black54, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, textColor: Colors.white, fontSize: 16.0);
-//         }
-//       });
-//     }
-//   }
-//
-//
-//   String _diffClockInOut(String clockInTime, String clockOutTime) {
-//     try{
-//       var format = DateFormat("h:mm a");
-//       var clockTimeIn = format.parse(clockInTime);
-//       var clockTimeOut = format.parse(clockOutTime);
-//
-//       if (clockTimeIn.isAfter(clockTimeOut)) {
-//         clockTimeOut = clockTimeOut.add(const Duration(days: 1));
-//       } else if (clockInTime == "--/--" || clockOutTime == "--/--") {
-//         return "Time not set";
-//       }
-//
-//       Duration diff = clockTimeOut.difference(clockTimeIn);
-//       final hours = diff.inHours;
-//       final minutes = diff.inMinutes % 60;
-//
-//       log('$hours hours $minutes minute');
-//       return ('$hours hour(s) $minutes minute(s)');
-//     }catch(e){
-//       return "0 hour(s) 0 minute(s)";
-//     }
-//
-//   }
-//
-//
-//   double _diffHoursWorked(String clockInTime, String clockOutTime) {
-//     try{
-//       var format = DateFormat("h:mm a");
-//       var clockTimeIn = format.parse(clockInTime);
-//       var clockTimeOut = format.parse(clockOutTime);
-//       if (clockTimeIn.isAfter(clockTimeOut)) {
-//         clockTimeOut = clockTimeOut.add(const Duration(days: 1));
-//       }
-//
-//       Duration diff = clockTimeOut.difference(clockTimeIn);
-//       final hours = diff.inHours;
-//       final minutes = diff.inMinutes % 60;
-//       final minCal = minutes / 60;
-//       String inStringMin = minCal.toStringAsFixed(3);
-//       double roundedMinDouble = double.parse(inStringMin);
-//       final totalTime = hours + roundedMinDouble;
-//
-//       log('$hours hours $minutes minutes');
-//       return totalTime;
-//     }catch(e){
-//       return 0.0;
-//     }
-//   }
-//
-//
-//   void showBottomSheet3(BuildContext context) {
-//     double screenHeight = MediaQuery.of(context).size.height;
-//     double screenWidth = MediaQuery.of(context).size.width;
-//     final ClockAttendanceWebController controller = Get.find<ClockAttendanceWebController>();
-//     Get.bottomSheet(
-//       StatefulBuilder(
-//         builder: (context, setState) {
-//           return Container(
-//             padding: const EdgeInsets.only(left: 20, right: 20),
-//             width: screenWidth,
-//             height: screenHeight * 0.65,
-//             color: Colors.white,
-//             alignment: Alignment.center,
-//             child: SingleChildScrollView(
-//               padding: const EdgeInsets.only(top: 20.0),
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   Text(
-//                     "Out Of Office?",
-//                     style: TextStyle(
-//                       color: Colors.black87,
-//                       fontWeight: FontWeight.bold,
-//                       fontSize: screenWidth / 15,
-//                     ),
+//   Widget _buildTimesheetStatusCard(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor) {
+//     return Card(
+//       elevation: 4,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
+//       child: Padding(
+//         padding: EdgeInsets.all(20.0 * cardPaddingFactor),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: <Widget>[
+//             Text(
+//               'Timesheet Status',
+//               style: TextStyle(fontSize: 20 * fontSizeFactor, fontWeight: FontWeight.bold),
+//             ),
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//                 Text('${5} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor)),
+//               ],
+//             ),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//                 Text('${3} Timesheets', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor)),
+//               ],
+//             ),
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             SizedBox(
+//               height: 80 * cardMarginFactor,
+//               child: SfLinearGauge(
+//                 minimum: 0,
+//                 maximum: 100,
+//                 orientation: LinearGaugeOrientation.horizontal,
+//                 majorTickStyle: const LinearTickStyle(length: 12),
+//                 minorTickStyle: const LinearTickStyle(length: 8),
+//                 axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+//                 barPointers: <LinearBarPointer>[
+//                   LinearBarPointer(
+//                     value: 75,
+//                     thickness: 20 * cardMarginFactor,
+//                     color: Colors.blue.shade400,
+//                     edgeStyle: LinearEdgeStyle.bothCurve,
 //                   ),
-//                   const SizedBox(height: 10),
-//                   Obx(() => Text(
-//                     "Current Latitude: ${controller.lati.value.toStringAsFixed(6)}, Current Longitude: ${controller.longi.value.toStringAsFixed(6)}",
-//                     style: TextStyle(
-//                       fontFamily: "NexaBold",
-//                       fontSize: screenWidth / 23,
-//                     ),
-//                   )),
-//                   const SizedBox(height: 10),
-//                   Obx(() => Text(
-//                     "Current State: ${controller.administrativeArea.value}",
-//                     style: TextStyle(
-//                       fontFamily: "NexaBold",
-//                       fontSize: screenWidth / 23,
-//                     ),
-//                   )),
-//                   const SizedBox(height: 10),
-//                   Obx(() => Text(
-//                     "Current Location: ${controller.location.value}",
-//                     style: TextStyle(
-//                       fontFamily: "NexaBold",
-//                       fontSize: screenWidth / 23,
-//                     ),
-//                   )),
-//                   const SizedBox(height: 10),
-//                   // MyInputField (You may need to adapt MyInputField for web or use standard TextField)
-//                   _buildInputField("Date", DateFormat("dd/MM/yyyy").format(_selectedDate), IconButton(
-//                     onPressed: () {
-//                       _getDateFromUser(setState);
-//                     },
-//                     icon: const Icon(Icons.calendar_today_outlined, color: Colors.grey),
-//                   )),
-//                   _buildDropdownInputField("Reasons For Day off", _reasons, reasonsForDayOff, (String? newValue) {
-//                     setState(() {
-//                       _reasons = newValue!;
-//                     });
-//                   }),
-//                   Row(
-//                     children: [
-//                       Expanded(
-//                         child: _buildInputField("Start Time", _startTime, IconButton(
-//                           onPressed: () {
-//                             _getTimeFromUser(isStartTime: true, setState: setState);
-//                           },
-//                           icon: const Icon(Icons.access_time_rounded, color: Colors.grey),
-//                         )),
-//                       ),
-//                       const SizedBox(width: 12),
-//                       Expanded(
-//                         child: _buildInputField("End Time", _endTime, IconButton(
-//                           onPressed: () {
-//                             _getTimeFromUser(isStartTime: false, setState: setState);
-//                           },
-//                           icon: const Icon(Icons.access_time_rounded, color: Colors.grey),
-//                         )),
-//                       ),
-//                     ],
+//                 ],
+//                 markerPointers: <LinearShapePointer>[
+//                   LinearShapePointer(
+//                     value: 75,
+//                     offset: 25,
+//                     shapeType: LinearShapePointerType.circle,
+//                     color: Colors.blue.shade700,
 //                   ),
-//                   const SizedBox(height: 18),
-//                   Row(
-//                     crossAxisAlignment: CrossAxisAlignment.center,
-//                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                     children: [
-//                       Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           Text(
-//                             "Color",
-//                             style: TextStyle(
-//                               color: Get.isDarkMode ? Colors.white : Colors.black,
-//                               fontSize: screenWidth / 21,
-//                               fontFamily: "NexaBold",
-//                             ),
-//                           ),
-//                           const SizedBox(height: 8.0),
-//                           Wrap(
-//                             crossAxisAlignment: WrapCrossAlignment.start,
-//                             children: List<Widget>.generate(3, (int index) {
-//                               return GestureDetector(
-//                                 onTap: () {
-//                                   setState(() {
-//                                     _selectedColor = index;
-//                                   });
-//                                 },
-//                                 child: Padding(
-//                                   padding: const EdgeInsets.all(8.0),
-//                                   child: CircleAvatar(
-//                                     radius: 14,
-//                                     backgroundColor: index == 0 ? Colors.red : index == 1 ? Colors.blueAccent : Colors.yellow,
-//                                     child: _selectedColor == index ? const Icon(Icons.done, color: Colors.white, size: 16) : Container(),
-//                                   ),
-//                                 ),
-//                               );
-//                             }),
-//                           ),
-//                         ],
-//                       ),
-//                       GestureDetector(
-//                         onTap: () => _validateData(context),
-//                         child: Container(
-//                           width: 120,
-//                           height: 60,
-//                           decoration: const BoxDecoration(
-//                             gradient: LinearGradient(colors: [Colors.red, Colors.black]),
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                           ),
-//                           child: const Center(
-//                             child: Text(
-//                               "Submit",
-//                               style: TextStyle(color: Colors.white),
-//                             ),
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   const SizedBox(height: 40),
 //                 ],
 //               ),
 //             ),
-//           );
-//         },
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Align(
+//               alignment: Alignment.bottomRight,
+//               child: TextButton(
+//                 onPressed: () {
+//                   print('Navigate to Timesheet Module');
+//                 },
+//                 child: Text('View Timesheets', style: TextStyle(fontSize: 14 * fontSizeFactor)),
+//               ),
+//             ),
+//           ],
+//         ),
 //       ),
-//       isScrollControlled: true,
 //     );
 //   }
 //
-//   Widget _buildInputField(String title, String hint, Widget widget) {
-//     return Container(
-//       margin: const EdgeInsets.only(top: 16),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Text(title, style: Get.textTheme.titleSmall),
-//           Container(
-//             height: 52,
-//             margin: const EdgeInsets.only(top: 8.0),
-//             padding: const EdgeInsets.only(left: 14, right: 14),
-//             decoration: BoxDecoration(
-//               border: Border.all(color: Colors.grey, width: 1.0),
-//               borderRadius: BorderRadius.circular(12),
+//   Widget _buildLeaveRequestsCard(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor) {
+//     return Card(
+//       elevation: 4,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
+//       child: Padding(
+//         padding: EdgeInsets.all(20.0 * cardPaddingFactor),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: <Widget>[
+//             Text(
+//               'Leave Requests',
+//               style: TextStyle(fontSize: 20 * fontSizeFactor, fontWeight: FontWeight.bold),
 //             ),
-//             child: Row(
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //               children: [
-//                 Expanded(
-//                   child: Text(hint, style: TextStyle(color: Colors.grey)),
-//                 ),
-//                 widget,
+//                 Text('Pending Requests:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//                 Text('${pendingLeaveRequests.length} Requests', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor)),
 //               ],
 //             ),
-//           ),
-//         ],
+//             SizedBox(height: 10 * cardMarginFactor),
+//             SizedBox(
+//               height: 150 * cardMarginFactor,
+//               child: ListView.builder(
+//                 itemCount: pendingLeaveRequests.length,
+//                 itemBuilder: (context, index) {
+//                   final request = pendingLeaveRequests[index];
+//                   return ListTile(
+//                     leading: Icon(Icons.pending_actions, color: Colors.orange, size: 24 * fontSizeFactor),
+//                     title: Text(request.employeeName, style: TextStyle(fontSize: 14 * fontSizeFactor)),
+//                     subtitle: Text('${request.leaveType} - ${request.startDate}', style: TextStyle(fontSize: 12 * fontSizeFactor)),
+//                     trailing: IconButton(
+//                       icon: Icon(Icons.arrow_forward_ios, size: 20 * fontSizeFactor),
+//                       onPressed: () {
+//                         print('Navigate to Leave Request Details for ${request.employeeName}');
+//                       },
+//                     ),
+//                   );
+//                 },
+//               ),
+//             ),
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Text('Upcoming Leaves', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             SizedBox(
+//               height: 100 * cardMarginFactor,
+//               child: ListView.builder(
+//                 itemCount: upcomingLeaves.length,
+//                 itemBuilder: (context, index) {
+//                   final leave = upcomingLeaves[index];
+//                   return ListTile(
+//                     leading: Icon(Icons.calendar_today, color: Colors.green, size: 24 * fontSizeFactor),
+//                     title: Text(leave.employeeName, style: TextStyle(fontSize: 14 * fontSizeFactor)),
+//                     subtitle: Text('${leave.leaveType} - ${leave.startDate}', style: TextStyle(fontSize: 12 * fontSizeFactor)),
+//                   );
+//                 },
+//               ),
+//             ),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Align(
+//               alignment: Alignment.bottomRight,
+//               child: TextButton(
+//                 onPressed: () {
+//                   print('Navigate to Leave Requests Module');
+//                 },
+//                 child: Text('View All Leave Requests', style: TextStyle(fontSize: 14 * fontSizeFactor)),
+//               ),
+//             ),
+//           ],
+//         ),
 //       ),
 //     );
 //   }
 //
-//   Widget _buildDropdownInputField(String title, String hint, List<String> items, Function(String?) onChanged) {
-//     return Container(
-//       margin: const EdgeInsets.only(top: 16),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Text(title, style: Get.textTheme.titleSmall),
-//           Container(
-//             height: 52,
-//             margin: const EdgeInsets.only(top: 8.0),
-//             padding: const EdgeInsets.only(left: 14, right: 14),
-//             decoration: BoxDecoration(
-//               border: Border.all(color: Colors.grey, width: 1.0),
-//               borderRadius: BorderRadius.circular(12),
+//   Widget _buildTaskManagementCard(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor, double screenWidth) {
+//     return Card(
+//       elevation: 4,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
+//       child: Padding(
+//         padding: EdgeInsets.all(20.0 * cardPaddingFactor),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: <Widget>[
+//             Text(
+//               'Task Management',
+//               style: TextStyle(fontSize: 20 * fontSizeFactor, fontWeight: FontWeight.bold),
 //             ),
-//             child: Row(
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //               children: [
-//                 Expanded(
-//                   child: DropdownButton<String>(
-//                     value: hint.isNotEmpty ? hint : null, // Set value to hint if not empty, otherwise null
-//                     hint: Text(hint.isEmpty ? "Select Reason" : hint, style: TextStyle(color: Colors.grey)), // Show "Select Reason" hint if hint is empty
-//                     icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
-//                     iconSize: 32,
-//                     elevation: 4,
-//                     style: TextStyle(color: Get.isDarkMode ? Colors.white : Colors.black),
-//                     underline: Container(height: 0),
-//                     onChanged: onChanged,
-//                     items: items.map<DropdownMenuItem<String>>((String value) {
-//                       return DropdownMenuItem<String>(
-//                         value: value,
-//                         child: Text(value, style: TextStyle(color: Get.isDarkMode ? Colors.white : Colors.black)),
-//                       );
-//                     }).toList(),
+//                 Text('Tasks In Progress:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//                 Text('${12} Tasks', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor)),
+//               ],
+//             ),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text('Overdue Tasks:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//                 Text('${2} Tasks', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor)),
+//               ],
+//             ),
+//             SizedBox(height: 20 * cardMarginFactor),
+//             Text('Task Completion Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
+//             SizedBox(height: 10 * cardMarginFactor),
+//             SizedBox(
+//               height: 80 * cardMarginFactor,
+//               child: SfLinearGauge(
+//                 minimum: 0,
+//                 maximum: 100,
+//                 orientation: LinearGaugeOrientation.horizontal,
+//                 majorTickStyle: const LinearTickStyle(length: 12),
+//                 minorTickStyle: const LinearTickStyle(length: 8),
+//                 axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+//                 barPointers: <LinearBarPointer>[
+//                   LinearBarPointer(
+//                     value: 60,
+//                     thickness: 20 * cardMarginFactor,
+//                     color: Colors.green.shade400,
+//                     edgeStyle: LinearEdgeStyle.bothCurve,
 //                   ),
-//                 ),
-//               ],
+//                 ],
+//                 markerPointers: <LinearShapePointer>[
+//                   LinearShapePointer(
+//                     value: 60,
+//                     offset: 25,
+//                     shapeType: LinearShapePointerType.circle,
+//                     color: Colors.green.shade700,
+//                   ),
+//                 ],
+//               ),
 //             ),
-//           ),
-//         ],
+//             SizedBox(height: 10 * cardMarginFactor),
+//             Align(
+//               alignment: Alignment.bottomRight,
+//               child: TextButton(
+//                 onPressed: () {
+//                   print('Navigate to Task Management Module');
+//                 },
+//                 child: Text('View Tasks', style: TextStyle(fontSize: 14 * fontSizeFactor)),
+//               ),
+//             ),
+//             SizedBox(height:10 * cardMarginFactor),
+//             SizedBox(
+//               height: 80 * cardMarginFactor,
+//               child: SfCartesianChart(
+//                 primaryXAxis: CategoryAxis(),
+//                 series: [
+//                   ColumnSeries<TaskCompletionData, String>(
+//                     dataSource: taskCompletionData,
+//                     xValueMapper: (TaskCompletionData data, _) => data.task,
+//                     yValueMapper: (TaskCompletionData data, _) => data.completion,
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ],
+//         ),
 //       ),
 //     );
 //   }
-//
-//
-//   void _validateData(BuildContext context) {
-//     if (_reasons.isNotEmpty) {
-//       _addDaysOffToDb();
-//       Get.off(() => ClockAttendanceWeb());
-//     } else if (_reasons.isEmpty) {
-//       Get.snackbar(
-//         "Required",
-//         "Reasons For Day Off is required!",
-//         colorText: Colors.white,
-//         snackPosition: SnackPosition.BOTTOM,
-//         backgroundColor: Colors.black87,
-//         icon: const Icon(Icons.warning_amber_rounded, color: Colors.white),
-//       );
-//     }
-//   }
-//
-//   _addDaysOffToDb() async {
-//     final attendanceLast = await getLastAttendanceFordate(
-//         DateFormat('dd-MMMM-yyyy').format(DateTime.now()));
-//
-//     if (lati.value == 0.0 && longi.value == 0.0) {
-//       Fluttertoast.showToast(
-//           msg: "Error: Latitude and Longitude Not gotten...Kindly wait",
-//           toastLength: Toast.LENGTH_LONG,
-//           backgroundColor: Colors.black54,
-//           gravity: ToastGravity.BOTTOM,
-//           timeInSecForIosWeb: 1,
-//           textColor: Colors.white,
-//           fontSize: 16.0);
-//     } else if (attendanceLast == null || attendanceLast.date != DateFormat('dd-MMMM-yyyy').format(_selectedDate)) {
-//       final attendnce = AttendanceModel(
-//         clockIn: _startTime,
-//         date: DateFormat('dd-MMMM-yyyy').format(_selectedDate),
-//         clockInLatitude: lati.value,
-//         clockInLocation: location.value,
-//         clockInLongitude: longi.value,
-//         clockOut: _endTime,
-//         clockOutLatitude: lati.value,
-//         clockOutLocation: location.value,
-//         clockOutLongitude: longi.value,
-//         isSynced: false,
-//         voided: false,
-//         isUpdated: true,
-//         offDay: true,
-//         durationWorked: _reasons,
-//         noOfHours: _diffHoursWorked(_startTime, _endTime),
-//         month: DateFormat('MMMM yyyy').format(_selectedDate),
-//         comments: "Day Off",
-//       ).toMap();
-//
-//       if (_currentUserId != null) {
-//         DocumentReference newAttendanceRef = staffCollection.doc(_currentUserId).collection('Record').doc();
-//         await newAttendanceRef.set(attendnce);
-//         Fluttertoast.showToast(
-//             msg: "Day Off Request Submitted",
-//             toastLength: Toast.LENGTH_LONG,
-//             backgroundColor: Colors.black54,
-//             gravity: ToastGravity.BOTTOM,
-//             timeInSecForIosWeb: 1,
-//             textColor: Colors.white,
-//             fontSize: 16.0);
-//       } else {
-//         Fluttertoast.showToast(
-//           msg: "User ID not available.",
-//           toastLength: Toast.LENGTH_LONG,
-//           backgroundColor: Colors.black54,
-//           gravity: ToastGravity.BOTTOM,
-//           timeInSecForIosWeb: 1,
-//           textColor: Colors.white,
-//           fontSize: 16.0,
-//         );
-//       }
-//
-//     } else {
-//       Fluttertoast.showToast(
-//           msg: "Error: Attendance with same date already exist",
-//           toastLength: Toast.LENGTH_LONG,
-//           backgroundColor: Colors.black54,
-//           gravity: ToastGravity.BOTTOM,
-//           timeInSecForIosWeb: 1,
-//           textColor: Colors.white,
-//           fontSize: 16.0);
-//     }
-//   }
-//
-//   void _getDateFromUser(StateSetter setState) async {
-//     DateTime? pickerDate = await showDatePicker(
-//       context: Get.context!,
-//       initialDate: DateTime.now(),
-//       firstDate: DateTime(2015),
-//       lastDate: DateTime(2090),
-//     );
-//     if (pickerDate != null) {
-//       setState(() {
-//         _selectedDate = pickerDate;
-//       });
-//     } else {
-//       print("It's null or something is wrong");
-//     }
-//   }
-//
-//   void _getTimeFromUser(
-//       {required bool isStartTime, required StateSetter setState}) async {
-//     var pickedTime = await _showTimePicker();
-//     String formattedTime = pickedTime.format(Get.context!);
-//     print(pickedTime);
-//     if (isStartTime) {
-//       setState(() {
-//         _startTime = formattedTime;
-//       });
-//     } else {
-//       setState(() {
-//         _endTime = formattedTime;
-//       });
-//     }
-//   }
-//
-//
-//   Future<TimeOfDay> _showTimePicker() async {
-//     TimeOfDay? pickedTime = await showTimePicker(
-//       initialEntryMode: TimePickerEntryMode.input,
-//       context: Get.context!,
-//       initialTime: TimeOfDay(
-//         hour: int.parse(_startTime.split(":")[0]),
-//         minute: int.parse(_startTime.split(":")[1].split(" ")[0]),
-//       ),
-//       builder: (context, child) {
-//         return MediaQuery(
-//           data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-//           child: child!,
-//         );
-//       },
-//     );
-//     return pickedTime ?? TimeOfDay.now();
-//   }
-//
-//
-//   Future<void> _getUserLocation() async {
-//     try {
-//       geolocator.Position position = await geolocator.Geolocator.getCurrentPosition(
-//           desiredAccuracy: geolocator.LocationAccuracy.high);
-//
-//       lati.value = position.latitude;
-//       longi.value = position.longitude;
-//       accuracy.value = position.accuracy;
-//       altitude.value = position.altitude;
-//       speed.value = position.speed;
-//       speedAccuracy.value = position.speedAccuracy;
-//       heading.value = position.heading;
-//       time.value = position.timestamp.millisecondsSinceEpoch.toDouble();
-//       isMock.value = position.isMocked;
-//      // verticalAccuracy.value = position.verticalAccuracy ?? 0.0;
-//       headingAccuracy.value = position.headingAccuracy ?? 0.0;
-//      // elapsedRealtimeNanos.value = position.elapsedRealtimeNanos.toDouble();
-//      // elapsedRealtimeUncertaintyNanos.value = position.elapsedRealtimeUncertaintyNanos.toDouble();
-//
-//       List<Placemark> placemark = await placemarkFromCoordinates(position.latitude, position.longitude);
-//       if (placemark.isNotEmpty) {
-//         location.value =
-//         "${placemark[0].street}, ${placemark[0].subLocality}, ${placemark[0].subAdministrativeArea}, ${placemark[0].locality}, ${placemark[0].administrativeArea}, ${placemark[0].postalCode}, ${placemark[0].country}";
-//         administrativeArea.value = placemark[0].administrativeArea ?? "";
-//       }
-//     } catch (e) {
-//       log("Location Error: ${e.toString()}");
-//     }
-//   }
 // }
 //
-// class UserModel {
-//   static double lat = 0.0;
-//   static double long = 0.0;
-//   String? firebaseAuthId;
-//   String? firstName;
-//   String? lastName;
-//   String? role;
-//   String? emailAddress;
-//   String? profileUrl;
-//   String? uid;
 //
-//
-//   UserModel({
-//     this.firebaseAuthId,
-//     this.firstName,
-//     this.lastName,
-//     this.role,
-//     this.emailAddress,
-//     this.profileUrl,
-//     this.uid,
-//
-//   });
-//
-//
-//   UserModel.fromMap(Map<String, dynamic> map)
-//       : firebaseAuthId = map['firebaseAuthId'],
-//         firstName = map['firstName'],
-//         lastName = map['lastName'],
-//         role = map['role'],
-//         emailAddress = map['emailAddress'],
-//         profileUrl = map['profileUrl'],
-//         uid = map['uid'];
-//
-//
-//   Map<String, dynamic> toMap() {
-//     return {
-//       'firebaseAuthId': firebaseAuthId,
-//       'firstName': firstName,
-//       'lastName': lastName,
-//       'role': role,
-//       'emailAddress': emailAddress,
-//       'profileUrl': profileUrl,
-//       'uid': uid,
-//     };
-//   }
+// class AttendanceData {
+//   final String status;
+//   final int count;
+//   AttendanceData(this.status, this.count);
 // }
 //
-// class AttendanceModel {
-//   int? id;
-//   String? clockIn;
-//   String? clockOut;
-//   String? date;
-//   double? clockInLatitude;
-//   double? clockInLongitude;
-//   double? clockOutLatitude;
-//   double? clockOutLongitude;
-//   String? clockInLocation;
-//   String? clockOutLocation;
-//   bool? isSynced;
-//   bool? voided;
-//   bool? isUpdated;
-//   String? durationWorked;
-//   double? noOfHours;
-//   bool? offDay;
-//   String? month;
-//   String? comments;
+// class WeeklyTrendData {
+//   final String day;
+//   final double percentage;
+//   WeeklyTrendData(this.day, this.percentage);
+// }
 //
-//   AttendanceModel({
-//     this.id,
-//     this.clockIn,
-//     this.clockOut,
-//     this.date,
-//     this.clockInLatitude,
-//     this.clockInLongitude,
-//     this.clockOutLatitude,
-//     this.clockOutLongitude,
-//     this.clockInLocation,
-//     this.clockOutLocation,
-//     this.isSynced,
-//     this.voided,
-//     this.isUpdated,
-//     this.durationWorked,
-//     this.noOfHours,
-//     this.offDay,
-//     this.month,
-//     this.comments,
-//   });
+// class TaskCompletionData {
+//   final String task;
+//   final double completion;
+//   TaskCompletionData(this.task, this.completion);
+// }
 //
-//   AttendanceModel.fromMap(Map<String, dynamic> map)
-//       : clockIn = map['clockIn'],
-//         clockOut = map['clockOut'],
-//         date = map['date'],
-//         clockInLatitude = map['clockInLatitude'],
-//         clockInLongitude = map['clockInLongitude'],
-//         clockOutLatitude = map['clockOutLatitude'],
-//         clockOutLongitude = map['clockOutLongitude'],
-//         clockInLocation = map['clockInLocation'],
-//         clockOutLocation = map['clockOutLocation'],
-//         isSynced = map['isSynced'],
-//         voided = map['voided'],
-//         isUpdated = map['isUpdated'],
-//         durationWorked = map['durationWorked'],
-//         noOfHours = map['noOfHours'],
-//         offDay = map['offDay'],
-//         month = map['month'],
-//         comments = map['comments'];
+// class GeolocationComplianceData {
+//   final String hour;
+//   final double locationCompliance;
+//   final double other;
+//   GeolocationComplianceData(this.hour, this.locationCompliance, this.other);
+// }
+//
+// class LeaveRequestData {
+//   final String employeeName;
+//   final String leaveType;
+//   final String startDate;
+//   LeaveRequestData(this.employeeName, this.leaveType, this.startDate);
+// }
 //
 //
-//   Map<String, dynamic> toMap() {
-//     return {
-//       'clockIn': clockIn,
-//       'clockOut': clockOut,
-//       'date': date,
-//       'clockInLatitude': clockInLatitude,
-//       'clockInLongitude': clockInLongitude,
-//       'clockOutLatitude': clockOutLatitude,
-//       'clockOutLongitude': clockOutLongitude,
-//       'clockInLocation': clockInLocation,
-//       'clockOutLocation': clockOutLocation,
-//       'isSynced': isSynced,
-//       'voided': voided,
-//       'isUpdated': isUpdated,
-//       'durationWorked': durationWorked,
-//       'noOfHours': noOfHours,
-//       'offDay': offDay,
-//       'month': month,
-//       'comments': comments,
-//     };
-//   }
+// class TaskData {
+//   final String status;
+//   final int count;
+//   TaskData(this.status, this.count);
+// }
+//
+//
+// List<TaskCompletionData> getTaskCompletionData() {
+//   return [
+//     TaskCompletionData('Task A', 90),
+//     TaskCompletionData('Task B', 75),
+//     TaskCompletionData('Task C', 60),
+//     TaskCompletionData('Task D', 85),
+//     TaskCompletionData('Task E', 70),
+//   ];
+// }
+//
+// List<GeolocationComplianceData> getGeolocationComplianceData() {
+//   return [
+//     GeolocationComplianceData('0h', 100, 50),
+//     GeolocationComplianceData('1h', 200, 100),
+//     GeolocationComplianceData('2h', 300, 150),
+//     GeolocationComplianceData('3h', 400, 200),
+//     GeolocationComplianceData('4h', 500, 250),
+//     GeolocationComplianceData('5h', 600, 300),
+//     GeolocationComplianceData('6h', 700, 400),
+//     GeolocationComplianceData('7h', 800, 500),
+//     GeolocationComplianceData('8h', 700, 400),
+//     GeolocationComplianceData('9h', 600, 300),
+//     GeolocationComplianceData('10h', 500, 200),
+//     GeolocationComplianceData('11h', 400, 150),
+//   ];
+// }
+//
+//
+// List<TaskData> getTaskStatusData() {
+//   return [
+//     TaskData('In Progress', 12),
+//     TaskData('Overdue', 2),
+//   ];
 // }

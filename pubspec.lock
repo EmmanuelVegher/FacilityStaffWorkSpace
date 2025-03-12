@@ -1930,6 +1930,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "27.1.50"
+  syncfusion_flutter_gauges:
+    dependency: "direct main"
+    description:
+      name: syncfusion_flutter_gauges
+      sha256: d9095e3eab07cef52c847bf552a8696ecc77bbfbc4aefe55e5225496b670d5a5
+      url: "https://pub.dev"
+    source: hosted
+    version: "27.1.50"
   syncfusion_flutter_maps:
     dependency: "direct main"
     description:

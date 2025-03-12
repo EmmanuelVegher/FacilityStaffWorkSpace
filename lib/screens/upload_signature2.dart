@@ -9,14 +9,14 @@ import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 
 import '../../widgets/drawer.dart';
 
-class UploadSignaturePage extends StatefulWidget {
-  const UploadSignaturePage({super.key});
+class UploadSignaturePage2 extends StatefulWidget {
+  const UploadSignaturePage2({super.key});
 
   @override
-  _UploadSignaturePageState createState() => _UploadSignaturePageState();
+  _UploadSignaturePage2State createState() => _UploadSignaturePage2State();
 }
 
-class _UploadSignaturePageState extends State<UploadSignaturePage> {
+class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
   final SignatureController _signatureController = SignatureController(
     penColor: Colors.black,
     penStrokeWidth: 3,

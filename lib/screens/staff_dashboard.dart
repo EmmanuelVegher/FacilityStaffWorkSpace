@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:rxdart/rxdart.dart'; // Import rxdart for combining streams
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -7,6 +12,8 @@ import '../api/attendance_api.dart';
 import '../models/attendance_record.dart';
 import '../utils/date_helper.dart';
 import '../widgets/drawer.dart';
+import 'login_screen.dart';
+import '../models/facility_staff_model.dart';
 
 class UserDashboardApp extends StatelessWidget {
   const UserDashboardApp({super.key});
@@ -36,7 +43,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   List<LocationRecord> _locationData = [];
 
   String? _errorMessage;
-  bool _isLoading = false; // Add loading state
+  bool _isLoading = false;
+  bool _isLoadingBestPlayer = false;
+  bool _isLoadingClockInData = false;
 
   String _selectedDepartment = 'All Departments';
   String _selectedMonth = 'January';
@@ -51,253 +60,484 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   int _noOfHolidaysFilled = 0;
   int _noOfAnnualLeaveTaken = 0;
 
-  final List<Map<String, dynamic>> _roleAchievements = [
-    {'role': 'Doctors', 'achievements': 15, 'kpi': 20, 'badge': 'Top Healer'},
-    {'role': 'Pharmacists', 'achievements': 25, 'kpi': 30, 'badge': 'Efficient Dispenser'},
-    {'role': 'Lab Technicians', 'achievements': 30, 'kpi': 40, 'badge': 'Fast Processor'},
-  ];
+  late Future<void> _initialDataLoadingFuture;
 
-  final List<Map<String, dynamic>> _leaderboard = [
-    {'name': 'John Doe', 'role': 'Doctor', 'points': 120},
-    {'name': 'Jane Smith', 'role': 'Pharmacist', 'points': 110},
-    {'name': 'Sam Wilson', 'role': 'Lab Technician', 'points': 105},
-  ];
+  Timer? _logoutTimer;
+  static const int _logoutAfterMinutes = 50;
 
-  late Future<void> _initialDataLoadingFuture; // For initial page load
+  Map<String, int> _firestoreBestPlayerCounts = {};
+  FacilityStaffModel? _bestPlayerOfWeek;
+  String? _currentUserState;
+  String? _currentUserLocation;
+  String? _currentUserStaffCategory;
+  Map<String, Map<String, dynamic>> _bestPlayerCache = {};
+  int _totalSurveysCountedForBestPlayer = 0; // Added survey count variable
+
+  void _resetLogoutTimer() {
+    _logoutTimer?.cancel();
+    _startLogoutTimer();
+  }
+
+  void _startLogoutTimer() {
+    _logoutTimer = Timer(const Duration(minutes: _logoutAfterMinutes), _logoutUser);
+  }
+
+  void _logoutUser() {
+    print('User logged out due to inactivity.');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _initialDataLoadingFuture = _fetchAttendanceData(); // Fetch initial data on page load
+    _initialDataLoadingFuture = _initializeData();
+    _startLogoutTimer();
   }
 
+  Future<void> _initializeData() async {
+    await _loadCurrentUserBioDataForBestPlayer();
+    await Future.wait([
+      _fetchAttendanceData(),
+      _loadBestPlayerDataForRange(_startDate, _endDate),
+    ]);
+  }
+
+  Future<void> _loadCurrentUserBioDataForBestPlayer() async {
+    try {
+      final userUUID = FirebaseAuth.instance.currentUser?.uid;
+      if (userUUID == null) {
+        print("No user logged in.");
+        return;
+      }
+
+      DocumentSnapshot<Map<String, dynamic>> bioDataSnapshot =
+      await FirebaseFirestore.instance.collection("Staff").doc(userUUID).get();
+
+      if (bioDataSnapshot.exists) {
+        final bioData = bioDataSnapshot.data();
+        if (bioData != null) {
+          setState(() {
+            _currentUserState = bioData['state'] as String?;
+            _currentUserLocation = bioData['location'] as String?;
+            _currentUserStaffCategory = bioData['staffCategory'] as String?;
+          });
+          print(
+              "Current User State: $_currentUserState, Location: $_currentUserLocation");
+        } else {
+          print("Bio data is null for UUID: $userUUID");
+        }
+      } else {
+        print("No bio data found for UUID: $userUUID");
+      }
+    } catch (e) {
+      print("Error loading bio data: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _logoutTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    // Define screen size breakpoints
-    bool isMobile = screenWidth < 600;
-    bool isTablet = screenWidth >= 600 && screenWidth < 1200;
-    bool isDesktop = screenWidth >= 1200 && screenWidth < 1920;
-    bool isLargeDesktop = screenWidth >= 1920;
+    double appBarHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+    double titleFontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double cardPaddingFactor = max(0.8, min(1.2, screenWidth / 800));
+    double cardMarginFactor = max(0.8, min(1.2, screenWidth / 800));
+    double fontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double iconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double chartHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+    double gridSpacingFactor = max(0.8, min(1.2, screenWidth / 800));
+    double appBarIconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double chartLegendFontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double summaryCardHeightFactor = screenWidth > 800 ? 1.0 : screenWidth > 800 ? 1.0 : 0.8; // Reduced height for tablet and mobile
+    double otherCardHeightFactor = max(1.0, min(1.5, screenHeight / 800));
+    double generateAnalyticsButtonPaddingFactor =
+    max(0.8, min(1.2, screenWidth / 800));
+    double chartCardVerticalPaddingFactor =
+    max(0.8, min(1.2, screenHeight / 800));
+    double cardHeightFactor = max(0.8, min(1.2, screenHeight / 800));
 
-    // Scaling factors for responsiveness based on screen size
-    double appBarHeightFactor;
-    double titleFontSizeFactor;
-    double cardPaddingFactor;
-    double cardMarginFactor;
-    double fontSizeFactor;
-    double iconSizeFactor;
-    double chartHeightFactor;
-    double gridSpacingFactor;
-    double appBarIconSizeFactor;
-    double chartLegendFontSizeFactor;
-    double summaryCardHeightFactor;
-    double otherCardHeightFactor;
-    double generateAnalyticsButtonPaddingFactor;
-    double chartCardVerticalPaddingFactor;
+    int summaryGridCrossAxisCount = screenWidth > 1200 ? 6 : screenWidth > 800 ? 4 : 2;
+    double summaryGridChildAspectRatio = screenWidth > 1200 ? 2.5 / 1.2 : screenWidth > 800 ? 2.0 / 1.2 : 1.5 / 1.0; // Adjusted for better mobile view
 
+    int otherCardsGridCrossAxisCount = screenWidth > 1200 ? 3 : screenWidth > 800 ? 2 : 1;
+    double otherCardsGridChildAspectRatio = screenWidth > 1200 ? 1.0 / 1.1 : screenWidth > 800 ? 1.5 / 1.1 : 2.0 / 1.1;
 
-    if (isMobile) {
-      appBarHeightFactor = screenHeight < 600 ? 0.6 : 0.9;
-      titleFontSizeFactor = 0.55;
-      cardPaddingFactor = 0.45;
-      cardMarginFactor = 0.7;
-      fontSizeFactor = 0.55;
-      iconSizeFactor = 0.55;
-      chartHeightFactor = 0.7;
-      gridSpacingFactor = 0.1;
-      appBarIconSizeFactor = 0.55;
-      chartLegendFontSizeFactor = 0.45;
-      summaryCardHeightFactor = 2.0;
-      otherCardHeightFactor = 1.8; // Reduced height for mobile
-      generateAnalyticsButtonPaddingFactor = 0.7;
-      chartCardVerticalPaddingFactor = 0.8;
-    } else if (isTablet) {
-      appBarHeightFactor = 1.1;
-      titleFontSizeFactor = 0.55;
-      cardPaddingFactor = 0.45;
-      cardMarginFactor = 0.7;
-      fontSizeFactor = 0.55;
-      iconSizeFactor = 0.55;
-      chartHeightFactor = 0.7;
-      gridSpacingFactor = 0.5;
-      appBarIconSizeFactor = 0.55;
-      chartLegendFontSizeFactor = 0.45;
-      summaryCardHeightFactor = 3.5;
-      otherCardHeightFactor = 2.1;
-      generateAnalyticsButtonPaddingFactor = 0.7;
-      chartCardVerticalPaddingFactor = 0.8;
-    } else if (isDesktop) {
-      appBarHeightFactor = 1.1;
-      titleFontSizeFactor = 0.95;
-      cardPaddingFactor = 0.95;
-      cardMarginFactor = 1.3;
-      fontSizeFactor = 0.95;
-      iconSizeFactor = 0.95;
-      chartHeightFactor = 1.0;
-      gridSpacingFactor = 0.7;
-      appBarIconSizeFactor = 0.95;
-      chartLegendFontSizeFactor = 0.85;
-      summaryCardHeightFactor = 1.2;
-      otherCardHeightFactor = 1.3;
-      generateAnalyticsButtonPaddingFactor = 1.0;
-      chartCardVerticalPaddingFactor = 1.0;
-    } else { // isLargeDesktop
-      appBarHeightFactor = 1.3;
-      titleFontSizeFactor = 1.0;
-      cardPaddingFactor = 1.0;
-      cardMarginFactor = 1.5;
-      fontSizeFactor = 1.0;
-      iconSizeFactor = 1.0;
-      chartHeightFactor = 1.1;
-      gridSpacingFactor = 0.8;
-      appBarIconSizeFactor = 1.0;
-      chartLegendFontSizeFactor = 0.9;
-      summaryCardHeightFactor = 1.1;
-      otherCardHeightFactor = 1.2;
-      generateAnalyticsButtonPaddingFactor = 1.0;
-      chartCardVerticalPaddingFactor = 1.0;
-    }
-
-    return Scaffold(
-      drawer: drawer(context,),
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Image.asset(
-              'assets/image/ccfn_logo.png', // Replace with your logo asset path
-              fit: BoxFit.contain,
-              height: 40, // Adjust logo height here and factor in responsiveness
-            ),
-            Padding(
-              padding: EdgeInsets.only(left: 10 * cardMarginFactor),
-              child: Text(
-                'Facility Staff Workflow Platform',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20 * titleFontSizeFactor,
+    return Listener(
+      onPointerDown: (_) => _resetLogoutTimer(),
+      onPointerMove: (_) => _resetLogoutTimer(),
+      onPointerUp: (_) => _resetLogoutTimer(),
+      onPointerCancel: (_) => _resetLogoutTimer(),
+      onPointerSignal: (_) => _resetLogoutTimer(),
+      behavior: HitTestBehavior.translucent,
+      child: Scaffold(
+        drawer: drawer(
+          context,
+        ),
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Image.asset(
+                'assets/image/ccfn_logo.png',
+                fit: BoxFit.contain,
+                height: 40 * appBarHeightFactor,
+              ),
+              Padding(
+                padding: EdgeInsets.only(left: 10 * cardMarginFactor),
+                child: Text(
+                  'Facility Staff WorkSpace',
+                   style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20 * titleFontSizeFactor,
+                  ),
                 ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF800018),
+          toolbarHeight: 80 * appBarHeightFactor,
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(60 * appBarHeightFactor),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor),
+              child: buildFilterBarInAppBar(
+                  context,
+                  cardPaddingFactor,
+                  cardMarginFactor,
+                  fontSizeFactor,
+                  appBarHeightFactor,
+                  generateAnalyticsButtonPaddingFactor),
+            ),
+          ),
+        ),
+        body: Stack(
+          children: [
+            FutureBuilder<void>(
+              future: _initialDataLoadingFuture,
+              builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else {
+                  return SingleChildScrollView(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0 * cardPaddingFactor),
+                      child: Column(
+                        children: [
+                          _buildSummaryGrid(
+                              context,
+                              cardPaddingFactor,
+                              cardMarginFactor,
+                              fontSizeFactor,
+                              iconSizeFactor,
+                              chartHeightFactor,
+                              gridSpacingFactor,
+                              summaryGridCrossAxisCount,
+                              summaryGridChildAspectRatio,
+                              summaryCardHeightFactor // Pass summaryCardHeightFactor
+                          ),
+                          SizedBox(height: 20 * gridSpacingFactor),
+                          _buildRecognitionCardForDashboardInDashboard(
+                              context, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+                          SizedBox(height: 20 * gridSpacingFactor),
+                          _buildOtherCardsGrid(
+                            context,
+                            cardPaddingFactor,
+                            cardMarginFactor,
+                            fontSizeFactor,
+                            iconSizeFactor,
+                            chartHeightFactor,
+                            gridSpacingFactor,
+                            otherCardsGridCrossAxisCount,
+                            otherCardsGridChildAspectRatio,
+                            chartLegendFontSizeFactor,
+                            summaryCardHeightFactor,
+                            otherCardHeightFactor,
+                            chartCardVerticalPaddingFactor,
+                            screenWidth, // Pass screenWidth for text scaling in charts
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            Visibility(
+              visible: _isLoading || _isLoadingClockInData,
+              child: Stack(
+                children: <Widget>[
+                  ModalBarrier(
+                      dismissible: false, color: Colors.grey.withOpacity(0.5)),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircularProgressIndicator(),
+                        SizedBox(height: 20 * cardMarginFactor),
+                        Text(
+                          'Please Wait...',
+                          style: TextStyle(
+                              fontSize: 16 * fontSizeFactor,
+                              color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF800018),
-        toolbarHeight: 80 * appBarHeightFactor,
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60 * appBarHeightFactor),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor),
-            child: buildFilterBarInAppBar(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, appBarHeightFactor, generateAnalyticsButtonPaddingFactor),
-          ),
-        ),
       ),
-      body: Stack( // Wrap SingleChildScrollView with Stack for potential overlay
+    );
+  }
+
+  Widget _buildSummaryGrid(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double iconSizeFactor,
+      double chartHeightFactor,
+      double gridSpacingFactor,
+      int crossAxisCount,
+      double childAspectRatio,
+      double summaryCardHeightFactor // Receive summaryCardHeightFactor
+      ) {
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 20 * gridSpacingFactor,
+      mainAxisSpacing: 20 * gridSpacingFactor,
+      childAspectRatio: childAspectRatio,
+      children: [
+        _buildSummaryCard(
+            context,
+            'Total Hours Worked',
+            '$_totalWorkHours',
+            Icons.timer,
+            Colors.blue,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor // Pass summaryCardHeightFactor to summary card
+        ),
+        _buildSummaryCard(
+            context,
+            'Min Hours Worked',
+            '$_minHoursWorked',
+            Icons.timer_off,
+            Colors.purple,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor// Pass summaryCardHeightFactor to summary card
+        ),
+        _buildSummaryCard(
+            context,
+            'Max Hours Worked',
+            '$_maxHoursWorked',
+            Icons.timer,
+            Colors.purple,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor// Pass summaryCardHeightFactor to summary card
+        ),
+        _buildSummaryCard(
+            context,
+            'Avg Hours Worked',
+            '$_averageHoursWorked',
+            Icons.timelapse,
+            Colors.purple,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor// Pass summaryCardHeightFactor to summary card
+        ),
+        _buildSummaryCard(
+            context,
+            'Holidays Filled',
+            '$_noOfHolidaysFilled',
+            Icons.holiday_village,
+            Colors.purple,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor// Pass summaryCardHeightFactor to summary card
+        ),
+        _buildSummaryCard(
+            context,
+            'Annual Leave Taken',
+            '$_noOfAnnualLeaveTaken',
+            Icons.beach_access,
+            Colors.purple,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            iconSizeFactor,
+            summaryCardHeightFactor// Pass summaryCardHeightFactor to summary card
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecognitionCardForDashboardInDashboard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          FutureBuilder<void>(
-            future: _initialDataLoadingFuture, // Use initial loading future
-            builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                // Show loading indicator while initial data is loading
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                // Show error message if initial data loading fails
-                return Center(child: Text('Error: ${snapshot.error}'));
-              } else {
-                // Data is loaded successfully, build the dashboard UI
-                return SingleChildScrollView(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0 * cardPaddingFactor),
-                    child: Column(
-                      children: [
-                        _buildSummaryGrid(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, chartHeightFactor, gridSpacingFactor, isMobile, isTablet, isDesktop, isLargeDesktop, chartLegendFontSizeFactor, summaryCardHeightFactor, otherCardHeightFactor),
-                        SizedBox(height: 20 * gridSpacingFactor),
-                        _buildOtherCardsGrid(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, chartHeightFactor, gridSpacingFactor, isMobile, isTablet, isDesktop, isLargeDesktop, chartLegendFontSizeFactor, summaryCardHeightFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor),
-                      ],
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-          Visibility( // Keep Visibility for "Generate Analytics" button loading if needed
-            visible: _isLoading,
-            child: Stack(
-              children: <Widget>[
-                ModalBarrier(dismissible: false, color: Colors.grey.withOpacity(0.5)),
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(),
-                      SizedBox(height: 20 * cardMarginFactor),
-                      Text(
-                        'Please Wait...',
-                        style: TextStyle(fontSize: 16 * fontSizeFactor, color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          Text(
+            "Best Team Player (Facility Collective Votes)",
+            style: TextStyle(
+              fontSize: 16 * fontSizeFactor,
+              fontWeight: FontWeight.bold,
             ),
+            textAlign: TextAlign.center,
           ),
+          SizedBox(height: 8 * cardMarginFactor),
+          _isLoadingBestPlayer
+              ? SizedBox(
+              height: 100 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
+              child: const Center(child: CircularProgressIndicator()))
+              : _bestPlayerOfWeek != null
+              ? _buildRecognitionCardForDashboard(
+              _bestPlayerOfWeek, fontSizeFactor, _firestoreBestPlayerCounts[_bestPlayerOfWeek!.name!] ?? 0, _totalSurveysCountedForBestPlayer) // Pass counts here
+              : SizedBox(
+              height: 50 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
+              child: const Center(
+                  child: Text("No Best Player data for this period"))),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryGrid(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double chartHeightFactor, double gridSpacingFactor, bool isMobile, bool isTablet, bool isDesktop, bool isLargeDesktop, double chartLegendFontSizeFactor, double summaryCardHeightFactor, double otherCardHeightFactor) {
+
+  Widget _buildOtherCardsGrid(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double iconSizeFactor,
+      double chartHeightFactor,
+      double gridSpacingFactor,
+      int crossAxisCount,
+      double childAspectRatio,
+      double chartLegendFontSizeFactor,
+      double summaryCardHeightFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth // Receive screenWidth
+      ) {
     return GridView.count(
-      crossAxisCount: 6,
+      crossAxisCount: crossAxisCount,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 20 * gridSpacingFactor,
       mainAxisSpacing: 20 * gridSpacingFactor,
-      childAspectRatio: 2.5 / summaryCardHeightFactor,
+      childAspectRatio: childAspectRatio,
       children: [
-        _buildSummaryCard(context, 'Total Hours Worked', '$_totalWorkHours', Icons.timer, Colors.blue, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
-        _buildSummaryCard(context, 'Min Hours Worked', '$_minHoursWorked', Icons.timer_off, Colors.purple, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
-        _buildSummaryCard(context, 'Max Hours Worked', '$_maxHoursWorked', Icons.timer, Colors.purple, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
-        _buildSummaryCard(context, 'Avg Hours Worked', '$_averageHoursWorked', Icons.timelapse, Colors.purple, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
-        _buildSummaryCard(context, 'Holidays Filled', '$_noOfHolidaysFilled', Icons.holiday_village, Colors.purple, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
-        _buildSummaryCard(context, 'Annual Leave Taken', '$_noOfAnnualLeaveTaken', Icons.beach_access, Colors.purple, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, summaryCardHeightFactor),
+        _buildFacilityClockInCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, otherCardHeightFactor), // New Card Here
+        _buildClockInOutTrendsChartCard(
+            context,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            chartHeightFactor,
+            chartLegendFontSizeFactor,
+            otherCardHeightFactor,
+            chartCardVerticalPaddingFactor,
+            screenWidth // Pass screenWidth
+        ),
+        _buildEarlyLateClockInsChartCard(
+            context,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            chartHeightFactor,
+            chartLegendFontSizeFactor,
+            otherCardHeightFactor,
+            chartCardVerticalPaddingFactor,
+            screenWidth// Pass screenWidth
+        ),
+        _buildDurationWorkedDistributionChartCard(
+            context,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            chartHeightFactor,
+            chartLegendFontSizeFactor,
+            otherCardHeightFactor,
+            chartCardVerticalPaddingFactor,
+            screenWidth// Pass screenWidth
+        ),
+        _buildAttendanceByLocationChartCard(
+            context,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            chartHeightFactor,
+            chartLegendFontSizeFactor,
+            otherCardHeightFactor,
+            chartCardVerticalPaddingFactor,
+            screenWidth// Pass screenWidth
+        ),
+        _buildBestTeamPlayerCardWrapper(
+            context,
+            cardPaddingFactor,
+            cardMarginFactor,
+            fontSizeFactor,
+            chartHeightFactor,
+            chartLegendFontSizeFactor,
+            otherCardHeightFactor,
+            chartCardVerticalPaddingFactor,
+            screenWidth, // Pass screenWidth
+            _totalSurveysCountedForBestPlayer // Pass survey count here
+        ),
+
       ],
     );
   }
 
-
-  Widget _buildOtherCardsGrid(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double chartHeightFactor, double gridSpacingFactor, bool isMobile, bool isTablet, bool isDesktop, bool isLargeDesktop, double chartLegendFontSizeFactor, double summaryCardHeightFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor) {
-    return GridView.count(
-      crossAxisCount: isMobile ? 1 : isTablet ? 2 : isDesktop ? 3 : 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 20 * gridSpacingFactor,
-      mainAxisSpacing: 20 * gridSpacingFactor,
-      childAspectRatio: isMobile ? 1.2 / otherCardHeightFactor :  isTablet ? 1.2 / otherCardHeightFactor : 1.0 / otherCardHeightFactor, // Reduced height for mobile
-      children: [
-        _buildClockInOutTrendsChartCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor),
-        _buildEarlyLateClockInsChartCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor),
-        _buildDurationWorkedDistributionChartCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor),
-        _buildAttendanceByLocationChartCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, chartHeightFactor, chartLegendFontSizeFactor, otherCardHeightFactor, chartCardVerticalPaddingFactor),
-        _buildRoleAchievementsCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, otherCardHeightFactor),
-        _buildLeaderboardCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, otherCardHeightFactor),
-      ],
-    );
-  }
-
-  Widget _buildSummaryCard(BuildContext context, String title, String value, IconData icon, Color cardColor, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double summaryCardHeightFactor) {
+  Widget _buildSummaryCard(
+      BuildContext context,
+      String title,
+      String value,
+      IconData icon,
+      Color cardColor,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double iconSizeFactor,
+      double summaryCardHeightFactor // Receive summaryCardHeightFactor
+      ) {
     return Container(
-      padding: EdgeInsets.all(12 * cardPaddingFactor * summaryCardHeightFactor),
+      padding: EdgeInsets.all(12 * cardPaddingFactor),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20 * cardMarginFactor),
       ),
-      height: 160 * summaryCardHeightFactor,
+      height: 140 * summaryCardHeightFactor, // Use summaryCardHeightFactor here
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -313,9 +553,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   style: TextStyle(
                     color: Colors.black87,
                     fontWeight: FontWeight.w500,
-                    fontSize: 12 * fontSizeFactor,
+                    fontSize: 10 * fontSizeFactor,
                     overflow: TextOverflow.visible,
-                    //softWrap: true,
                   ),
                 ),
               ),
@@ -324,7 +563,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 20 * fontSizeFactor,
+              fontSize: 15 * fontSizeFactor,
               fontWeight: FontWeight.bold,
               color: cardColor,
             ),
@@ -334,19 +573,21 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  Widget buildFilterBarInAppBar(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double appBarHeightFactor, double generateAnalyticsButtonPaddingFactor) {
+  Widget buildFilterBarInAppBar(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double appBarHeightFactor,
+      double generateAnalyticsButtonPaddingFactor) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        _buildDepartmentDropdown(cardPaddingFactor, fontSizeFactor),
-        SizedBox(width: 8 * cardMarginFactor),
-        _buildMonthDropdown(cardPaddingFactor, fontSizeFactor),
-        SizedBox(width: 8 * cardMarginFactor),
-        _buildYearDropdown(cardPaddingFactor, fontSizeFactor),
         SizedBox(width: 8 * cardMarginFactor),
         _buildDatePickerInAppBar('Start Date', _startDate, (date) {
           setState(() {
             _startDate = date;
+            _resetLogoutTimer();
           });
         }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
         SizedBox(width: 8 * cardMarginFactor),
@@ -354,25 +595,46 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           setState(() {
             _endDate = date;
             formattedMonth = DateFormat('MMMM yyyy').format(_endDate);
+            _resetLogoutTimer();
           });
         }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
         SizedBox(width: 12 * cardMarginFactor),
         ElevatedButton(
           onPressed: () {
-            _fetchAttendanceData(); // Call fetch data on button press
+            setState(() {
+              _isLoading = true;
+            });
+            Future.wait([
+              _fetchAttendanceData(),
+              _loadBestPlayerDataForRange(_startDate, _endDate),
+            ]).then((_) {
+              setState(() {
+                _isLoading = false;
+              });
+            }).catchError((error) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = 'Error generating analytics: ${error.toString()}';
+              });
+            });
+            _resetLogoutTimer();
           },
           style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 15 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor, vertical: 10 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor),
+            padding: EdgeInsets.symmetric(
+                horizontal:
+                15 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor,
+                vertical:
+                10 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor),
           ),
           child: Text(
             'Generate Analytics',
-            style: TextStyle(fontSize: 14 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
+            style: TextStyle(
+                fontSize: 14 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
           ),
         ),
       ],
     );
   }
-
 
   Widget _buildDepartmentDropdown(double cardPaddingFactor, double fontSizeFactor) {
     return DropdownButton<String>(
@@ -392,6 +654,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       onChanged: (String? newValue) {
         setState(() {
           _selectedDepartment = newValue!;
+          _resetLogoutTimer();
         });
       },
       dropdownColor: const Color(0xFF800018),
@@ -416,6 +679,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       onChanged: (String? newValue) {
         setState(() {
           _selectedMonth = newValue!;
+          _resetLogoutTimer();
         });
       },
       dropdownColor: const Color(0xFF800018),
@@ -438,6 +702,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       onChanged: (int? newValue) {
         setState(() {
           _selectedYear = newValue!;
+          _resetLogoutTimer();
         });
       },
       dropdownColor: const Color(0xFF800018),
@@ -447,27 +712,48 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  Widget _buildClockInOutTrendsChartCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor) {
-    final timeFormat = DateFormat('hh:mm a');
+  Widget _buildClockInOutTrendsChartCard(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double chartHeightFactor,
+      double chartLegendFontSizeFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth // Receive screenWidth
+      ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor, vertical: 16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildClockInOutTrendsChartContent(fontSizeFactor, cardMarginFactor, timeFormat),
+        padding: EdgeInsets.symmetric(
+            horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
+            vertical:
+            16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: _buildClockInOutTrendsChartContent(
+            fontSizeFactor, cardMarginFactor, screenWidth), // Pass screenWidth
       ),
     );
   }
 
-  Widget _buildClockInOutTrendsChartContent(double fontSizeFactor, double cardMarginFactor, DateFormat timeFormat) {
+  Widget _buildClockInOutTrendsChartContent(double fontSizeFactor, double cardMarginFactor, double screenWidth) {
+    final timeFormat = DateFormat('hh:mm a');
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
+
+    final filteredAttendanceData = _attendanceData
+        .where((data) =>
+    data.clockInTime != null)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Clock-In and Clock-Out Trends',
           style: TextStyle(
-              fontSize: 16 * fontSizeFactor,
-              fontWeight: FontWeight.bold),
+              fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         Expanded(
@@ -475,30 +761,31 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             plotAreaBorderWidth: 0,
             primaryXAxis: CategoryAxis(
                 majorGridLines: const MajorGridLines(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Days of the Week',
                   textStyle: TextStyle(
-                      fontSize: 14 * fontSizeFactor,
+                      fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             primaryYAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Time of the Day',
                   textStyle: TextStyle(
-                      fontSize: 14 * fontSizeFactor,
+                      fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
-                )),
+                ),
+                isVisible: false),
             tooltipBehavior: TooltipBehavior(
               enable: true,
               format: 'Clock-In: point.yClockIn\nClock-Out: point.yClockOut',
             ),
             series: <CartesianSeries<AttendanceRecord, String>>[
               LineSeries<AttendanceRecord, String>(
-                dataSource: _attendanceData,
+                dataSource: filteredAttendanceData,
                 xValueMapper: (data, _) =>
                     DateFormat('dd-MMM').format(data.date),
                 yValueMapper: (data, _) {
@@ -509,21 +796,44 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 name: 'Clock-In',
                 color: Colors.green,
                 markerSettings: const MarkerSettings(isVisible: true),
-                dataLabelSettings: const DataLabelSettings(isVisible: false),
+                dataLabelSettings: DataLabelSettings(
+                  isVisible: true,
+                  builder: (data, point, series, pointIndex, seriesIndex) {
+                    return Text(
+                      timeFormat.format(timeFormat.parse(data.clockInTime)),
+                      style: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                    );
+                  },
+                  labelAlignment: ChartDataLabelAlignment.top,
+                ),
               ),
               LineSeries<AttendanceRecord, String>(
-                dataSource: _attendanceData,
+                dataSource: filteredAttendanceData,
                 xValueMapper: (data, _) =>
                     DateFormat('dd-MMM').format(data.date),
                 yValueMapper: (data, _) {
-                  DateTime clockOut = timeFormat.parse(data.clockOutTime);
-                  return double.parse(
-                      (clockOut.hour + (clockOut.minute / 60)).toStringAsFixed(1));
+                  if (data.clockOutTime == '--/--') {
+                    return null; // Return null to not plot Clock-Out when it's "--/--"
+                  } else {
+                    DateTime clockOut = timeFormat.parse(data.clockOutTime);
+                    return double.parse(
+                        (clockOut.hour + (clockOut.minute / 60)).toStringAsFixed(1));
+                  }
                 },
                 name: 'Clock-Out',
                 color: Colors.red,
                 markerSettings: const MarkerSettings(isVisible: true),
-                dataLabelSettings: const DataLabelSettings(isVisible: false),
+                dataLabelSettings: DataLabelSettings(
+                  isVisible: true,
+                  builder: (data, point, series, pointIndex, seriesIndex) {
+                    // Conditionally show data label only when clockOutTime is not "--/--"
+                    return data.clockOutTime == '--/--' ? const Text('') : Text(
+                      timeFormat.format(timeFormat.parse(data.clockOutTime)),
+                      style: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                    );
+                  },
+                  labelAlignment: ChartDataLabelAlignment.bottom,
+                ),
               ),
             ],
           ),
@@ -532,27 +842,41 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-
-  Widget _buildDurationWorkedDistributionChartCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor) {
+  Widget _buildDurationWorkedDistributionChartCard(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double chartHeightFactor,
+      double chartLegendFontSizeFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth // Receive screenWidth
+      ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor, vertical: 16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildDurationWorkedDistributionChartContent(fontSizeFactor, cardMarginFactor),
+        padding: EdgeInsets.symmetric(
+            horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
+            vertical:
+            16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: _buildDurationWorkedDistributionChartContent(
+            fontSizeFactor, cardMarginFactor, screenWidth), // Pass screenWidth
       ),
     );
   }
 
-  Widget _buildDurationWorkedDistributionChartContent(double fontSizeFactor, double cardMarginFactor) {
+  Widget _buildDurationWorkedDistributionChartContent(double fontSizeFactor, double cardMarginFactor, double screenWidth) {
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Distribution of Hours Worked',
           style: TextStyle(
-              fontSize: 16 * fontSizeFactor,
-              fontWeight: FontWeight.bold),
+              fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         Expanded(
@@ -561,21 +885,21 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             primaryXAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Duration of Hours Worked (Grouped By Hours)',
                   textStyle: TextStyle(
-                      fontSize: 14 * fontSizeFactor,
+                      fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             primaryYAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Frequency',
                   textStyle: TextStyle(
-                      fontSize: 14 * fontSizeFactor,
+                      fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             tooltipBehavior: TooltipBehavior(enable: true),
@@ -595,43 +919,57 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  Widget _buildAttendanceByLocationChartCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor) {
+  Widget _buildAttendanceByLocationChartCard(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double chartHeightFactor,
+      double chartLegendFontSizeFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth // Receive screenWidth
+      ) {
     List<LocationRecord> locationData1 = _getLocationData(_attendanceData);
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor, vertical: 16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildAttendanceByLocationChartContent(fontSizeFactor, cardMarginFactor, locationData1),
+        padding: EdgeInsets.symmetric(
+            horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
+            vertical:
+            16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: _buildAttendanceByLocationChartContent(
+            fontSizeFactor, cardMarginFactor, locationData1, screenWidth), // Pass screenWidth
       ),
     );
   }
 
-  Widget _buildAttendanceByLocationChartContent(double fontSizeFactor, double cardMarginFactor, List<LocationRecord> locationData1) {
+  Widget _buildAttendanceByLocationChartContent(double fontSizeFactor, double cardMarginFactor, List<LocationRecord> locationData1, double screenWidth) {
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Attendance by Location',
           style: TextStyle(
-              fontSize: 16 * fontSizeFactor,
-              fontWeight: FontWeight.bold),
+              fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         Expanded(
           child: SfCircularChart(
-            // plotAreaBorderWidth: 0,
             legend: Legend(
                 isVisible: true,
                 position: LegendPosition.bottom,
                 orientation: LegendItemOrientation.horizontal,
-                textStyle: TextStyle(fontSize: 12 * fontSizeFactor)),
+                textStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
             series: <CircularSeries>[
               DoughnutSeries<LocationRecord, String>(
                 dataSource: locationData1,
                 xValueMapper: (LocationRecord data, _) => data.location,
                 yValueMapper: (LocationRecord data, _) => data.attendanceCount,
-                dataLabelSettings:  const DataLabelSettings(
+                dataLabelSettings: const DataLabelSettings(
                   isVisible: false,
                   labelPosition: ChartDataLabelPosition.inside,
                 ),
@@ -644,8 +982,17 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-
-  Widget _buildEarlyLateClockInsChartCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartHeightFactor, double chartLegendFontSizeFactor, double otherCardHeightFactor, double chartCardVerticalPaddingFactor) {
+  Widget _buildEarlyLateClockInsChartCard(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double chartHeightFactor,
+      double chartLegendFontSizeFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth // Receive screenWidth
+      ) {
     final timeFormat = DateFormat('hh:mm a');
     List<Map<String, dynamic>> chartData = _attendanceData.map((record) {
       int earlyLateMinutes = DateHelper.calculateEarlyLateTime(record.clockInTime);
@@ -656,26 +1003,30 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       };
     }).toList();
 
-
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor, vertical: 16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildEarlyLateClockInsChartContent(fontSizeFactor, cardMarginFactor, chartData),
+        padding: EdgeInsets.symmetric(
+            horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
+            vertical:
+            16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: _buildEarlyLateClockInsChartContent(
+            fontSizeFactor, cardMarginFactor, chartData, screenWidth), // Pass screenWidth
       ),
     );
   }
 
-  Widget _buildEarlyLateClockInsChartContent(double fontSizeFactor, double cardMarginFactor, List<Map<String, dynamic>> chartData) {
+  Widget _buildEarlyLateClockInsChartContent(double fontSizeFactor, double cardMarginFactor, List<Map<String, dynamic>> chartData, double screenWidth) {
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Did You Clock In Early or Late? (Green = Early, Red = Late, 0 = On Time)',
           style: TextStyle(
-              fontSize: 16 * fontSizeFactor,
-              fontWeight: FontWeight.bold),
+              fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         Expanded(
@@ -684,11 +1035,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             primaryXAxis: CategoryAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
+                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Days Of the Week',
                   textStyle: TextStyle(
-                      fontSize: 14 * fontSizeFactor,
+                      fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             primaryYAxis: NumericAxis(
@@ -697,28 +1048,30 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               title: AxisTitle(
                 text: 'Minutes Early/Late (vs 8:00 AM)',
                 textStyle: TextStyle(
-                    fontSize: 14 * fontSizeFactor,
+                    fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                     fontWeight: FontWeight.bold),
               ),
-              labelStyle: TextStyle(fontSize: 12 * fontSizeFactor),
-              minimum: chartData
+              labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+              minimum: chartData.isNotEmpty // Check if chartData is not empty
+                  ? chartData
                   .map((data) => data['earlyLateMinutes'] as int)
-                  .reduce((a, b) => a < b ? a : b) <
-                  0
+                  .reduce((a, b) => a < b ? a : b) < 0
                   ? chartData
                   .map((data) => data['earlyLateMinutes'] as int)
                   .reduce((a, b) => a < b ? a : b)
                   .toDouble()
-                  : null,
-              maximum: chartData
+                  : null
+                  : 0, // Default minimum if chartData is empty
+              maximum: chartData.isNotEmpty // Check if chartData is not empty
+                  ? chartData
                   .map((data) => data['earlyLateMinutes'] as int)
-                  .reduce((a, b) => a > b ? a : b) >
-                  0
+                  .reduce((a, b) => a > b ? a : b) > 0
                   ? chartData
                   .map((data) => data['earlyLateMinutes'] as int)
                   .reduce((a, b) => a > b ? a : b)
                   .toDouble()
-                  : null,
+                  : null
+                  : 0, // Default maximum if chartData is empty,
             ),
             tooltipBehavior: TooltipBehavior(enable: true),
             series: <CartesianSeries<Map<String, dynamic>, String>>[
@@ -740,109 +1093,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-
-  Widget _buildRoleAchievementsCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
-      child: SizedBox(
-        height: 350 * otherCardHeightFactor,
-        child: Padding(
-          padding: EdgeInsets.all(10 * cardPaddingFactor * otherCardHeightFactor),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Role-Based Achievements',
-                  style: TextStyle(
-                      fontSize: 18 * fontSizeFactor,
-                      fontWeight: FontWeight.bold)),
-              SizedBox(height: 10 * cardMarginFactor),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _roleAchievements.length,
-                  itemBuilder: (context, index) {
-                    final achievement = _roleAchievements[index];
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12 * cardMarginFactor)),
-                      elevation: 4,
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.blueAccent,
-                          child: Text(
-                            achievement['badge'][0],
-                            style: TextStyle(fontSize: 14 * fontSizeFactor),
-                          ),
-                        ),
-                        title: Text(
-                          achievement['role'],
-                          style: TextStyle(fontSize: 16 * fontSizeFactor),
-                        ),
-                        subtitle: Text(
-                          'Achievements: ${achievement['achievements']}/${achievement['kpi']}',
-                          style: TextStyle(fontSize: 14 * fontSizeFactor),
-                        ),
-                        trailing: Text(
-                          achievement['badge'],
-                          style: TextStyle(fontSize: 14 * fontSizeFactor),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLeaderboardCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
-    return Card(
-      color: Colors.grey[400],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
-      child: SizedBox(
-        height: 350 * otherCardHeightFactor,
-        child: Padding(
-          padding: EdgeInsets.all(10 * cardPaddingFactor * otherCardHeightFactor),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Leaderboard',
-                  style: TextStyle(
-                      fontSize: 18 * fontSizeFactor,
-                      fontWeight: FontWeight.bold)),
-              SizedBox(height: 10 * cardMarginFactor),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _leaderboard.length,
-                  itemBuilder: (context, index) {
-                    final leader = _leaderboard[index];
-                    return ListTile(
-                      leading: const CircleAvatar(),
-                      title: Text(
-                        leader['name'],
-                        style: TextStyle(fontSize: 16 * fontSizeFactor),
-                      ),
-                      subtitle: Text(
-                        '${leader['role']} - ${leader['points']} pts',
-                        style: TextStyle(fontSize: 14 * fontSizeFactor),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildDatePickerInAppBar(String label, DateTime initialDate,
-      Function(DateTime) onDateSelected, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor) {
+  Widget _buildDatePickerInAppBar(
+      String label,
+      DateTime initialDate,
+      Function(DateTime) onDateSelected,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor) {
     return Row(
       children: [
         Text('$label: ',
@@ -857,6 +1114,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             );
             if (selectedDate != null) {
               onDateSelected(selectedDate);
+              _resetLogoutTimer();
             }
           },
           child: Text(DateFormat('dd-MM-yyyy').format(initialDate),
@@ -878,10 +1136,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         .toList();
   }
 
-
   Future<void> _fetchAttendanceData() async {
     setState(() {
-      _isLoading = true; // Set loading to true when button is pressed or initial load
+      _isLoading = true;
       _errorMessage = null;
     });
 
@@ -896,7 +1153,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       });
     } finally {
       setState(() {
-        _isLoading = false; // Set loading to false when data fetching is complete
+        _isLoading = false;
       });
     }
   }
@@ -920,12 +1177,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     _noOfAnnualLeaveTaken = _calculateNoOfAnnualLeaveTaken(filteredData);
   }
 
-
   int _calculateTotalWorkHours(List<AttendanceRecord> filteredData) {
     double totalHours = 0;
     for (var record in filteredData) {
-      if (record.durationWorked != "Annual Leave" && record.durationWorked != "Holiday") {
-        totalHours += DateHelper.calculateHoursWorked(record.clockInTime, record.clockOutTime);
+      if (record.durationWorked != "Annual Leave" &&
+          record.durationWorked != "Holiday") {
+        totalHours += DateHelper.calculateHoursWorked(
+            record.clockInTime, record.clockOutTime);
       }
     }
     return totalHours.round();
@@ -935,8 +1193,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     if (filteredData.isEmpty) return 0;
     double minHours = double.infinity;
     for (var record in filteredData) {
-      if (record.durationWorked != "Annual Leave" && record.durationWorked != "Holiday") {
-        double hours = DateHelper.calculateHoursWorked(record.clockInTime, record.clockOutTime);
+      if (record.durationWorked != "Annual Leave" &&
+          record.durationWorked != "Holiday") {
+        double hours = DateHelper.calculateHoursWorked(
+            record.clockInTime, record.clockOutTime);
         minHours = minHours < hours ? minHours : hours;
       }
     }
@@ -947,8 +1207,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     if (filteredData.isEmpty) return 0;
     double maxHours = 0;
     for (var record in filteredData) {
-      if (record.durationWorked != "Annual Leave" && record.durationWorked != "Holiday") {
-        double hours = DateHelper.calculateHoursWorked(record.clockInTime, record.clockOutTime);
+      if (record.durationWorked != "Annual Leave" &&
+          record.durationWorked != "Holiday") {
+        double hours = DateHelper.calculateHoursWorked(
+            record.clockInTime, record.clockOutTime);
         maxHours = maxHours > hours ? maxHours : hours;
       }
     }
@@ -958,31 +1220,45 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   int _calculateAverageHoursWorked(List<AttendanceRecord> filteredData) {
     if (filteredData.isEmpty) return 0;
     double totalHours = 0;
-    int validAttendanceCount = 0; // Count only valid attendance records for average calculation
+    int validAttendanceCount = 0;
     for (var record in filteredData) {
-      if (record.durationWorked != "Annual Leave" && record.durationWorked != "Holiday") {
-        totalHours += DateHelper.calculateHoursWorked(record.clockInTime, record.clockOutTime);
+      if (record.durationWorked != "Annual Leave" &&
+          record.durationWorked != "Holiday") {
+        totalHours += DateHelper.calculateHoursWorked(
+            record.clockInTime, record.clockOutTime);
         validAttendanceCount++;
       }
     }
-    return validAttendanceCount == 0 ? 0 : (totalHours / validAttendanceCount).round();
+    return validAttendanceCount == 0
+        ? 0
+        : (totalHours / validAttendanceCount).round();
   }
 
-
   int _calculateNoOfHolidaysFilled(List<AttendanceRecord> filteredData) {
-    return filteredData.where((record) => record.durationWorked == "Holiday").length;
+    return filteredData
+        .where((record) => record.durationWorked == "Holiday")
+        .length;
   }
 
   int _calculateNoOfAnnualLeaveTaken(List<AttendanceRecord> filteredData) {
-    return filteredData.where((record) => record.durationWorked == "Annual Leave").length;
+    return filteredData
+        .where((record) => record.durationWorked == "Annual Leave")
+        .length;
   }
 
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<List<AttendanceRecord>> getRecordsForDateRangeForChart(
       DateTime startDate, DateTime endDate) async {
     final records = <AttendanceRecord>[];
+    final User? user = _auth.currentUser;
+    final String? userId = user?.uid;
+
+    if (userId == null) {
+      print('User not logged in or User ID not found.');
+      return [];
+    }
 
     try {
       for (var date = startDate;
@@ -992,7 +1268,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
         final recordSnapshot = await _firestore
             .collection('Staff')
-            .doc("0A0ySoctMZcmJVh5OaJ5uUTcn073")
+            .doc(userId)
             .collection('Record')
             .doc(formattedDate)
             .get();
@@ -1006,6 +1282,517 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       rethrow;
     }
     return records;
+  }
+
+  Widget _buildBestTeamPlayerCardWrapper(
+      BuildContext context,
+      double cardPaddingFactor,
+      double cardMarginFactor,
+      double fontSizeFactor,
+      double chartHeightFactor,
+      double chartLegendFontSizeFactor,
+      double otherCardHeightFactor,
+      double chartCardVerticalPaddingFactor,
+      double screenWidth, // Receive screenWidth
+      int surveyCount // Receive surveyCount
+      ) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
+            vertical:
+            16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: _buildBestTeamPlayerCardContent(
+            fontSizeFactor, cardMarginFactor, _startDate, _endDate, screenWidth, surveyCount), // Pass screenWidth and surveyCount
+      ),
+    );
+  }
+
+  Widget _buildBestTeamPlayerCardContent(
+      double fontSizeFactor, double cardMarginFactor, DateTime startDate, DateTime endDate, double screenWidth, int surveyCount) {
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
+    String bestPlayerName = _bestPlayerOfWeek?.name ?? "No Best Player";
+    int bestPlayerVoteCount = _firestoreBestPlayerCounts[bestPlayerName] ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Best Team Player of the Week',
+          style: TextStyle(
+              fontSize: 16 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
+        ),
+        SizedBox(height: 8 * cardMarginFactor),
+        _isLoadingBestPlayer
+            ? SizedBox(
+            height: 150 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
+            child: const Center(child: CircularProgressIndicator()))
+            : _bestPlayerOfWeek != null
+            ? _buildRecognitionCardForDashboard(
+            _bestPlayerOfWeek, fontSizeFactor, bestPlayerVoteCount, surveyCount) // Pass counts here
+            : SizedBox(
+            height: 50 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
+            child: const Center(
+                child: Text("No data for this period"))),
+        SizedBox(height: 8 * cardMarginFactor),
+        Expanded(
+          child: _isLoadingBestPlayer
+              ? const Center(child: SizedBox.shrink())
+              : _buildBestPlayerFirestoreChartForDashboard(
+              _firestoreBestPlayerCounts, fontSizeFactor, screenWidth, surveyCount), // Pass screenWidth and surveyCount
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecognitionCardForDashboard(
+      FacilityStaffModel? bestPlayerOfWeek, double fontSizeFactor, int bestPlayerCount, int surveyCount) {
+    if (bestPlayerOfWeek == null) {
+      return const SizedBox.shrink();
+    }
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            Icon(Icons.star, color: Colors.orange, size: 30 * fontSizeFactor),
+            Text(
+              bestPlayerOfWeek.name ?? "Unknown",
+              style: TextStyle(fontSize: 14 * fontSizeFactor),
+              textAlign: TextAlign.center,
+            ),
+            Text( // Added votes count display here
+              '$bestPlayerCount/$surveyCount votes',
+              style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBestPlayerFirestoreChartForDashboard(
+      Map<String, int> firestoreBestPlayerCounts, double fontSizeFactor, double screenWidth, int surveyCount) {
+    double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (firestoreBestPlayerCounts.isNotEmpty)
+          Expanded(
+            child: SfCartesianChart(
+              plotAreaBorderWidth: 0,
+              primaryXAxis: CategoryAxis(
+                  majorGridLines: const MajorGridLines(width: 0),
+                  labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
+              primaryYAxis: NumericAxis(
+                  majorGridLines: const MajorGridLines(width: 0),
+                  axisLine: const AxisLine(width: 0),
+                  labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                  isVisible: false),
+              series: <CartesianSeries>[
+                BarSeries<MapEntry<String, int>, String>(
+                  dataSource: firestoreBestPlayerCounts.entries.toList(),
+                  xValueMapper: (entry, _) => entry.key,
+                  yValueMapper: (entry, _) => entry.value,
+                  dataLabelSettings: DataLabelSettings(
+                      isVisible: true,
+                      textStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                      builder: (data, point, series, pointIndex, seriesIndex) { // Custom builder for data labels
+                        return Text('${data.value}/$surveyCount votes'); // Display count and survey count
+                      }
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+              height: 80 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
+              child: Center(
+                child: Text(
+                  "No survey data available for the selected period to display the chart.",
+                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey, fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                  textAlign: TextAlign.center,
+                ),
+              ))
+      ],
+    );
+  }
+
+  Future<void> _loadBestPlayerDataForRange(
+      DateTime startDate, DateTime endDate) async {
+    if (_currentUserState == null || _currentUserLocation == null) {
+      print(
+          "Current user state or location is not loaded yet for Best Player Chart.");
+      return;
+    }
+
+    setState(() {
+      _isLoadingBestPlayer = true;
+      _firestoreBestPlayerCounts.clear(); // ADDED: Clear counts before fetching new data
+    });
+
+    try {
+      final bestPlayerCounts = <String, int>{};
+      final formattedStartDate = DateFormat('yyyy-MM-dd').format(startDate);
+      final formattedEndDate = DateFormat('yyyy-MM-dd').format(endDate);
+      int surveyCount = 0; // Initialize survey count here
+      _totalSurveysCountedForBestPlayer = 0; // Reset survey count in state
+
+      print(
+          "Best Player Data Query Range (Function Start): Start Date = $formattedStartDate, End Date = $formattedEndDate"); // Log at function start
+      print(
+          "Current User State: $_currentUserState, Location: $_currentUserLocation");
+
+      final staffCollection = FirebaseFirestore.instance
+          .collection('Staff')
+          .where('state', isEqualTo: _currentUserState)
+          .where('location', isEqualTo: _currentUserLocation);
+
+      final staffSnapshot = await staffCollection.get();
+
+      print(
+          "Number of Staff documents found in current location/state: ${staffSnapshot.docs.length}");
+
+      for (final staffDoc in staffSnapshot.docs) {
+        print("Processing Staff Document ID: ${staffDoc.id}");
+
+        final surveyResponsesCollection =
+        staffDoc.reference.collection('SurveyResponses');
+
+        final surveyQuerySnapshot = await surveyResponsesCollection
+            .where('date', isGreaterThanOrEqualTo: startDate)
+            .where('date', isLessThanOrEqualTo: endDate)
+            .get();
+
+        print(
+            "Number of Survey Responses found for Staff ID ${staffDoc.id} (Field Query): ${surveyQuerySnapshot.docs.length}");
+
+        for (final surveyDoc in surveyQuerySnapshot.docs) {
+          surveyCount++; // Increment survey count for each survey document processed
+          print("Processing Survey Document ID: ${surveyDoc.id}"); // Log Survey Doc ID
+
+          final surveyDataFull = surveyDoc.data();
+
+          if (surveyDataFull == null) {
+            print("Survey data is null for document: ${surveyDoc.id}");
+            continue;
+          }
+          print("Full Survey Data: $surveyDataFull");
+
+          if (surveyDataFull.containsKey('surveyData')) {
+            final surveyDataList = surveyDataFull['surveyData'] as List;
+
+            for (var surveyData in surveyDataList) {
+              if (surveyData is Map<String, dynamic>) {
+                if (surveyData.containsKey(
+                    "For the current week, who is the best team player in your facility")) {
+                  final bestPlayerFieldValue = surveyData[
+                  "For the current week, who is the best team player in your facility"];
+                  print("Best Player Field Value (Raw): $bestPlayerFieldValue"); // Log raw field value
+
+                  List<dynamic> bestPlayerList = [];
+                  if (bestPlayerFieldValue is String) {
+                    try {
+                      bestPlayerList = json.decode(bestPlayerFieldValue) as List;
+                    } catch (e) {
+                      print("Error decoding JSON string (string value case): $e");
+                    }
+                  } else if (bestPlayerFieldValue is List) {
+                    bestPlayerList = bestPlayerFieldValue;
+                  }
+
+                  print("Best Player List (Parsed): $bestPlayerList"); // Log parsed list
+
+
+                  if (bestPlayerList.isNotEmpty) {
+                    // Modified part: Only consider the first name in the list as the best team player nomination
+                    var firstPlayer = bestPlayerList[0];
+                    if (firstPlayer is Map<String, dynamic> &&
+                        firstPlayer.containsKey('name')) {
+                      final playerName = firstPlayer['name'] as String;
+                      print("Extracted Player Name: $playerName"); // Log extracted name
+                      bestPlayerCounts[playerName] =
+                          (bestPlayerCounts[playerName] ?? 0) + 1;
+                      print("Best Player Counts (During Loop): $bestPlayerCounts"); // Log counts during loop
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      String? bestPlayerName;
+      int maxCount = 0;
+      bestPlayerCounts.forEach((playerName, count) {
+        if (count > maxCount) {
+          maxCount = count;
+          bestPlayerName = playerName;
+        }
+      });
+      FacilityStaffModel? bestPlayer;
+      if (bestPlayerName != null) {
+        bestPlayer = FacilityStaffModel(name: bestPlayerName);
+      } else {
+        bestPlayer = null;
+      }
+
+      setState(() {
+        _firestoreBestPlayerCounts = bestPlayerCounts;
+        _bestPlayerOfWeek = bestPlayer;
+        _isLoadingBestPlayer = false;
+        _totalSurveysCountedForBestPlayer = surveyCount; // Update survey count in state
+      });
+
+      print("Final Best Player Counts: $bestPlayerCounts"); // Log final counts
+
+      final cacheKey =
+          '${DateFormat('yyyy-MM-dd').format(startDate)}-${DateFormat('yyyy-MM-dd').format(endDate)}';
+      _bestPlayerCache[cacheKey] = {
+        'counts': bestPlayerCounts,
+        'bestPlayer': bestPlayer,
+        'surveyCount': surveyCount // Store survey count in cache
+      };
+    } catch (e) {
+      print('Error loading Best Player Firestore data: $e');
+      setState(() {
+        _isLoadingBestPlayer = false;
+      });
+    }
+  }
+
+  Widget _buildFacilityClockInCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
+    return Container(
+      padding: EdgeInsets.all(15 * cardPaddingFactor * otherCardHeightFactor),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'All Facility Clock-In (Live Feed) - Today',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                  fontSize: 16 * fontSizeFactor,
+                ),
+              ),
+              IconButton(onPressed: () {}, icon: Icon(Icons.more_vert, size: 24 * iconSizeFactor)),
+            ],
+          ),
+          Divider(height: 10 * cardMarginFactor,),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor, vertical: 4.0 * cardPaddingFactor),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Name & Date", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
+                Text("Clock-In Time", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _facilityClockInDataStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                List<Map<String, dynamic>> facilityClockInData = snapshot.data ?? [];
+
+                // Sort the list by clock-in time
+                facilityClockInData.sort((a, b) {
+                  final timeFormat = DateFormat('hh:mm a');
+                  DateTime? timeA, timeB;
+                  try {
+                    timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
+                  } catch (e) {
+                    timeA = DateTime(0); // Fallback in case of parsing error
+                  }
+                  try {
+                    timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
+                  } catch (e) {
+                    timeB = DateTime(0); // Fallback in case of parsing error
+                  }
+
+                  if (a['clockIn'] == 'N/A' && b['clockIn'] == 'N/A') return 0;
+                  if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
+                  if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
+
+                  return timeA!.compareTo(timeB!);
+                });
+
+
+                if (facilityClockInData.isEmpty) {
+                  return Center(child: Text("No Clock-Ins Today", style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
+                }
+                return SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: facilityClockInData.map((data) => _buildClockInListItem(
+                      data['fullName'] ?? 'Unknown Staff',
+                      data['date'] ?? 'N/A',
+                      data['clockIn'] ?? 'N/A',
+                      data['clockOut'] ?? '--/--', // Ensure clockOut is not null, default to '--/--'
+                      fontSizeFactor,
+                      cardMarginFactor,
+                      cardPaddingFactor,
+                    )).toList(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildClockInListItem(String title, String date, String clockInTime, String clockOutTime, double fontSizeFactor, double cardMarginFactor, double cardPaddingFactor) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.0 * cardMarginFactor, horizontal: 8.0 * cardPaddingFactor), // Added horizontal padding
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically center
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 14 * fontSizeFactor),
+                ),
+                Text(
+                  date,
+                  style: TextStyle(color: Colors.black54, fontSize: 12 * fontSizeFactor),
+                ),
+              ],
+            ),
+          ),
+          Row( // Wrap Clock-In Time and Tick in a Row
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center, // Align tick vertically center
+            children: [
+              Text(
+                clockInTime,
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor), // Increased font size
+              ),
+              SizedBox(width: 5 * cardMarginFactor),
+              if (clockInTime != 'N/A' && clockOutTime == '--/--')
+                Column(
+                  children: [
+                    Icon(Icons.check, color: Colors.orange, size: 16 * fontSizeFactor),
+                    SizedBox(width: 3 * cardMarginFactor),
+                    Text("Clocked-In,Yet to Clock Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.orange),)
+                  ],
+                )
+              else if (clockInTime != 'N/A' && clockOutTime != '--/--')
+                Column(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 16 * fontSizeFactor),
+                    SizedBox(width: 3 * cardMarginFactor),
+                    Text("Clocked-In and Clocked Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.green),)
+                  ],
+                )
+              else
+                SizedBox.shrink(), // No icon if clockIn is 'N/A'
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Stream<List<Map<String, dynamic>>> _facilityClockInDataStream() {
+    final currentUserUUID = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserUUID == null || _currentUserState == null || _currentUserLocation == null || _currentUserStaffCategory == null) {
+      print("Could not retrieve user info to load facility clock-in data stream.");
+      return Stream.value([]); // Return an empty stream if user info is missing
+    }
+
+    final currentDateFormatted = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
+
+    // Create a stream builder for the current user's record
+    Stream<DocumentSnapshot> currentUserRecordStream = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(currentUserUUID)
+        .collection('Record')
+        .doc(currentDateFormatted)
+        .snapshots();
+
+    // Create a stream builder for other staff records in the facility
+    Stream<QuerySnapshot> facilityStaffRecordsStream = FirebaseFirestore.instance
+        .collection('Staff')
+        .where('state', isEqualTo: _currentUserState)
+        .where('location', isEqualTo: _currentUserLocation)
+        .snapshots();
+
+
+    return Rx.combineLatest2(
+      currentUserRecordStream,
+      facilityStaffRecordsStream,
+          (currentUserRecordSnapshot, facilityStaffSnapshot) async* {
+        List<Map<String, dynamic>> clockInData = [];
+
+        // Process current user's record
+        if (currentUserRecordSnapshot.exists) {
+          Map<String, dynamic> recordData = currentUserRecordSnapshot.data() as Map<String, dynamic>? ?? {};
+          DocumentSnapshot staffDataSnapshot = await FirebaseFirestore.instance.collection('Staff').doc(currentUserUUID).get();
+          Map<String, dynamic> staffData = staffDataSnapshot.data() as Map<String, dynamic>? ?? {};
+
+          clockInData.add({
+            'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
+            'date': recordData['date'] ?? 'N/A',
+            'clockIn': recordData['clockIn'] ?? 'N/A',
+            'clockOut': recordData['clockOut'] ?? '--/--', // Include clockOut
+          });
+        }
+
+        // Process other facility staff records
+        for (var staffDoc in facilityStaffSnapshot.docs) {
+          if (staffDoc.id == currentUserUUID) continue; // Skip current user as already added
+
+          DocumentSnapshot recordSnapshot = await staffDoc.reference
+              .collection('Record')
+              .doc(currentDateFormatted)
+              .get();
+
+          if (recordSnapshot.exists) {
+            Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>? ?? {};
+            Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>? ?? {};
+
+            clockInData.add({
+              'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
+              'date': recordData['date'] ?? 'N/A',
+              'clockIn': recordData['clockIn'] ?? 'N/A',
+              'clockOut': recordData['clockOut'] ?? '--/--', // Include clockOut
+            });
+          }
+        }
+        yield clockInData;
+      },
+    ).asyncMap((stream) async => await stream.first); // Convert combined stream to single stream of List<Map<String, dynamic>>
   }
 }
 

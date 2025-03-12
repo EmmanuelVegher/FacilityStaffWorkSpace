@@ -77,6 +77,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   String? staffSignatureLink;
   BioModel? bioData; // Make bioData nullable// Currently selected project
   String? selectedSupervisor; // State variable to store the selected supervisor
+  String? selectedFacilitySupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
   String? _signatureLink;
   Uint8List? staffSignature; // Store staff signature as Uint8List
@@ -806,12 +807,12 @@ $selectedBioFirstName $selectedBioLastName
             attendanceDate.month == date.month &&
             attendanceDate.day == date.day) {
           if (category == projectName && !attendance.offDay!) {
-            double hours = attendance.noOfHours!;
+            double hours = attendance.noOfHours ?? 0; // Null-safe access
             totalHoursForDate += hours > 8.0 ? 8.0 : hours; // Applying the cap
           } else if (attendance.offDay! &&
-              attendance.durationWorked!.toLowerCase() ==
+              attendance.durationWorked?.toLowerCase() ==
                   category.toLowerCase()) {
-            double hours = attendance.noOfHours!;
+            double hours = attendance.noOfHours ?? 0; // Null-safe access
             totalHoursForDate +=
             hours > 8.0 ? 8.0 : hours; // Cap for off-days too
           }
@@ -834,12 +835,12 @@ $selectedBioFirstName $selectedBioLastName
             attendanceDate.month == date.month &&
             attendanceDate.day == date.day) {
           if (category == projectName && !attendance.offDay!) {
-            double hours = attendance.noOfHours!;
+            double hours = attendance.noOfHours ?? 0; // Null-safe access
             totalHoursForDate += hours > 8.0 ? 8.0 : hours; // Applying the cap
           } else if (attendance.offDay! &&
-              attendance.durationWorked!.toLowerCase() ==
+              attendance.durationWorked?.toLowerCase() ==
                   category.toLowerCase()) {
-            double hours = attendance.noOfHours!;
+            double hours = attendance.noOfHours ?? 0; // Null-safe access
             totalHoursForDate +=
             hours > 8.0 ? 8.0 : hours; // Cap for off-days too
           }
@@ -862,14 +863,13 @@ $selectedBioFirstName $selectedBioLastName
         if (attendanceDate.year == date.year &&
             attendanceDate.month == date.month &&
             attendanceDate.day == date.day) {
+          double hours = attendance.noOfHours ?? 0; // Null-safe access
           if (category == projectName && !attendance.offDay!) {
-            totalHoursForDate +=
-            attendance.noOfHours! > 8 ? 8 : attendance.noOfHours!;
+            totalHoursForDate += hours > 8 ? 8 : hours;
           } else if (attendance.offDay! &&
-              attendance.durationWorked!.toLowerCase() ==
+              attendance.durationWorked?.toLowerCase() ==
                   category.toLowerCase()) {
-            totalHoursForDate +=
-            attendance.noOfHours! > 8 ? 8 : attendance.noOfHours!;
+            totalHoursForDate += hours > 8 ? 8 : hours;
           }
         }
       } catch (e) {
@@ -882,11 +882,12 @@ $selectedBioFirstName $selectedBioLastName
 
 // Updated function to calculate total hours for a project (with capping)
   double calculateTotalHours1(String? projectName) {
+    if (projectName == null) return 0; // Handle null projectName
     double totalHours = 0;
     for (var date in daysInRange) {
       if (!isWeekend(date)) {
         totalHours += _getCappedHoursForDate(
-            date, projectName, projectName!); // Use helper function
+            date, projectName, projectName); // Use helper function
       }
     }
     return totalHours;
@@ -924,6 +925,7 @@ $selectedBioFirstName $selectedBioLastName
 
   // Updated percentage calculation for a project (using capped hours)
   double calculatePercentageWorked1(String? projectName) {
+    if (projectName == null) return 0; // Handle null projectName
     int workingDays = daysInRange
         .where((date) => !isWeekend(date))
         .length;
@@ -1287,13 +1289,13 @@ $selectedBioFirstName $selectedBioLastName
             attendanceDate.day == date.day) {
           if (category == projectName) {
             if (!attendance.offDay!) {
-              totalHoursForDate += attendance.noOfHours!;
+              totalHoursForDate += attendance.noOfHours ?? 0; // Null-safe access
             }
           } else {
             if (attendance.offDay! &&
                 attendance.durationWorked?.toLowerCase() ==
                     category.toLowerCase()) {
-              totalHoursForDate += attendance.noOfHours!;
+              totalHoursForDate += attendance.noOfHours ?? 0; // Null-safe access
             }
           }
         }
@@ -1453,7 +1455,7 @@ $selectedBioFirstName $selectedBioLastName
                 attendanceDate.month == date.month &&
                 attendanceDate.day == date.day &&
                 !attendance.offDay!) {
-              totalHours += attendance.noOfHours!;
+              totalHours += attendance.noOfHours ?? 0; // Null-safe access
             }
           } catch (e) {
             print("Error parsing date: $e");
@@ -1476,7 +1478,7 @@ $selectedBioFirstName $selectedBioLastName
             if (attendanceDate.year == date.year &&
                 attendanceDate.month == date.month &&
                 attendanceDate.day == date.day) {
-              totalGrandHours += attendance.noOfHours!;
+              totalGrandHours += attendance.noOfHours ?? 0; // Null-safe access
             }
           } catch (e) {
             print("Error parsing date: $e");
@@ -1632,6 +1634,19 @@ $selectedBioFirstName $selectedBioLastName
         snapshot.docs.map((doc) => doc['supervisor'] as String?).toList());
   }
 
+  Stream<List<String?>> getFacilitySupervisorsFromFirestore(String location, String state) {
+    return FirebaseFirestore.instance
+        .collection('Staff')
+        .where('location', isEqualTo: location)
+        .where('state', isEqualTo: state)
+        .where('staffCategory', isEqualTo: "Facility Supervisor")
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => "${doc['firstName']} ${doc['lastName']}")
+        .toList());
+  }
+
+
 
   Future<String?> getSupervisorEmailFromFirestore(String state, String supervisorName) async {
     try {
@@ -1642,17 +1657,63 @@ $selectedBioFirstName $selectedBioLastName
           .doc(supervisorName)
           .get();
 
-      return docSnapshot.exists ? docSnapshot.data() != null?['email'] as String? : null:null;
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final data = docSnapshot.data()!;
+        final emailField = data['email'];
+
+        // If emailField is a list and not empty, return the first email
+        if (emailField is List && emailField.isNotEmpty) {
+          return emailField[0] as String;
+        }
+        // If emailField is already a String, return it directly
+        else if (emailField is String) {
+          return emailField;
+        }
+      }
+      return null;
     } catch (e) {
       print("Error fetching supervisor email: $e");
       return null;
     }
   }
 
+
+
+  Future<String?> getFacilitySupervisorEmailFromFirestore(String location,String state, String supervisorName) async {
+    try {
+      // Query the "Staff" collection for documents with the matching state.
+      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('location', isEqualTo: location)
+          .where('state', isEqualTo: state)
+          .where('staffCategory', isEqualTo: "Facility Supervisor")
+          .get();
+
+      // Loop through each document in the query snapshot.
+      for (var doc in querySnapshot.docs) {
+        String firstName = doc['firstName'] as String;
+        String lastName = doc['lastName'] as String;
+        // Concatenate firstName and lastName with a space.
+        String fullName = "$firstName $lastName";
+        // Check if the fullName matches the provided supervisorName.
+        if (fullName == supervisorName) {
+          return doc['emailAddress'] as String?;
+        }
+      }
+      // Return null if no matching supervisor is found.
+      return null;
+    } catch (e) {
+      print("Error fetching supervisor email: $e");
+      return null;
+    }
+  }
+
+
+
   Widget buildSupervisorDropdown() {
     return StreamBuilder<List<String?>>(
-      stream: (bioData != null && bioData!.department != null && bioData!.state != null)
-          ? getSupervisorsFromFirestore(bioData!.department!, bioData!.state!)
+      stream: (selectedBioDepartment != null && selectedBioState != null)
+          ? getSupervisorsFromFirestore(selectedBioDepartment!, selectedBioState!)
           : Stream.value([]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1680,14 +1741,14 @@ $selectedBioFirstName $selectedBioLastName
                 setState(() {
                   selectedSupervisor = newValue;
                 });
-                print("Selected Supervisor: $newValue");
+                print("Selected Caritas Supervisor: $newValue");
 
                 if (newValue != null) {
-                  String? supervisorEmail = await getSupervisorEmailFromFirestore(bioData!.state!, newValue);
+                  String? supervisorEmail = await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
                   setState(() {
                     _selectedSupervisorEmail = supervisorEmail;
                   });
-                  print("Supervisor Email: $_selectedSupervisorEmail");
+                  print("Caritas Supervisor Email: $_selectedSupervisorEmail");
                 }
               },
               hint: const Text('Select Supervisor'),
@@ -1699,6 +1760,54 @@ $selectedBioFirstName $selectedBioLastName
   }
 
 
+  Widget buildFacilitySupervisorDropdown() {
+    return StreamBuilder<List<String?>>(
+      stream: (selectedBioLocation != null && selectedBioState != null)
+          ? getFacilitySupervisorsFromFirestore(selectedBioLocation!, selectedBioState!)
+          : Stream.value([]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        } else {
+          List<String?> supervisorNames = snapshot.data ?? [];
+
+          return SizedBox(
+            width: double.infinity,
+            child: DropdownButton<String?>(
+              isExpanded: true,
+              value: _selectedFacilitySupervisorFullName,
+              items: supervisorNames.map((supervisorName) {
+                return DropdownMenuItem<String?>(
+                  value: supervisorName,
+                  child: Text(
+                    supervisorName ?? 'No Supervisor',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) async {
+                setState(() {
+                  _selectedFacilitySupervisorFullName = newValue;
+                });
+                print("Selected Facility Supervisor: $newValue");
+
+                if (newValue != null) {
+                  String? supervisorEmail = await getFacilitySupervisorEmailFromFirestore(selectedBioLocation!,selectedBioState!, newValue);
+                  setState(() {
+                    _selectedFacilitySupervisorEmail = supervisorEmail;
+                  });
+                  print("Facility Supervisor Email: $_selectedFacilitySupervisorEmail");
+                }
+              },
+              hint: const Text('Select Supervisor'),
+            ),
+          );
+        }
+      },
+    );
+  }
 
 
   // Calculate total hours for a specific category
@@ -1716,7 +1825,7 @@ $selectedBioFirstName $selectedBioLastName
                 attendance.offDay! && //Check for offDay for these categories
                 attendance.durationWorked?.toLowerCase() ==
                     category.toLowerCase()) {
-              totalHours += attendance.noOfHours!;
+              totalHours += attendance.noOfHours ?? 0; // Null-safe access
             }
           } catch (e) {
             print("Error parsing date: $e");
@@ -2572,7 +2681,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     //Image.network(Uri.decodeFull(staffSignature!)),
 
                                                     CachedNetworkImage(
-                                                        imageUrl: Uri.decodeFull(staffSignature!),
+                                                      imageUrl: staffSignature!,
                                                       placeholder: (context, url) => const CircularProgressIndicator(),
                                                       errorWidget: (context, url, error) => const Icon(Icons.error),
                                                     ),
@@ -3284,7 +3393,7 @@ $selectedBioFirstName $selectedBioLastName
                                               .shortestSide < 600
                                               ? 0.07
                                               : 0.05)),
-                                          // facilitySupervisor!=null?
+                                          //
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
                                             stream: FirebaseFirestore.instance
@@ -3307,210 +3416,23 @@ $selectedBioFirstName $selectedBioLastName
                                                     dynamic>;
 
                                                 final facilitySupervisor = data['facilitySupervisor']; // Assuming this stores the image URL
-                                                final caritasSupervisorDate = data['date']; // Assuming you store the date
+                                                //final caritasSupervisorDate = data['date'];
+                                                //Assuming you store the date
+                                                print("facilitySupervisor == $facilitySupervisor");
 
-                                                if (facilitySupervisor ==
-                                                    null) {
+                                                if (facilitySupervisor == null) {
                                                   // caritasSupervisorSignature is a URL/path to the image
-                                                  return StreamBuilder<List<
-                                                      Map<String, dynamic>>>(
-                                                    stream: Stream.value(
-                                                        facilitySupervisorsList),
-                                                    builder: (context,
-                                                        snapshot) {
-                                                      if (snapshot
-                                                          .connectionState ==
-                                                          ConnectionState
-                                                              .waiting) {
-                                                        return const Center(
-                                                            child: CircularProgressIndicator());
-                                                      } else
-                                                      if (snapshot.hasError) {
-                                                        return Text(
-                                                            'Error: ${snapshot
-                                                                .error}');
-                                                      } else {
-                                                        // Extract the supervisors list or provide an empty list
-                                                        List<Map<String,
-                                                            dynamic>> supervisors = snapshot
-                                                            .data ?? [];
-
-                                                        // Map the data into dropdown items
-                                                        List<DropdownMenuItem<
-                                                            Map<String,
-                                                                dynamic>>> dropdownItems =
-                                                        supervisors.map((
-                                                            supervisor) {
-                                                          // Concatenate first name and last name
-                                                          String fullName = "${supervisor['lastName']} ${supervisor['firstName']}";
-                                                          return DropdownMenuItem<
-                                                              Map<
-                                                                  String,
-                                                                  dynamic>>(
-                                                            value: supervisor,
-                                                            child: Text(
-                                                                fullName),
-                                                          );
-                                                        }).toList();
-
-                                                        return Column(
-                                                          crossAxisAlignment: CrossAxisAlignment
-                                                              .start,
-                                                          children: [
-                                                            SizedBox(
-                                                              width: double
-                                                                  .infinity,
-                                                              // Ensures the dropdown fits the container
-                                                              child: DropdownButton<
-                                                                  Map<
-                                                                      String,
-                                                                      dynamic>>(
-                                                                isExpanded: true,
-                                                                // Allows the dropdown to fit the available width
-                                                                value: _selectedFacilitySupervisor,
-                                                                // Use the state variable here
-                                                                items: dropdownItems,
-                                                                onChanged: (Map<
-                                                                    String,
-                                                                    dynamic>? newValue) {
-                                                                  if (newValue !=
-                                                                      null) {
-                                                                    setState(() {
-                                                                      _selectedFacilitySupervisor =
-                                                                          newValue;
-                                                                      // Save the concatenated name and email address
-                                                                      _selectedFacilitySupervisorFullName =
-                                                                      "${newValue['lastName']} ${newValue['firstName']}";
-                                                                      _selectedFacilitySupervisorEmail =
-                                                                      newValue['emailAddress'];
-                                                                      _selectedFacilitySupervisorSignatureLink =
-                                                                      newValue['signatureLink'];
-                                                                    });
-                                                                    print(
-                                                                        "Selected Supervisor: $_selectedFacilitySupervisorFullName");
-                                                                    print(
-                                                                        "Supervisor Email: $_selectedFacilitySupervisorEmail");
-                                                                  }
-                                                                },
-                                                                hint: const Text(
-                                                                    'Select Supervisor'),
-                                                              ),
-                                                            ),
-
-                                                          ],
-                                                        );
-                                                      }
-                                                    },
-                                                  );
+                                                  return  buildFacilitySupervisorDropdown();
                                                 } else {
                                                   return Text(
                                                       "$facilitySupervisor");
                                                 }
                                               } else {
-                                                return StreamBuilder<
-                                                    List<Map<String, dynamic>>>(
-                                                  stream: Stream.value(
-                                                      facilitySupervisorsList),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot
-                                                        .connectionState ==
-                                                        ConnectionState
-                                                            .waiting) {
-                                                      return const Center(
-                                                          child: CircularProgressIndicator());
-                                                    } else
-                                                    if (snapshot.hasError) {
-                                                      return Text(
-                                                          'Error: ${snapshot
-                                                              .error}');
-                                                    } else {
-                                                      // Extract the supervisors list or provide an empty list
-                                                      List<Map<String,
-                                                          dynamic>> supervisors = snapshot
-                                                          .data ?? [];
-
-                                                      // Map the data into dropdown items
-                                                      List<DropdownMenuItem<Map<
-                                                          String,
-                                                          dynamic>>> dropdownItems =
-                                                      supervisors.map((
-                                                          supervisor) {
-                                                        // Concatenate first name and last name
-                                                        String fullName = "${supervisor['lastName']} ${supervisor['firstName']}";
-                                                        return DropdownMenuItem<
-                                                            Map<
-                                                                String,
-                                                                dynamic>>(
-                                                          value: supervisor,
-                                                          child: Text(fullName),
-                                                        );
-                                                      }).toList();
-
-                                                      return Column(
-                                                        crossAxisAlignment: CrossAxisAlignment
-                                                            .start,
-                                                        children: [
-                                                          SizedBox(
-                                                            width: double
-                                                                .infinity,
-                                                            // Ensures the dropdown fits the container
-                                                            child: DropdownButton<
-                                                                Map<
-                                                                    String,
-                                                                    dynamic>>(
-                                                              isExpanded: true,
-                                                              // Allows the dropdown to fit the available width
-                                                              value: _selectedFacilitySupervisor,
-                                                              // Use the state variable here
-                                                              items: dropdownItems,
-                                                              onChanged: (Map<
-                                                                  String,
-                                                                  dynamic>? newValue) {
-                                                                if (newValue !=
-                                                                    null) {
-                                                                  setState(() {
-                                                                    _selectedFacilitySupervisor =
-                                                                        newValue;
-                                                                    // Save the concatenated name and email address
-                                                                    _selectedFacilitySupervisorFullName =
-                                                                    "${newValue['lastName']} ${newValue['firstName']}";
-                                                                    _selectedFacilitySupervisorEmail =
-                                                                    newValue['emailAddress'];
-                                                                    _selectedFacilitySupervisorSignatureLink =
-                                                                    newValue['signatureLink'];
-                                                                  });
-                                                                  print(
-                                                                      "Selected Supervisor: $_selectedFacilitySupervisorFullName");
-                                                                  print(
-                                                                      "Supervisor Email: $_selectedFacilitySupervisorEmail");
-                                                                }
-                                                              },
-                                                              hint: const Text(
-                                                                  'Select Supervisor'),
-                                                            ),
-                                                          ),
-                                                          // const SizedBox(height: 16),
-                                                          // ElevatedButton(
-                                                          //   onPressed: () {
-                                                          //     if (_selectedFacilitySupervisorFullName != null &&
-                                                          //         _selectedFacilitySupervisorEmail != null) {
-                                                          //       print("Submitting:");
-                                                          //       print("Full Name: $_selectedFacilitySupervisorFullName");
-                                                          //       print("Email Address: $_selectedFacilitySupervisorEmail");
-                                                          //     } else {
-                                                          //       print("Please select a supervisor first.");
-                                                          //     }
-                                                          //   },
-                                                          //   child: const Text("Submit"),
-                                                          // ),
-                                                        ],
-                                                      );
-                                                    }
-                                                  },
-                                                );
+                                                return buildFacilitySupervisorDropdown();
                                               }
                                             },
                                           ),
+                                          //
 
 
                                           SizedBox(
@@ -4128,381 +4050,300 @@ $selectedBioFirstName $selectedBioLastName
                                                 else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Pending") {
                                                   return Column(
                                                     children: [
-                                                      const Text(
-                                                        "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
-                                                        // style: TextStyle(fontWeight: FontWeight.bold),
-                                                        softWrap: true,
-                                                        overflow: TextOverflow.visible,
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      facilitySupervisorSignatureStatus == "Pending"
-                                                          ? Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          const Padding(
-                                                            padding: EdgeInsets.only(top: 0.0),
-                                                            child: Icon(Icons.access_time, color: Colors.orange),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Expanded(
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.only(top: 0.0),
-                                                              child: Text(
-                                                                "$facilitySupervisorSignatureStatus (Awaiting Approval from Facility Supervisor)",
-                                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                                softWrap: true,
-                                                                overflow: TextOverflow.visible,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      )
-                                                          : facilitySupervisorSignatureStatus == "Rejected"
-                                                          ? Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          const Padding(
-                                                            padding: EdgeInsets.only(top: 0.0),
-                                                            child: Icon(Icons.cancel, color: Colors.red),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Expanded(
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                                              child: Text(
-                                                                "$facilitySupervisorSignatureStatus (Approval Rejected by Facility Supervisor)",
-                                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                                softWrap: true,
-                                                                overflow: TextOverflow.visible,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          GestureDetector(
-                                                            onTap: () {
-                                                              showDialog(
-                                                                context: context,
-                                                                builder: (context) {
-                                                                  return AlertDialog(
-                                                                    title: const Text("Reason for Rejection"),
-                                                                    content: Text(
-                                                                      facilitySupervisorSignatureStatus ?? "No reason provided.",
-                                                                      softWrap: true,
-                                                                      overflow: TextOverflow.visible,
-                                                                    ),
-                                                                    actions: [
-                                                                      TextButton(
-                                                                        onPressed: () {
-                                                                          Navigator.of(context).pop();
-                                                                        },
-                                                                        child: const Text("Close"),
-                                                                      ),
-                                                                    ],
-                                                                  );
-                                                                },
-                                                              );
-                                                            },
-                                                            child: const Icon(
-                                                              Icons.info_outline,
-                                                              color: Colors.blue,
-                                                              size: 20,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      )
-                                                          : Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          const Padding(
-                                                            padding: EdgeInsets.only(top: 0.0),
-                                                            child: Icon(Icons.check_circle, color: Colors.green),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Expanded(
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                                              child: Text(
-                                                                "$facilitySupervisorSignatureStatus",
-                                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                                softWrap: true,
-                                                                overflow: TextOverflow.visible,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  );
-                                                }
-                                                else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Rejected") {
-                                                  return Column(
-                                                    children: [
-                                                      const Text(
-                                                        "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
-                                                        // style: TextStyle(fontWeight: FontWeight.w100),
-                                                        softWrap: true,
-                                                        overflow: TextOverflow.visible,
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      facilitySupervisorSignatureStatus == "Rejected"
-                                                          ? const Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Padding(
-                                                            padding: EdgeInsets.only(top: 0.0),
-                                                            child: Icon(Icons.cancel, color: Colors.red),
-                                                          ),
-                                                          SizedBox(width: 8),
-                                                          Expanded(
-                                                            child: Padding(
-                                                              padding: EdgeInsets.only(bottom: 0.0),
-                                                              child: Text(
-                                                                "(Approval Rejected by Facility Supervisor)",
-                                                                style: TextStyle(fontWeight: FontWeight.bold),
-                                                                softWrap: true,
-                                                                overflow: TextOverflow.visible,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          SizedBox(width: 8),
+                                                    const Text(
+                                                    "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
+                                                    // style: TextStyle(fontWeight: FontWeight.bold),
+                                                    softWrap: true,
+                                                    overflow: TextOverflow.visible,
+                                                  ),
+                                              const SizedBox(height: 8),
+                                              facilitySupervisorSignatureStatus == "Pending"
+                                              ? Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets.only(top: 0.0),
+                                              child: Icon(Icons.access_time, color: Colors.orange),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                              child: Padding(
+                                              padding: const EdgeInsets.only(top: 0.0),
+                                              child: Text(
+                                              "$facilitySupervisorSignatureStatus (Awaiting Approval from Facility Supervisor)",
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              ),
+                                              ),
+                                              ],
+                                              )
+                                                  : facilitySupervisorSignatureStatus == "Rejected"
+                                              ? Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets.only(top: 0.0),
+                                              child: Icon(Icons.cancel, color: Colors.red),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                              child: Padding(
+                                              padding: const EdgeInsets.only(bottom: 0.0),
+                                              child: Text(
+                                              "$facilitySupervisorSignatureStatus (Approval Rejected by Facility Supervisor)",
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                              onTap: () {
+                                              showDialog(
+                                              context: context,
+                                              builder: (context) {
+                                              return AlertDialog(
+                                              title: const Text("Reason for Rejection"),
+                                              content: Text(
+                                              facilitySupervisorSignatureStatus ?? "No reason provided.",
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              actions: [
+                                              TextButton(
+                                              onPressed: () {
+                                              Navigator.of(context).pop();
+                                              },
+                                              child: const Text("Close"),
+                                              ),
+                                              ],
+                                              );
+                                              },
+                                              );
+                                              },
+                                              child: const Icon(
+                                              Icons.info_outline,
+                                              color: Colors.blue,
+                                              size: 20,
+                                              ),
+                                              ),]
+                                              )
+                                                  : Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets.only(top: 0.0),
+                                              child: Icon(Icons.check_circle, color: Colors.green),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                              child: Padding(
+                                              padding: const EdgeInsets.only(bottom: 0.0),
+                                              child: Text(
+                                              "$facilitySupervisorSignatureStatus",
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              ),
+                                              ),
+                                              ],
+                                              ),
+                                              ],
+                                              );
+                                              }
+                                              else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Rejected") {
+                                              return Column(
+                                              children: [
+                                              const Text(
+                                              "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
+                                              // style: TextStyle(fontWeight: FontWeight.w100),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              facilitySupervisorSignatureStatus == "Rejected"
+                                              ? const Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                              Padding(
+                                              padding: EdgeInsets.only(top: 0.0),
+                                              child: Icon(Icons.cancel, color: Colors.red),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Expanded(
+                                              child: Padding(
+                                              padding: EdgeInsets.only(bottom: 0.0),
+                                              child: Text(
+                                              "(Approval Rejected by Facility Supervisor)",
+                                              style: TextStyle(fontWeight: FontWeight.bold),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              ),
+                                              ),
+                                              SizedBox(width: 8),
 
-                                                        ],
-                                                      )
-                                                          : Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          const Padding(
-                                                            padding: EdgeInsets.only(top: 0.0),
-                                                            child: Icon(Icons.check_circle, color: Colors.green),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Expanded(
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                                              child: Text(
-                                                                "$facilitySupervisorSignatureStatus",
-                                                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                                                softWrap: true,
-                                                                overflow: TextOverflow.visible,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  );
-                                                }
-
-
-                                                else {
-                                                  return Column(
-                                                    children: [
-                                                      const Text(
-                                                          "Awaiting Caritas Supervisor Signature"),
-                                                      const SizedBox(height: 8),
-                                                      caritasSupervisorSignatureStatus ==
-                                                          "Pending"
-                                                          ?
-                                                      Row(
-                                                        //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                                          children: [
-                                                            const Padding(
-                                                              padding: EdgeInsets
-                                                                  .only(
-                                                                  top: 0.0),
-                                                              child:
-                                                              Icon(Icons
-                                                                  .access_time,
-                                                                  color: Colors
-                                                                      .orange),
-                                                            ),
-                                                            const SizedBox(width: 8),
-                                                            Padding(
-                                                              padding: const EdgeInsets
-                                                                  .only(
-                                                                  top: 0.0),
-                                                              child: Text(
-                                                                "$caritasSupervisorSignatureStatus",
-                                                                style: const TextStyle(
-                                                                    fontWeight: FontWeight
-                                                                        .bold),
-                                                              ),
-                                                            ),
-                                                          ]
-                                                      )
-                                                          : caritasSupervisorSignatureStatus ==
-                                                          "Rejected" ?
-                                                      Row(
-                                                          children: [
-                                                            const Padding(
-                                                              padding: EdgeInsets
-                                                                  .only(
-                                                                  top: 0.0),
-                                                              child:
-                                                              Icon(Icons.cancel,
-                                                                  color: Colors
-                                                                      .red),
-                                                            ),
-                                                            const SizedBox(width: 8),
-                                                            Padding(
-                                                              padding: const EdgeInsets
-                                                                  .only(
-                                                                  bottom: 0.0),
-                                                              child: Text(
-                                                                "$caritasSupervisorSignatureStatus",
-                                                                style: const TextStyle(
-                                                                    fontWeight: FontWeight
-                                                                        .bold),
-                                                              ),
-                                                            ),
-                                                            const SizedBox(width:8),
-                                                            GestureDetector(
-                                                              onTap: () {
-                                                                showDialog(
-                                                                  context: context,
-                                                                  builder: (context) {
-                                                                    return AlertDialog(
-                                                                      title: const Text("Reason for Rejection"),
-                                                                      content: Text(caritasSupervisorRejectionReason ?? "No reason provided."),
-                                                                      actions: [
-                                                                        TextButton(
-                                                                          onPressed: () {
-                                                                            Navigator.of(context).pop();
-                                                                          },
-                                                                          child: const Text("Close"),
-                                                                        ),
-                                                                      ],
-                                                                    );
-                                                                  },
-                                                                );
-                                                              },
-                                                              child: const Icon(
-                                                                Icons.info_outline,
-                                                                color: Colors.blue,
-                                                                size: 20,
-                                                              ),
-                                                            ),
-                                                          ]
-                                                      )
-                                                          : Row(
-                                                          children: [
-                                                            const Padding(
-                                                              padding: EdgeInsets
-                                                                  .only(
-                                                                  top: 0.0),
-                                                              child:
-                                                              Icon(Icons
-                                                                  .check_circle,
-                                                                  color: Colors
-                                                                      .green),
-                                                            ),
-                                                            const SizedBox(width: 8),
-                                                            Padding(
-                                                              padding: const EdgeInsets
-                                                                  .only(
-                                                                  bottom: 0.0),
-                                                              child: Text(
-                                                                "$caritasSupervisorSignatureStatus",
-                                                                style: const TextStyle(
-                                                                    fontWeight: FontWeight
-                                                                        .bold),
-                                                              ),
-                                                            ),
-                                                          ]
-                                                      ),
+                                              ],
+                                              )
+                                                  : Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets.only(top: 0.0),
+                                              child: Icon(Icons.check_circle, color: Colors.green),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                              child: Padding(
+                                              padding: const EdgeInsets.only(bottom: 0.0),
+                                              child: Text(
+                                              "$facilitySupervisorSignatureStatus",
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              softWrap: true,
+                                              overflow: TextOverflow.visible,
+                                              ),
+                                              ),
+                                              ),
+                                              ],
+                                              ),
+                                              ],
+                                              );
+                                              }
 
 
-                                                    ],
-                                                  );
-                                                }
+                                              else {
+                                              return Column(
+                                              children: [
+                                              const Text(
+                                              "Awaiting Caritas Supervisor Signature"),
+                                              const SizedBox(height: 8),
+                                              caritasSupervisorSignatureStatus ==
+                                              "Pending"
+                                              ?
+                                              Row(
+                                              //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets
+                                                  .only(
+                                              top: 0.0),
+                                              child:
+                                              Icon(Icons
+                                                  .access_time,
+                                              color: Colors
+                                                  .orange),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Padding(
+                                              padding: const EdgeInsets
+                                                  .only(
+                                              top: 0.0),
+                                              child: Text(
+                                              "$caritasSupervisorSignatureStatus",
+                                              style: const TextStyle(
+                                              fontWeight: FontWeight
+                                                  .bold),
+                                              ),
+                                              ),
+                                              ]
+                                              )
+                                                  : caritasSupervisorSignatureStatus ==
+                                              "Rejected" ?
+                                              Row(
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets
+                                                  .only(
+                                              top: 0.0),
+                                              child:
+                                              Icon(Icons.cancel,
+                                              color: Colors
+                                                  .red),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Padding(
+                                              padding: const EdgeInsets
+                                                  .only(
+                                              bottom: 0.0),
+                                              child: Text(
+                                              "$caritasSupervisorSignatureStatus",
+                                              style: const TextStyle(
+                                              fontWeight: FontWeight
+                                                  .bold),
+                                              ),
+                                              ),
+                                              const SizedBox(width:8),
+                                              GestureDetector(
+                                              onTap: () {
+                                              showDialog(
+                                              context: context,
+                                              builder: (context) {
+                                              return AlertDialog(
+                                              title: const Text("Reason for Rejection"),
+                                              content: Text(caritasSupervisorRejectionReason ?? "No reason provided."),
+                                              actions: [
+                                              TextButton(
+                                              onPressed: () {
+                                              Navigator.of(context).pop();
+                                              },
+                                              child: const Text("Close"),
+                                              ),
+                                              ],
+                                              );
+                                              },
+                                              );
+                                              },
+                                              child: const Icon(
+                                              Icons.info_outline,
+                                              color: Colors.blue,
+                                              size: 20,
+                                              ),
+                                              ),
+                                              ]
+                                              )
+                                                  : Row(
+                                              children: [
+                                              const Padding(
+                                              padding: EdgeInsets
+                                                  .only(
+                                              top: 0.0),
+                                              child:
+                                              Icon(Icons
+                                                  .check_circle,
+                                              color: Colors
+                                                  .green),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Padding(
+                                              padding: const EdgeInsets
+                                                  .only(
+                                              bottom: 0.0),
+                                              child: Text(
+                                              "$caritasSupervisorSignatureStatus",
+                                              style: const TextStyle(
+                                              fontWeight: FontWeight
+                                                  .bold),
+                                              ),
+                                              ),
+                                              ]
+                                              ),
+
+
+                                              ],
+                                              );
+                                              }
 
 
                                               } else {
-                                                return const Text(
-                                                    "Timesheet Yet to be submitted for Caritas Supervisor's Signature");
+                                              return const Text(
+                                              "Timesheet Yet to be submitted for Caritas Supervisor's Signature");
                                               }
                                             },
                                           ), // Adjust path and size accordingly
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
-                                    //Date of CARITAS Staff Signature Date
-
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.30 : 0.30),
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        children: [
-                                          const Text('Date', style: TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
-
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final caritasSupervisorDate = data['caritasSupervisorSignatureDate']; // Assuming this stores the image URL
-                                                //  final caritasSupervisorDate = data['date']; // Assuming you store the date
-
-                                                if (caritasSupervisorDate !=
-                                                    null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return Column(
-                                                    children: [
-                                                      //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
-                                                      Text(
-                                                          caritasSupervisorDate
-                                                              .toString()),
-                                                    ],
-                                                  );
-                                                } else {
-                                                  return const Text(
-                                                      "Awaiting CARITAS Supervisor Date");
-                                                }
-                                              } else {
-                                                return const Text(
-                                                    "Timesheet Yet to be submitted for CARITAS Supervisor's Signature Date");
-                                              }
-                                            },
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -4600,8 +4441,8 @@ $selectedBioFirstName $selectedBioLastName
       // Fetch pending leaves
       final leavesSnapshot = await FirebaseFirestore.instance
           .collectionGroup('Staff')
-          .where('state', isEqualTo: bioData!.state)
-          .where('location', isEqualTo: bioData!.location)
+          .where('state', isEqualTo: selectedBioState)
+          .where('location', isEqualTo: selectedBioLocation)
           .where('staffCategory', isEqualTo: 'Facility Supervisor')
           .get();
 
@@ -4669,49 +4510,20 @@ $selectedBioFirstName $selectedBioLastName
 
     print("Step One");
 
-    if (bioData!.signatureLink == null) {
+    if (staffSignatureLink == null) {
       // Handle case where signature is not present (e.g., show a message)
-
-      if (checkSignatureImage
-          .isNotEmpty) { // Check if signature image exists in Hive
-        try {
-          // 1. Upload image to Cloud Storage
-          final storageRef = FirebaseStorage.instance.ref().child(
-              'signatures/${selectedFirebaseId}_signature.jpg'); // Create unique filename
-          final uploadTask = storageRef.putData(
-              checkSignatureImage.first); // Upload the image data
-          final snapshot = await uploadTask;
-          final downloadURL = await snapshot.ref.getDownloadURL();
-
-          // // 2. Update Isar and timesheet data with download URL
-          // bioData = await IsarService().getBioData();
-          // bioData?.signatureLink = downloadURL;
-          // await IsarService().updateBioSignatureLink(
-          //     bioData!.id, bioData!, false);
-          // staffSignatureLink = downloadURL; // Update the local variable as well
-
-
-        } catch (e) {
-          print('Error uploading signature or updating database: $e');
-          // Handle error, e.g., show a dialog
-        }
-      }
-      else {
-        Fluttertoast.showToast(
-          msg: "Cannot send timesheet without staff signature.",
+      Fluttertoast.showToast(
+          msg: "Cannot send timesheet without staff signature",
           toastLength: Toast.LENGTH_LONG,
           backgroundColor: Colors.black54,
           gravity: ToastGravity.BOTTOM,
           timeInSecForIosWeb: 1,
           textColor: Colors.white,
-          fontSize: 16.0,
-        );
-        print("Cannot send timesheet without staff signature.");
-        return;
-      }
-      print("selectedSupervisor ===$selectedSupervisor");
-      print(
-          "_selectedFacilitySupervisorFullName ==$_selectedFacilitySupervisorFullName");
+          fontSize: 16.0);
+
+
+
+
     }
     if (selectedSupervisor == null ||
         _selectedFacilitySupervisorFullName == null) {
@@ -4744,7 +4556,7 @@ $selectedBioFirstName $selectedBioLastName
 
       QuerySnapshot snap = await FirebaseFirestore.instance
           .collection("Staff")
-          .where("id", isEqualTo: bioData!.firebaseAuthId)
+          .where("id", isEqualTo: selectedFirebaseId)
           .get();
 
       List<Map<String, dynamic>> timesheetEntries = [];

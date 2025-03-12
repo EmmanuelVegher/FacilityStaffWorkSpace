@@ -7,6 +7,7 @@ import 'package:js/js.dart';
 import 'dart:js_util' as js_util;
 import 'package:fluttertoast/fluttertoast.dart';
 
+import '../components/clock_attendance.dart';
 import '../staff_dashboard.dart';
 
 // JS interop: functions defined in face_recognition.js
@@ -272,7 +273,7 @@ class _FacialRecognitionPageState extends State<FacialRecognitionPage> {
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const UserDashboardPage()),
+          MaterialPageRoute(builder: (context) => const ClockAttendanceWeb()),
         );
       }
     } catch (e) {

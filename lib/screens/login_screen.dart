@@ -1,7 +1,9 @@
+import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'facial_recognition/Facial_recognition_page.dart';
 import 'forgot_password_page.dart';
+import 'loading_screen.dart';
 import 'registration_page.dart';
 // Other dashboard imports if needed
 
@@ -27,7 +29,7 @@ class _LoginPageState extends State<LoginPage>
   late Animation<double> _fadeAnimation;
 
   int _currentCharIndex = 0;
-  final String _title = "Facility Staff Workflow Platform";
+  final String _title = "Facility Staff WorkSpace";
   String _animatedText = "";
 
   @override
@@ -67,7 +69,7 @@ class _LoginPageState extends State<LoginPage>
       // Navigate to your desired page (e.g., FacialRecognitionPage)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const FacialRecognitionPage()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } catch (error) {
       setState(() {
@@ -88,7 +90,7 @@ class _LoginPageState extends State<LoginPage>
       // Navigate to your desired page (e.g., FacialRecognitionPage)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const FacialRecognitionPage()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } catch (error) {
       setState(() {
@@ -248,26 +250,26 @@ class _LoginPageState extends State<LoginPage>
                     ),
                     const SizedBox(height: 10),
                     // Sign Up with Outlook Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Implement Outlook signup if needed
-                        },
-                        icon: const Icon(Icons.mail_outline, color: Colors.white),
-                        label: const Text(
-                          'Sign up with Outlook',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade800,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton.icon(
+                    //     onPressed: () {
+                    //       // Implement Outlook signup if needed
+                    //     },
+                    //     icon: const Icon(Icons.mail_outline, color: Colors.white),
+                    //     label: const Text(
+                    //       'Sign up with Outlook',
+                    //       style: TextStyle(color: Colors.white),
+                    //     ),
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor: Colors.blue.shade800,
+                    //       padding: const EdgeInsets.symmetric(vertical: 14),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(8),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 10),
                     // Google Sign-In Button for web
                     SizedBox(
@@ -302,7 +304,7 @@ class _LoginPageState extends State<LoginPage>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => const RegistrationPage()),
+                                  builder: (context) => const RegistrationPageWeb()),
                             );
                           },
                           child: const Text(
@@ -312,29 +314,29 @@ class _LoginPageState extends State<LoginPage>
                         ),
                       ],
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Need a different account?',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // Navigate to alternative account registration if needed
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => const RegistrationPage()),
-                            );
-                          },
-                          child: const Text(
-                            'Register here',
-                            style: TextStyle(color: Colors.redAccent),
-                          ),
-                        ),
-                      ],
-                    ),
+                    // Row(
+                    //   mainAxisAlignment: MainAxisAlignment.center,
+                    //   children: [
+                    //     Text(
+                    //       'Need a different account?',
+                    //       style: TextStyle(color: Colors.grey.shade600),
+                    //     ),
+                    //     TextButton(
+                    //       onPressed: () {
+                    //         // Navigate to alternative account registration if needed
+                    //         Navigator.push(
+                    //           context,
+                    //           MaterialPageRoute(
+                    //               builder: (context) => const RegistrationPage()),
+                    //         );
+                    //       },
+                    //       child: const Text(
+                    //         'Register here',
+                    //         style: TextStyle(color: Colors.redAccent),
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
                   ],
                 ),
               ),

@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:developer';
+import 'dart:developer' as dev;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -11,409 +8,27 @@ import 'package:flutter_email_sender/flutter_email_sender.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:location/location.dart' as locationPkg;
+import 'package:geolocator/geolocator.dart' as geolocator;
+import 'package:location/location.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:math';
+
 
 import '../../services/location_services.dart';
 import '../../widgets/drawer.dart';
-import '../../widgets/header_widget.dart';
+import '../../widgets/drawer2.dart';
 import '../../widgets/geo_utils.dart';
-
-// Model Classes
-class LeaveRequestModel {
-  String? leaveRequestId;
-  String? staffId;
-  String? type;
-  DateTime? startDate;
-  DateTime? endDate;
-  String? reason;
-  String? status;
-  String? selectedSupervisor;
-  String? selectedSupervisorEmail;
-  int? leaveDuration;
-  bool isSynced;
-  String? firstName;
-  String? lastName;
-  String? staffCategory;
-  String? staffState;
-  String? staffLocation;
-  String? staffEmail;
-  String? staffPhone;
-  String? staffDepartment;
-  String? staffDesignation;
-  String? reasonsForRejectedLeave;
+import '../../widgets/header_widget.dart';
 
 
-  LeaveRequestModel({
-    this.leaveRequestId,
-    this.staffId,
-    this.type,
-    this.startDate,
-    this.endDate,
-    this.reason,
-    this.status = 'Pending',
-    this.selectedSupervisor,
-    this.selectedSupervisorEmail,
-    this.leaveDuration,
-    this.isSynced = false,
-    this.firstName,
-    this.lastName,
-    this.staffCategory,
-    this.staffState,
-    this.staffLocation,
-    this.staffEmail,
-    this.staffPhone,
-    this.staffDepartment,
-    this.staffDesignation,
-    this.reasonsForRejectedLeave
-  });
-
-  factory LeaveRequestModel.fromJson(Map<String, dynamic> json) {
-    return LeaveRequestModel(
-      leaveRequestId: json['leaveRequestId'] as String?,
-      staffId: json['staffId'] as String?,
-      type: json['type'] as String?,
-      startDate: json['startDate'] != null ? (json['startDate'] as Timestamp).toDate() : null,
-      endDate: json['endDate'] != null ? (json['endDate'] as Timestamp).toDate() : null,
-      reason: json['reason'] as String?,
-      status: json['status'] as String? ?? 'Pending',
-      selectedSupervisor: json['selectedSupervisor'] as String?,
-      selectedSupervisorEmail: json['selectedSupervisorEmail'] as String?,
-      leaveDuration: json['leaveDuration'] as int?,
-      isSynced: json['isSynced'] as bool? ?? false,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
-      staffCategory: json['staffCategory'] as String?,
-      staffState: json['staffState'] as String?,
-      staffLocation: json['staffLocation'] as String?,
-      staffEmail: json['staffEmail'] as String?,
-      staffPhone: json['staffPhone'] as String?,
-      staffDepartment: json['staffDepartment'] as String?,
-      staffDesignation: json['staffDesignation'] as String?,
-      reasonsForRejectedLeave: json['reasonsForRejectedLeave'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'leaveRequestId': leaveRequestId,
-      'staffId': staffId,
-      'type': type,
-      'startDate': startDate,
-      'endDate': endDate,
-      'reason': reason,
-      'status': status,
-      'selectedSupervisor': selectedSupervisor,
-      'selectedSupervisorEmail': selectedSupervisorEmail,
-      'leaveDuration': leaveDuration,
-      'isSynced': isSynced,
-      'firstName': firstName,
-      'lastName': lastName,
-      'staffCategory': staffCategory,
-      'staffState': staffState,
-      'staffLocation': staffLocation,
-      'staffEmail': staffEmail,
-      'staffPhone': staffPhone,
-      'staffDepartment': staffDepartment,
-      'staffDesignation': staffDesignation,
-      'reasonsForRejectedLeave': reasonsForRejectedLeave,
-    };
-  }
-}
-
-class AttendanceModel {
-  int? Offline_DB_id;
-  String? date;
-  String? clockIn;
-  String? clockOut;
-  double? clockInLatitude;
-  double? clockInLongitude;
-  String? clockInLocation;
-  double? clockOutLatitude;
-  double? clockOutLongitude;
-  String? clockOutLocation;
-  bool? isSynced;
-  bool? voided;
-  bool? offDay;
-  String? durationWorked;
-  double? noOfHours;
-  bool? isUpdated;
-  String? month;
-  String? comments;
-
-  AttendanceModel({
-    this.Offline_DB_id,
-    this.date,
-    this.clockIn,
-    this.clockOut,
-    this.clockInLatitude,
-    this.clockInLongitude,
-    this.clockInLocation,
-    this.clockOutLatitude,
-    this.clockOutLongitude,
-    this.clockOutLocation,
-    this.isSynced,
-    this.voided,
-    this.offDay,
-    this.durationWorked,
-    this.noOfHours,
-    this.isUpdated,
-    this.month,
-    this.comments,
-  });
-
-
-  factory AttendanceModel.fromJson(Map<String, dynamic> json) {
-    return AttendanceModel(
-      Offline_DB_id: json['Offline_DB_id'] as int?,
-      date: json['date'] as String?,
-      clockIn: json['clockIn'] as String?,
-      clockOut: json['clockOut'] as String?,
-      clockInLatitude: _parseStringToDouble(json['clockInLatitude']),
-      clockInLongitude: _parseStringToDouble(json['clockInLongitude']),
-      clockInLocation: json['clockInLocation'] as String?,
-      clockOutLatitude: _parseStringToDouble(json['clockOutLatitude']),
-      clockOutLongitude: _parseStringToDouble(json['clockOutLongitude']),
-      clockOutLocation: json['clockOutLocation'] as String?,
-      isSynced: _parseToBool(json['isSynced']),
-      voided: _parseToBool(json['voided']),
-      offDay: _parseToBool(json['offDay']),
-      durationWorked: json['durationWorked'] as String?,
-      noOfHours: _parseStringToDouble(json['noOfHours']),
-      isUpdated: _parseToBool(json['isUpdated']),
-      month: json['month'] as String?,
-      comments: json['comments'] as String?,
-    );
-  }
-
-  static double? _parseStringToDouble(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-    if (value is num) {
-      return value.toDouble();
-    }
-    if (value is String) {
-      return double.tryParse(value);
-    }
-    return null;
-  }
-
-
-  static bool? _parseToBool(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-    if (value is bool) {
-      return value;
-    }
-    if (value is int) {
-      return value != 0; // Assuming 0 is false, and anything else (like 1) is true
-    }
-    if (value is String) {
-      if (value.toLowerCase() == 'true') {
-        return true;
-      } else if (value.toLowerCase() == 'false') {
-        return false;
-      }
-    }
-    return null; // Return null if parsing fails or type is unexpected
-  }
-
-
-  Map<String, dynamic> toJson() {
-    return {
-      'Offline_DB_id': Offline_DB_id,
-      'date': date,
-      'clockIn': clockIn,
-      'clockOut': clockOut,
-      'clockInLatitude': clockInLatitude,
-      'clockInLongitude': clockInLongitude,
-      'clockInLocation': clockInLocation,
-      'clockOutLatitude': clockOutLatitude,
-      'clockOutLongitude': clockOutLongitude,
-      'clockOutLocation': clockOutLocation,
-      'isSynced': isSynced,
-      'voided': voided,
-      'offDay': offDay,
-      'durationWorked': durationWorked,
-      'noOfHours': noOfHours,
-      'isUpdated': isUpdated,
-      'month': month,
-      'comments': comments,
-    };
-  }
-}
-
-class BioModel {
-  String? firebaseAuthId;
-  String? firstName;
-  String? lastName;
-  String? emailAddress;
-  String? mobile;
-  String? gender;
-  String? maritalStatus;
-  String? designation;
-  String? department;
-  String? location;
-  String? state;
-  String? role;
-  String? staffCategory;
-
-
-  BioModel({
-    this.firebaseAuthId,
-    this.firstName,
-    this.lastName,
-    this.emailAddress,
-    this.mobile,
-    this.gender,
-    this.maritalStatus,
-    this.designation,
-    this.department,
-    this.location,
-    this.state,
-    this.role,
-    this.staffCategory,
-
-  });
-
-  factory BioModel.fromJson(Map<String, dynamic> json) {
-    return BioModel(
-      firebaseAuthId: json['firebaseAuthId'] as String?,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
-      emailAddress: json['emailAddress'] as String?,
-      mobile: json['mobile'] as String?,
-      gender: json['gender'] as String?,
-      maritalStatus: json['maritalStatus'] as String?,
-      designation: json['designation'] as String?,
-      department: json['department'] as String?,
-      location: json['location'] as String?,
-      state: json['state'] as String?,
-      role: json['role'] as String?,
-      staffCategory: json['staffCategory'] as String?,
-
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'firebaseAuthId': firebaseAuthId,
-      'firstName': firstName,
-      'lastName': lastName,
-      'emailAddress': emailAddress,
-      'mobile': mobile,
-      'gender': gender,
-      'maritalStatus': maritalStatus,
-      'designation': designation,
-      'department': department,
-      'location': location,
-      'state': state,
-      'role': role,
-      'staffCategory': staffCategory,
-
-    };
-  }
-}
-
-class LocationModel {
-  String? locationId;
-  String? locationName;
-  double? latitude;
-  double? longitude;
-  double? radius;
-  String? state;
-  String? lga;
-
-  LocationModel({
-    this.locationId,
-    this.locationName,
-    this.latitude,
-    this.longitude,
-    this.radius,
-    this.state,
-    this.lga,
-  });
-
-  factory LocationModel.fromJson(Map<String, dynamic> json) {
-    return LocationModel(
-      locationId: json['locationId'] as String?,
-      locationName: json['locationName'] as String?,
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      radius: (json['radius'] as num?)?.toDouble(),
-      state: json['state'] as String?,
-      lga: json['lga'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'locationId': locationId,
-      'locationName': locationName,
-      'latitude': latitude,
-      'longitude': longitude,
-      'radius': radius,
-      'state': state,
-      'lga': lga,
-    };
-  }
-}
-
-class RemainingLeaveModel {
-  String? id;
-  String? staffId;
-  int? annualLeaveBalance;
-  int? paternityLeaveBalance;
-  int? maternityLeaveBalance;
-  int? holidayLeaveBalance;
-  DateTime? dateUpdated;
-
-
-  RemainingLeaveModel({
-    this.id,
-    this.staffId,
-    this.annualLeaveBalance,
-    this.paternityLeaveBalance,
-    this.maternityLeaveBalance,
-    this.holidayLeaveBalance,
-    this.dateUpdated,
-
-  });
-
-  factory RemainingLeaveModel.fromJson(Map<String, dynamic> json) {
-    return RemainingLeaveModel(
-      id: json['id'] as String?,
-      staffId: json['staffId'] as String?,
-      annualLeaveBalance: json['annualLeaveBalance'] as int?,
-      paternityLeaveBalance: json['paternityLeaveBalance'] as int?,
-      maternityLeaveBalance: json['maternityLeaveBalance'] as int?,
-      holidayLeaveBalance: json['holidayLeaveBalance'] as int?,
-      dateUpdated: json['dateUpdated'] != null ? (json['dateUpdated'] as Timestamp).toDate() : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'staffId': staffId,
-      'annualLeaveBalance': annualLeaveBalance,
-      'paternityLeaveBalance': paternityLeaveBalance,
-      'maternityLeaveBalance': maternityLeaveBalance,
-      'holidayLeaveBalance': holidayLeaveBalance,
-      'dateUpdated': dateUpdated,
-
-    };
-  }
-}
-
-
-class GeofenceModel {  // Keep the GeofenceModel
+class GeofenceModel {
   final String name;
   final double latitude;
   final double longitude;
@@ -427,18 +42,128 @@ class GeofenceModel {  // Keep the GeofenceModel
   });
 }
 
+class LeaveRequestModel {
+  String? type;
+  String? status = "Pending";
+  DateTime? startDate;
+  DateTime? endDate;
+  String? reason;
+  bool isSynced = false;
+  String? staffId;
+  String? leaveRequestId;
+  String? selectedSupervisor;
+  String? selectedSupervisorEmail;
+  int? leaveDuration;
+  String? firstName;
+  String? lastName;
+  String? staffCategory;
+  String? staffState;
+  String? staffLocation;
+  String? staffEmail;
+  String? staffPhone;
+  String? staffDepartment;
+  String? staffDesignation;
+  String? reasonsForRejectedLeave;
 
-class LeaveRequestsPageWeb extends StatefulWidget {
-  const LeaveRequestsPageWeb({super.key});
 
-  @override
-  _LeaveRequestsPageWebState createState() => _LeaveRequestsPageWebState();
+  LeaveRequestModel({
+    this.type,
+    this.status = "Pending",
+    this.startDate,
+    this.endDate,
+    this.reason,
+    this.isSynced = false,
+    this.staffId,
+    this.leaveRequestId,
+    this.selectedSupervisor,
+    this.selectedSupervisorEmail,
+    this.leaveDuration,
+    this.firstName,
+    this.lastName,
+    this.staffCategory,
+    this.staffState,
+    this.staffLocation,
+    this.staffEmail,
+    this.staffPhone,
+    this.staffDepartment,
+    this.staffDesignation,
+    this.reasonsForRejectedLeave,
+  });
+
+
+  factory LeaveRequestModel.fromJson(Map<String, dynamic> json) {
+    return LeaveRequestModel(
+      type: json['type'] as String?,
+      status: json['status'] as String? ?? "Pending",
+      startDate: json['startDate'] == null
+          ? null
+          : json['startDate'] is Timestamp
+          ? (json['startDate'] as Timestamp).toDate()
+          : DateTime.tryParse(json['startDate'] as String),
+      endDate: json['endDate'] == null
+          ? null
+          : json['endDate'] is Timestamp
+          ? (json['endDate'] as Timestamp).toDate()
+          : DateTime.tryParse(json['endDate'] as String),
+      reason: json['reason'] as String?,
+      isSynced: json['isSynced'] as bool? ?? false,
+      staffId: json['staffId'] as String?,
+      leaveRequestId: json['leaveRequestId'] as String?,
+      selectedSupervisor: json['selectedSupervisor'] as String?,
+      selectedSupervisorEmail: json['selectedSupervisorEmail'] as String?,
+      leaveDuration: json['leaveDuration'] as int?,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
+      staffCategory: json['staffCategory'] as String?,
+      staffState: json['staffState'] as String?,
+      staffLocation: json['staffLocation'] as String?,
+      staffEmail: json['staffEmail'] as String?,
+      staffPhone: json['staffPhone'] as String?,
+      staffDepartment: json['staffDepartment'] as String?,
+      staffDesignation: json['staffDesignation'] as String?,
+      reasonsForRejectedLeave: json['reasonsForRejectedLeave'] as String?,
+    );
+  }
+
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'status': status,
+      'startDate': startDate?.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
+      'reason': reason,
+      'isSynced': isSynced,
+      'staffId': staffId,
+      'leaveRequestId': leaveRequestId,
+      'selectedSupervisor': selectedSupervisor,
+      'selectedSupervisorEmail': selectedSupervisorEmail,
+      'leaveDuration':leaveDuration,
+      'firstName':firstName,
+      'lastName':lastName,
+      'staffCategory':staffCategory,
+      'staffState':staffState,
+      'staffLocation':staffLocation,
+      'staffEmail':staffEmail,
+      'staffPhone':staffPhone,
+      'staffDepartment':staffDepartment,
+      'staffDesignation':staffDesignation,
+      'reasonsForRejectedLeave':reasonsForRejectedLeave
+    };
+  }
 }
 
-class _LeaveRequestsPageWebState extends State<LeaveRequestsPageWeb> with SingleTickerProviderStateMixin  {
+class LeaveRequestsPage1 extends StatefulWidget {
+  const LeaveRequestsPage1({super.key});
+
+  @override
+  _LeaveRequestsPage1State createState() => _LeaveRequestsPage1State();
+}
+
+class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTickerProviderStateMixin  {
 
 
-  late TabController _tabController; // Declare a TabController
+  late TabController _tabController;
 
   final RxInt _totalAnnualLeaves = 10.obs;
   final RxInt _totalPaternityLeaves = 6.obs;
@@ -450,11 +175,10 @@ class _LeaveRequestsPageWebState extends State<LeaveRequestsPageWeb> with Single
   final RxInt _remainingPaternityLeaveBalance = 0.obs;
   final RxInt _remainingMaternityLeaveBalance = 0.obs;
   final RxInt _remainingAnnualLeaveBalance = 0.obs;
-// Store the index of the currently expanded panel
   RxInt expandedPanelIndex = (-1).obs;
 
-  final _markedDates = <DateTime>[].obs; // Store marked dates
-  final _nigerianHolidays = <DateTime, String>{}.obs;  // Nigerian holidays
+  final _markedDates = <DateTime>[].obs;
+  final _nigerianHolidays = <DateTime, String>{}.obs;
 
 
   RxDouble lati = 0.0.obs;
@@ -462,8 +186,8 @@ class _LeaveRequestsPageWebState extends State<LeaveRequestsPageWeb> with Single
   RxString administrativeArea = "".obs;
   RxString location = "".obs;
   RxBool isGpsEnabled = false.obs;
-  RxBool isInternetConnected = false.obs; // Observable for internet connection status
-  locationPkg.Location locationService = locationPkg.Location(); // Location service instance
+  RxBool isInternetConnected = false.obs;
+  locationPkg.Location locationService = locationPkg.Location();
   RxBool isInsideAnyGeofence = false.obs;
   RxDouble accuracy = 0.0.obs;
   RxDouble altitude = 0.0.obs;
@@ -476,171 +200,154 @@ class _LeaveRequestsPageWebState extends State<LeaveRequestsPageWeb> with Single
   RxDouble headingAccuracy = 0.0.obs;
   RxDouble elapsedRealtimeNanos = 0.0.obs;
   RxDouble elapsedRealtimeUncertaintyNanos = 0.0.obs;
-  var isCircularProgressBarOn = true.obs; // Observable boolean
+  var isCircularProgressBarOn = true.obs;
   RxBool isLocationTurnedOn = false.obs;
   RxBool isAlertSet = false.obs;
   RxBool isAlertSet2 = false.obs;
   Rx<LocationPermission> isLocationPermissionGranted =
       LocationPermission.denied.obs;
-  late StreamSubscription subscription;
+  late StreamSubscription<LocationData> subscription; // Initialize subscription here
 
   String _selectedLeaveType = 'Annual';
-  RemainingLeaveModel? _remainingLeaves1; // Store remaining leaves - nullable
+  RemainingLeaveModel? _remainingLeaves1;
   final TextEditingController _reasonController = TextEditingController();
   PickerDateRange? _selectedDateRange;
   final List<LeaveRequestModel> _leaveRequests1 = [];
-  final bool _isarInitialized1 = false; // No Isar anymore
-  String? _selectedSupervisor;
+  final bool _firebaseInitialized1 = false;
+  // Use RxString for selectedSupervisor to observe changes
+  RxString _selectedSupervisor = RxString('');
   String? _selectedSupervisorEmail;
   BioModel? _bioInfo1;
-  LeaveRequestModel? _leaveRequestInfo; // Nullable
+  LeaveRequestModel? _leaveRequestInfo;
+  String? selectedProjectName;
+  String? selectedBioFirstName;
+  String? selectedBioLastName;
+  String? selectedBioDepartment;
+  String? selectedBioState;
+  String? selectedBioDesignation;
+  String? selectedBioLocation;
+  String? selectedBioStaffCategory;
+  String? selectedBioEmail;
+  String? selectedBioPhone;
+  String? selectedFirebaseId;
+  String? facilitySupervisor;
+  String? caritasSupervisor;
+  DateTime? selectedDate;
+  String? staffSignatureLink;
+  BioModel? bioData; // Make bioData nullable// Currently selected project
+  // Remove duplicated state variable, use RxString _selectedSupervisor
+  String? selectedFacilitySupervisor; // State variable to store the selected supervisor
 
-  final _leaveRequests = <LeaveRequestModel>[].obs; // Use RxList for reactivity
-  final _remainingLeaves = Rxn<RemainingLeaveModel>(); // Use Rxn for nullable observable
-  final _bioInfo = Rxn<BioModel>();  // Use Rxn for nullable observable
-  final _firebaseInitialized = false.obs; // Track Firebase initialization
+  final _leaveRequests = <LeaveRequestModel>[].obs;
+  final _remainingLeaves = Rxn<RemainingLeaveModel>();
+  final _bioInfo = Rxn<BioModel>();
+  final _firebaseInitialized = false.obs;
   List<String> attachments = [];
   bool isHTML = false;
-
+  String? _currentUserId;
 
 
   @override
   void initState() {
     super.initState();
-    // ... existing initState code
+    subscription = Stream<LocationData>.empty().listen((_) {}); // Initialize with an empty stream
 
-    _loadAttendanceDates();  // Load attendance dates when initializing
-    _loadNigerianHolidays(); // Load Nigerian holidays
-    //_init();
-    _initFirebase().then((_) => _init()); // Initialize Firebase first
-    _tabController = TabController(length: 2, vsync: this); // Initialize the TabController
-    //     .then((_){
-    //   // Start a 2-second timer
-    //   Timer(const Duration(seconds: 2), () {
-    //     setState(() async {
-    //      await _init();
-    //       _isIndicatorVisible = true;
-    //     });
-    //   });
-    // });
+    _loadBioData();
+    _loadAttendanceDates();
+    _loadNigerianHolidays();
+    _initFirebase().then((_) => _init()).then((_) {
+      _startLocationService(); // Start location service after Firebase and BioData are initialized
+      _getUserLocation(); // Get initial location
+    });
+    _tabController = TabController(length: 2, vsync: this);
 
   }
 
 
   @override
   void dispose() {
-    _tabController.dispose(); // Dispose of the TabController
-    subscription.cancel(); // Cancel GPS subscription
+    _tabController.dispose();
+    subscription.cancel();
     super.dispose();
   }
 
   Future<void> _loadAttendanceDates() async {
     print("_loadAttendanceDates here");
     try {
-      final attendanceRecords = await _getAllAttendanceFromFirebase();
-      //isar.attendanceModels.where().findAll();
-      final markedDatesMap = <DateTime, String?>{};
-      // final dates = attendanceRecords
-      //     .map((record) => DateFormat('dd-MMMM-yyyy').parse(record.date!))
-      //     .toSet();
-      // _markedDates.assignAll(dates);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      _currentUserId = user.uid;
 
-      for (var record in attendanceRecords) {
-        final date = DateFormat('dd-MMMM-yyyy').parse(record.date!);
-        markedDatesMap[date] = record.durationWorked; // Store durationWorked for all attendance
+      final attendanceCollection = FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(_currentUserId)
+          .collection('Record');
+
+      final querySnapshot = await attendanceCollection.get();
+      final markedDates = <DateTime>[];
+
+      for (var doc in querySnapshot.docs) {
+        final dateStr = doc.id; // Document ID is the date string
+        try {
+          final date = DateFormat('dd-MMMM-yyyy').parse(dateStr);
+          markedDates.add(date);
+        } catch (e) {
+          print("Error parsing date: $dateStr, error: $e");
+        }
       }
-
-      _markedDates.assignAll(markedDatesMap.keys);
-      print("attendanceRecords == $attendanceRecords");
+      _markedDates.assignAll(markedDates.toSet().toList()); // Ensure unique dates and update observable list
       print("_markedDates == $_markedDates");
     } catch (e) {
-      print("Error loading attendance dates: $e");
+      print("Error loading attendance dates from Firebase: $e");
     }
-  }
-
-  Future<List<AttendanceModel>> _getAllAttendanceFromFirebase() async {
-    List<AttendanceModel> attendanceRecords = [];
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(user.uid)
-            .collection('Record')
-            .get();
-
-        attendanceRecords = querySnapshot.docs.map((doc) => AttendanceModel.fromJson(doc.data())).toList();
-        log("attendanceRecords===$attendanceRecords");
-      }
-    } catch (e) {
-      print("Error fetching attendance from Firebase: $e");
-    }
-    return attendanceRecords;
   }
 
 
   Future<void> _loadNigerianHolidays() async {
-    _nigerianHolidays.addAll({  // Add holidays with names
+    _nigerianHolidays.addAll({
       DateTime(2024, 1, 1): "New Year's",
       DateTime(2024, 4, 19): "Good Friday",
       DateTime(2024, 4, 22): "Easter Monday",
       DateTime(2024, 5, 1): "Worker's Day",
-      // ... more holidays
     });
   }
 
 
   Future<void> _initFirebase() async {
     try {
-      await Firebase.initializeApp(); // Initialize Firebase
+      await Firebase.initializeApp();
       _firebaseInitialized.value = true;
     } catch (e) {
       print("Firebase initialization error: $e");
-      // Handle error (e.g., show a dialog to the user)
     }
   }
 
 
   Future<void> _init() async {
-    if (!_firebaseInitialized.value) return; // Avoid re-initialization if Firebase not ready
+    if (_firebaseInitialized.value == false) return;
     print("Starting _init");
 
     try {
-      await _getUserLocation(); // Call the location fetching function
-      await getLocationStatus().then((_) async {
-        await getPermissionStatus().then((_) async {
-          await _startLocationService();
-        });
-      });
-
-     // await checkInternetConnection();
 
 
-      // Fetch `_bioInfo` from Firebase
-      final bioInfo = await _fetchBioInfoFromFirebase();
-
-      // Ensure `bioInfo` is not null
-      if (bioInfo == null) {
-        throw Exception("Failed to fetch bioInfo from Firebase");
+      _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (_currentUserId == null) {
+        throw Exception("User not logged in");
       }
 
-      // Use GetX's ever method to listen to changes
+      await _fetchBioInfo();
+
       ever(_bioInfo, (_) async {
         if (_bioInfo.value != null) {
-          _remainingLeaves.value = await _initializeRemainingLeaveModel(_bioInfo.value!);
-          //_isarInitialized.value = true; // No Isar anymore
-          //Add these 2 functions here
+          _remainingLeaves.value = await _initializeRemainingLeaveModel();
           await syncUnsyncedLeaveRequests();
           _checkAndUpdateLeaveStatus();
+          _calculateAndStoreRemainingLeave();
         }
       });
 
-
-      // Initialize _bioInfo, which triggers the chain of reactions
-      _bioInfo.value = bioInfo;
-
-      _leaveRequests.bindStream(_fetchLeaveRequestsStream(_bioInfo.value?.firebaseAuthId ?? ''));
-
+      _bioInfo.value = await _fetchBioInfo();
+      _leaveRequests.bindStream(_streamLeaveRequests());
 
       _updateRemainingLeavesAndDate();
 
@@ -651,40 +358,38 @@ class _LeaveRequestsPageWebState extends State<LeaveRequestsPageWeb> with Single
     }
   }
 
+  Stream<List<LeaveRequestModel>> _streamLeaveRequests() async* {
+    if (_currentUserId == null) yield [];
 
-  Future<BioModel?> _fetchBioInfoFromFirebase() async {
+    final leaveRequestCollection = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('Leave Request');
+
+    yield* leaveRequestCollection.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => LeaveRequestModel.fromJson(doc.data() as Map<String, dynamic>)).toList();
+    });
+  }
+
+
+  Future<BioModel?> _fetchBioInfo() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        DocumentSnapshot<Map<String, dynamic>> docSnapshot =
-        await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
-        if (docSnapshot.exists) {
-          return BioModel.fromJson(docSnapshot.data()!);
-        }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+
+      final bioDoc = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(user.uid)
+          .get();
+
+      if (bioDoc.exists && bioDoc.data() != null) {
+        return BioModel.fromJson(bioDoc.data()!);
+      } else {
+        return null;
       }
-      return null;
     } catch (e) {
       print("Error fetching BioInfo from Firebase: $e");
       return null;
-    }
-  }
-
-  Stream<List<LeaveRequestModel>> _fetchLeaveRequestsStream(String staffId) {
-    try {
-      if (staffId.isEmpty) {
-        return Stream.value([]); // Return an empty stream if staffId is empty
-      }
-      return FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(staffId)
-          .collection('Leave Request')
-          .snapshots()
-          .map((snapshot) {
-        return snapshot.docs.map((doc) => LeaveRequestModel.fromJson(doc.data())).toList();
-      });
-    } catch (e) {
-      print("Error fetching leave requests stream from Firebase: $e");
-      return Stream.value([]); // Return an empty stream in case of error
     }
   }
 
@@ -736,7 +441,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       recipients: [to],
       subject: subject,
       body: body,
-      isHTML: true, // Set to true if your body is HTML
+      isHTML: true,
     );
 
     try {
@@ -744,16 +449,14 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       print('Email sent successfully (user interaction required)');
     } catch (error) {
       print('Error sending email: $error');
-      // ... error handling (show a dialog to the user)
     }
   }
 
 
   String _formatLeaveRequestEmail2(LeaveRequestModel leaveRequest) {
-    // Inline CSS styles
     String tableStyle = """
     border-collapse: separate;
-    border-spacing: 10px; /* Spacing between columns */
+    border-spacing: 10px;
     width: 100%;
     font-family: Arial, sans-serif;
     margin: 20px 0;
@@ -776,7 +479,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     String headerStyle = "color: #4CAF50; font-weight: bold; font-size: 16px;";
     String bodyStyle = "font-family: Arial, sans-serif; font-size: 14px; color: #333;";
 
-    // HTML email body
+
     return """
 <!DOCTYPE html>
 <html>
@@ -868,56 +571,77 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
     }
 
-    locationPkg.PermissionStatus permission = await locationService.hasPermission();
-    if (permission == locationPkg.PermissionStatus.denied) {
+    PermissionStatus permission = await locationService.hasPermission();
+    if (permission == PermissionStatus.denied) {
       permission = await locationService.requestPermission();
-      if (permission != locationPkg.PermissionStatus.granted) {
+      if (permission != PermissionStatus.granted) {
         return;
       }
     }
 
-    // Use a FutureBuilder to manage the asynchronous location fetching
-    _getLocation2().then((_) { // Call _getLocation and wait for it to complete
-      // Now that the location is obtained, update the UI using Obx
-      lati.refresh(); // Force a refresh of the Obx variable
-      longi.refresh();
-      administrativeArea.refresh();
-      location.refresh();
+    subscription = locationService.onLocationChanged.listen((LocationData locationData) async { // Assign subscription here
+      lati.value = locationData.latitude!;
+      longi.value = locationData.longitude!;
+      accuracy.value = locationData.accuracy!;
+      altitude.value = locationData.altitude!;
+      speed.value = locationData.speed!;
+      speedAccuracy.value = locationData.speedAccuracy!;
+      heading.value = locationData.heading!;
+      time.value = locationData.time!;
+      isMock.value = locationData.isMock!;
+      verticalAccuracy.value = locationData.verticalAccuracy!;
+      headingAccuracy.value = locationData.headingAccuracy!;
+      elapsedRealtimeNanos.value = locationData.elapsedRealtimeNanos!;
+      elapsedRealtimeUncertaintyNanos.value = locationData.elapsedRealtimeUncertaintyNanos!;
+
+
+      _updateLocation();
+    }, onError: (e) {
+      print("_getLocation2 Error:$e");
+      _handleLocationError();
     });
 
+
   }
+
+  Future<void> _handleLocationError() async {
+    print("There is nooooooo internet to get location data or location error occurred");
+    Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: geolocator.LocationAccuracy.best,
+      forceAndroidLocationManager: true,
+    );
+
+    Position? position1 = await Geolocator.getLastKnownPosition();
+
+    lati.value = position.latitude;
+    longi.value = position.longitude;
+    print("locationData.latitude == ${position.latitude}");
+    _updateLocation();
+  }
+
 
   Future<Position?> getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Test if location services are enabled.
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Location services are not enabled, handle this case.
-      // You could show a dialog asking the user to enable location services.
       return Future.error('Location services are disabled.');
     }
 
-    // Check for location permission.
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        // Permissions are denied, handle this case.
         return Future.error('Location permissions are denied');
       }
     }
 
-    // If the permission is denied forever, show a dialog to the user.
     if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
       return Future.error(
           'Location permissions are permanently denied, we cannot request permissions.');
     }
 
-    // When we reach here, permissions are granted and we can
-    // continue accessing the position of the device.
     return await Geolocator.getCurrentPosition();
   }
 
@@ -927,24 +651,20 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       Position? position = await getCurrentLocation();
       if (position != null) {
         print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
-        // Use the position data (latitude, longitude) as needed
         lati.value = position.latitude;
         longi.value = position.longitude;
 
-        // Update location based on new latitude and longitude
         List<Placemark> placemarks = await placemarkFromCoordinates(
           position.latitude,
           position.longitude,
-          // timeout: const Duration(seconds: 15),
         );
 
-        // print("placemarksssssss==$placemarks");
 
         if (placemarks.isNotEmpty) {
           Placemark placemark = placemarks[0];
           location.value =
           "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
-          administrativeArea.value = placemark.administrativeArea!; // Update state name
+          administrativeArea.value = placemark.administrativeArea!;
 
           print("location.valuesssss==${location.value}");
           print("placemark.administrativeArea==${placemark.administrativeArea}");
@@ -956,20 +676,16 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           await _updateLocationUsingGeofencing2(position.latitude,position.longitude);
         }
 
-        // Geofencing logic
+
         if (administrativeArea.value != '') {
-          // Query Firebase for locations with the same administrative area
-          List<LocationModel> firebaseLocations =
-          await _getLocationsByStateFromFirebase(administrativeArea.value);
-
-
-          // Convert Firebase locations to GeofenceModel
-          List<GeofenceModel> offices = firebaseLocations.map((location) => GeofenceModel(
-            name: location.locationName!, // Use 'locationName'
-            latitude: location.latitude ?? 0.0,
-            longitude: location.longitude ?? 0.0,
-            radius: location.radius?.toDouble() ?? 0.0,
-          )).toList();
+          List<GeofenceModel> offices = [];
+          final locationsSnapshot = await FirebaseFirestore.instance.collection('Locations').where('state', isEqualTo: administrativeArea.value).get();
+          offices = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
+            name: locationModel.locationName ?? '',
+            latitude: locationModel.latitude ?? 0.0,
+            longitude: locationModel.longitude ?? 0.0,
+            radius: locationModel.radius?.toDouble() ?? 0.0,
+          )).toList(); // Removed .cast<LocationModel>()
 
           print("Officessss == $offices");
 
@@ -983,7 +699,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
               location.value = office.name;
               isInsideAnyGeofence.value = true;
-              // isCircularProgressBarOn.value = false; // Update observable value
               break;
             }
           }
@@ -996,12 +711,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
 
             print("Location from map === ${location.value}");
-            // isCircularProgressBarOn.value = false; // Update observable value
           }
         }
         else if(administrativeArea.value == '' && location.value != 0.0){
-          // If we cant get the state, check the entire location name for geo fencing
-          print("administrativeArea.value1 == '' && location.value1 != 0.0");
           await _updateLocationUsingGeofencing();
         }
         else {
@@ -1019,10 +731,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
     } catch (e) {
 
-      // Handle location errors (e.g., show an error message)
       if(lati.value != 0.0 && administrativeArea.value == ''){
-        // If we cant get the state, check the entire location name for geo fencing
-        print("administrativeArea.value2 == '' && location.value2 != 0.0");
         await _updateLocationUsingGeofencing();
       }else if(lati.value == 0.0 && administrativeArea.value == '') {
         Timer(const Duration(seconds: 10), () async {
@@ -1034,7 +743,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
       else{
 
-        log('Error getting location: $e');
+        dev.log('Error getting location: $e');
         Fluttertoast.showToast(
           msg: "Error getting location: $e",
           toastLength: Toast.LENGTH_LONG,
@@ -1047,87 +756,21 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
   }
 
-  Future<List<LocationModel>> _getLocationsByStateFromFirebase(String state) async {
-    List<LocationModel> locations = [];
-    try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-          .collection('Locations')
-          .where('state', isEqualTo: state)
-          .get();
-
-      locations = querySnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).toList();
-    } catch (e) {
-      print("Error fetching locations by state from Firebase: $e");
-    }
-    return locations;
-  }
-
-
-  Future<void> _getLocation2() async {
-
-    // Check for internet connection
- //   isInternetConnected.value = await InternetConnectionChecker.instance.hasConnection;
-    try{
-      print("_getLocation2 hereeeee");
-      locationService.onLocationChanged.listen((locationPkg.LocationData locationData) async {
-        lati.value = locationData.latitude!;
-        longi.value = locationData.longitude!;
-        accuracy.value = locationData.accuracy!;
-        altitude.value = locationData.altitude!;
-        speed.value = locationData.speed!;
-        speedAccuracy.value = locationData.speedAccuracy!;
-        heading.value = locationData.heading!;
-        time.value = locationData.time!;
-        isMock.value = locationData.isMock!;
-        verticalAccuracy.value = locationData.verticalAccuracy!;
-        headingAccuracy.value = locationData.headingAccuracy!;
-        elapsedRealtimeNanos.value = locationData.elapsedRealtimeNanos!;
-        elapsedRealtimeUncertaintyNanos.value = locationData.elapsedRealtimeUncertaintyNanos!;
-        // satelliteNumber.value = locationData.satelliteNumber!;
-        // provider.value = locationData.provider!;
-
-
-        // print("locationData.latitude! == ${locationData.latitude!}");
-        //print("locationData.longitude! == ${locationData.longitude!}");
-        _updateLocation();
-      });
-    }catch(e){
-      print("_getLocation2 Error:$e");
-      print("There is nooooooo internet to get location data");
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        forceAndroidLocationManager: true, // Important for Android
-      );
-
-      Position? position1 = await Geolocator.getLastKnownPosition();
-
-      lati.value = position.latitude;
-      longi.value = position.longitude;
-      print("locationData.latitude == ${position.latitude}");
-      _updateLocation();
-
-
-
-    }
-
-  }
 
   Future<void> _updateLocation() async {
     try{
-      // Update location based on new latitude and longitude
+
       List<Placemark> placemarks = await placemarkFromCoordinates(
         lati.value,
         longi.value,
-        // timeout: const Duration(seconds: 15),
       );
 
-      // print("placemarksssssss==$placemarks");
 
       if (placemarks.isNotEmpty) {
         Placemark placemark = placemarks[0];
         location.value =
         "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
-        administrativeArea.value = placemark.administrativeArea!; // Update state name
+        administrativeArea.value = placemark.administrativeArea!;
 
         print("location.valuesssss==${location.value}");
         print("placemark.administrativeArea==${placemark.administrativeArea}");
@@ -1138,20 +781,18 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         administrativeArea.value = "";
       }
 
-      // Geofencing logic
+
       if (administrativeArea.value != '') {
-        // Query Firebase database for locations with the same administrative area
-        List<LocationModel> firebaseLocations =
-        await _getLocationsByStateFromFirebase(administrativeArea.value);
 
-
-        // Convert Firebase locations to GeofenceModel
-        List<GeofenceModel> offices = firebaseLocations.map((location) => GeofenceModel(
-          name: location.locationName!, // Use 'locationName'
-          latitude: location.latitude ?? 0.0,
-          longitude: location.longitude ?? 0.0,
-          radius: location.radius?.toDouble() ?? 0.0,
+        List<GeofenceModel> offices = [];
+        final locationsSnapshot = await FirebaseFirestore.instance.collection('Locations').where('state', isEqualTo: administrativeArea.value).get();
+        offices = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
+          name: locationModel.locationName ?? '',
+          latitude: locationModel.latitude ?? 0.0,
+          longitude: locationModel.longitude ?? 0.0,
+          radius: locationModel.radius?.toDouble() ?? 0.0,
         )).toList();
+
 
         print("Officessss == $offices");
 
@@ -1165,7 +806,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
             location.value = office.name;
             isInsideAnyGeofence.value = true;
-            isCircularProgressBarOn.value = false; // Update observable value
+            isCircularProgressBarOn.value = false;
             break;
           }
         }
@@ -1178,13 +819,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
 
           print("Location from map === ${location.value}");
-          isCircularProgressBarOn.value = false; // Update observable value
+          isCircularProgressBarOn.value = false;
         }
       }
       else if(administrativeArea.value == '' && location.value != 0.0){
-        // If we cant get the state, check the entire location name for geo fencing
-        print("_updateLocationUsingGeofencing2 here");
         await _updateLocationUsingGeofencing();
+        print("_updateLocationUsingGeofencing2 here");
       } else {
         List<Placemark> placemark = await placemarkFromCoordinates(
             lati.value, longi.value);
@@ -1193,12 +833,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
 
         print("Unable to get administrative area. Using default location.");
-        isCircularProgressBarOn.value = false; // Update observable value
+        isCircularProgressBarOn.value = false;
       }
 
     }catch(e){
       if(lati.value != 0.0 && administrativeArea.value == ''){
-        // If we cant get the state, check the entire location name for geo fencing
         await _updateLocationUsingGeofencing();
         print("_updateLocationUsingGeofencing3 here");
       }else if(lati.value == 0.0 && administrativeArea.value == '') {
@@ -1211,7 +850,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         });
       }
       else{
-        log("$e");
+        dev.log("$e");
         Fluttertoast.showToast(
           msg: "Error: $e",
           toastLength: Toast.LENGTH_LONG,
@@ -1227,93 +866,73 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   }
 
-  // Function to update location details using geofencing
-  Future<void> _updateLocationUsingGeofencing() async {
-    // 1. Check if latitude is valid and location name is empty
-    if (lati.value != 0.0 && location.value == "") {
-      // 2. Get all locations from LocationModel
-      List<LocationModel> allLocations = await _getAllLocationsFromFirebase();
-      print("updateLocationUsingGeofencing for all location here");
 
-      // 3. Convert LocationModel objects to GeofenceModel for easier calculations
-      List<GeofenceModel> geofences = allLocations.map((location) => GeofenceModel(
-        name: location.locationName!,
-        latitude: location.latitude ?? 0.0,
-        longitude: location.longitude ?? 0.0,
-        radius: location.radius?.toDouble() ?? 0.0,
+  Future<void> _updateLocationUsingGeofencing() async {
+
+    if (lati.value != 0.0 && location.value == "") {
+
+      List<GeofenceModel> geofences = [];
+      final locationsSnapshot = await FirebaseFirestore.instance.collection('Locations').get();
+      geofences = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
+        name: locationModel.locationName ?? '',
+        latitude: locationModel.latitude ?? 0.0,
+        longitude: locationModel.longitude ?? 0.0,
+        radius: locationModel.radius?.toDouble() ?? 0.0,
       )).toList();
 
-      // 4. Iterate through each geofence to check if current location falls within
+
       for (GeofenceModel geofence in geofences) {
         double distance = GeoUtils.haversine(
             lati.value, longi.value, geofence.latitude, geofence.longitude);
 
         if (distance <= geofence.radius) {
-          // Found a matching geofence!
+
           print('Using geofence location: ${geofence.name}');
           location.value = geofence.name;
           isInsideAnyGeofence.value = true;
-          isCircularProgressBarOn.value = false; // Update observable value
-          break; // Exit loop after finding a match
+          isCircularProgressBarOn.value = false;
+          break;
         }
       }
 
-      // If no geofence match is found, you can keep the location.value as ""
-      // or set a default value.
+
     }
   }
-
-  Future<List<LocationModel>> _getAllLocationsFromFirebase() async {
-    List<LocationModel> locations = [];
-    try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-          .collection('Locations')
-          .get();
-
-      locations = querySnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).toList();
-    } catch (e) {
-      print("Error fetching all locations from Firebase: $e");
-    }
-    return locations;
-  }
-
 
   Future<void> _updateLocationUsingGeofencing2(double latitde, double longitde) async {
-    // 1. Check if latitude is valid and location name is empty
+
     print("_updateLocationUsingGeofencing2 is here");
 
-    // 2. Get all locations from LocationModel
-    List<LocationModel> allLocations = await _getAllLocationsFromFirebase();
-    print("updateLocationUsingGeofencing for all location here");
 
-    // 3. Convert LocationModel objects to GeofenceModel for easier calculations
-    List<GeofenceModel> geofences = allLocations.map((location) => GeofenceModel(
-      name: location.locationName!,
-      latitude: location.latitude ?? 0.0,
-      longitude: location.longitude ?? 0.0,
-      radius: location.radius?.toDouble() ?? 0.0,
+    List<GeofenceModel> geofences = [];
+    final locationsSnapshot = await FirebaseFirestore.instance.collection('Locations').get();
+    geofences = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
+      name: locationModel.locationName ?? '',
+      latitude: locationModel.latitude ?? 0.0,
+      longitude: locationModel.longitude ?? 0.0,
+      radius: locationModel.radius?.toDouble() ?? 0.0,
     )).toList();
 
-    // 4. Iterate through each geofence to check if current location falls within
+
     for (GeofenceModel geofence in geofences) {
       double distance = GeoUtils.haversine(
           latitde, longitde, geofence.latitude, geofence.longitude);
 
       if (distance <= geofence.radius) {
-        // Found a matching geofence!
+
         print('Using geofence location: ${geofence.name}');
         location.value = geofence.name;
         isInsideAnyGeofence.value = true;
-        isCircularProgressBarOn.value = false; // Update observable value
-        break; // Exit loop after finding a match
+        isCircularProgressBarOn.value = false;
+        break;
       }
     }
 
   }
 
   Future<void> _getLocationDetailsFromLocationModel() async {
-    // 1. Get the location field from BioModel
-    final bioModel = _bioInfo.value; // Use the observable value
+
+    final bioModel = _bioInfo.value;
     final locationFromBioModel = bioModel?.location;
     print("locationFromBioModel === $locationFromBioModel");
 
@@ -1322,44 +941,25 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       return;
     }
 
-    // 2. Query LocationModel using the location from BioModel
-    final locationModel = await _getLocationByNameFromFirebase(locationFromBioModel);
 
+    final locationDoc = await FirebaseFirestore.instance
+        .collection('Locations')
+        .where('locationName', isEqualTo: locationFromBioModel)
+        .get();
 
-    if (locationModel == null) {
+    if (locationDoc.docs.isEmpty) {
       print("No matching location found in LocationModel");
       return;
     }
 
-    // 3. Update the controller's variables with data from LocationModel
+    final locationModel = LocationModel.fromJson(locationDoc.docs.first.data());
+
+
     lati.value = locationModel.latitude ?? 0.0;
     longi.value = locationModel.longitude ?? 0.0;
     administrativeArea.value = locationModel.state ?? "";
     location.value = locationModel.locationName ?? "";
   }
-
-  Future<LocationModel?> _getLocationByNameFromFirebase(String? locationName) async {
-    if (locationName == null || locationName.isEmpty) {
-      return null;
-    }
-    try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-          .collection('Locations')
-          .where('locationName', isEqualTo: locationName)
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        return LocationModel.fromJson(querySnapshot.docs.first.data());
-      } else {
-        return null;
-      }
-    } catch (e) {
-      print("Error fetching location by name from Firebase: $e");
-      return null;
-    }
-  }
-
 
   Future<void> getLocationStatus() async {
     bool isLocationEnabled = await Geolocator.isLocationServiceEnabled();
@@ -1372,24 +972,25 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
   Future<void> getPermissionStatus() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      isLocationPermissionGranted.value = permission;
+    LocationPermission permission = await Geolocator.checkPermission();
+    isLocationPermissionGranted.value = permission;
 
-      // Check if permission is denied
-      if (isLocationPermissionGranted.value == LocationPermission.denied ||
-          isLocationPermissionGranted.value == LocationPermission.deniedForever) {
-        showDialogBox2();
-        isAlertSet2.value = true;
-      }
-    } catch (e) {
-      print("Error in getPermissionStatus: $e");
-      // Handle the error gracefully, maybe set a default permission status or show a message
-      isLocationPermissionGranted.value = LocationPermission.denied; // Default to denied in case of error
+
+    if (isLocationPermissionGranted.value == LocationPermission.denied ||
+        isLocationPermissionGranted.value == LocationPermission.deniedForever) {
+      showDialogBox2();
+      isAlertSet2.value = true;
+    }
+  }
+
+  Future<void> checkInternetConnection() async {
+    // isInternetConnected.value = await InternetConnectionChecker.instance.hasConnection;
+    if (!isInternetConnected.value) {
       Fluttertoast.showToast(
-        msg: "Error checking location permission: $e",
+        msg:
+        "No Internet Connectivity Detected.",
         toastLength: Toast.LENGTH_LONG,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: Colors.black54,
         gravity: ToastGravity.BOTTOM,
         timeInSecForIosWeb: 1,
         textColor: Colors.white,
@@ -1397,31 +998,16 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       );
     }
   }
-  // Future<void> checkInternetConnection() async {
-  //   isInternetConnected.value = await InternetConnectionChecker.instance.hasConnection;
-  //   if (!isInternetConnected.value) {
-  //     Fluttertoast.showToast(
-  //       msg:
-  //       "No Internet Connectivity Detected.",
-  //       toastLength: Toast.LENGTH_LONG,
-  //       backgroundColor: Colors.black54,
-  //       gravity: ToastGravity.BOTTOM,
-  //       timeInSecForIosWeb: 1,
-  //       textColor: Colors.white,
-  //       fontSize: 16.0,
-  //     );
-  //   }
-  // }
 
   showDialogBox() => showCupertinoDialog<String>(
-    context: Get.context!, // Retrieve BuildContext from Get
+    context: Get.context!,
     builder: (BuildContext context) => CupertinoAlertDialog(
       title: const Text("Location Turned Off"),
       content: const Text("Please turn on your location to ClockIn and Out"),
       actions: <Widget>[
         TextButton(
           onPressed: () async {
-            Get.back(); // You can use Get.back() here
+            Get.back();
             isAlertSet.value = false;
             isLocationTurnedOn.value =
             await LocationService().getLocationStatus();
@@ -1438,13 +1024,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
   showDialogBox2() => showCupertinoDialog<String>(
-    context: Get.context!, // Retrieve BuildContext from Get
+    context: Get.context!,
     builder: (BuildContext builderContext) => CupertinoAlertDialog(
-      // ... your AlertDialog content
       actions: <Widget>[
         TextButton(
           onPressed: () async {
-            Get.back(); // You can use Get.back() here
+            Get.back();
             isAlertSet2.value = false;
             isLocationPermissionGranted.value =
             await LocationService().getPermissionStatus();
@@ -1452,7 +1037,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                 LocationPermission.denied ||
                 isLocationPermissionGranted.value ==
                     LocationPermission.deniedForever) {
-              showDialogBox2(); // Use builderContext for the recursive call
+              showDialogBox2();
             }
           },
           child: const Text("OK"),
@@ -1462,361 +1047,189 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   );
 
 
-  Future<RemainingLeaveModel?> _initializeRemainingLeaveModel(BioModel bioInfo) async {
-    RemainingLeaveModel? remainingLeave;
-    try {
-      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(bioInfo.firebaseAuthId!)
-          .collection('RemainingLeaves')
-          .doc(bioInfo.firebaseAuthId!)
-          .get();
 
-      if (docSnapshot.exists) {
-        remainingLeave = RemainingLeaveModel.fromJson(docSnapshot.data()!);
+  Future<RemainingLeaveModel?> _initializeRemainingLeaveModel() async {
+    try {
+      // Get current user's UUID
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print("No logged-in user found.");
+        return null;
       }
+
+      String userId = user.uid;
+      print("Current user ID: $userId");
+
+      // Reference to the user's document in the "Staff" collection
+      DocumentReference staffDocRef = FirebaseFirestore.instance.collection('Staff').doc(userId);
+
+      // Fetch user data
+      DocumentSnapshot staffDoc = await staffDocRef.get();
+
+      // Check if document exists and fetch data
+      if (!staffDoc.exists || staffDoc.data() == null) {
+        print("User document does not exist in Staff collection.");
+        return null;
+      }
+
+      Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>;
+
+      // Ensure gender and maritalStatus exist
+      String gender = staffData['gender'] ?? "Male";
+      String maritalStatus = staffData['maritalStatus'] ?? "Single";
+
+      // If missing, update Firestore
+      if (!staffData.containsKey('gender') || !staffData.containsKey('maritalStatus')) {
+        await staffDocRef.update({
+          'gender': gender,
+          'maritalStatus': maritalStatus,
+        });
+        print("Updated missing fields: gender = $gender, maritalStatus = $maritalStatus");
+      }
+
+      // Reference to RemainingLeave document
+      DocumentReference remainingLeaveRef = staffDocRef.collection('RemainingLeave').doc('remainingLeaveDoc');
+      DocumentSnapshot remainingLeaveDoc = await remainingLeaveRef.get();
+
+      RemainingLeaveModel? remainingLeave;
+
+      if (remainingLeaveDoc.exists && remainingLeaveDoc.data() != null) {
+        remainingLeave = RemainingLeaveModel.fromJson(remainingLeaveDoc.data() as Map<String, dynamic>);
+      } else {
+        // Document does not exist, create and initialize it
+        remainingLeave = RemainingLeaveModel(
+          staffId: userId,
+          annualLeaveBalance: _totalAnnualLeaves.value,
+          holidayLeaveBalance: _totalHolidayLeaves.value,
+          dateUpdated: DateTime.now(),
+          paternityLeaveBalance: (gender == 'Male' && maritalStatus == 'Married') ? _totalPaternityLeaves.value : 0,
+          maternityLeaveBalance: (gender == 'Female' && maritalStatus == 'Married') ? _totalMaternityLeaves.value : 0,
+        );
+
+        await remainingLeaveRef.set(remainingLeave.toJson());
+        print("Created new remaining leave document for user.");
+      }
+
+      // Update leave balances
+      if (remainingLeave != null) {
+        _usedPaternityLeaves.value = _totalPaternityLeaves.value - (remainingLeave.paternityLeaveBalance ?? 0);
+        _usedMaternityLeaves.value = _totalMaternityLeaves.value - (remainingLeave.maternityLeaveBalance ?? 0);
+        _usedAnnualLeaves.value = _totalAnnualLeaves.value - (remainingLeave.annualLeaveBalance ?? 0);
+        _remainingPaternityLeaveBalance.value = remainingLeave.paternityLeaveBalance ?? 0;
+        _remainingMaternityLeaveBalance.value = remainingLeave.maternityLeaveBalance ?? 0;
+        _remainingAnnualLeaveBalance.value = remainingLeave.annualLeaveBalance ?? 0;
+      }
+
+      return remainingLeave;
     } catch (e) {
-      print("Error fetching remaining leave from Firebase: $e");
+      print("Error initializing remaining leave model: $e");
       return null;
     }
-
-
-    if (remainingLeave == null) {
-      remainingLeave = RemainingLeaveModel(
-        staffId: bioInfo.firebaseAuthId!,
-        annualLeaveBalance: await _calculateInitialAnnualLeave(),
-        holidayLeaveBalance: await _calculateInitialHoliday(),
-        dateUpdated: DateTime.now(),
-        paternityLeaveBalance: (bioInfo.gender == 'Male' && bioInfo.maritalStatus == 'Married')
-            ? _totalPaternityLeaves.value
-            : 6,
-        maternityLeaveBalance: (bioInfo.gender == 'Female' && bioInfo.maritalStatus == 'Married')
-            ? _totalMaternityLeaves.value
-            : 60,
-      );
-
-      await _saveRemainingLeaveToFirebase(remainingLeave).then((_) async {
-        await _insertInitialAnnualLeave().then((_) async {
-          await _insertInitialHolidayLeave();
-        });
-      });
-
-    } else{
-
-      _usedPaternityLeaves.value = _totalPaternityLeaves.value -remainingLeave.paternityLeaveBalance!;
-      _usedMaternityLeaves.value =_totalMaternityLeaves.value -remainingLeave.maternityLeaveBalance!;
-      _usedAnnualLeaves.value = _totalAnnualLeaves.value - remainingLeave.annualLeaveBalance! ;
-      _remainingPaternityLeaveBalance.value = remainingLeave.paternityLeaveBalance!;
-      _remainingMaternityLeaveBalance.value = remainingLeave.maternityLeaveBalance!;
-      _remainingAnnualLeaveBalance.value = remainingLeave.annualLeaveBalance!;
-    }
-
-    return remainingLeave;
   }
 
-  Future<void> _saveRemainingLeaveToFirebase(RemainingLeaveModel remainingLeave) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(user.uid)
-            .collection('RemainingLeaves')
-            .doc(user.uid)
-            .set(remainingLeave.toJson());
+
+
+  Future<void> _calculateAndStoreRemainingLeave() async {
+    if (_currentUserId == null) return;
+
+    final now = DateTime.now();
+    final lastYearOctober = DateTime(now.year - 1, 10, 1);
+    final currentYearSeptember = DateTime(now.year, 9, 30);
+
+    DateTime startDate = lastYearOctober;
+    DateTime endDate = currentYearSeptember;
+
+    if (now.isBefore(currentYearSeptember)) {
+      endDate = currentYearSeptember;
+    } else {
+      startDate = currentYearSeptember.add(const Duration(days: 1));
+      endDate = DateTime(now.year + 1, 9, 30);
+    }
+
+
+    final attendanceCollection = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('Record');
+
+    final querySnapshot = await attendanceCollection
+        .where('durationWorked', isEqualTo: 'Annual Leave')
+        .where('date', isGreaterThanOrEqualTo: DateFormat('dd-MMMM-yyyy').format(startDate))
+        .where('date', isLessThanOrEqualTo: DateFormat('dd-MMMM-yyyy').format(endDate))
+        .get();
+
+    int annualLeaveDays = 0;
+    for (var doc in querySnapshot.docs) {
+      final recordDate = DateFormat('dd-MMMM-yyyy').parse(doc['date'] as String);
+      if (recordDate.weekday != DateTime.saturday && recordDate.weekday != DateTime.sunday) {
+        annualLeaveDays++;
       }
-    } catch (e) {
-      print("Error saving remaining leave to Firebase: $e");
+    }
+
+    final remainingLeaveDocRef = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('RemainingLeave')
+        .doc('remainingLeaveDoc');
+
+    final docSnapshot = await remainingLeaveDocRef.get();
+    if (docSnapshot.exists) {
+      RemainingLeaveModel updatedRemainingLeave = RemainingLeaveModel.fromJson(docSnapshot.data()!);
+      updatedRemainingLeave.annualLeaveBalance = (_totalAnnualLeaves.value - annualLeaveDays).clamp(0, _totalAnnualLeaves.value);
+      await remainingLeaveDocRef.set(updatedRemainingLeave.toJson(), SetOptions(merge: true));
+      _remainingLeaves.value = updatedRemainingLeave;
+      _remainingAnnualLeaveBalance.value = updatedRemainingLeave.annualLeaveBalance ?? 0;
     }
   }
+
 
 
   Future<int> _calculateInitialAnnualLeave() async {
-    final now = DateTime.now();
-    final currentYear = now.year;
-
-    // Define October 1st for the current and previous years
-    final octoberFirstCurrentYear = DateTime(currentYear, 10, 1);
-    final octoberFirstPreviousYear = DateTime(currentYear - 1, 10, 1);
-
-    // Determine the start date
-    final start = now.isAfter(octoberFirstCurrentYear)
-        ? octoberFirstCurrentYear
-        : octoberFirstPreviousYear;
-
-    final annualLeaveRecords = await _getAttendanceRecordsForDurationWorkedFromFirebase(
-        'Annual Leave',
-        DateFormat('dd-MMMM-yyyy').format(start),
-        DateFormat('dd-MMMM-yyyy').format(now)
-    );
-
-
-    // Count records excluding weekends
-    final leaveDaysExcludingWeekends = annualLeaveRecords.where((date) {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(date.date!);
-      return recordDate.weekday != DateTime.saturday &&
-          recordDate.weekday != DateTime.sunday;
-    }).length;
-
-
-    return (_totalAnnualLeaves.value - leaveDaysExcludingWeekends).clamp(0, _totalAnnualLeaves.value);
+    return _totalAnnualLeaves.value; // Initial annual leave is just the total allocated.
   }
-
-  Future<List<AttendanceModel>> _getAttendanceRecordsForDurationWorkedFromFirebase(String durationWorked, String startDate, String endDate) async {
-    List<AttendanceModel> attendanceRecords = [];
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(user.uid)
-            .collection('Attendance')
-            .where('durationWorked', isEqualTo: durationWorked)
-            .where('offDay', isEqualTo: true)
-            .where('date', isGreaterThanOrEqualTo: startDate)
-            .where('date', isLessThanOrEqualTo: endDate)
-            .get();
-
-        attendanceRecords = querySnapshot.docs.map((doc) => AttendanceModel.fromJson(doc.data())).toList();
-      }
-    } catch (e) {
-      print("Error fetching attendance records by duration from Firebase: $e");
-    }
-    return attendanceRecords;
-  }
-
 
   Future<void> _insertInitialAnnualLeave() async {
-    final now = DateTime.now();
-    final currentYear = now.year;
-
-    final octoberFirstCurrentYear = DateTime(currentYear, 10, 1);
-    final octoberFirstPreviousYear = DateTime(currentYear - 1, 10, 1);
-
-    final start = now.isAfter(octoberFirstCurrentYear)
-        ? octoberFirstCurrentYear
-        : octoberFirstPreviousYear;
-
-    final annualLeaveRecords = await _getAttendanceRecordsForDurationWorkedFromFirebase(
-        'Annual Leave',
-        DateFormat('dd-MMMM-yyyy').format(start),
-        DateFormat('dd-MMMM-yyyy').format(now)
-    );
-
-    for (final leaveRecord in annualLeaveRecords) {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(leaveRecord.date!);
-
-      // Check if the date is not a weekend before inserting
-      if (recordDate.weekday != DateTime.saturday &&
-          recordDate.weekday != DateTime.sunday) {
-        await _addLeaveRecordToLeaveRequest(leaveRecord); // Call the insert function
-      }
-    }
-
-
+    // No need to insert initial annual leave records in Firestore as it's calculated dynamically.
   }
 
   Future<void> _insertInitialHolidayLeave() async {
-    final now = DateTime.now();
-    final currentYear = now.year;
-
-    final octoberFirstCurrentYear = DateTime(currentYear, 10, 1);
-    final octoberFirstPreviousYear = DateTime(currentYear - 1, 10, 1);
-
-    final start = now.isAfter(octoberFirstCurrentYear)
-        ? octoberFirstCurrentYear
-        : octoberFirstPreviousYear;
-
-    final holidayLeaveRecords = await _getAttendanceRecordsForDurationWorkedFromFirebase(
-        'Holiday',
-        DateFormat('dd-MMMM-yyyy').format(start),
-        DateFormat('dd-MMMM-yyyy').format(now)
-    );
-
-
-    for (final leaveRecord in holidayLeaveRecords) {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(leaveRecord.date!);
-
-      // Check if the date is not a weekend before inserting
-      if (recordDate.weekday != DateTime.saturday &&
-          recordDate.weekday != DateTime.sunday) {
-        await _addHolidayLeaveRecordToLeaveRequest(leaveRecord); // Call the insert function
-      }
-    }
-
-
+    // No need to insert initial holiday leave records in Firestore.
   }
 
-  Future<void> _addLeaveRecordToLeaveRequest(AttendanceModel leaveRecord) async {
-    try {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(leaveRecord.date!);
-
-      final newLeaveRequest = LeaveRequestModel(
-        type: leaveRecord.durationWorked,
-        status: "Approved", // Set the status
-        startDate: recordDate,
-        endDate: recordDate,
-        reason: "Annual Leave", // Or any default reason if needed
-        isSynced: false, // Important to mark not synced initially
-        staffId: _bioInfo.value?.firebaseAuthId, // Get the staffId from _bioInfo
-        leaveRequestId: const Uuid().v4(),
-        selectedSupervisor: "App Support", // or determine how to set this
-        selectedSupervisorEmail: "appsupport@ccfng.org",
-        leaveDuration: 1, // since it represents a single day of leave
-        firstName: "App Support",
-        lastName: "CaritasNigeria",
-        staffCategory: _bioInfo.value?.staffCategory,
-        staffState: _bioInfo.value?.state,
-        staffLocation: _bioInfo.value?.location,
-        staffEmail: _bioInfo.value?.emailAddress,
-        staffPhone: _bioInfo.value?.mobile,
-        staffDepartment: _bioInfo.value?.department,
-        staffDesignation: _bioInfo.value?.designation,
-      );
-
-
-      await _saveLeaveRequestToFirebase(newLeaveRequest);
-    } catch (e) {
-      print("Error adding leave record to Leave_request: $e");
-    }
-  }
-
-  Future<void> _saveLeaveRequestToFirebase(LeaveRequestModel leaveRequest) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final staffCollection = FirebaseFirestore.instance.collection('Staff').doc(user.uid);
-        final leaveRequestCollection = staffCollection.collection('Leave Request');
-        await leaveRequestCollection.doc(leaveRequest.leaveRequestId).set(leaveRequest.toJson());
-      }
-    } catch (e) {
-      print("Error saving leave request to Firebase: $e");
-    }
-  }
-
-
-  Future<void> _addHolidayLeaveRecordToLeaveRequest(AttendanceModel leaveRecord) async {
-    try {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(leaveRecord.date!);
-
-      final newLeaveRequest = LeaveRequestModel(
-        type: leaveRecord.durationWorked,
-        status: "Approved", // Set the status
-        startDate: recordDate,
-        endDate: recordDate,
-        reason: "Holiday", // Or any default reason if needed
-        isSynced: false, // Important to mark not synced initially
-        staffId: _bioInfo.value?.firebaseAuthId, // Get the staffId from _bioInfo
-        leaveRequestId: const Uuid().v4(),
-        selectedSupervisor: "App Support", // or determine how to set this
-        selectedSupervisorEmail: "appsupport@ccfng.org",
-        leaveDuration: 1, // since it represents a single day of leave
-        firstName: "App Support",
-        lastName: "CaritasNigeria",
-        staffCategory: _bioInfo.value?.staffCategory,
-        staffState: _bioInfo.value?.state,
-        staffLocation: _bioInfo.value?.location,
-        staffEmail: _bioInfo.value?.emailAddress,
-        staffPhone: _bioInfo.value?.mobile,
-        staffDepartment: _bioInfo.value?.department,
-        staffDesignation: _bioInfo.value?.designation,
-      );
-
-
-      await _saveLeaveRequestToFirebase(newLeaveRequest);
-    } catch (e) {
-      print("Error adding holiday leave record to Leave_request: $e");
-    }
-  }
 
   Future<int> _calculateInitialHoliday() async {
-    print("holidayLeaveRecords Here");
-    final now = DateTime.now();
-    final currentYear = now.year;
-
-    // Define October 1st for the current and previous years
-    final octoberFirstCurrentYear = DateTime(currentYear, 10, 1);
-    final octoberFirstPreviousYear = DateTime(currentYear - 1, 10, 1);
-
-    // Determine the start date
-    final start = now.isAfter(octoberFirstCurrentYear)
-        ? octoberFirstCurrentYear
-        : octoberFirstPreviousYear;
-
-    final holidayRecords = await _getAttendanceRecordsForDurationWorkedFromFirebase(
-        'Holiday',
-        DateFormat('dd-MMMM-yyyy').format(start),
-        DateFormat('dd-MMMM-yyyy').format(now)
-    );
-
-
-    // Count records excluding weekends
-    final holidayDaysExcludingWeekends = holidayRecords.where((date) {
-      final recordDate = DateFormat('dd-MMMM-yyyy').parse(date.date!);
-      return recordDate.weekday != DateTime.saturday &&
-          recordDate.weekday != DateTime.sunday;
-    }).length;
-
-
-    return holidayDaysExcludingWeekends;
-
+    return 0; // Initial holiday leave is 0
   }
+
 
   Future<void> syncUnsyncedLeaveRequests() async {
 
-    try {
-      final unsyncedLeaveRequests = await _getUnsyncedLeaveRequestsFromFirebase();
-
-      for (final leaveRequest in unsyncedLeaveRequests) {
-        await _syncLeaveRequestToFirebase(leaveRequest);
-      }
-    } catch (e) {
-      print("Error syncing unsynced leave requests: $e");
-    }
-  }
-
-  // This function needs to be adjusted to fetch unsynced requests from Firebase if you were tracking 'isSynced' status in Firebase.
-  // If 'isSynced' was only tracked locally (in Isar, which is now removed), you might not need this function at all,
-  // or you might need to rethink how to handle offline/sync scenarios with Firebase directly.
-  Future<List<LeaveRequestModel>> _getUnsyncedLeaveRequestsFromFirebase() async {
-    return []; // Since we are not tracking 'isSynced' in Firebase in this example, return empty list.
+    print("syncUnsyncedLeaveRequests called - Firestore is online, syncing is mostly automatic.");
   }
 
 
   Future<void> _syncLeaveRequestToFirebase(LeaveRequestModel leaveRequest) async {
     try {
 
-      //Check network connectivity first
-      // final isInternetConnected = await InternetConnectionChecker.instance.hasConnection;
-      // if(!isInternetConnected){
-      //   print("No Internet Connection. Syncing aborted.");
-      //   return;
-      // }
 
-      final user = FirebaseAuth.instance.currentUser; //Ensure Firebase is initialized before use
+
+      final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final staffCollection = FirebaseFirestore.instance.collection('Staff').doc(user.uid);
         final leaveRequestCollection = staffCollection.collection('Leave Request');
 
         final leaveRequestId = leaveRequest.leaveRequestId;
-        if (leaveRequestId != null) { //Ensure leaveRequestId exists
+        if (leaveRequestId != null) {
           await leaveRequestCollection.doc(leaveRequestId).set({
             ...leaveRequest.toJson(),
             'leaveRequestId': leaveRequestId,
           });
 
           print('Leave request synced successfully: $leaveRequestId');
-
         }
       }
-
-
     } catch (e) {
-
       print('Error syncing leave request to Firebase: $e');
-      // Handle error, e.g., retry later or show a message to the user.
-
-
     }
   }
 
@@ -1824,29 +1237,152 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
   Future<LeaveRequestModel> _getOrCreateLeaveRequestModel(String userId) async {
-    // This function might not be needed anymore as we are directly saving to Firebase and not using local IDs like Isar.
-    // If you need to ensure a leave request exists, you'll need to adjust this logic for Firebase.
-    // For now, let's assume we create a new LeaveRequestModel every time.
 
-    final newRequest = LeaveRequestModel(
-      staffId: userId,
-      endDate: DateTime.now(),
-      startDate: DateTime.now(),
-      leaveRequestId: const Uuid().v4(),
-      reason: "Annual Leave",
-      selectedSupervisor: "Super User",
-      selectedSupervisorEmail: "superuser@ccfng.org",
-      type: "Annual",
+    return LeaveRequestModel()
+      ..staffId = userId
+      ..endDate = DateTime.now()
+      ..startDate = DateTime.now()
+      ..leaveRequestId = const Uuid().v4()
+      ..reason = "Annual Leave"
+      ..selectedSupervisor = "Super User"
+      ..selectedSupervisorEmail = "superuser@ccfng.org"
+      ..type = "Annual";
+  }
+
+  Future<void> _loadBioData() async {
+    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
+
+    if (userId == null) {
+      print("User is not authenticated.");
+      return;
+    }
+
+    try {
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(userId)
+          .get();
+
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        Map<String, dynamic> data = docSnapshot.data()!;
+        setState(() {
+          selectedBioFirstName = data['firstName'] ?? '';
+          selectedBioLastName = data['lastName'] ?? '';
+          selectedBioDepartment = data['department'] ?? '';
+          selectedBioState = data['state'] ?? '';
+          selectedBioDesignation = data['designation'] ?? '';
+          selectedBioLocation = data['location'] ?? '';
+          selectedBioStaffCategory = data['staffCategory'] ?? '';
+          selectedBioEmail = data['emailAddress'] ?? '';
+          selectedBioPhone = data['mobile'] ?? '';
+          staffSignatureLink = data['signatureLink'] ?? '';
+          selectedFirebaseId = userId; // Store the Firebase UUID
+        });
+
+
+      } else {
+        print("No bio data found for user ID: $userId");
+      }
+    } catch (e) {
+      print("Error loading bio data: $e");
+    }
+  }
+
+  Widget buildSupervisorDropdown() {
+    return StreamBuilder<List<String?>>( // Wrap with Obx to rebuild on _selectedSupervisor change if needed in future
+      stream: (selectedBioDepartment != null && selectedBioState != null)
+          ? getSupervisorsFromFirestore(selectedBioDepartment!, selectedBioState!)
+          : Stream.value([]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        } else {
+          List<String?> supervisorNames = snapshot.data ?? [];
+          print("Selected Supervisor before Dropdown: ${_selectedSupervisor.value}"); // Print here
+
+          return SizedBox(
+            width: double.infinity,
+            child: DropdownButton<String?>(
+              isExpanded: true,
+              value: _selectedSupervisor.value.isNotEmpty ? _selectedSupervisor.value : null, // Use .value to access RxString value
+              items: supervisorNames.map((supervisorName) {
+                return DropdownMenuItem<String?>(
+                  value: supervisorName,
+                  child: Text(
+                    supervisorName ?? 'No Supervisor',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) async {
+                if (newValue != null) {
+                  _selectedSupervisor.value = newValue; // Update RxString value
+                  print("Selected Caritas Supervisor: $_selectedSupervisor.value");
+
+                  String? supervisorEmail = await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
+                  _selectedSupervisorEmail = supervisorEmail;
+                  print("Caritas Supervisor Email: $_selectedSupervisorEmail");
+
+                } else {
+                  _selectedSupervisor.value = ''; // Clear selection if newValue is null
+                  _selectedSupervisorEmail = null;
+                }
+              },
+              hint: const Text('Select Supervisor'),
+            ),
+          );
+        }
+      },
     );
+  }
 
-    return newRequest;
+
+  Stream<List<String?>> getSupervisorsFromFirestore(String department, String state) {
+    return FirebaseFirestore.instance
+        .collection('Supervisors')
+        .doc(state)
+        .collection(state)
+        .where('department', isEqualTo: department)
+        .snapshots()
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => doc['supervisor'] as String?).toList());
+  }
+
+  Future<String?> getSupervisorEmailFromFirestore(String state, String supervisorName) async {
+    try {
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+          .collection('Supervisors')
+          .doc(state)
+          .collection(state)
+          .doc(supervisorName)
+          .get();
+
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final data = docSnapshot.data()!;
+        final emailField = data['email'];
+
+        // If emailField is a list and not empty, return the first email
+        if (emailField is List && emailField.isNotEmpty) {
+          return emailField[0] as String;
+        }
+        // If emailField is already a String, return it directly
+        else if (emailField is String) {
+          return emailField;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching supervisor email: $e");
+      return null;
+    }
   }
 
 
   Future<void> _getLeaveData() async {
     print("Starting getLeaveData");
-    // Data is already loaded via stream in _init, no need to explicitly fetch again unless refreshing is needed.
-    // If you need to refresh the leave data, consider re-triggering the stream or refetching data.
+
     print("Finished getLeaveData");
     await _checkAndUpdateLeaveStatus();
   }
@@ -1854,23 +1390,23 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
 
-  Widget _buildLeaveSummaryItem(String leaveType, int used, int total) {
+  Widget _buildLeaveSummaryItem(String leaveType, int used, int total, double fontSizeFactor, double paddingFactor) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0), // Increased spacing
+      padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Align items to edges
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
 
-              Text("$leaveType Leave:", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)), // Style adjustments
+              Text("$leaveType Leave:", style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.w500)),
 
-              Text("$used Used, ${total - used} Remaining", style: const TextStyle(fontSize: 14)), // Usage/Remaining info
+              Text("$used Used, ${total - used} Remaining", style: TextStyle(fontSize: 14 * fontSizeFactor)),
             ],
           ),
           LinearPercentIndicator(
-            lineHeight: 10,
+            lineHeight: 8 * fontSizeFactor,
             percent: total > 0 ? used.toDouble() / total : 0,
             progressColor: Colors.green,
             backgroundColor: Colors.grey[300],
@@ -1880,25 +1416,20 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     );
   }
 
-  Widget _buildLeaveSummaryItem1(String leaveType, int used, int total) {
+  Widget _buildLeaveSummaryItem1(String leaveType, int used, int total, double fontSizeFactor, double paddingFactor) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0), // Increased spacing
+      padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Align items to edges
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("No of $leaveType(s) observed:", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),// Style adjustments
-              Text("$used Observed", style: const TextStyle(fontSize: 14))
+              Text("No of $leaveType(s) observed:", style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.w500)),
+              Text("$used Observed", style: TextStyle(fontSize: 14 * fontSizeFactor))
             ],
           ),
-          // LinearPercentIndicator(
-          //   lineHeight: 10,
-          //   percent: total > 0 ? used.toDouble() / total : 0,
-          //   progressColor: Colors.blue,
-          //   backgroundColor: Colors.grey[300],
-          // ),
+
         ],
       ),
     );
@@ -1908,65 +1439,84 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() { // Wrap with Obx to rebuild when observables change
-      if (!_firebaseInitialized.value || _bioInfo.value == null || _remainingLeaves.value == null) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+
+    double fontSizeFactor = max(0.8, min(1.2, shortestSide / 600));
+    double paddingFactor = max(0.8, min(1.2, shortestSide / 600));
+    double marginFactor = max(0.8, min(1.2, shortestSide / 600));
+    double iconSizeFactor = max(0.8, min(1.2, shortestSide / 600));
+    double headerHeightFactor = max(0.8, min(1.2, shortestSide / 600));
+    double cardHeightFactor = max(0.8, min(1.2, screenHeight / 800));
+    double buttonPaddingFactor = max(0.8, min(1.2, shortestSide / 600));
+    double circularIndicatorRadiusFactor = max(0.8, min(1.2, shortestSide / 600));
+    double circularIndicatorLineWidthFactor = max(0.8, min(1.2, shortestSide / 600));
+
+    return Obx(() {
+      if (_firebaseInitialized.value == false || _bioInfo.value == null || _remainingLeaves.value == null) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       } else {
-        return _buildMainScaffold(); // Call _buildMainScaffold when data is available
+        return _buildMainScaffold(fontSizeFactor, paddingFactor, marginFactor, iconSizeFactor, headerHeightFactor, cardHeightFactor, buttonPaddingFactor, circularIndicatorRadiusFactor, circularIndicatorLineWidthFactor);
       }
     });
   }
 
 
 
-  Widget _buildMainScaffold() { //Widget builds the main scaffold
-    List<Widget> leaveSummaryItems = []; //Create a list of widget for leave summary items
+  Widget _buildMainScaffold(double fontSizeFactor, double paddingFactor, double marginFactor, double iconSizeFactor, double headerHeightFactor, double cardHeightFactor, double buttonPaddingFactor, double circularIndicatorRadiusFactor, double circularIndicatorLineWidthFactor) {
+    List<Widget> leaveSummaryItems = [];
 
 
-
-    //Create Leave Summary Items
     leaveSummaryItems.add(
-        _buildLeaveSummaryItem("Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value)); //Safe null checks
+        _buildLeaveSummaryItem("Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value, fontSizeFactor, paddingFactor));
 
 
     if (_bioInfo.value?.maritalStatus == 'Married') {
       if (_bioInfo.value?.gender == 'Male') {
         leaveSummaryItems.add(
-          _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value),
+          _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor),
         );
       } else {
         leaveSummaryItems.add(
           _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0) == _totalAnnualLeaves.value?
-          _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value),
+          _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
         );
       }
     }
-    leaveSummaryItems.add(_buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value));
+    leaveSummaryItems.add(_buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor));
 
-    //   _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0)
 
-    return Scaffold( //Build Scaffold. Now you can safely access _remainingLeaves and _bioInfo here
+    return Scaffold(
+
       appBar: AppBar(
-        title: const Text("Out of Office Leave Requests"),
+        title: Text('Leave Request', style: TextStyle(color: Colors.white, fontSize: 20 * fontSizeFactor)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(
+            colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),),
+        ),
+
       ),
-      drawer: drawer(context), // Use web drawer
+      drawer: drawer(context),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0 * paddingFactor),
         child: Column(
           children: [
-            const SizedBox(
-              height: 100, // Fixed height for web header
-              width: double.infinity, // Full width for web
-              child: HeaderWidget(100, false, Icons.house_rounded),
+            SizedBox(
+              height: 60 * headerHeightFactor,
+              width: double.infinity,
+              child: HeaderWidget(100 * headerHeightFactor, false, Icons.house_rounded),
             ),
-            const SizedBox(height: 10),
+
             Obx(() => Card (
               elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * marginFactor)),
               child: Container(
-                width: double.infinity, // Full width for web card
-                //height: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 1.15 : 0.50), // Adjusted height for web - consider fixed or more flexible
-                padding: const EdgeInsets.all(16.0),
+                width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -1977,117 +1527,118 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       Colors.black12,
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10 * marginFactor),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Geo-Cordinates Information:",
-                      style: TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 20, // Fixed font size for web
-                        color: Colors.blueGrey,
+                child: Padding(
+                  padding: EdgeInsets.all(16.0 * paddingFactor),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Geo-Cordinates Information:",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 18 * fontSizeFactor,
+                          color: Colors.blueGrey,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
+                      SizedBox(height: 10 * paddingFactor),
 
-                    Text(
-                      "GPS is: ${isGpsEnabled.value ? 'On' : 'Off'}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                      IntrinsicWidth(child: Text(
+                        "GPS is: ${isGpsEnabled.value ? 'On' : 'Off'}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      ),),
+                      SizedBox(height: 10 * paddingFactor),
 
-                    Text(
-                      "Current Latitude: ${lati.value.toStringAsFixed(
-                          6)}, Current Longitude: ${longi.value.toStringAsFixed(6)}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    ),
-                    const SizedBox(height: 10), // Spacing between status and coordinates
+                      IntrinsicWidth(child: Text(
+                        "Current Latitude: ${lati.value.toStringAsFixed(
+                            6)}, Current Longitude: ${longi.value.toStringAsFixed(6)}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      ),),
+                      SizedBox(height: 10 * paddingFactor),
 
-                    Text(
-                      "Coordinates Accuracy: ${accuracy.value}, Altitude: ${altitude.value} , Speed: ${speed.value}, Speed Accuracy: ${speedAccuracy.value}, Location Data Timestamp: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(time.value.toInt()))} , Is Location Mocked?: ${isMock.value}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Obx(() => Text(
-                      "Current State: ${administrativeArea.value}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    )),
-                    const SizedBox(height: 10),
+                      IntrinsicWidth(child: Text(
+                        "Coordinates Accuracy: ${accuracy.value}, Altitude: ${altitude.value} , Speed: ${speed.value}, Speed Accuracy: ${speedAccuracy.value}, Location Data Timestamp: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(time.value.toInt()))} , Is Location Mocked?: ${isMock.value}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      ),),
+                      SizedBox(height: 10 * paddingFactor),
+                      IntrinsicWidth(child:  Obx(() => Text(
+                        "Current State: ${administrativeArea.value}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      )),),
+                      SizedBox(height: 10 * paddingFactor),
 
 
-                    Obx(() => Text(
-                      "Current Location: ${location.value}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    )),
-                    const SizedBox(height: 10),
+                      IntrinsicWidth(child: Obx(() => Text(
+                        "Current Location: ${location.value}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      ),),),
+                      SizedBox(height: 10 * paddingFactor),
 
-                    Obx(() => Text(
-                      "Current State: ${administrativeArea.value}",
-                      style: const TextStyle(
-                        fontFamily: "NexaBold",
-                        fontSize: 18, // Fixed font size for web
-                      ),
-                    )),
-                  ],
+                      IntrinsicWidth(child: Obx(() => Text(
+                        "Current State: ${administrativeArea.value}",
+                        style: TextStyle(
+                          fontFamily: "NexaBold",
+                          fontSize: 16 * fontSizeFactor,
+                        ),
+                      )),),
+                    ],
+                  ),
                 ),
               ),
             ),
             ),
-            const SizedBox(height: 10),
-            //
-            // _buildCircularPercentIndicator(_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value,
-            //     _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value,
-            //     _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0), _totalMaternityLeaves.value) ,// Show the indicator after the delay
+            SizedBox(height: 10 * paddingFactor),
+
+
             Obx(() => _buildCircularPercentIndicator(
-              _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0),
-              _totalAnnualLeaves.value,
-              _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0),
-              _totalPaternityLeaves.value,
-              _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0),
-              _totalMaternityLeaves.value,
+                _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0),
+                _totalAnnualLeaves.value,
+                _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0),
+                _totalPaternityLeaves.value,
+                _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0),
+                _totalMaternityLeaves.value,
+                fontSizeFactor, circularIndicatorRadiusFactor, circularIndicatorLineWidthFactor
             )),
             Obx(() => Card(
-              margin: const EdgeInsets.only(top: 16.0),
+              margin: EdgeInsets.only(top: 16.0 * marginFactor),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0 * paddingFactor),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Leave Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
+                    Text("Leave Summary", style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 12 * paddingFactor),
 
-                    // ... leaveSummaryItems (calculate these reactively within the Obx)
-                    // Example:
+
                     _buildLeaveSummaryItem(
-                      "Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value,
+                      "Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value, fontSizeFactor, paddingFactor,
                     ),
 
 
-                    if (_bioInfo.value!.maritalStatus == 'Married') ...[ // Conditional rendering inside Obx
+                    if (_bioInfo.value!.maritalStatus == 'Married') ...[
                       if (_bioInfo.value!.gender == 'Male')
-                        _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value)
-                      else // Assuming if not Male, it's Female
+                        _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor)
+                      else
                         _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0) == _totalAnnualLeaves.value?
-                        _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value),
+                        _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
                     ],
-                    _buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value),
+                    _buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor),
 
 
                   ],
@@ -2095,7 +1646,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               ),
             )),
 
-            Obx(() =>_buildLeaveRequestsCard()),
+            Obx(() =>_buildLeaveRequestsCard(fontSizeFactor, paddingFactor, marginFactor, iconSizeFactor)),
 
 
           ],
@@ -2105,9 +1656,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showApplyLeaveBottomSheet(context);
+          _showApplyLeaveBottomSheet(context, fontSizeFactor, paddingFactor, marginFactor, iconSizeFactor, buttonPaddingFactor);
         },
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, size: 30 * iconSizeFactor),
       ),
     );
 
@@ -2115,19 +1666,19 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
-  Widget _buildSummaryItem(String label, int count, Color color) {
+  Widget _buildSummaryItem(String label, int count, Color color, double fontSizeFactor) {
     return Column(
       children: [
-        Text("$count", style: TextStyle(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(label),
+        Text("$count", style: TextStyle(fontSize: 18 * fontSizeFactor, color: color, fontWeight: FontWeight.bold)),
+        SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 14 * fontSizeFactor)),
       ],
     );
   }
 
 
 
-  void _showApplyLeaveBottomSheet(BuildContext context) {
+  void _showApplyLeaveBottomSheet(BuildContext context, double fontSizeFactor, double paddingFactor, double marginFactor, double iconSizeFactor, double buttonPaddingFactor) {
     showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -2138,185 +1689,143 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             if (_bioInfo.value?.maritalStatus == 'Married') {
               if (_bioInfo.value?.gender == 'Male') {
                 leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave'),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave'),
+                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, buttonPaddingFactor),
+                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
                 ]);
               } else {
                 leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Maternity', 'Maternity Leave'),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave'),
+                  _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, buttonPaddingFactor),
+                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
                 ]);
               }
             } else {
-              leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave'));
+              leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor));
             }
 
-            leaveTypeButtons.add(_leaveTypeButton(setState, 'Holiday', 'Holidays'));
+            leaveTypeButtons.add(_leaveTypeButton(setState, 'Holiday', 'Holidays', fontSizeFactor, buttonPaddingFactor));
 
 
-            return SingleChildScrollView( // Wrap with SingleChildScrollView
+            return SingleChildScrollView(
               child: Container(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom,
-                  left: 16,
-                  right: 16,
-                  top: 16,
+                  left: 16 * paddingFactor,
+                  right: 16 * paddingFactor,
+                  top: 16 * paddingFactor,
                 ),
-                width: MediaQuery.of(context).size.width * 0.5, // Limit width for web
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch across width
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    // ... (rest of the bottom sheet content)
+
                     Wrap(
-                      spacing: 8.0,
-                      runSpacing: 8.0,
+                      spacing: 8.0 * paddingFactor,
+                      runSpacing: 8.0 * paddingFactor,
                       children: leaveTypeButtons,
                     ),
-                    // ... (date picker, reason field, supervisor dropdown)
-                    // Date Range Picker
-                    SizedBox( // Added SizedBox to control width of SfDateRangePicker on web
-                      width: 400, // Set a fixed width for the date picker on web
-                      height: 400, // Set a fixed height for the date picker on web
-                      child: SfDateRangePicker(
-
-                        onSelectionChanged: (args) {
-                          if (args.value is PickerDateRange) {
-                            // final selectedDates = _getSelectedDates(args.value);
-                            // final containsMarkedDate = selectedDates.any((date) => _markedDates.contains(date));
-                            _selectedDateRange = args.value; // Store the selected date range
-                            final selectedDates = _getSelectedDates(_selectedDateRange!); //Use the stored range
-
-                            final containsMarkedDate = selectedDates.any((date) => _markedDates.contains(date));
-
-                            if (containsMarkedDate) {
-                              Fluttertoast.showToast(msg: "Attendance exists for certain date(s) within your range.");
 
 
-                              // Clear the selection or reset to a valid range
-                              //_selectedDateRange = null; //Clear selection, or
-                              //_selectedDateRange = PickerDateRange(DateTime.now(), DateTime.now()); //Reset to today
-                              setState(() {}); //Force bottom sheet to rebuild
-                              return;
-                            }
+                    SfDateRangePicker(
+
+                      onSelectionChanged: (args) {
+                        if (args.value is PickerDateRange) {
+
+                          _selectedDateRange = args.value;
+                          final selectedDates = _getSelectedDates(_selectedDateRange!);
+
+                          final containsMarkedDate = selectedDates.any((date) => _markedDates.contains(date));
+
+                          if (containsMarkedDate) {
+                            Fluttertoast.showToast(msg: "Attendance exists for certain date(s) within your range.", fontSize: 14 * fontSizeFactor);
+
+
+                            setState(() {});
+                            return;
                           }
-                          _onSelectionChanged(args, setState); //Call original function
-                        },
-                        selectionMode: DateRangePickerSelectionMode.range,
-                        initialSelectedRange: PickerDateRange(
-                          DateTime.now(),
-                          DateTime.now().add(const Duration(days: 1)),
-                        ),
-                        headerStyle: const DateRangePickerHeaderStyle(
-                          backgroundColor: Colors.blue,
-                          textStyle: TextStyle(color: Colors.white),
-                        ),
-                        todayHighlightColor: Colors.red,
-                        selectableDayPredicate: (DateTime date) {
-                          return !_markedDates.contains(date);  // Disable marked dates directly
-                        },
-                        cellBuilder: (BuildContext context, DateRangePickerCellDetails cellDetails) {
-
-                          final holidayName = _nigerianHolidays[cellDetails.date];
-                          bool isHoliday = holidayName != null;
-                          bool isMarked = _markedDates.contains(cellDetails.date);
-                          final markedDateLabel = _getMarkedDateLabel(cellDetails.date); // Always get the label
-
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: isHoliday ? Colors.green.withOpacity(0.2) : isMarked
-                                  ? Colors.grey
-                                  : null,
-                              border: Border.all(color: const Color(0xFFF0F0F0), width: 0.5),
-                            ),
-                            child: Column(  // Use a Column for vertical layout
-                              mainAxisAlignment: MainAxisAlignment.center, // Center vertically
-                              children: [
-                                if (markedDateLabel != null) ...[
-                                  FittedBox( // Use FittedBox for better scaling
-                                    fit: BoxFit.scaleDown, // Scale down text to fit
-                                    child: Text(markedDateLabel, style: const TextStyle(fontSize: 6)), // Smaller font size
-                                  ),
-                                  const SizedBox(height: 2),
-                                ],
-                                if (isHoliday && markedDateLabel == null && !isMarked) ...[
-                                  FittedBox( // FittedBox for holidays too
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(holidayName, style: const TextStyle(fontSize: 6)), // Smaller font size
-                                  ),
-                                  const SizedBox(height: 2),
-                                ],
-
-
-                                Text(cellDetails.date.day.toString()),
-                              ],
-                            ),
-                          );
-                        },
-
-                      ),
-                    ),
-
-
-                    FutureBuilder<List<DropdownMenuItem<String>>>(
-                      future: _fetchSupervisorsFromFirebase(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        } else if (snapshot.hasError) {
-                          return Text('Error: ${snapshot.error}');
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Text('No supervisors found.');
-                        } else {
-                          // Extract items from snapshot
-                          final items = snapshot.data!;
-
-                          // Ensure the selected value exists in the dropdown items
-                          final isValuePresent = items.any((item) => item.value == _selectedSupervisor);
-
-                          return DropdownButtonFormField<String>(
-                            value: isValuePresent ? _selectedSupervisor : null, // Use null if the value is not present
-                            hint: const Text('Select Supervisor'),
-                            onChanged: (newValue) async {
-                              setState(() {
-                                _selectedSupervisor = newValue;
-                              });
-
-                              List<String?> supervisorsemail = await _getSupervisorEmailFromFirebase(
-                                _bioInfo.value?.department,
-                                newValue,
-                              );
-
-                              setState(() {
-                                _selectedSupervisorEmail = supervisorsemail[0];
-                              });
-                              print(_selectedSupervisorEmail);
-                            },
-                            items: items,
-                            decoration: const InputDecoration(labelText: 'Supervisor'),
-                          );
                         }
+                        _onSelectionChanged(args, setState);
                       },
+                      selectionMode: DateRangePickerSelectionMode.range,
+                      initialSelectedRange: PickerDateRange(
+                        DateTime.now(),
+                        DateTime.now().add(const Duration(days: 1)),
+                      ),
+                      headerStyle: DateRangePickerHeaderStyle(
+                        backgroundColor: Colors.blue,
+                        textStyle: TextStyle(color: Colors.white, fontSize: 16 * fontSizeFactor),
+                      ),
+                      todayHighlightColor: Colors.red,
+                      selectableDayPredicate: (DateTime date) {
+                        return !_markedDates.contains(date);
+                      },
+                      cellBuilder: (BuildContext context, DateRangePickerCellDetails cellDetails) {
+
+                        final holidayName = _nigerianHolidays[cellDetails.date];
+                        bool isHoliday = holidayName != null;
+                        bool isMarked = _markedDates.contains(cellDetails.date);
+                        final markedDateLabel = _getMarkedDateLabel(cellDetails.date);
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: isHoliday ? Colors.green.withOpacity(0.2) : isMarked
+                                ? Colors.grey
+                                : null,
+                            border: Border.all(color: const Color(0xFFF0F0F0), width: 0.5),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (markedDateLabel != null) ...[
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(markedDateLabel, style: TextStyle(fontSize: 6 * fontSizeFactor)),
+                                ),
+                                SizedBox(height: 2 * paddingFactor),
+                              ],
+                              if (isHoliday && markedDateLabel == null && !isMarked) ...[
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(holidayName, style: TextStyle(fontSize: 6 * fontSizeFactor)),
+                                ),
+                                SizedBox(height: 2 * paddingFactor),
+                              ],
+
+
+                              Text(cellDetails.date.day.toString(), style: TextStyle(fontSize: 14 * fontSizeFactor)),
+                            ],
+                          ),
+                        );
+                      },
+
                     ),
 
-                    // Other Leave Details
+
+                    buildSupervisorDropdown(),
+
+
+
                     TextFormField(
-                      controller: _reasonController, // Use a controller
-                      decoration: const InputDecoration(labelText: "Reason(s) For been Out-Of-Office"),
+                      controller: _reasonController,
+                      decoration: InputDecoration(labelText: "Reason(s) For been Out-Of-Office", labelStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
+                      style: TextStyle(fontSize: 14 * fontSizeFactor),
                     ),
 
 
 
 
-                    const SizedBox(height: 16.0), // Add spacing between dropdown and buttons
+                    SizedBox(height: 16.0 * paddingFactor),
 
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Evenly space buttons
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         ElevatedButton(
                           onPressed: () {
-                            _handleSaveAndSubmit(context, setState);
+                            _handleSaveAndSubmit(context, setState, fontSizeFactor, paddingFactor);
                           },
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 20 * buttonPaddingFactor, vertical: 12 * buttonPaddingFactor),
+                            textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
+                          ),
                           child: const Text("Save Request"),
                         ),
                       ],
@@ -2329,66 +1838,15 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         });
   }
 
-  Future<List<String?>> _getSupervisorEmailFromFirebase(String? department, String? newValue) async {
-    List<String?> emails = [];
-    try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .where('department', isEqualTo: department)
-          .where('role', isEqualTo: 'Supervisor')
-          .where('firstName', isEqualTo: newValue) // Assuming supervisor name is stored in 'firstName'
-          .get();
-
-      emails = querySnapshot.docs.map((doc) => BioModel.fromJson(doc.data()).emailAddress).toList();
-    } catch (e) {
-      print("Error fetching supervisor emails from Firebase: $e");
-    }
-    return emails;
-  }
-
-
-  Future<List<DropdownMenuItem<String>>> _fetchSupervisorsFromFirebase() async {
-    List<DropdownMenuItem<String>> supervisorItems = [];
-    try {
-      BioModel? userBio = _bioInfo.value;
-      if (userBio != null) {
-        QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-            .collection('Staff')
-            .where('department', isEqualTo: userBio.department)
-            .where('state', isEqualTo: userBio.state)
-            .where('role', isEqualTo: 'Supervisor')
-            .get();
-
-        supervisorItems = querySnapshot.docs.map((doc) {
-          BioModel supervisorBio = BioModel.fromJson(doc.data());
-          return DropdownMenuItem<String>(
-            value: supervisorBio.firstName, // Use supervisor's first name as value
-            child: Text(supervisorBio.firstName!),
-          );
-        }).toList();
-      }
-    } catch (e) {
-      print("Error fetching supervisors from Firebase: $e");
-    }
-    return supervisorItems;
-  }
-
-
   String? _getMarkedDateLabel(DateTime date) {
-    final attendanceRecords = _getAttendanceForDateFromFirebaseSync(DateFormat('dd-MMMM-yyyy').format(date));
 
-    if (attendanceRecords.isNotEmpty){
-      return attendanceRecords[0].durationWorked;
-    }
+    final formattedDate = DateFormat('dd-MMMM-yyyy').format(date);
+    final attendanceCollection = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('Record');
+
     return null;
-  }
-
-  List<AttendanceModel> _getAttendanceForDateFromFirebaseSync(String formattedDate) {
-    // This is a synchronous placeholder. In real web app, avoid synchronous operations if possible.
-    // Consider fetching this data asynchronously beforehand or use a different approach for web.
-    List<AttendanceModel> records = [];
-    // Placeholder for synchronous data fetching - consider making this asynchronous for web
-    return records;
   }
 
 
@@ -2401,11 +1859,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
-  Widget _leaveTypeButton(StateSetter setState, String type, String label) {
+  Widget _leaveTypeButton(StateSetter setState, String type, String label, double fontSizeFactor, double buttonPaddingFactor) {
     return ElevatedButton(
       onPressed: () => setState(() => _selectedLeaveType = type),
       style: ElevatedButton.styleFrom(
         backgroundColor: _selectedLeaveType == type ? Colors.blue : Colors.grey,
+        padding: EdgeInsets.symmetric(horizontal: 20 * buttonPaddingFactor, vertical: 12 * buttonPaddingFactor),
+        textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
       ),
       child: Text(label),
     );
@@ -2416,31 +1876,54 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       DateRangePickerSelectionChangedArgs args, StateSetter setState) {
     if (args.value is PickerDateRange) {
       _selectedDateRange = args.value;
-      setState(() {}); // This line is important to rebuild the bottom sheet
+      setState(() {});
     }
   }
 
 
-  Widget _buildCircularPercentIndicator(int usedAnnual,int remainingAnnual,int usedPaternity,int remainingPaternity,int usedMaternity,int remainingMaternity) {
+
+
+
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisorsFromFirebase() async {
+    List<DropdownMenuItem<String>> supervisorItems = [];
+    try {
+      final supervisorsQuery = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('department', isEqualTo: _bioInfo.value?.department)
+          .where('role', isEqualTo: 'Supervisor')
+          .get();
+
+      supervisorItems = supervisorsQuery.docs
+          .map((doc) => DropdownMenuItem<String>(
+        value: doc['fullName'] as String,
+        child: Text(doc['fullName'] as String),
+      ))
+          .toList();
+    } catch (e) {
+      print("Error fetching supervisors from Firebase: $e");
+    }
+    return supervisorItems;
+  }
+
+  Widget _buildCircularPercentIndicator(int usedAnnual,int remainingAnnual,int usedPaternity,int remainingPaternity,int usedMaternity,int remainingMaternity, double fontSizeFactor, double circularIndicatorRadiusFactor, double circularIndicatorLineWidthFactor) {
     RxInt totalLeaves = 0.obs;
     RxInt usedLeaves = 0.obs;
     final DateTime now = DateTime.now();
     final int fiscalYear = now.month >= 10 ? now.year + 1 : now.year;
-    final String fiscalYearShort = fiscalYear.toString().substring(2); // Extract last two digits
+    final String fiscalYearShort = fiscalYear.toString().substring(2);
 
 
-    // Calculate leave values reactively
     totalLeaves.bindStream(
       (() async* {
         if (_bioInfo.value?.maritalStatus == 'Married') {
           if (_bioInfo.value?.gender == 'Male') {
             yield remainingAnnual + remainingPaternity;
           } else {
-            // Female: Maternity leave includes annual leave
+
             yield remainingMaternity;
           }
         } else {
-          // Other marital statuses
+
           yield remainingAnnual;
         }
       })(),
@@ -2452,11 +1935,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           if (_bioInfo.value?.gender == 'Male') {
             yield usedAnnual + usedPaternity;
           } else {
-            // Female: Adjust if part of the annual leave
+
             yield (usedMaternity + usedAnnual);
           }
         } else {
-          // Other marital statuses
+
           yield usedAnnual;
         }
       })(),
@@ -2469,26 +1952,27 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           children: [
             Obx(() => CircularPercentIndicator(
 
-              radius: 100, // Fixed radius for web
-              lineWidth: 14, // Fixed lineWidth for web
+              radius: 100 * circularIndicatorRadiusFactor,
+
+              lineWidth: 10 * circularIndicatorLineWidthFactor,
               percent: totalLeaves.value > 0
                   ? usedLeaves.value / totalLeaves.value
                   : 0,
               center: Text(
-                "Total for FY$fiscalYearShort: ${totalLeaves.value}", // Total available across leave types
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600), // Fixed font size
+                "Total for FY$fiscalYearShort: ${totalLeaves.value}",
+                style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.w600),
               ),
               progressColor: Colors.green,
               backgroundColor: Colors.grey,
               circularStrokeCap: CircularStrokeCap.round,
             )),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Obx(() => _buildSummaryItem("Used", usedLeaves.value, Colors.blue)),
+                Obx(() => _buildSummaryItem("Used", usedLeaves.value, Colors.blue, fontSizeFactor)),
                 Obx(() => _buildSummaryItem(
-                    "Balance", totalLeaves.value - usedLeaves.value, Colors.grey)),
+                    "Balance", totalLeaves.value - usedLeaves.value, Colors.grey, fontSizeFactor)),
               ],
             ),
           ],
@@ -2500,8 +1984,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
 
-  Widget _buildLeaveRequestsCard() {
-    // Group leave requests by fiscal year
+  Widget _buildLeaveRequestsCard(double fontSizeFactor, double paddingFactor, double marginFactor, double iconSizeFactor) {
+
     final leaveRequestsByFiscalYear = <String, List<LeaveRequestModel>>{};
     for (final leaveRequest in _leaveRequests) {
       final fiscalYear = _getFiscalYear(leaveRequest.startDate!);
@@ -2509,24 +1993,24 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
 
     return Card(
-      margin: const EdgeInsets.only(top: 16.0),
+      margin: EdgeInsets.only(top: 16.0 * marginFactor),
       elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0 * marginFactor)),
       child: Padding(
-        padding: const EdgeInsets.all(0.0),
+        padding: EdgeInsets.all(0.0 * paddingFactor),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 16.0),
+            Padding(
+              padding: EdgeInsets.only(left: 16.0 * paddingFactor),
               child: Text(
                 "Leave Requests",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12 * paddingFactor),
             if (_leaveRequests.isEmpty)
-              const Center(child: Text("No leave requests found."))
+              Center(child: Text("No leave requests found.", style: TextStyle(fontSize: 14 * fontSizeFactor)))
             else
               ExpansionPanelList(
                 expansionCallback: (int index, bool isExpanded) {
@@ -2535,7 +2019,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       expandedPanelIndex.value = index;
                     } else {
                       if (expandedPanelIndex.value == index) {
-                        expandedPanelIndex.value = -1; // Collapse
+                        expandedPanelIndex.value = -1;
                       }
                     }
                   });
@@ -2547,8 +2031,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                   return ExpansionPanel(
                     headerBuilder: (BuildContext context, bool isExpanded) {
                       return ListTile(
-                          title: Text("FY $fiscalYear Out-of-Office Leave Section"),
-                          leading: isExpanded?const Icon(Icons.remove,color: Colors.red,):const Icon(Icons.add,color: Colors.green,)
+                          title: Text("FY $fiscalYear Out-of-Office Leave Section", style: TextStyle(fontSize: 16 * fontSizeFactor)),
+                          leading: isExpanded?Icon(Icons.remove,color: Colors.red, size: 24 * iconSizeFactor):Icon(Icons.add,color: Colors.green, size: 24 * iconSizeFactor)
                       );
                     },
                     isExpanded: expandedPanelIndex.value == leaveRequestsByFiscalYear.entries
@@ -2560,13 +2044,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       itemCount: leaveRequests.length,
                       itemBuilder: (context, index) {
                         final leaveRequest = leaveRequests[index];
-                        return _buildLeaveRequestTile(leaveRequest); //Helper function
+                        return _buildLeaveRequestTile(leaveRequest, fontSizeFactor, paddingFactor, iconSizeFactor);
                       },
                     ),
-                    canTapOnHeader: true, // IMPORTANT: Allow tapping on the header
-                    // isExpanded: leaveRequestsByFiscalYear.entries // Correct expansion logic
-                    //     .toList()
-                    //     .indexWhere((e) => e.key == fiscalYear) == 0
+                    canTapOnHeader: true,
+
 
                   );
                 }).toList(),
@@ -2582,71 +2064,74 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
 
-  Widget _buildLeaveRequestTile(LeaveRequestModel leaveRequest){  //Helper function to build individual leave request tiles
+  Widget _buildLeaveRequestTile(LeaveRequestModel leaveRequest, double fontSizeFactor, double paddingFactor, double iconSizeFactor){
     return ListTile(
-      title: Text(leaveRequest.type!),
+      title: Text(leaveRequest.type!, style: TextStyle(fontSize: 16 * fontSizeFactor)),
       subtitle: Text(
         'From ${DateFormat('dd MMMM, yyyy').format(leaveRequest.startDate!)} to ${DateFormat('dd MMMM, yyyy').format(leaveRequest.endDate!)}',
-        style: const TextStyle(fontSize: 12),
+        style: TextStyle(fontSize: 12 * fontSizeFactor),
       ),
       trailing: SizedBox(
-        width: 400, // Fixed width for web trailing section
+        width: 200 * paddingFactor,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               _getStatusIcon(leaveRequest.status),
               color: _getStatusColor(leaveRequest.status),
+              size: 20 * iconSizeFactor,
             ),
-            const SizedBox(width: 8),
-            Flexible( // Wraps the text to the next line if it's too long
+            SizedBox(width: 8 * paddingFactor),
+            Flexible(
               child: Text(
                 leaveRequest.status!,
-                overflow: TextOverflow.ellipsis, // Truncates the text with "..." if it overflows
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14 * fontSizeFactor),
               ),
             ),
-            // ... (Rest of your trailing widgets - edit, delete, sync, duration)
+
+
             leaveRequest.status == "Approved" ?const SizedBox.shrink():
             leaveRequest.status == "Rejected" ?const SizedBox.shrink():
             IconButton(
-              icon: const Icon(Icons.edit),
+              icon: Icon(Icons.edit, size: 20 * iconSizeFactor),
               onPressed: () {
-                _showEditLeaveBottomSheet(context, leaveRequest);
+                _showEditLeaveBottomSheet(context, leaveRequest, fontSizeFactor, paddingFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600)), iconSizeFactor);
               },
             ),
             leaveRequest.status == "Approved" ?const SizedBox.shrink():
             leaveRequest.status == "Rejected" ?const SizedBox.shrink():
             IconButton(
-              icon: const Icon(Icons.delete),
+              icon: Icon(Icons.delete, size: 20 * iconSizeFactor),
               onPressed: () {
-                _showDeleteConfirmationDialog(context, leaveRequest);
+                _showDeleteConfirmationDialog(context, leaveRequest, fontSizeFactor, paddingFactor);
               },
             ),
             leaveRequest.status == "Approved" ?const SizedBox.shrink():
             leaveRequest.status == "Rejected" ?const SizedBox.shrink():
             IconButton(
-              icon: const Icon(Icons.sync),
+              icon: Icon(Icons.sync, size: 20 * iconSizeFactor),
               onPressed: () {
                 _handleSync(leaveRequest);
               },
             ),
-            const SizedBox(width:20),
+            SizedBox(width:8 * paddingFactor),
 
             leaveRequest.status == "Approved"?
-            Text("Duration: ${leaveRequest.leaveDuration} day(s)"):const SizedBox.shrink(),
+            Text("Duration: ${leaveRequest.leaveDuration} day(s)", style: TextStyle(fontSize: 12 * fontSizeFactor)):const SizedBox.shrink(),
             leaveRequest.status == "Rejected"?
             IconButton(
-              icon: const Icon(Icons.info),
+              icon: Icon(Icons.info, size: 20 * iconSizeFactor),
               onPressed: () {
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
-                      title: const Text("Rejection Reason"),
-                      content: Text(leaveRequest.reasonsForRejectedLeave ?? ""), // Handle null
+                      title: Text("Rejection Reason", style: TextStyle(fontSize: 18 * fontSizeFactor)),
+                      content: Text(leaveRequest.reasonsForRejectedLeave ?? "", style: TextStyle(fontSize: 14 * fontSizeFactor)),
                       actions: <Widget>[
                         TextButton(
-                          child: const Text("OK"),
+                          child: Text("OK", style: TextStyle(fontSize: 14 * fontSizeFactor)),
                           onPressed: () {
                             Navigator.of(context).pop();
                           },
@@ -2679,12 +2164,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
-  void _showEditLeaveBottomSheet(BuildContext context, LeaveRequestModel leaveRequest) {
-    // Set initial values for the bottom sheet fields
+  void _showEditLeaveBottomSheet(BuildContext context, LeaveRequestModel leaveRequest, double fontSizeFactor, double paddingFactor, double marginFactor, double iconSizeFactor) {
+
+
     _selectedLeaveType = leaveRequest.type!;
     _reasonController.text = leaveRequest.reason!;
     _selectedDateRange = PickerDateRange(leaveRequest.startDate, leaveRequest.endDate);
-    _selectedSupervisor = leaveRequest.selectedSupervisor;
+    _selectedSupervisor.value = leaveRequest.selectedSupervisor ?? ''; // Initialize RxString with existing value
     _selectedSupervisorEmail = leaveRequest.selectedSupervisorEmail;
 
 
@@ -2699,176 +2185,140 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             if (_bioInfo.value?.maritalStatus == 'Married') {
               if (_bioInfo.value?.gender == 'Male') {
                 leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave'),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave'),
+                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide  / 600))),
+                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
                 ]);
               } else {
                 leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Maternity', 'Maternity Leave'),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave'),
+                  _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
                 ]);
               }
             } else {
-              leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave'));
+              leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))));
             }
 
-            leaveTypeButtons.add(_leaveTypeButton(setState, 'Holiday', 'Holidays'));
+            leaveTypeButtons.add(_leaveTypeButton(setState, 'Holiday', 'Holidays', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))));
 
 
-            return SingleChildScrollView( // Wrap with SingleChildScrollView
+            return SingleChildScrollView(
               child: Container(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom,
-                  left: 16,
-                  right: 16,
-                  top: 16,
+                  left: 16 * paddingFactor,
+                  right: 16 * paddingFactor,
+                  top: 16 * paddingFactor,
                 ),
-                width: MediaQuery.of(context).size.width * 0.5, // Limit width for web
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch across width
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    // ... (rest of the bottom sheet content)
+
+
                     Wrap(
-                      spacing: 8.0,
-                      runSpacing: 8.0,
+                      spacing: 8.0 * paddingFactor,
+                      runSpacing: 8.0 * paddingFactor,
                       children: leaveTypeButtons,
                     ),
-                    // ... (date picker, reason field, supervisor dropdown)
-
-                    SizedBox( // Added SizedBox to control width of SfDateRangePicker on web
-                      width: 400, // Set a fixed width for the date picker on web
-                      height: 400, // Set a fixed height for the date picker on web
-                      child: SfDateRangePicker(
-
-                        onSelectionChanged: (args) {
-                          if (args.value is PickerDateRange) {
-                            final selectedDates = _getSelectedDates(args.value);
-                            final containsMarkedDate = selectedDates.any((date) => _markedDates.contains(date));
-
-                            if (containsMarkedDate) {
-                              Fluttertoast.showToast(msg: "Attendance exists for the selected date(s).");
 
 
-                              // Clear the selection or reset to a valid range
-                              _selectedDateRange = null; //Clear selection, or
-                              //_selectedDateRange = PickerDateRange(DateTime.now(), DateTime.now()); //Reset to today
-                              setState(() {}); //Force bottom sheet to rebuild
-                              return;
-                            }
+
+                    SfDateRangePicker(
+
+                      onSelectionChanged: (args) {
+                        if (args.value is PickerDateRange) {
+                          final selectedDates = _getSelectedDates(args.value);
+                          final containsMarkedDate = selectedDates.any((date) => _markedDates.contains(date));
+
+                          if (containsMarkedDate) {
+                            Fluttertoast.showToast(msg: "Attendance exists for the selected date(s).", fontSize: 14 * fontSizeFactor);
+
+
+                            _selectedDateRange = null;
+                            setState(() {});
+                            return;
                           }
-                          _onSelectionChanged(args, setState); //Call original function
-                        },
-                        selectionMode: DateRangePickerSelectionMode.range,
-                        initialSelectedRange: PickerDateRange(
-                          DateTime.now(),
-                          DateTime.now().add(const Duration(days: 1)),
-                        ),
-                        headerStyle: const DateRangePickerHeaderStyle(
-                          backgroundColor: Colors.blue,
-                          textStyle: TextStyle(color: Colors.white),
-                        ),
-                        todayHighlightColor: Colors.red,
-                        selectableDayPredicate: (DateTime date) {
-                          return !_markedDates.contains(date);  // Disable marked dates directly
-                        },
-                        cellBuilder: (BuildContext context, DateRangePickerCellDetails cellDetails) {
-
-                          final holidayName = _nigerianHolidays[cellDetails.date];
-                          bool isHoliday = holidayName != null;
-                          bool isMarked = _markedDates.contains(cellDetails.date);
-                          final markedDateLabel = _getMarkedDateLabel(cellDetails.date); // Always get the label
-
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: isHoliday ? Colors.green.withOpacity(0.2) : isMarked
-                                  ? Colors.grey
-                                  : null,
-                              border: Border.all(color: const Color(0xFFF0F0F0), width: 0.5),
-                            ),
-                            child: Column(  // Use a Column for vertical layout
-                              mainAxisAlignment: MainAxisAlignment.center, // Center vertically
-                              children: [
-                                if (markedDateLabel != null) ...[
-                                  FittedBox( // Use FittedBox for better scaling
-                                    fit: BoxFit.scaleDown, // Scale down text to fit
-                                    child: Text(markedDateLabel, style: const TextStyle(fontSize: 6)), // Smaller font size
-                                  ),
-                                  const SizedBox(height: 2),
-                                ],
-                                if (isHoliday && markedDateLabel == null && !isMarked) ...[
-                                  FittedBox( // FittedBox for holidays too
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(holidayName, style: const TextStyle(fontSize: 6)), // Smaller font size
-                                  ),
-                                  const SizedBox(height: 2),
-                                ],
-
-
-                                Text(cellDetails.date.day.toString()),
-                              ],
-                            ),
-                          );
-                        },
-
-                      ),
-                    ),
-
-                    FutureBuilder<List<DropdownMenuItem<String>>>(
-                      future: _fetchSupervisorsFromFirebase(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        } else if (snapshot.hasError) {
-                          return Text('Error: ${snapshot.error}');
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Text('No supervisors found.');
-                        } else {
-                          return DropdownButtonFormField<String>(
-                            value: _selectedSupervisor,
-                            hint: const Text('Select Supervisor'),
-                            onChanged: (newValue) async {
-
-
-                              setState(() {
-                                _selectedSupervisor = newValue;
-
-                              });
-
-                              List<String?> supervisorsemail = await _getSupervisorEmailFromFirebase(_bioInfo.value?.department,newValue);
-
-
-                              setState(() {
-                                _selectedSupervisorEmail = supervisorsemail[0];
-
-                              });
-                              print(_selectedSupervisorEmail);
-
-                            },
-                            items: snapshot.data,
-                            decoration: const InputDecoration(labelText: 'Supervisor'),
-                          );
                         }
+                        _onSelectionChanged(args, setState);
                       },
+                      selectionMode: DateRangePickerSelectionMode.range,
+                      initialSelectedRange: PickerDateRange(
+                        DateTime.now(),
+                        DateTime.now().add(const Duration(days: 1)),
+                      ),
+                      headerStyle: DateRangePickerHeaderStyle(
+                        backgroundColor: Colors.blue,
+                        textStyle: TextStyle(color: Colors.white, fontSize: 16 * fontSizeFactor),
+                      ),
+                      todayHighlightColor: Colors.red,
+                      selectableDayPredicate: (DateTime date) {
+                        return !_markedDates.contains(date);
+                      },
+                      cellBuilder: (BuildContext context, DateRangePickerCellDetails cellDetails) {
+
+                        final holidayName = _nigerianHolidays[cellDetails.date];
+                        bool isHoliday = holidayName != null;
+                        bool isMarked = _markedDates.contains(cellDetails.date);
+                        final markedDateLabel = _getMarkedDateLabel(cellDetails.date);
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: isHoliday ? Colors.green.withOpacity(0.2) : isMarked
+                                ? Colors.grey
+                                : null,
+                            border: Border.all(color: const Color(0xFFF0F0F0), width: 0.5),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (markedDateLabel != null) ...[
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(markedDateLabel, style: TextStyle(fontSize: 6 * fontSizeFactor)),
+                                ),
+                                SizedBox(height: 2 * paddingFactor),
+                              ],
+                              if (isHoliday && markedDateLabel == null && !isMarked) ...[
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(holidayName, style: TextStyle(fontSize: 6 * fontSizeFactor)),
+                                ),
+                                SizedBox(height: 2 * paddingFactor),
+                              ],
+
+
+                              Text(cellDetails.date.day.toString(), style: TextStyle(fontSize: 14 * fontSizeFactor)),
+                            ],
+                          ),
+                        );
+                      },
+
                     ),
-                    //Other Leave Details
+
+                    buildSupervisorDropdown(), // Use the same dropdown builder
+
                     TextFormField(
-                      controller: _reasonController, // Use a controller
-                      decoration: const InputDecoration(labelText: "Reason(s) For been Out-Of-Office"),
+                      controller: _reasonController,
+                      decoration: InputDecoration(labelText: "Reason(s) For been Out-Of-Office", labelStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
+                      style: TextStyle(fontSize: 14 * fontSizeFactor),
                     ),
 
 
 
 
-                    const SizedBox(height: 16.0), // Add spacing between dropdown and buttons
+                    SizedBox(height: 16.0 * paddingFactor),
 
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Evenly space buttons
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         ElevatedButton(
                           onPressed: () async {
-                            await _handleUpdateLeaveRequest(context, leaveRequest, setState); // Add setState here
+                            await _handleUpdateLeaveRequest(context, leaveRequest, setState, fontSizeFactor, paddingFactor);
                           },
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 20 * max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600)), vertical: 12 * max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+                            textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
+                          ),
                           child: const Text("Update"),
                         ),
                       ],
@@ -2882,73 +2332,49 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
   Future<void> _updateRemainingLeavesAndDate() async {
-    final userId = _bioInfo.value?.firebaseAuthId;
-    if (userId == null) return;
+    if (_currentUserId == null) return;
 
-    DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+    final remainingLeaveDocRef = FirebaseFirestore.instance
         .collection('Staff')
-        .doc(userId)
-        .collection('RemainingLeaves')
-        .doc(userId)
-        .get();
+        .doc(_currentUserId)
+        .collection('RemainingLeave')
+        .doc('remainingLeaveDoc');
 
-    RemainingLeaveModel? remainingLeaveRequest;
-    if (docSnapshot.exists) {
-      remainingLeaveRequest = RemainingLeaveModel.fromJson(docSnapshot.data()!);
-    }
+    final docSnapshot = await remainingLeaveDocRef.get();
+    if (docSnapshot.exists && docSnapshot.data() != null) {
+      final remainingLeaveRequest = RemainingLeaveModel.fromJson(docSnapshot.data()!);
 
-    if (remainingLeaveRequest != null) {
       final now = DateTime.now();
       final currentYear = now.year;
       final octoberThisYear = DateTime(currentYear, 10, 1);
 
       if (remainingLeaveRequest.dateUpdated!.isBefore(octoberThisYear) &&
-          now.isAfter(octoberThisYear)) { // Check current date against October
-
+          now.isAfter(octoberThisYear)) {
         remainingLeaveRequest.annualLeaveBalance = 10;
         remainingLeaveRequest.paternityLeaveBalance = 6;
         remainingLeaveRequest.maternityLeaveBalance = 60;
         remainingLeaveRequest.holidayLeaveBalance = 0;
 
-        // Update observables for immediate UI update:
         _remainingAnnualLeaveBalance.value = 10;
         _remainingPaternityLeaveBalance.value = 6;
         _remainingMaternityLeaveBalance.value = 60;
-        //_totalHolidayLeaves.value = 0; // You might not need to update this if it's always 0
       }
 
       remainingLeaveRequest.dateUpdated = DateTime.now();
-      await _updateRemainingLeaveInFirebase(remainingLeaveRequest);
+      await remainingLeaveDocRef.set(remainingLeaveRequest.toJson(), SetOptions(merge: true));
 
-      // Update observables to trigger UI updates *after* the transaction
       _remainingLeaves.value = remainingLeaveRequest;
     }
   }
 
-  Future<void> _updateRemainingLeaveInFirebase(RemainingLeaveModel remainingLeaveRequest) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(user.uid)
-            .collection('RemainingLeaves')
-            .doc(user.uid)
-            .set(remainingLeaveRequest.toJson());
-      }
-    } catch (e) {
-      print("Error updating remaining leave in Firebase: $e");
-    }
-  }
 
-
-  Future<void> _handleUpdateLeaveRequest(BuildContext context, LeaveRequestModel leaveRequest, StateSetter setState) async{
+  Future<void> _handleUpdateLeaveRequest(BuildContext context, LeaveRequestModel leaveRequest, StateSetter setState, double fontSizeFactor, double paddingFactor) async{
     try {
       leaveRequest.type = _selectedLeaveType;
       leaveRequest.startDate = _selectedDateRange!.startDate;
       leaveRequest.endDate = _selectedDateRange!.endDate ?? _selectedDateRange!.startDate;
       leaveRequest.reason = _reasonController.text;
-      leaveRequest.selectedSupervisor = _selectedSupervisor;
+      leaveRequest.selectedSupervisor = _selectedSupervisor.value; // Get value from RxString
       leaveRequest.selectedSupervisorEmail = _selectedSupervisorEmail;
       leaveRequest.staffCategory = _bioInfo.value?.staffCategory;
       leaveRequest.staffState = _bioInfo.value?.state;
@@ -2961,18 +2387,22 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       leaveRequest.lastName = _bioInfo.value?.lastName;
 
 
-      await _updateLeaveRequestInFirebase(leaveRequest);
-      await _updateLeaveBalanceAfterApproval(leaveRequest);
-      await _updateRemainingLeavesAndDate(); // Pass the endDate
+      final leaveRequestDocRef = FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(_currentUserId)
+          .collection('Leave Request')
+          .doc(leaveRequest.leaveRequestId);
 
-      // Update status to Pending after updating Firestore
-
-      leaveRequest.status = 'Pending';
-      await _updateLeaveRequestInFirebase(leaveRequest);
+      await leaveRequestDocRef.update(leaveRequest.toJson());
 
 
-      if (mounted) { // Add mounted check
-        Navigator.of(context).pop(); // Close the bottom sheet
+      setState(() {
+        leaveRequest.status = 'Pending';
+      });
+
+
+      if (mounted) {
+        Navigator.of(context).pop();
         Fluttertoast.showToast(
             msg: "Leave Request updated successfully",
             toastLength: Toast.LENGTH_LONG,
@@ -2980,14 +2410,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             gravity: ToastGravity.BOTTOM,
             timeInSecForIosWeb: 1,
             textColor: Colors.white,
-            fontSize: 16.0);
+            fontSize: 16 * fontSizeFactor);
       }
 
 
-
-
     } catch (e) {
-      // Handle any errors
       print("Error updating leave request: $e");
       if (mounted) {
         Fluttertoast.showToast(
@@ -2997,7 +2424,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             gravity: ToastGravity.BOTTOM,
             timeInSecForIosWeb: 1,
             textColor: Colors.white,
-            fontSize: 16.0);
+            fontSize: 16 * fontSizeFactor);
 
       }
 
@@ -3005,129 +2432,47 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   }
 
-  Future<void> _updateLeaveBalanceAfterApproval(LeaveRequestModel leaveRequest) async {
-    if (leaveRequest.status == 'Approved') {
-      final leaveDuration = leaveRequest.leaveDuration;
-      if (leaveDuration != null && leaveDuration > 0) {
-        try {
-          final currentRemainingLeaves = _remainingLeaves.value; // Get a local copy
-          if (currentRemainingLeaves == null) {
-            print("Remaining leaves not initialized."); // Handle this case as needed
-            return;
-          }
-
-          // Update Firebase Firestore
-          final userId = _bioInfo.value?.firebaseAuthId;
-          if (userId != null) {
-            DocumentReference remainingLeaveDocRef = FirebaseFirestore.instance
-                .collection('Staff')
-                .doc(userId)
-                .collection('RemainingLeaves')
-                .doc(userId);
-
-            int updatedAnnualBalance = currentRemainingLeaves.annualLeaveBalance!;
-            int updatedPaternityBalance = currentRemainingLeaves.paternityLeaveBalance!;
-            int updatedMaternityBalance = currentRemainingLeaves.maternityLeaveBalance!;
-            int updatedHolidayBalance = currentRemainingLeaves.holidayLeaveBalance!;
 
 
-            switch (leaveRequest.type) {
-              case 'Annual':
-                updatedAnnualBalance = (currentRemainingLeaves.annualLeaveBalance! - leaveDuration).clamp(0, _totalAnnualLeaves.value);
-                break;
-              case 'Paternity':
-                updatedPaternityBalance = (currentRemainingLeaves.paternityLeaveBalance! - leaveDuration).clamp(0, _totalPaternityLeaves.value);
-                break;
-              case 'Maternity':
-                updatedMaternityBalance = (currentRemainingLeaves.maternityLeaveBalance! - leaveDuration).clamp(0, _totalMaternityLeaves.value);
-                break;
-              case 'Holiday':
-                updatedHolidayBalance = (currentRemainingLeaves.holidayLeaveBalance! + leaveDuration).clamp(0, _totalHolidayLeaves.value);
-                break;
-            }
-
-            await remainingLeaveDocRef.update({
-              'annualLeaveBalance': updatedAnnualBalance,
-              'paternityLeaveBalance': updatedPaternityBalance,
-              'maternityLeaveBalance': updatedMaternityBalance,
-              'holidayLeaveBalance': updatedHolidayBalance,
-            });
-
-            // Update local observable after successful Firestore update
-            currentRemainingLeaves.annualLeaveBalance = updatedAnnualBalance;
-            currentRemainingLeaves.paternityLeaveBalance = updatedPaternityBalance;
-            currentRemainingLeaves.maternityLeaveBalance = updatedMaternityBalance;
-            currentRemainingLeaves.holidayLeaveBalance = updatedHolidayBalance;
-            _remainingLeaves.value = currentRemainingLeaves; // Update observable
-
-          }
-
-
-        } catch (e) {
-          print('Error updating leave balance in Firebase: $e');
-          // Display an error message to the user.
-          Fluttertoast.showToast(
-              msg: "Error updating leave balance: $e",
-              toastLength: Toast.LENGTH_LONG,
-              backgroundColor: Colors.black54,
-              gravity: ToastGravity.BOTTOM,
-              timeInSecForIosWeb: 1,
-              textColor: Colors.white,
-              fontSize: 16.0
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _updateLeaveRequestInFirebase(LeaveRequestModel leaveRequest) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final staffCollection = FirebaseFirestore.instance.collection('Staff').doc(user.uid);
-        final leaveRequestCollection = staffCollection.collection('Leave Request');
-        await leaveRequestCollection.doc(leaveRequest.leaveRequestId).update(leaveRequest.toJson());
-      }
-    } catch (e) {
-      print("Error updating leave request in Firebase: $e");
-    }
-  }
-
-
-
-  void _showDeleteConfirmationDialog(BuildContext context, LeaveRequestModel leaveRequest) {
+  void _showDeleteConfirmationDialog(BuildContext context, LeaveRequestModel leaveRequest, double fontSizeFactor, double paddingFactor) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Confirm Delete"),
-          content: const Text("Are you sure you want to delete this leave request?"),
+          title: Text("Confirm Delete", style: TextStyle(fontSize: 18 * fontSizeFactor)),
+          content: Text("Are you sure you want to delete this leave request?", style: TextStyle(fontSize: 14 * fontSizeFactor)),
           actions: <Widget>[
             TextButton(
-              child: const Text("No"),
+              child: Text("No", style: TextStyle(fontSize: 14 * fontSizeFactor)),
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text("Yes"),
+              child: Text("Yes", style: TextStyle(fontSize: 14 * fontSizeFactor)),
               onPressed: () async {
                 try {
-                  // Delete from Firestore
-                  await _deleteLeaveRequestFromFirebase(leaveRequest);
 
-                  // Refresh the UI
+
+                  await FirebaseFirestore.instance
+                      .collection('Staff')
+                      .doc(leaveRequest.staffId)
+                      .collection('Leave Request')
+                      .doc(leaveRequest.leaveRequestId)
+                      .delete();
+
+
                   _getLeaveData();
 
                   if(mounted){
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Leave Request deleted successfully")));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Leave Request deleted successfully", style: TextStyle(fontSize: 14 * fontSizeFactor))));
                   }
 
 
                 } catch (e) {
                   if(mounted){
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to delete Leave Request")));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete Leave Request", style: TextStyle(fontSize: 14 * fontSizeFactor))));
                   }
                   print("Error deleting leave request: $e");
                 }
@@ -3139,21 +2484,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     );
   }
 
-  Future<void> _deleteLeaveRequestFromFirebase(LeaveRequestModel leaveRequest) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(user.uid)
-            .collection('Leave Request')
-            .doc(leaveRequest.leaveRequestId)
-            .delete();
-      }
-    } catch (e) {
-      print("Error deleting leave request from Firebase: $e");
-    }
-  }
+
+
+
 
 
   IconData _getStatusIcon(String? status) {
@@ -3177,17 +2510,18 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
   Future<void> _handleSaveAndSubmit(
-      BuildContext context, StateSetter setState) async {
+      BuildContext context, StateSetter setState, double fontSizeFactor, double paddingFactor) async {
 
 
 
     if (_selectedDateRange == null ||
         _reasonController.text.isEmpty ||
-        _selectedSupervisor == null) {
+        _selectedSupervisor.value.isEmpty) { // Check if RxString value is empty
       Fluttertoast.showToast(
           msg: "Please fill all fields.",
           toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM);
+
+          fontSize: 14 * fontSizeFactor);
       return;
     }
 
@@ -3202,74 +2536,71 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       Fluttertoast.showToast(
           msg: "Selected dates are invalid.",
           toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM);
+          fontSize: 14 * fontSizeFactor);
       return;
     }
 
-    if (_remainingLeaves.value == null) { //Check if _remainingLeaves.value is null
-      return; //or show some error message
+    if (_remainingLeaves.value == null) {
+      return;
     }
 
     final selectedDates = _getSelectedDates(_selectedDateRange!);
     if (selectedDates.any((date) => _markedDates.contains(date))) {
-      Fluttertoast.showToast(msg: "There are days with attendance within your date range. Request not saved.");
-      return; // Don't proceed with saving
+      Fluttertoast.showToast(msg: "There are days with attendance within your date range. Request not saved.", fontSize: 14 * fontSizeFactor);
+      return;
     }
 
 
     switch (_selectedLeaveType) {
       case 'Annual':
         final annualBalance = _remainingLeaves.value!.annualLeaveBalance;
-        if (annualBalance != null && leaveDuration > annualBalance) { // Check for null and then compare
-          _showLeaveExceedsBalanceError(context, 'Annual', annualBalance); //No need for !
+        if (annualBalance != null && leaveDuration > annualBalance) {
+          _showLeaveExceedsBalanceError(context, 'Annual', annualBalance, fontSizeFactor, paddingFactor);
           return;
         }
         break;
       case 'Paternity':
         final paternityBalance = _remainingLeaves.value!.paternityLeaveBalance;
         if (paternityBalance != null && leaveDuration > paternityBalance) {
-          _showLeaveExceedsBalanceError(context, 'Paternity', paternityBalance);
+          _showLeaveExceedsBalanceError(context, 'Paternity', paternityBalance, fontSizeFactor, paddingFactor);
           return;
         }
         break;
       case 'Maternity':
         final maternityBalance = _remainingLeaves.value!.maternityLeaveBalance;
         if (maternityBalance != null && leaveDuration > maternityBalance) {
-          _showLeaveExceedsBalanceError(context, 'Maternity', maternityBalance);
+          _showLeaveExceedsBalanceError(context, 'Maternity', maternityBalance, fontSizeFactor, paddingFactor);
           return;
         }
         break;
     }
 
 
-    final newLeaveRequest = LeaveRequestModel(
-      type: _selectedLeaveType,
-      startDate: _selectedDateRange!.startDate,
-      endDate: _selectedDateRange!.endDate ?? _selectedDateRange!.startDate,
-      reason: _reasonController.text,
-      staffId: _bioInfo.value?.firebaseAuthId,
-      selectedSupervisor: _selectedSupervisor,
-      selectedSupervisorEmail: _selectedSupervisorEmail,
-      leaveDuration: leaveDuration,
-      status: 'Pending',
-      firstName: _bioInfo.value?.firstName!,
-      lastName: _bioInfo.value?.lastName!,
-      staffCategory: _bioInfo.value?.staffCategory!,
-      staffState: _bioInfo.value?.state!,
-      staffLocation: _bioInfo.value?.location!,
-      staffEmail: _bioInfo.value?.emailAddress!,
-      staffPhone: _bioInfo.value?.mobile!,
-      staffDepartment: _bioInfo.value?.department!,
-      staffDesignation: _bioInfo.value?.designation!,
-      leaveRequestId: const Uuid().v4(), // Generate UUID for leaveRequestId
-    );
+    final newLeaveRequest = LeaveRequestModel()
+      ..type = _selectedLeaveType
+      ..startDate = _selectedDateRange!.startDate
+      ..endDate = _selectedDateRange!.endDate ?? _selectedDateRange!.startDate
+      ..reason = _reasonController.text
+      ..staffId = _bioInfo.value?.firebaseAuthId
+      ..selectedSupervisor = _selectedSupervisor.value // Get value from RxString
+      ..selectedSupervisorEmail = _selectedSupervisorEmail
+      ..leaveDuration = leaveDuration
+      ..status = 'Pending'
+      ..firstName = _bioInfo.value?.firstName!
+      ..lastName = _bioInfo.value?.lastName!
+      ..staffCategory = _bioInfo.value?.staffCategory!
+      ..staffState= _bioInfo.value?.state!
+      ..staffLocation= _bioInfo.value?.location!
+      ..staffEmail= _bioInfo.value?.emailAddress!
+      ..staffPhone= _bioInfo.value?.mobile!
+      ..staffDepartment= _bioInfo.value?.department!
+      ..staffDesignation= _bioInfo.value?.designation!
+      ..leaveRequestId = const Uuid().v4();
 
 
-
-
-    // The await calls don't return a value, so just await them directly
     try {
-      await _saveLeaveRequestToFirebase(newLeaveRequest);  // Save to Firebase
+      await _saveLeaveRequest(newLeaveRequest);
+      await _updateRemainingLeavesAndDate();
 
       if (mounted) {
         Navigator.pop(context);
@@ -3280,19 +2611,19 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             gravity: ToastGravity.BOTTOM,
             timeInSecForIosWeb: 1,
             textColor: Colors.white,
-            fontSize: 16.0);
-        setState(() {}); // Rebuild to show saved request.
+            fontSize: 16 * fontSizeFactor);
+        setState(() {});
 
 
       }
 
     } catch (error) {
-      // Handle any errors during submission
+
       print("Error in Save and Submit: $error");
-      // Show an error message to the user if needed
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("An error occurred with saveLeaveRequest. Please try again.")),
+          SnackBar(content: Text("An error occurred with saveLeaveRequest. Please try again.", style: TextStyle(fontSize: 14 * fontSizeFactor))),
         );
       }
 
@@ -3301,11 +2632,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
-  void _showLeaveExceedsBalanceError(BuildContext context, String leaveType, int remainingBalance) {
+  void _showLeaveExceedsBalanceError(BuildContext context, String leaveType, int remainingBalance, double fontSizeFactor, double paddingFactor) {
     Fluttertoast.showToast(
       msg: "$leaveType leave cannot exceed $remainingBalance working days. You have $remainingBalance days remaining.",
       toastLength: Toast.LENGTH_LONG,
       gravity: ToastGravity.BOTTOM,
+      fontSize: 14 * fontSizeFactor,
     );
   }
 
@@ -3323,13 +2655,26 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
+
+
+  Future<void> _saveLeaveRequest(LeaveRequestModel leaveRequest) async {
+
+    final leaveRequestCollection = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('Leave Request');
+    await leaveRequestCollection.doc(leaveRequest.leaveRequestId).set(leaveRequest.toJson());
+  }
+
+
+
   Future<void> _submitLeaveRequest(LeaveRequestModel leaveRequest, BuildContext context) async {
 
-    // Check if Firebase is initialized before using it
+
     if (!_firebaseInitialized.value) {
       print("Firebase not initialized. Cannot submit leave request.");
       Fluttertoast.showToast(msg: "Firebase not initialized. Cannot submit request.");
-      return; // Or handle the error as needed
+      return;
     }
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -3339,18 +2684,18 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         FirebaseFirestore.instance.collection('Staff').doc(user.uid);
         final leaveRequestCollection = staffCollection.collection('Leave Request');
 
-        // Use the leaveRequestId from the LeaveRequestModel as the document ID in Firestore
-        final leaveRequestId = leaveRequest.leaveRequestId; // Get leaveRequestId
 
-        if (leaveRequestId != null) {  //Check if leaveRequestId exists for local requests
-          await leaveRequestCollection.doc(leaveRequestId).set({ // Use set() with doc ID
+        final leaveRequestId = leaveRequest.leaveRequestId;
+
+        if (leaveRequestId != null) {
+          await leaveRequestCollection.doc(leaveRequestId).set({
             ...leaveRequest.toJson(),
-            'leaveRequestId': leaveRequestId, // Include leaveRequestId in document
+            'leaveRequestId': leaveRequestId,
             'status':"Pending"
 
           });
 
-          //await sendEmailToSupervisor(leaveRequest); // Send email after saving
+
           await sendEmailFromDevice(
             leaveRequest.selectedSupervisorEmail!,
             'New Leave Request from ${leaveRequest.firstName} ${leaveRequest.lastName}',
@@ -3358,12 +2703,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           );
 
 
-          // Update isSynced flag - if you are tracking it in Firebase, update here.
-          // Since we are not tracking 'isSynced' in Firebase in this example, no need to update it.
-
-
-          // Refresh leave data and UI
-          _getLeaveData(); // Or setState(() {});
+          _getLeaveData();
           if(mounted){
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Out of Office request submitted successfully.")));
           }
@@ -3383,23 +2723,17 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
     }
   }
-
   Future<void> _checkAndUpdateLeaveStatus() async {
     try {
-      final userId = _bioInfo.value?.firebaseAuthId;
-      if (userId == null) return;
-
-      // Fetch all leave requests for the staff member from Firebase Stream (already bound to _leaveRequests)
-      // No need to fetch again unless you need to refresh it explicitly.
 
       for (final leaveRequest in _leaveRequests) {
         print("leaveRequest === ${leaveRequest.leaveRequestId}");
 
         try {
-          // Fetch the corresponding leave request document from Firestore
+
           final doc = await FirebaseFirestore.instance
               .collection('Staff')
-              .doc(userId)
+              .doc(_bioInfo.value?.firebaseAuthId)
               .collection('Leave Request')
               .doc(leaveRequest.leaveRequestId)
               .get();
@@ -3407,18 +2741,20 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           if (doc.exists) {
             final firestoreStatus = doc.data()?['status'] as String?;
             final firestoreReason = doc.data()?['reason'] as String?;
-
             final firestoreReasonsForRejectedLeave = doc.data()?['reasonsForRejectedLeave'] as String?;
 
-            // Update local state if Firestore status differs
+
             if (firestoreStatus != null && firestoreStatus != leaveRequest.status) {
-              leaveRequest.status = firestoreStatus; // Update the local LeaveRequestModel status
-              // No need to save back to Firebase here as status is updated from Firebase itself
+
+              setState(() {
+                leaveRequest.status = firestoreStatus;
+              });
+
 
               if (firestoreStatus == 'Approved') {
-                // Add attendance records and deduct leave balance
+
                 await _addLeaveToAttendance1(
-                  userId,
+                  _bioInfo.value?.firebaseAuthId,
                   leaveRequest.startDate,
                   leaveRequest.endDate,
                   leaveRequest.type,
@@ -3429,10 +2765,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                 });
                 Fluttertoast.showToast(msg: "Out of Office Request Approved");
               } else if (firestoreStatus == 'Rejected') {
-                leaveRequest.reasonsForRejectedLeave = firestoreReasonsForRejectedLeave; //Update rejection reason
+                leaveRequest.reasonsForRejectedLeave = firestoreReasonsForRejectedLeave;
+
                 Fluttertoast.showToast(msg: "Out of Office Request Rejected");
               }
-              // Since _leaveRequests is an RxList, updating leaveRequest object inside it should trigger UI update.
             }
           }
         } catch (innerError) {
@@ -3442,9 +2778,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         }
       }
 
-      // No need to navigate again as data is streamed and UI updates automatically.
-      // If you need to refresh the whole page, consider using Navigator.pushReplacementNamed for web.
-      // Get.off(() => LeaveRequestsPageWeb()); // Navigation might not be necessary for web refresh, consider other methods if needed.
+
+      Get.off(() => const LeaveRequestsPage1());
     } catch (e) {
       print('Error checking Out of Office Request status: $e');
       Fluttertoast.showToast(msg: "Error syncing Out of Office Request status");
@@ -3454,47 +2789,79 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
   Future<void> _addLeaveAttendanceRecord(DateTime date, String leaveType) async {
-    // This function seems to be related to Isar. For Firebase, you might want to directly save attendance to Firestore.
-    // However, based on the original code, this might not be directly needed in this web version if attendance is managed differently.
-    // If you need to save attendance records to Firebase, implement the Firebase save operation here.
-    print("Placeholder for _addLeaveAttendanceRecord for web using Firebase.");
+
+    final attendanceDocRef = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('Record')
+        .doc(DateFormat('dd-MMMM-yyyy').format(date));
+
+    await attendanceDocRef.set({
+      'Offline_DB_id': 1,
+      'clockIn': '08:00 AM',
+      'date': DateFormat('dd-MMMM-yyyy').format(date),
+      'clockInLatitude': 0.0,
+      'clockInLocation': "",
+      'clockInLongitude': 0.0,
+      'clockOut': '05:00 PM',
+      'clockOutLatitude': 0.0,
+      'clockOutLocation': "",
+      'clockOutLongitude': 0.0,
+      'isSynced': true,
+      'voided': false,
+      'isUpdated': true,
+      'offDay': true,
+      'durationWorked': leaveType,
+      'noOfHours': 8.1,
+      'month': DateFormat('MMMM yyyy').format(date),
+    });
   }
 
   Future<void> _deductLeaveBalance(LeaveRequestModel leaveRequest, int daysToDeduct) async {
-    final userId = _bioInfo.value?.firebaseAuthId;
-    if (userId == null) return;
 
-    DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+    final remainingLeaveDocRef = FirebaseFirestore.instance
         .collection('Staff')
-        .doc(userId)
-        .collection('RemainingLeaves')
-        .doc(userId)
-        .get();
+        .doc(_currentUserId)
+        .collection('RemainingLeave')
+        .doc('remainingLeaveDoc');
 
-    RemainingLeaveModel? updatedLeaveRequest;
-    if (docSnapshot.exists) {
-      updatedLeaveRequest = RemainingLeaveModel.fromJson(docSnapshot.data()!);
-    }
+    final docSnapshot = await remainingLeaveDocRef.get();
+    if (docSnapshot.exists && docSnapshot.data() != null) {
+      final updatedRemainingLeaveRequest = RemainingLeaveModel.fromJson(docSnapshot.data()!);
 
-    if (updatedLeaveRequest != null) {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        DocumentSnapshot snapshot = await transaction.get(remainingLeaveDocRef);
+        if (!snapshot.exists) {
+          throw Exception("Remaining leave document does not exist!");
+        }
 
+        int currentAnnualLeaveBalance = updatedRemainingLeaveRequest.annualLeaveBalance ?? 0;
+        int currentPaternityLeaveBalance = updatedRemainingLeaveRequest.paternityLeaveBalance ?? 0;
+        int currentMaternityLeaveBalance = updatedRemainingLeaveRequest.maternityLeaveBalance ?? 0;
+        int currentHolidayLeaveBalance = updatedRemainingLeaveRequest.holidayLeaveBalance ?? 0;
 
-      switch (leaveRequest.type) {
-        case 'Annual':
-          updatedLeaveRequest.annualLeaveBalance = (updatedLeaveRequest.annualLeaveBalance! - daysToDeduct).clamp(0, _totalAnnualLeaves.value);
-          break;
-        case 'Paternity':
-          updatedLeaveRequest.paternityLeaveBalance = (updatedLeaveRequest.paternityLeaveBalance! - daysToDeduct).clamp(0, _totalPaternityLeaves.value);
-          break;
-        case 'Maternity':
-          updatedLeaveRequest.maternityLeaveBalance = (updatedLeaveRequest.maternityLeaveBalance! - daysToDeduct).clamp(0, _totalMaternityLeaves.value);
-          break;
-        case 'Holiday':
-          updatedLeaveRequest.holidayLeaveBalance = (updatedLeaveRequest.holidayLeaveBalance! + daysToDeduct);
-          break;
-      }
-      await _updateRemainingLeaveInFirebase(updatedLeaveRequest);
-      _remainingLeaves.value = updatedLeaveRequest; //Update observable
+        switch (leaveRequest.type) {
+          case 'Annual':
+            currentAnnualLeaveBalance = (currentAnnualLeaveBalance - daysToDeduct).clamp(0, _totalAnnualLeaves.value);
+            break;
+          case 'Paternity':
+            currentPaternityLeaveBalance = (currentPaternityLeaveBalance - daysToDeduct).clamp(0, _totalPaternityLeaves.value);
+            break;
+          case 'Maternity':
+            currentMaternityLeaveBalance = (currentMaternityLeaveBalance - daysToDeduct).clamp(0, _totalMaternityLeaves.value);
+            break;
+          case 'Holiday':
+            currentHolidayLeaveBalance = (currentHolidayLeaveBalance - daysToDeduct).clamp(0, _totalHolidayLeaves.value);
+            break;
+        }
+
+        transaction.update(remainingLeaveDocRef, {
+          'annualLeaveBalance': currentAnnualLeaveBalance,
+          'paternityLeaveBalance': currentPaternityLeaveBalance,
+          'maternityLeaveBalance': currentMaternityLeaveBalance,
+          'holidayLeaveBalance': currentHolidayLeaveBalance,
+        });
+      });
     }
   }
 
@@ -3506,17 +2873,16 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       String? leaveType,
       String? firestoreReason
       ) async {
-    // Insert into Leave Request collection in Firestore
+
     await FirebaseFirestore.instance
         .collection('Staff')
         .doc(userId)
-        .collection('Leave Request') // Use consistent collection name
-        .add({ // Use add() to create a new document with auto-generated ID
+        .collection('Leave Request')
+        .add({
       'startDate': startDate,
       'endDate': endDate,
-      'leaveType': leaveType, // Include the leave type
-      'reason': firestoreReason ?? '', // Or handle null as needed
-      // ... any other relevant leave details
+      'leaveType': leaveType,
+      'reason': firestoreReason ?? '',
 
     });
   }
@@ -3529,7 +2895,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       String? leaveType,
       String? firestoreReason
       ) async {
-    // Validate input parameters
+
     if (userId == null || startDate == null || endDate == null || leaveType == null) {
       print('Invalid input for _addLeaveToAttendance1');
       Fluttertoast.showToast(
@@ -3544,18 +2910,23 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       return;
     }
 
-    const int maxRetries = 5; // Maximum number of retry attempts
-    const Duration initialDelay = Duration(seconds: 2); // Initial delay for retry
+    const int maxRetries = 5;
+    const Duration initialDelay = Duration(seconds: 2);
 
     for (var date = startDate; !date.isAfter(endDate); date = date.add(const Duration(days: 1))) {
-      // Skip weekends
-      if (date.weekday != DateTime.saturday && date.weekday != DateTime.sunday) {
-        int retryCount = 0; // Reset retry count for each date
 
-        // Check if the record for this date already exists - Implement Firebase check here if needed.
+      if (date.weekday != DateTime.saturday && date.weekday != DateTime.sunday) {
+        int retryCount = 0;
+
         final formattedDate = DateFormat('dd-MMMM-yyyy').format(date);
-        final existingRecord = await _getAttendanceForDateFromFirebase(formattedDate, userId);
-        if (existingRecord.isNotEmpty) {
+        final attendanceDocRef = FirebaseFirestore.instance
+            .collection('Staff')
+            .doc(userId)
+            .collection('Record')
+            .doc(formattedDate);
+
+        final docSnapshot = await attendanceDocRef.get();
+        if (docSnapshot.exists) {
           print("Attendance for $formattedDate already exists. Skipping...");
           Fluttertoast.showToast(
             msg: "Attendance for $formattedDate already exists. Skipping...",
@@ -3582,29 +2953,29 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               fontSize: 16.0,
             );
 
-            // Save attendance for the given date to Firebase
-            await _saveAttendanceToFirebase(AttendanceModel(
-              clockIn: '08:00 AM',
-              date: formattedDate,
-              clockInLatitude: lati.value,
-              clockInLocation: location.value,
-              clockInLongitude: longi.value,
-              clockOut: '05:00 PM',
-              clockOutLatitude: lati.value,
-              clockOutLocation: location.value,
-              clockOutLongitude: longi.value,
-              comments: firestoreReason,
-              isSynced: false,
-              voided: false,
-              isUpdated: true,
-              offDay: true, // Set offDay to true for leave days
-              durationWorked: leaveType == "Annual" ? "Annual Leave" : leaveType,
-              noOfHours: 9.0001,
-              month: DateFormat('MMMM yyyy').format(date),
-            ), userId);
+
+            await attendanceDocRef.set({
+              'Offline_DB_id': 1,
+              'clockIn': '08:00 AM',
+              'date': formattedDate,
+              'clockInLatitude': lati.value,
+              'clockInLocation': location.value,
+              'clockInLongitude': longi.value,
+              'clockOut': '05:00 PM',
+              'clockOutLatitude': lati.value,
+              'clockOutLocation': location.value,
+              'clockOutLongitude': longi.value,
+              'comments': firestoreReason,
+              'isSynced': true,
+              'voided': false,
+              'isUpdated': true,
+              'offDay': true,
+              'durationWorked': leaveType == "Annual" ? "Annual Leave" : leaveType,
+              'noOfHours': 9.0001,
+              'month': DateFormat('MMMM yyyy').format(date),
+            });
 
 
-            // Break out of retry loop if successful
             print("Successfully added leave attendance for: $date");
             Fluttertoast.showToast(
               msg: "Successfully added leave attendance for: $date",
@@ -3630,7 +3001,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             );
 
             if (retryCount < maxRetries) {
-              final delay = initialDelay * retryCount; // Exponential backoff
+              final delay = initialDelay * retryCount;
               print("Retrying after ${delay.inSeconds} seconds...");
               Fluttertoast.showToast(
                 msg: "Retrying after ${delay.inSeconds} seconds...",
@@ -3659,10 +3030,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
     }
 
-    // Fetch leave data after processing - Consider if refresh is needed for web UI.
-    // await _getLeaveData(); // Refreshing data might not be necessary for web if using streams effectively.
 
-    // Show confirmation message
+    await _getLeaveData();
+
+
     Fluttertoast.showToast(
       msg: "Leave added to attendance records.",
       toastLength: Toast.LENGTH_LONG,
@@ -3670,49 +3041,368 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     );
   }
 
-  Future<List<AttendanceModel>> _getAttendanceForDateFromFirebase(String formattedDate, String userId) async {
-    List<AttendanceModel> attendanceRecords = [];
 
-    try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(userId)
-          .collection('Attendance')
-          .where('date', isEqualTo: formattedDate)
-          .get();
 
-      attendanceRecords = querySnapshot.docs.map((doc) {
-        // Decode the log content if it's stored as a JSON string
-        Map<String, dynamic> data = doc.data();
-        if (data.containsKey('log') && data['log'] is String) {
-          try {
-            data['log'] = jsonDecode(data['log']);
-          } catch (e) {
-            print("Error decoding log data: $e");
+
+  Future<void> _updateLeaveBalanceAfterApproval(LeaveRequestModel leaveRequest) async {
+    if (leaveRequest.status == 'Approved') {
+      final leaveDuration = leaveRequest.leaveDuration;
+      if (leaveDuration != null && leaveDuration > 0) {
+        try {
+          final currentRemainingLeaves = _remainingLeaves.value;
+          if (currentRemainingLeaves == null) {
+            print("Remaining leaves not initialized.");
+            return;
           }
+
+          final remainingLeaveDocRef = FirebaseFirestore.instance
+              .collection('Staff')
+              .doc(_currentUserId)
+              .collection('RemainingLeave')
+              .doc('remainingLeaveDoc');
+
+
+          await FirebaseFirestore.instance.runTransaction((transaction) async {
+            DocumentSnapshot snapshot = await transaction.get(remainingLeaveDocRef);
+            if (!snapshot.exists) {
+              throw Exception("Remaining leave document does not exist!");
+            }
+            RemainingLeaveModel updatedRemainingLeaveRequest = RemainingLeaveModel.fromJson(snapshot.data() as Map<String, dynamic>);
+
+
+            int currentAnnualLeaveBalance = updatedRemainingLeaveRequest.annualLeaveBalance ?? 0;
+            int currentPaternityLeaveBalance = updatedRemainingLeaveRequest.paternityLeaveBalance ?? 0;
+            int currentMaternityLeaveBalance = updatedRemainingLeaveRequest.maternityLeaveBalance ?? 0;
+            int currentHolidayLeaveBalance = updatedRemainingLeaveRequest.holidayLeaveBalance ?? 0;
+
+            switch (leaveRequest.type) {
+              case 'Annual':
+                currentAnnualLeaveBalance = (currentAnnualLeaveBalance - leaveDuration).clamp(0, _totalAnnualLeaves.value);
+                break;
+              case 'Paternity':
+                currentPaternityLeaveBalance = (currentPaternityLeaveBalance - leaveDuration).clamp(0, _totalPaternityLeaves.value);
+                break;
+              case 'Maternity':
+                currentMaternityLeaveBalance = (currentMaternityLeaveBalance - leaveDuration).clamp(0, _totalMaternityLeaves.value);
+                break;
+              case 'Holiday':
+                currentHolidayLeaveBalance = (currentHolidayLeaveBalance - leaveDuration).clamp(0, _totalHolidayLeaves.value);
+                break;
+            }
+
+            transaction.update(remainingLeaveDocRef, {
+              'annualLeaveBalance': currentAnnualLeaveBalance,
+              'paternityLeaveBalance': currentPaternityLeaveBalance,
+              'maternityLeaveBalance': currentMaternityLeaveBalance,
+              'holidayLeaveBalance': currentHolidayLeaveBalance,
+            });
+          });
+
+
+        } catch (e) {
+          print('Error updating leave balance: $e');
+          Fluttertoast.showToast(
+              msg: "Error updating leave balance: $e",
+              toastLength: Toast.LENGTH_LONG,
+              backgroundColor: Colors.black54,
+
+              timeInSecForIosWeb: 1,
+              textColor: Colors.white,
+              fontSize: 16.0
+          );
         }
-        return AttendanceModel.fromJson(data);
-      }).toList();
-    } catch (e) {
-      print("Error fetching attendance for date from Firebase: $e");
-    }
-
-    return attendanceRecords;
-  }
-
-  Future<void> _saveAttendanceToFirebase(AttendanceModel attendance, String userId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(userId)
-          .collection('Attendance')
-          .doc(DateFormat('dd-MM-yyyy').format(DateTime.now())) // Use date as document ID for simplicity, consider UUID if needed
-          .set(attendance.toJson());
-    } catch (e) {
-      print("Error saving attendance to Firebase: $e");
-      rethrow; // Re-throw to be caught by the retry logic
+      }
     }
   }
 
 
+}
+
+class BioModel {
+  String? id; // Document ID from Firestore
+  String? firstName;
+  String? lastName;
+  String? maritalStatus;
+  String? gender;
+  String? staffCategory;
+  String? designation;
+  String? password;
+  String? state;
+  String? emailAddress;
+  String? role;
+  String? location;
+  String? firebaseAuthId;
+  String? department;
+  String? mobile;
+  String? project;
+  bool? isSynced;
+  String? supervisor;
+  String? supervisorEmail;
+  String? version;
+  bool? isRemoteDelete;
+  bool? isRemoteUpdate;
+  DateTime? lastUpdateDate;
+  String? signatureLink;
+
+  BioModel({
+    this.id,
+    this.firstName,
+    this.lastName,
+    this.staffCategory,
+    this.designation,
+    this.password,
+    this.state,
+    this.emailAddress,
+    this.role,
+    this.location,
+    this.firebaseAuthId,
+    this.department,
+    this.mobile,
+    this.project,
+    this.isSynced,
+    this.supervisor,
+    this.supervisorEmail,
+    this.version,
+    this.isRemoteDelete,
+    this.isRemoteUpdate,
+    this.lastUpdateDate,
+    this.signatureLink
+  });
+
+  factory BioModel.fromJson(Map<String, dynamic> json) {
+    return BioModel(
+        id: json['id'], // Get ID from json
+        firstName: json['firstName'],
+        lastName: json['lastName'],
+        staffCategory: json['staffCategory'],
+        designation: json['designation'],
+        password: json['password'],
+        state: json['state'],
+        emailAddress: json['emailAddress'],
+        role: json['role'],
+        location: json['location'],
+        firebaseAuthId: json['firebaseAuthId'],
+        department: json['department'],
+        mobile: json['mobile'],
+        project: json['project'],
+        isSynced:json['isSynced'],
+        supervisor:json['supervisor'],
+        supervisorEmail:json['supervisorEmail'],
+        version:json['version'],
+        isRemoteDelete:json['isRemoteDelete'],
+        isRemoteUpdate:json['isRemoteUpdate'],
+        lastUpdateDate: json['lastUpdateDate'] != null ? (json['lastUpdateDate'] as Timestamp).toDate() : null,
+        signatureLink:json['signatureLink']
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'firstName': firstName,
+      'lastName': lastName,
+      'staffCategory': staffCategory,
+      'designation': designation,
+      'password': password,
+      'state': state,
+      'emailAddress': emailAddress,
+      'role': role,
+      'location': location,
+      'firebaseAuthId': firebaseAuthId,
+      'department': department,
+      'mobile': mobile,
+      'project': project,
+      'isSynced':isSynced,
+      'supervisor':supervisor,
+      'supervisorEmail':supervisorEmail,
+      'version':version,
+      'isRemoteDelete':isRemoteDelete,
+      'isRemoteUpdate':isRemoteUpdate,
+      'lastUpdateDate':lastUpdateDate,
+      'signatureLink':signatureLink
+    };
+  }
+}
+
+class LocationModel {
+  String? id; // Document ID from Firestore
+  String? state;
+  String? locationName;
+  String? category;
+  double? latitude;
+  double? longitude;
+  double? radius;
+
+  LocationModel(
+      {this.id,
+        this.state,
+        this.locationName,
+        this.category,
+        this.latitude,
+        this.longitude,
+        this.radius});
+
+  factory LocationModel.fromJson(Map<String, dynamic> json) {
+    return LocationModel(
+      id: json['id'], // Get ID from json
+      state: json['state'],
+      locationName: json['locationName'],
+      category: json['category'],
+      latitude: json['latitude'],
+      longitude: json['longitude'],
+      radius: (json['radius'] as num?)?.toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'state': state,
+      'locationName': locationName,
+      'category':category,
+      'latitude': latitude,
+      'longitude': longitude,
+      'radius': radius
+    };
+  }
+}
+
+class AttendanceModel {
+  String? id; // Document ID (date string) from Firestore
+  String? clockIn;
+  String? clockOut;
+  String? clockInLocation;
+  String? clockOutLocation;
+  String? date;
+  bool? isSynced;
+  double? clockInLatitude;
+  double? clockInLongitude;
+  double? clockOutLatitude;
+  double? clockOutLongitude;
+  bool? voided;
+  bool? isUpdated;
+  bool? offDay;
+  double? noOfHours;
+  String? durationWorked;
+  String? month;
+  String? comments;
+  int? offlineDbId;
+
+  AttendanceModel(
+      {this.id,
+        this.clockIn,
+        this.clockOut,
+        this.clockInLocation,
+        this.clockOutLocation,
+        this.date,
+        this.isSynced,
+        this.clockInLatitude,
+        this.clockInLongitude,
+        this.clockOutLatitude,
+        this.clockOutLongitude,
+        this.voided,
+        this.isUpdated,
+        this.offDay,
+        this.noOfHours,
+        this.durationWorked,
+        this.month,
+        this.comments,
+        this.offlineDbId
+      });
+
+  factory AttendanceModel.fromJson(Map<String, dynamic> json) {
+    return AttendanceModel(
+        id: json['id'], // Get ID from json
+        offlineDbId: json['Offline_DB_id'],
+        clockIn: json['clockIn'],
+        clockOut: json['clockOut'],
+        clockInLocation: json['clockInLocation'],
+        clockOutLocation: json['clockOutLocation'],
+        date: json['date'],
+        isSynced: json['isSynced'],
+        clockInLatitude: (json['clockInLatitude'] as num?)?.toDouble(),
+        clockInLongitude: (json['clockInLongitude'] as num?)?.toDouble(),
+        clockOutLatitude: (json['clockOutLatitude'] as num?)?.toDouble(),
+        clockOutLongitude: (json['clockOutLongitude'] as num?)?.toDouble(),
+        voided: json['voided'],
+        isUpdated: json['isUpdated'],
+        offDay: json['offDay'],
+        noOfHours: (json['noOfHours'] as num?)?.toDouble(),
+        durationWorked: json['durationWorked'],
+        month: json['month'],
+        comments:json['comments']
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      'Offline_DB_id': offlineDbId,
+      'clockIn': clockIn,
+      'clockOut': clockOut,
+      'clockInLocation': clockInLocation,
+      'clockOutLocation': clockOutLocation,
+      'date': date,
+      'isSynced': isSynced,
+      'clockInLatitude': clockInLatitude,
+      'clockInLongitude': clockInLongitude,
+      'clockOutLatitude': clockOutLatitude,
+      'clockOutLongitude': clockOutLongitude,
+      'voided': voided,
+      'isUpdated': isUpdated,
+      'offDay': offDay,
+      'noOfHours': noOfHours,
+      'durationWorked': durationWorked,
+      'month': month,
+      'comments':comments
+    };
+  }
+}
+
+class RemainingLeaveModel {
+  String? id; // Document ID from Firestore (default to 'remainingLeaveDoc')
+  String? staffId;
+  int? paternityLeaveBalance;
+  int? maternityLeaveBalance;
+  int? annualLeaveBalance;
+  int? holidayLeaveBalance;
+  DateTime? dateUpdated;
+
+
+  RemainingLeaveModel({
+    this.id = 'remainingLeaveDoc', // Default Document ID
+    this.staffId,
+    this.paternityLeaveBalance,
+    this.maternityLeaveBalance,
+    this.annualLeaveBalance,
+    this.holidayLeaveBalance,
+    this.dateUpdated,
+  });
+
+
+  factory RemainingLeaveModel.fromJson(Map<String, dynamic> json) {
+    return RemainingLeaveModel(
+      id: json['id'] ?? 'remainingLeaveDoc', // Get ID from json or default
+      staffId: json['staffId'],
+      paternityLeaveBalance: json['paternityLeaveBalance'],
+      maternityLeaveBalance: json['maternityLeaveBalance'],
+      annualLeaveBalance: json['annualLeaveBalance'],
+      holidayLeaveBalance: json['holidayLeaveBalance'],
+      dateUpdated: json['dateUpdated'] != null ? (json['dateUpdated'] as Timestamp).toDate() : null,
+    );
+  }
+
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'staffId':staffId,
+      'paternityLeaveBalance': paternityLeaveBalance,
+      'maternityLeaveBalance': maternityLeaveBalance,
+      'annualLeaveBalance': annualLeaveBalance,
+      'holidayLeaveBalance': holidayLeaveBalance,
+      'dateUpdated':dateUpdated
+
+    };
+  }
 }

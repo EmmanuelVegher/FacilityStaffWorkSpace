@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widgets/drawer.dart';
+import '../widgets/drawer2.dart';
 
-class ForgotPasswordPage extends StatefulWidget {
-  const ForgotPasswordPage({super.key});
+class ForgotPasswordPage2 extends StatefulWidget {
+  const ForgotPasswordPage2({super.key});
 
   @override
-  _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
+  _ForgotPasswordPage2State createState() => _ForgotPasswordPage2State();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTickerProviderStateMixin {
+class _ForgotPasswordPage2State extends State<ForgotPasswordPage2> with SingleTickerProviderStateMixin {
   final _auth = FirebaseAuth.instance;
   final _emailController = TextEditingController();
   bool _isLoading = false;
@@ -72,7 +73,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer(context,),
+      drawer: drawer2(context,),
       appBar: AppBar(
         title: const Text('Forgot Password', style: TextStyle(color: Colors.white)),
         iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
