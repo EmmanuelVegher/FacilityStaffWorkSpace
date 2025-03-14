@@ -248,9 +248,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                               summaryGridChildAspectRatio,
                               summaryCardHeightFactor // Pass summaryCardHeightFactor
                           ),
-                          SizedBox(height: 20 * gridSpacingFactor),
-                          _buildRecognitionCardForDashboardInDashboard(
-                              context, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+                          // SizedBox(height: 20 * gridSpacingFactor),
+                          // _buildRecognitionCardForDashboardInDashboard(
+                          //     context, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
                           SizedBox(height: 20 * gridSpacingFactor),
                           _buildOtherCardsGrid(
                             context,
@@ -1321,7 +1321,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Best Team Player of the Week',
+          'Team Player for the Current Month (Facility Votes)',
           style: TextStyle(
               fontSize: 16 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
