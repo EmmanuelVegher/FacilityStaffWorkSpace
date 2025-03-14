@@ -264,7 +264,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
   @override
   void initState() {
     super.initState();
-    controller.onRefreshPage(); // Call onRefreshPage in initState to fetch fresh location
+    controller.initializeLocationAndGeofence(); // Initialize location and geofence in initState
     _startInactivityTimer();
   }
 
@@ -1255,13 +1255,9 @@ class ClockAttendanceWebController extends GetxController {
   void onInit() {
     super.onInit();
     _loadInitialData();
+    initializeLocationAndGeofence(); // Call initialization here in onInit
   }
 
-  @override
-  void onReady() {
-    super.onReady();
-    _init();
-  }
 
   @override
   void onClose() {
@@ -1274,16 +1270,28 @@ class ClockAttendanceWebController extends GetxController {
     super.onClose();
   }
 
-  Future<void> onRefreshPage() async {
-    _clearLocationData(); // Clear old location data
-    await _initLocationServiceAndData(); // Re-initialize location and data
+
+  Future<void> initializeLocationAndGeofence() async {
+    await _initLocationServiceAndData();
   }
+
 
   Future<void> _initLocationServiceAndData() async {
     await getLocationStatus().then((_) async {
+      await _getLocation2();
+      await _getUserLocation();
+      await _updateLocationUsingGeofencing();
+      await _updateLocation();
       await getPermissionStatus().then((_) async {
-        await _startLocationService();
-        await _loadInitialData(); // Load other data after location is ready
+        await _startLocationService().then((_) async {
+          await _getLocation2();
+         // await _getUserLocation1();
+          await _getUserLocation();
+          await _updateLocationUsingGeofencing();
+          await _updateLocation();
+          await _loadInitialData(); // Load other data after location is ready
+        });
+
       });
     });
   }
@@ -1318,7 +1326,7 @@ class ClockAttendanceWebController extends GetxController {
   }
 
   Future<void> _init() async {
-    await _initLocationServiceAndData();
+    // No need to call _initLocationServiceAndData here anymore, called from initializeLocationAndGeofence
   }
 
   Timer? _locationTimer;
@@ -1347,47 +1355,153 @@ class ClockAttendanceWebController extends GetxController {
     print("_updateLocationUsingGeofencing2 is skipped for web in this example");
   }
 
-  Future<String> _determineGeofenceLocation(
-      double latitude, double longitude) async {
+  Future<String?> _getUserState() async {
+    try {
+      String? userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return null;
+
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists && userDoc.data() != null) {
+        return userDoc["state"] as String?;
+      }
+    } catch (e) {
+      dev.log("Error fetching user state: $e");
+    }
+    return null;
+  }
+
+  Future<String> _determineGeofenceLocation(double latitude, double longitude) async {
     String geofenceName = "";
-    String? userState = await firestoreService.getUserState();
+    String? userState = await _getUserState();
 
     for (GeofenceModel geofence in cachedGeofences) {
-      double distance =
-      GeoUtils.haversine(latitude, longitude, geofence.latitude, geofence.longitude);
+      double distance = GeoUtils.haversine(latitude, longitude, geofence.latitude, geofence.longitude);
       if (distance <= geofence.radius) {
-        if (geofence.stateName == userState) {
-          currentStateDisplay.value =
-              geofence.name;
-        } else {
-          currentStateDisplay.value =
-              geofence.stateName;
-        }
+        currentStateDisplay.value = (geofence.stateName == userState) ? geofence.name : geofence.stateName;
         return geofence.name;
       }
     }
-    if (userState != null) {
-      currentStateDisplay.value =
-          userState;
-    } else {
-      currentStateDisplay.value = administrativeArea.value.isNotEmpty
-          ? administrativeArea.value
-          : "State Unknown";
-    }
 
+    currentStateDisplay.value = userState ?? (administrativeArea.value.isNotEmpty ? administrativeArea.value : "State Unknown");
     return geofenceName;
   }
 
+  String? getUserId() {
+    print("Current UUID === ${FirebaseAuth.instance.currentUser?.uid}");
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> streamAttendanceRecord(
+      String userId, String date) {
+    return FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(userId)
+        .collection('Record')
+        .doc(date)
+        .snapshots();
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>> getAttendanceRecord(
+      String userId, String date) async {
+    return await FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(userId)
+        .collection('Record')
+        .doc(date)
+        .get();
+  }
+
+  Future<void> createAttendanceRecord(
+      String userId, String date, Map<String, dynamic> data) async {
+    await FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(userId)
+        .collection('Record')
+        .doc(date)
+        .set(data);
+  }
+
+  Future<void> updateAttendanceRecord(
+      String userId, String date, Map<String, dynamic> data) async {
+    await FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(userId)
+        .collection('Record')
+        .doc(date)
+        .update(data);
+  }
+
+  Future<String?> getUserState() async {
+    DocumentSnapshot userSnapshot =
+    await FirebaseFirestore.instance.collection('Staff').doc(getUserId()).get();
+    if (userSnapshot.exists) {
+      Map<String, dynamic>? userData =
+      userSnapshot.data() as Map<String, dynamic>?;
+      return userData?['state'] as String?;
+    }
+    return null;
+  }
+
+  Future<List<String>> getAllStates() async {
+    List<String> states = [];
+    try {
+      QuerySnapshot locationSnapshot =
+      await FirebaseFirestore.instance.collection('Location').get();
+      for (var doc in locationSnapshot.docs) {
+        states.add(doc.id);
+      }
+    } catch (e) {
+      dev.log("Error fetching states: $e");
+    }
+    return states;
+  }
+
+  Future<List<GeofenceModel>> getGeofencesForState(String state) async {
+    List<GeofenceModel> geofenceLocations = [];
+    try {
+      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+          .collection('Location')
+          .doc(state)
+          .collection(state)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        geofenceLocations
+            .add(GeofenceModel.fromFirestore(doc.data(), state));
+      }
+      dev.log("geofenceLocations =$geofenceLocations");
+    } catch (e) {
+      dev.log("Error fetching geofences for state $state: $e");
+    }
+    return geofenceLocations;
+  }
+
+  Future<List<GeofenceModel>> getGeofencesForAllStatesExceptCurrent(
+      String currentState) async {
+    List<GeofenceModel> allGeofences = [];
+    List<String> allStates = await getAllStates();
+
+    for (String state in allStates) {
+      if (state != currentState) {
+        allGeofences.addAll(await getGeofencesForState(state));
+      }
+    }
+    return allGeofences;
+  }
+
+
   Future<void> _fetchGeofenceLocations() async {
-    String? userState = await firestoreService.getUserState();
+    String? userState = await _getUserState();
     if (userState != null) {
       dev.log("User state found==$userState");
-      List<GeofenceModel> currentStateGeofences =
-      await firestoreService.getGeofencesForState(userState);
+      List<GeofenceModel> currentStateGeofences = await firestoreService.getGeofencesForState(userState);
       cachedGeofences.addAll(currentStateGeofences);
 
-      List<GeofenceModel> otherStatesGeofences =
-      await firestoreService.getGeofencesForAllStatesExceptCurrent(userState);
+      List<GeofenceModel> otherStatesGeofences = await firestoreService.getGeofencesForAllStatesExceptCurrent(userState);
       cachedGeofences.addAll(otherStatesGeofences);
 
       dev.log("cachedGeofences count==${cachedGeofences.length}");
@@ -1395,12 +1509,12 @@ class ClockAttendanceWebController extends GetxController {
       dev.log("User state not found, geofencing might not work correctly.");
       List<String> allStates = await firestoreService.getAllStates();
       for (String state in allStates) {
-        List<GeofenceModel> stateGeofences =
-        await firestoreService.getGeofencesForState(state);
+        List<GeofenceModel> stateGeofences = await firestoreService.getGeofencesForState(state);
         cachedGeofences.addAll(stateGeofences);
       }
     }
   }
+
 
   Future<void> _loadNTPTime() async {
     try {

@@ -38,8 +38,8 @@ class MyApp extends StatelessWidget {
       initialRoute: '/login',
       getPages: [
         GetPage(name: '/login', page: () => const LoginPage()),
-        GetPage(name: '/home', page: () => const HomeScreen()),
-        GetPage(name: '/dashboard', page: () => const UserDashboardApp()),
+      //  GetPage(name: '/home', page: () => const HomeScreen()),
+       // GetPage(name: '/dashboard', page: () => const UserDashboardApp()),
       ],
     );
   }
