@@ -86,6 +86,16 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   bool isHTML = false;
   List<Uint8List> checkSignatureImage = []; // Initialize as empty list
 
+  // Responsive scaling factors
+  late double appBarHeightFactor;
+  late double titleFontSizeFactor;
+  late double fontSizeFactor;
+  late double paddingFactor;
+  late double marginFactor;
+  late double iconSizeFactor;
+  late double tableFontSizeFactor;
+  late double dropdownFontSizeFactor;
+
   @override
   void initState() {
     super.initState();
@@ -377,7 +387,7 @@ $selectedBioFirstName $selectedBioLastName
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(platformResponse),
+        content: Text(platformResponse, style: TextStyle(fontSize: 14 * fontSizeFactor)),
       ),
     );
   }
@@ -447,19 +457,17 @@ $selectedBioFirstName $selectedBioLastName
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Name: $selectedBioFirstName $selectedBioLastName'),
-        pw.Text('Department: $selectedBioDepartment'),
-        pw.Text('Designation: $selectedBioDesignation'),
-        pw.Text('Location: $selectedBioLocation'),
-        pw.Text('State: $selectedBioState'),
-        pw.SizedBox(height: 20), // Add some spacing
-
+        pw.Text('Name: $selectedBioFirstName $selectedBioLastName', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.Text('Department: $selectedBioDepartment', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.Text('Designation: $selectedBioDesignation', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.Text('Location: $selectedBioLocation', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.Text('State: $selectedBioState', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.SizedBox(height: 20),
       ],
     );
   }
 
   pw.Widget _buildTimesheetTable(pw.Context context) {
-    // Data for the table
     final tableHeaders = [
       'Project Name',
       ...daysInRange.map((date) => DateFormat('dd').format(date)),
@@ -467,34 +475,18 @@ $selectedBioFirstName $selectedBioLastName
       '%'
     ];
 
-    List<List<String>> allRows = []; // List to hold all rows
+    List<List<String>> allRows = [];
 
-
-
-    // Project Data Row
     final projectData = [
       selectedProjectName ?? '',
       ...daysInRange.map((date) {
-        return _getDurationForDate3(
-            date, selectedProjectName, selectedProjectName!)
-            .round()
-            .toString(); // No rounding here
+        return _getDurationForDate3(date, selectedProjectName, selectedProjectName!).round().toString();
       }),
-      // calculateTotalHours1(selectedProjectName).toStringAsFixed(2),  // Calculate total for project, 2 decimal places
-      // '${calculatePercentageWorked1(selectedProjectName).toStringAsFixed(2)}%'
-      //  calculateTotalHours1(selectedProjectName).round().toString(), // Round total hours
-      // '${calculatePercentageWorked1(selectedProjectName).round()}%' // Round percentage
-      // Total hours and percentage will be calculated later based on rounded values
       '0',
-      // Placeholder for Total Hours
       '0%'
-      // Placeholder for Percentage
-
-
     ];
-    allRows.add(projectData); // Add project data to allRows
+    allRows.add(projectData);
 
-    // Out-of-office Rows
     final outOfOfficeCategories = [
       'Annual leave',
       'Holiday',
@@ -505,92 +497,60 @@ $selectedBioFirstName $selectedBioLastName
       final rowData = [
         category,
         ...daysInRange.map((date) {
-          return _getDurationForDate3(date, selectedProjectName, category)
-              .round()
-              .toString(); // No rounding here
+          return _getDurationForDate3(date, selectedProjectName, category).round().toString();
         }),
-        // calculateCategoryHours(category).toStringAsFixed(2), // Calculate total for category, 2 decimal places
-        // '${calculateCategoryPercentage(category).toStringAsFixed(1)}%'
-        // calculateCategoryHours(category).round().toString(),  // Round category hours
-        // '${calculateCategoryPercentage(category).round()}%' // Round percentage
         '0',
-        // Placeholder for Total Hours
         '0%'
-        // Placeholder for Percentage
       ];
-      allRows.add(rowData); // Add each category row to allRows
+      allRows.add(rowData);
       return rowData;
     }).toList();
 
-    // Now calculate totals AFTER rounding for ALL rows (including project data)
     for (List<String> row in allRows) {
       double rowTotal = 0;
-      for (int i = 1; i <=
-          daysInRange.length; i++) { // Sum the rounded daily hours
+      for (int i = 1; i <= daysInRange.length; i++) {
         rowTotal += double.tryParse(row[i]) ?? 0;
       }
+      row[daysInRange.length + 1] = rowTotal.round().toString();
 
-      row[daysInRange.length + 1] =
-          rowTotal.round().toString(); // Rounded total hours
-
-      int workingDays = daysInRange
-          .where((date) => !isWeekend(date))
-          .length;
-      double percentage = (workingDays * 8) != 0 ? (rowTotal /
-          (workingDays * 8)) * 100 : 0;
-      row[daysInRange.length + 2] =
-      '${percentage.round()}%'; // Rounded percentage
+      int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
+      double percentage = (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
+      row[daysInRange.length + 2] = '${percentage.round()}%';
     }
 
-
-    // Total Row Calculation (rounding to whole numbers)
     List<String> totalRow = [
       'Total',
       ...List.generate(daysInRange.length, (index) => '0'),
       '0',
       '0%'
     ];
-    for (int i = 1; i <= daysInRange.length; i++) { // Iterate over day columns
-      double dayTotal = 0; // Use double to accumulate, round later
+    for (int i = 1; i <= daysInRange.length; i++) {
+      double dayTotal = 0;
       for (List<String> row in allRows) {
         dayTotal += double.tryParse(row[i]) ?? 0.0;
       }
-      totalRow[i] =
-          dayTotal.round().toString(); // Round day total before storing
+      totalRow[i] = dayTotal.round().toString();
     }
 
-    // Calculate grand total and percentage (using rounded day totals)
     int grandTotalHours = 0;
     for (int i = 1; i <= daysInRange.length; i++) {
       grandTotalHours += int.parse(totalRow[i]);
     }
-    totalRow[daysInRange.length + 1] =
-        grandTotalHours.toString(); // Grand total
+    totalRow[daysInRange.length + 1] = grandTotalHours.toString();
 
-    int workingDays = daysInRange
-        .where((date) => !isWeekend(date))
-        .length;
-    double grandPercentage = (workingDays * 8) > 0 ? (grandTotalHours /
-        (workingDays * 8)) * 100 : 0;
-    totalRow[daysInRange.length + 2] =
-    '${grandPercentage.round()}%'; // Round percentage
+    int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
+    double grandPercentage = (workingDays * 8) > 0 ? (grandTotalHours / (workingDays * 8)) * 100 : 0;
+    totalRow[daysInRange.length + 2] = '${grandPercentage.round()}%';
 
-
-    // Build the table
     return pw.Table(
       border: pw.TableBorder.all(),
       columnWidths: {
         0: const pw.FixedColumnWidth(250),
-        for (int i = 1; i <= daysInRange.length; i++) i: const pw
-            .FixedColumnWidth(80),
-        // Fixed width for date columns
+        for (int i = 1; i <= daysInRange.length; i++) i: const pw.FixedColumnWidth(80),
         daysInRange.length + 1: const pw.FixedColumnWidth(200),
-        // Fixed width for "Total Hours"
         daysInRange.length + 2: const pw.FixedColumnWidth(200),
-        // Fixed width for "Percentage"
       },
       children: [
-        // Header row
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: tableHeaders
@@ -600,89 +560,43 @@ $selectedBioFirstName $selectedBioLastName
                   padding: const pw.EdgeInsets.all(1.0),
                   child: pw.Text(
                     header,
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * tableFontSizeFactor),
                   ),
                 ),
               ))
               .toList(),
         ),
-        // // Project data row
-        // pw.TableRow(
-        //   children: projectData
-        //       .map((data) => pw.Center(
-        //     child: pw.Padding(
-        //       padding: const pw.EdgeInsets.all(1.0),
-        //       child: pw.Text(data),
-        //     ),
-        //   ))
-        //       .toList(),
-        // ),
-        // // Out-of-office rows
-        // ...outOfOfficeData.map(
-        //       (rowData) => pw.TableRow(
-        //     children: rowData
-        //         .map((data) => pw.Center(
-        //       child: pw.Padding(
-        //         padding: const pw.EdgeInsets.all(1.0),
-        //         child: pw.Text(data),
-        //       ),
-        //     ))
-        //         .toList(),
-        //   ),
-        // ),
-
-        // Total Row
-
-        // // Project data row
-        // pw.TableRow(
-        //   children: _buildRowChildrenWithWeekendColor(projectData),
-        // ),
-        //
-        // // Out-of-office rows
-        // ...outOfOfficeData.map(
-        //       (rowData) => pw.TableRow(
-        //       children: _buildRowChildrenWithWeekendColor(rowData) //use method to create the cells for the row
-        //   ),
-        // ),
-
-
-        // Combined loop for project and out-of-office rows, including Total row:
         ...allRows.map((rowData) {
           return pw.TableRow(
             children: rowData
                 .asMap()
                 .entries
-                .map((entry) { // Use asMap().entries to get index
+                .map((entry) {
               final i = entry.key;
               final data = entry.value;
-              final isWeekendColumn = i > 0 && i <= daysInRange.length &&
-                  isWeekend(daysInRange[i - 1]);
+              final isWeekendColumn = i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]);
 
               return pw.Container(
                 color: isWeekendColumn ? PdfColors.grey900 : null,
-                // Grey for weekend cells
                 padding: const pw.EdgeInsets.all(1.0),
                 alignment: pw.Alignment.center,
-                // Center the text
-                child: pw.Text(data),
+                child: pw.Text(data, style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
               );
             }).toList(),
           );
         }),
-
-
-        // Total Row (updated to use rounded values)
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: totalRow.map((data) => pw.Center(child: pw.Padding(
               padding: const pw.EdgeInsets.all(1.0),
               child: pw.Text(data,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))))
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * tableFontSizeFactor)))))
               .toList(),
         ),
       ],
     );
   }
+
 
 
   Future<Uint8List?> networkImageToByte(String imageUrl) async {
@@ -698,98 +612,72 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-
-  Future<List<pw.Widget>> _buildSignatureColumns(
-      Map<String, String> supervisorData) async {
-    // Ensure all keys are safely retrieved and provide default values if missing
-    final staffSig = (supervisorData['staffSignature'] != null &&
-        supervisorData['staffSignature']!.isNotEmpty)
+  Future<List<pw.Widget>> _buildSignatureColumns(Map<String, String> supervisorData) async {
+    final staffSig = (supervisorData['staffSignature'] != null && supervisorData['staffSignature']!.isNotEmpty)
         ? await networkImageToByte(supervisorData['staffSignature']!)
         : await networkImageToByte(staffSignatureLink!);
 
-
-    final coordSig = (supervisorData['projectCoordinatorSignature'] != null &&
-        supervisorData['projectCoordinatorSignature']!.isNotEmpty)
-        ? await networkImageToByte(
-        supervisorData['projectCoordinatorSignature']!)
+    final coordSig = (supervisorData['projectCoordinatorSignature'] != null && supervisorData['projectCoordinatorSignature']!.isNotEmpty)
+        ? await networkImageToByte(supervisorData['projectCoordinatorSignature']!)
         : null;
 
-    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null &&
-        supervisorData['caritasSupervisorSignature']!.isNotEmpty)
-        ? await networkImageToByte(
-        supervisorData['caritasSupervisorSignature']!)
+    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null && supervisorData['caritasSupervisorSignature']!.isNotEmpty)
+        ? await networkImageToByte(supervisorData['caritasSupervisorSignature']!)
         : null;
 
-    // Fetch names with fallbacks for missing values
-    final staffName = '${selectedBioFirstName?.toUpperCase() ??
-        'UNKNOWN'} ${selectedBioLastName?.toUpperCase() ?? ''}'.trim();
-    //final staffName = supervisorData['staffName']?.toUpperCase()  ?? 'UNKNOWN';
-    final projectCoordinatorName = supervisorData['projectCoordinatorName']
-        ?.toUpperCase() ?? 'UNKNOWN';
-    final caritasSupervisorName = supervisorData['caritasSupervisorName']
-        ?.toUpperCase() ?? 'UNKNOWN';
+    final staffName = '${selectedBioFirstName?.toUpperCase() ?? 'UNKNOWN'} ${selectedBioLastName?.toUpperCase() ?? ''}'.trim();
+    final projectCoordinatorName = supervisorData['projectCoordinatorName']?.toUpperCase() ?? 'UNKNOWN';
+    final caritasSupervisorName = supervisorData['caritasSupervisorName']?.toUpperCase() ?? 'UNKNOWN';
 
-    final staffSignatureDate = supervisorData['staffSignatureDate'] ??
-        formattedDate;
-    final facilitySupervisorSignatureDate = supervisorData['facilitySupervisorSignatureDate'] ??
-        'UNKNOWN';
-    final caritasSupervisorSignatureDate = supervisorData['caritasSupervisorSignatureDate'] ??
-        'UNKNOWN';
+    final staffSignatureDate = supervisorData['staffSignatureDate'] ?? formattedDate;
+    final facilitySupervisorSignatureDate = supervisorData['facilitySupervisorSignatureDate'] ?? 'UNKNOWN';
+    final caritasSupervisorSignatureDate = supervisorData['caritasSupervisorSignatureDate'] ?? 'UNKNOWN';
 
-    // Return the list of signature columns
     return [
-      _buildSingleSignatureColumn(
-          'Name of Staff', staffName, staffSig, staffSignatureDate),
-      _buildSingleSignatureColumn(
-          'Name of Project Coordinator', projectCoordinatorName, coordSig,
-          facilitySupervisorSignatureDate),
-      _buildSingleSignatureColumn(
-          'Name of Caritas Supervisor', caritasSupervisorName, caritasSig,
-          caritasSupervisorSignatureDate),
+      _buildSingleSignatureColumn('Name of Staff', staffName, staffSig, staffSignatureDate),
+      _buildSingleSignatureColumn('Name of Project Coordinator', projectCoordinatorName, coordSig, facilitySupervisorSignatureDate),
+      _buildSingleSignatureColumn('Name of Caritas Supervisor', caritasSupervisorName, caritasSig, caritasSupervisorSignatureDate),
     ];
   }
 
-
-  pw.Widget _buildSingleSignatureColumn(String title, String name,
-      Uint8List? imageBytes, String date) {
+  pw.Widget _buildSingleSignatureColumn(String title, String name, Uint8List? imageBytes, String date) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * fontSizeFactor)),
         pw.SizedBox(height: 10),
-        pw.Text(name),
+        pw.Text(name, style: pw.TextStyle(fontSize: 12 * fontSizeFactor)),
         pw.SizedBox(height: 10),
         pw.Container(
-          height: 100,
-          width: 150,
+          height: 100 * fontSizeFactor,
+          width: 150 * fontSizeFactor,
           decoration: pw.BoxDecoration(
             border: pw.Border.all(),
           ),
           child: pw.Center(
             child: imageBytes != null
                 ? pw.Image(pw.MemoryImage(imageBytes))
-                : pw.Text("Signature"), // Placeholder if no image
+                : pw.Text("Signature", style: pw.TextStyle(fontSize: 10 * fontSizeFactor)),
           ),
         ),
         pw.SizedBox(height: 10),
-        pw.Text("Date: $date"),
+        pw.Text("Date: $date", style: pw.TextStyle(fontSize: 12 * fontSizeFactor)),
       ],
     );
   }
 
 
-  pw.Widget _buildSignatureSection(pw.Context context,
-      List<pw.Widget> signatureColumns) {
+
+  pw.Widget _buildSignatureSection(pw.Context context, List<pw.Widget> signatureColumns) {
     return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text('Signature & Date',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 30 * fontSizeFactor)),
           pw.Divider(),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: signatureColumns, // Use the pre-built signature columns
-
+            children: signatureColumns,
           ),
         ]
     );
@@ -1922,6 +1810,51 @@ $selectedBioFirstName $selectedBioLastName
 
   @override
   Widget build(BuildContext context) {
+// Responsiveness calculations based on screen width
+    final screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1200;
+    bool isDesktop = screenWidth >= 1200 && screenWidth < 1920;
+    bool isLargeDesktop = screenWidth >= 1920;
+
+    if (isMobile) {
+      appBarHeightFactor = 0.8;
+      titleFontSizeFactor = 1.2;
+      fontSizeFactor = 0.9;
+      paddingFactor = 0.8;
+      marginFactor = 0.8;
+      iconSizeFactor = 0.8;
+      tableFontSizeFactor = 0.8;
+      dropdownFontSizeFactor = 0.9;
+    } else if (isTablet) {
+      appBarHeightFactor = 1.0;
+      titleFontSizeFactor = 1.5;
+      fontSizeFactor = 1.0;
+      paddingFactor = 1.0;
+      marginFactor = 1.0;
+      iconSizeFactor = 1.0;
+      tableFontSizeFactor = 1.0;
+      dropdownFontSizeFactor = 1.0;
+    } else if (isDesktop) {
+      appBarHeightFactor = 1.2;
+      titleFontSizeFactor = 1.8;
+      fontSizeFactor = 1.1;
+      paddingFactor = 1.2;
+      marginFactor = 1.2;
+      iconSizeFactor = 1.2;
+      tableFontSizeFactor = 1.1;
+      dropdownFontSizeFactor = 1.1;
+    } else { // isLargeDesktop
+      appBarHeightFactor = 1.4;
+      titleFontSizeFactor = 2.0;
+      fontSizeFactor = 1.2;
+      paddingFactor = 1.4;
+      marginFactor = 1.4;
+      iconSizeFactor = 1.4;
+      tableFontSizeFactor = 1.2;
+      dropdownFontSizeFactor = 1.2;
+    }
+
     int totalHours = calculateTotalHours();
     double percentageWorked = calculatePercentageWorked();
     int totalGrandHours = calculateGrandTotalHours();
@@ -1930,14 +1863,15 @@ $selectedBioFirstName $selectedBioLastName
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Timesheet'),
+        title: Text('Timesheet', style: TextStyle(fontSize: 12 * titleFontSizeFactor)),
+        toolbarHeight: 50 * appBarHeightFactor,
         actions: <Widget>[
           IconButton(
-            icon: const Icon(Icons.save_alt),
+            icon: Icon(Icons.save_alt, size: 24 * iconSizeFactor),
             onPressed: _createAndExportPDF,
           ),
-          const Icon(Icons.picture_as_pdf),
-          const SizedBox(width: 15)
+          Icon(Icons.picture_as_pdf, size: 24 * iconSizeFactor),
+          SizedBox(width: 15 * marginFactor)
           // IconButton(
           //   icon: const Icon(Icons.save_alt), // Use a suitable icon for Excel
           //   onPressed: _createAndExportExcel,
@@ -1955,96 +1889,58 @@ $selectedBioFirstName $selectedBioLastName
           :
       SingleChildScrollView( // Wrap the entire body in SingleChildScrollView
         child: Column(
-          //crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
 
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: EdgeInsets.all(8.0 * paddingFactor),
               child: Column(
                 //mainAxisAlignment:MainAxisAlignment.start,
                   children: [
                     Image(
                       image: const AssetImage("./assets/image/ccfn_logo.png"),
-                      width: MediaQuery
-                          .of(context)
-                          .size
-                          .width * (MediaQuery
-                          .of(context)
-                          .size
-                          .shortestSide < 600 ? 0.15 : 0.10),
+                      width: MediaQuery.of(context).size.width * 0.10 * iconSizeFactor,
                       //height: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.050 : 0.30),
                     ),
                     Text('Name: $selectedBioFirstName $selectedBioLastName',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: MediaQuery
-                          .of(context)
-                          .size
-                          .width * (MediaQuery
-                          .of(context)
-                          .size
-                          .shortestSide < 600 ? 0.035 : 0.020),),),
-                    const SizedBox(height: 5),
+                        fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
+                    SizedBox(height: 5 * marginFactor),
                     Text('Department: $selectedBioDepartment',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: MediaQuery
-                          .of(context)
-                          .size
-                          .width * (MediaQuery
-                          .of(context)
-                          .size
-                          .shortestSide < 600 ? 0.035 : 0.020),),),
-                    const SizedBox(height: 5),
+                        fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
+                    SizedBox(height: 5 * marginFactor),
                     Text('Designation: $selectedBioDesignation',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: MediaQuery
-                          .of(context)
-                          .size
-                          .width * (MediaQuery
-                          .of(context)
-                          .size
-                          .shortestSide < 600 ? 0.035 : 0.020),),),
-                    const SizedBox(height: 5),
+                        fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
+                    SizedBox(height: 5 * marginFactor),
                     Text('Location: $selectedBioLocation', style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: MediaQuery
-                        .of(context)
-                        .size
-                        .width * (MediaQuery
-                        .of(context)
-                        .size
-                        .shortestSide < 600 ? 0.035 : 0.020),),),
-                    const SizedBox(height: 5),
+                      fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
+                    SizedBox(height: 5 * marginFactor),
                     Text('State: $selectedBioState', style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: MediaQuery
-                        .of(context)
-                        .size
-                        .width * (MediaQuery
-                        .of(context)
-                        .size
-                        .shortestSide < 600 ? 0.035 : 0.020),),),
-                    const SizedBox(height: 10),
-                    // Add some spacing
+                      fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
+                    SizedBox(height: 10 * marginFactor),
                   ]
               ),),
 
 
             // Month Picker Dropdown
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
               child: Row(
                 children: [
                   const Text(
                     'Select Month:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10 * marginFactor),
                   DropdownButton<int>(
                     value: selectedMonth,
                     items: List.generate(12, (index) {
                       DateTime monthDate = DateTime(2024, index + 1, 1);
                       return DropdownMenuItem<int>(
                         value: index,
-                        child: Text(DateFormat.MMMM().format(monthDate)),
+                        child: Text(DateFormat.MMMM().format(monthDate), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
                       );
                     }),
                     onChanged: (int? newValue) {
@@ -2058,12 +1954,12 @@ $selectedBioFirstName $selectedBioLastName
                   ),
 
 
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10 * marginFactor),
                   const Text(
                     'Select Year:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10 * marginFactor),
 
 
                   DropdownButton<int>(
@@ -2074,7 +1970,7 @@ $selectedBioFirstName $selectedBioLastName
                           .year - index;
                       return DropdownMenuItem<int>(
                         value: year,
-                        child: Text(year.toString()),
+                        child: Text(year.toString(), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
                       );
                     }),
                     onChanged: (int? newValue) {
@@ -2089,7 +1985,7 @@ $selectedBioFirstName $selectedBioLastName
                 ],
               ),
             ),
-            const Divider(),
+            Divider(height: 20 * marginFactor),
             // Attendance Sheet in a Container with 50% screen height
             Container(
               //height: MediaQuery.of(context).size.height * 0.5, // Adjusted height for better visibility
@@ -2101,11 +1997,10 @@ $selectedBioFirstName $selectedBioLastName
                             controller: _scrollController,
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(), // Smooth scrolling effect
-                            padding: const EdgeInsets.symmetric(horizontal: 10), // Adds space on sides
+                            padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
                             dragStartBehavior: DragStartBehavior.start,
                             clipBehavior: Clip.hardEdge,
                             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-
                             child:
                             // SizedBox( // <-- Use SizedBox to constrain the width
                             //     width: totalContentWidth(), // Calculate this dynamically
@@ -2474,24 +2369,12 @@ $selectedBioFirstName $selectedBioLastName
                             ),
                             //),
                           ),
-                          SizedBox(height: MediaQuery
-                              .of(context)
-                              .size
-                              .width * (MediaQuery
-                              .of(context)
-                              .size
-                              .shortestSide < 600 ? 0.07 : 0.05)),
+                          SizedBox(height: 5 * marginFactor),
                           //Signature and Detials
 
                           const Divider(),
                           Text('Signature & Date', style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: MediaQuery
-                              .of(context)
-                              .size
-                              .width * (MediaQuery
-                              .of(context)
-                              .size
-                              .shortestSide < 600 ? 0.050 : 0.030),)),
+                            fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
                           const Divider(),
                           Column(
                               mainAxisAlignment: MainAxisAlignment.start,
@@ -2526,52 +2409,19 @@ $selectedBioFirstName $selectedBioLastName
                                         children: [
                                           Text('Name of Staff',
                                               style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600
-                                                    ? 0.040
-                                                    : 0.020),)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
+                                                fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
+                                          SizedBox(height: 5 * marginFactor),
                                           Text(
                                             '${selectedBioFirstName.toString()
                                                 .toUpperCase()} ${selectedBioLastName
                                                 .toString().toUpperCase()}',
                                             style: TextStyle(
-                                              fontSize: MediaQuery
-                                                  .of(context)
-                                                  .size
-                                                  .width * (MediaQuery
-                                                  .of(context)
-                                                  .size
-                                                  .shortestSide < 600
-                                                  ? 0.035
-                                                  : 0.015),
+                                              fontSize: 16 * fontSizeFactor,
                                               // fontWeight: FontWeight.bold,
                                               fontFamily: "NexaLight",
                                             ),
                                           ),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.13
-                                              : 0.10)),
+                                          SizedBox(height: 5 * marginFactor),
                                           // Adjust path and size accordingly
                                         ],
                                       ),
@@ -2598,25 +2448,8 @@ $selectedBioFirstName $selectedBioLastName
                                       child: Column(
                                         children: [
                                           Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600
-                                                ? 0.040
-                                                : 0.020),)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.01
-                                              : 0.009)),
+                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
+                                          SizedBox(height: 5 * marginFactor),
 
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
@@ -3245,16 +3078,8 @@ $selectedBioFirstName $selectedBioLastName
                                       child: Column(
                                         children: [
                                           const Text('Date', style: TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
+                                            fontWeight: FontWeight.bold, fontSize: 20 ),),
+                                          SizedBox(height: 5 * marginFactor),
 
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
@@ -3305,15 +3130,7 @@ $selectedBioFirstName $selectedBioLastName
                                               }
                                             },
                                           ),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.13
-                                              : 0.10)),
+                                          SizedBox(height: 5 * marginFactor),
                                         ],
                                       ),
                                     ),
@@ -3370,28 +3187,9 @@ $selectedBioFirstName $selectedBioLastName
                                           Text(
                                             'Name of Facility Supervisor',
                                             style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: MediaQuery
-                                                  .of(context)
-                                                  .size
-                                                  .width *
-                                                  (MediaQuery
-                                                      .of(context)
-                                                      .size
-                                                      .shortestSide < 600
-                                                      ? 0.040
-                                                      : 0.020),
-                                            ),
+                                              fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
                                           ),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
+                                          SizedBox(height: 5 * marginFactor),
                                           //
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
@@ -3424,7 +3222,8 @@ $selectedBioFirstName $selectedBioLastName
                                                   return  buildFacilitySupervisorDropdown();
                                                 } else {
                                                   return Text(
-                                                      "$facilitySupervisor");
+                                                      "$facilitySupervisor",style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
                                                 }
                                               } else {
                                                 return buildFacilitySupervisorDropdown();
@@ -3434,18 +3233,7 @@ $selectedBioFirstName $selectedBioLastName
                                           //
 
 
-                                          SizedBox(
-                                            height: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width *
-                                                (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600
-                                                    ? 0.005
-                                                    : 0.005),
-                                          ),
+                                          SizedBox(height: 5 * marginFactor),
                                         ],
                                       ),
                                     ),
@@ -3473,25 +3261,9 @@ $selectedBioFirstName $selectedBioLastName
                                       child: Column(
                                         children: [
                                           Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600
-                                                ? 0.040
-                                                : 0.020),)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.01
-                                              : 0.009)),
+                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
                                             stream: FirebaseFirestore.instance
@@ -3650,7 +3422,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                   context: context,
                                                                   builder: (context) {
                                                                     return AlertDialog(
-                                                                      title: const Text("Reason for Rejection"),
+                                                                      title: const Text("Reason for Return"),
                                                                       content: Text(facilitySupervisorRejectionReason ?? "No reason provided."),
                                                                       actions: [
                                                                         TextButton(
@@ -3696,13 +3468,7 @@ $selectedBioFirstName $selectedBioLastName
                                         ],
                                       ),
                                     ),
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
+                                    SizedBox(height: 5 * marginFactor),
                                     //Date of Project Signature Date
 
                                     Container(
@@ -3717,16 +3483,8 @@ $selectedBioFirstName $selectedBioLastName
                                       child: Column(
                                         children: [
                                           const Text('Date', style: TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
+                                            fontWeight: FontWeight.bold, fontSize: 20 ,),),
+                                          SizedBox(height: 5 * marginFactor),
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
                                             stream: FirebaseFirestore.instance
@@ -3819,28 +3577,10 @@ $selectedBioFirstName $selectedBioLastName
                                           Text(
                                             'Name of CARITAS Supervisor',
                                             style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: MediaQuery
-                                                  .of(context)
-                                                  .size
-                                                  .width *
-                                                  (MediaQuery
-                                                      .of(context)
-                                                      .size
-                                                      .shortestSide < 600
-                                                      ? 0.040
-                                                      : 0.020),
+                                              fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
                                             ),
-                                          ),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.07
-                                              : 0.05)),
+
+                                          SizedBox(height: 5 * marginFactor),
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
                                             stream: FirebaseFirestore.instance
@@ -3872,25 +3612,16 @@ $selectedBioFirstName $selectedBioLastName
                                                   return  buildSupervisorDropdown();
                                                 } else {
                                                   return Text(
-                                                      "$caritasSupervisor");
+                                                      "$caritasSupervisor",style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
                                                 }
                                               } else {
                                                 return buildSupervisorDropdown();
                                               }
                                             },
                                           ),
-                                          SizedBox(
-                                            height: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width *
-                                                (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600
-                                                    ? 0.005
-                                                    : 0.005),
-                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+
                                         ],
                                       ),
                                     ),
@@ -3917,25 +3648,9 @@ $selectedBioFirstName $selectedBioLastName
                                       child: Column(
                                         children: [
                                           Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600
-                                                ? 0.040
-                                                : 0.020),)),
-                                          SizedBox(height: MediaQuery
-                                              .of(context)
-                                              .size
-                                              .width * (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.02
-                                              : 0.02)),
+                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
                                           StreamBuilder<DocumentSnapshot>(
                                             // Stream the supervisor signature
                                             stream: FirebaseFirestore.instance
@@ -4346,15 +4061,81 @@ $selectedBioFirstName $selectedBioLastName
                                         ],
                                       ),
                                     ),
+
+                                    SizedBox(width: MediaQuery
+                                        .of(context)
+                                        .size
+                                        .width * (MediaQuery
+                                        .of(context)
+                                        .size
+                                        .shortestSide < 600 ? 0.01 : 0.009)),
+
+                                    //Date of CARITAS Supervisor
+                                    Container(
+                                      width: MediaQuery
+                                          .of(context)
+                                          .size
+                                          .width * (MediaQuery
+                                          .of(context)
+                                          .size
+                                          .shortestSide < 600 ? 0.30 : 0.30),
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          const Text('Date', style: TextStyle(
+                                            fontWeight: FontWeight.bold, fontSize: 20),),
+                                          SizedBox(height: 5 * marginFactor),
+                                          StreamBuilder<DocumentSnapshot>(
+                                            // Stream the supervisor signature
+                                            stream: FirebaseFirestore.instance
+                                                .collection("Staff")
+                                                .doc(
+                                                selectedFirebaseId) // Replace with how you get the staff document ID
+                                                .collection("TimeSheets")
+                                                .doc(
+                                                DateFormat('MMMM_yyyy').format(
+                                                    DateTime(selectedYear,
+                                                        selectedMonth +
+                                                            1))) // Replace monthYear with the timesheet document ID
+                                                .snapshots(),
+                                            builder: (context, snapshot) {
+                                              if (snapshot.hasData &&
+                                                  snapshot.data!.exists) {
+                                                final data = snapshot.data!
+                                                    .data() as Map<
+                                                    String,
+                                                    dynamic>;
+
+                                                final caritasSupervisorDate = data['caritasSupervisorSignatureDate']; // Assuming this stores the image URL
+                                                //  final caritasSupervisorDate = data['date']; // Assuming you store the date
+
+                                                if (caritasSupervisorDate !=
+                                                    null) {
+                                                  // caritasSupervisorSignature is a URL/path to the image
+                                                  return Column(
+                                                    children: [
+                                                      //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
+                                                      Text(
+                                                          caritasSupervisorDate
+                                                              .toString()),
+                                                    ],
+                                                  );
+                                                } else {
+                                                  return const Text(
+                                                      "Awaiting Caritas Supervisor Date");
+                                                }
+                                              } else {
+                                                return const Text(
+                                                    "Timesheet Yet to be submitted for Caritas Signature Date");
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                SizedBox(height: MediaQuery
-                                    .of(context)
-                                    .size
-                                    .width * (MediaQuery
-                                    .of(context)
-                                    .size
-                                    .shortestSide < 600 ? 0.005 : 0.005)),
+                                SizedBox(height: 5 * marginFactor),
                                 const Divider(),
                                 StreamBuilder<DocumentSnapshot>(
                                   // Stream the supervisor signature
