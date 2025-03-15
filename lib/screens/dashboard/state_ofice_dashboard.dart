@@ -31,7 +31,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   String? _currentUserState;
   String? _currentUserLocation;
   String? _currentUserStaffCategory;
-  bool _isLoadingClockInData = false;
+  final bool _isLoadingClockInData = false;
   String _selectedDateRange = "Today";
   DateTime? _startDateFilter;
   DateTime? _endDateFilter;
@@ -448,7 +448,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 Text('${pendingLeaveRequests.length} Requests', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
               ],
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             SizedBox(
               height: 50 * cardMarginFactor * otherCardHeightFactor,
               child: ListView.builder(
@@ -472,7 +472,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             SizedBox(height: 10 * cardMarginFactor),
             Text('Upcoming Leaves', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             SizedBox(
               height: 50 * cardMarginFactor * otherCardHeightFactor,
               child: ListView.builder(
@@ -488,7 +488,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 },
               ),
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             Align(
               alignment: Alignment.bottomRight,
               child: TextButton(
@@ -535,7 +535,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             SizedBox(height: 20 * cardMarginFactor),
             Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             SizedBox(
               height: 50 * cardMarginFactor * otherCardHeightFactor,
               child: SfLinearGauge(
@@ -563,7 +563,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Align(
               alignment: Alignment.bottomRight,
               child: TextButton(
@@ -638,7 +638,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Align(
               alignment: Alignment.bottomRight,
               child: TextButton(
@@ -895,7 +895,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '${totalPresent} ClockedIn / ${totalCount} Staffs', // Display dynamic percentage
+                          '$totalPresent ClockedIn / $totalCount Staffs', // Display dynamic percentage
                           style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.grey.shade600),
                         ),
                       ],
@@ -913,14 +913,16 @@ class DashboardScreenState extends State<DashboardScreen> {
   List<Widget> _buildAttendanceSummary(String gender, List<AttendanceData> data, double fontSizeFactor, double iconSizeFactor) {
     return data.map((item) {
       Color color;
-      if (item.status == 'Present') color = Colors.green.shade400;
-      else if (item.status == 'Absent') color = Colors.orange.shade400;
+      if (item.status == 'Present') {
+        color = Colors.green.shade400;
+      } else if (item.status == 'Absent') color = Colors.orange.shade400;
       else if (item.status == 'Late') color = Colors.red.shade400;
       else color = Colors.grey.shade400;
 
       String statusText = '';
-      if (item.status == 'Present') statusText = 'Present';
-      else if (item.status == 'Absent') statusText = 'Absent';
+      if (item.status == 'Present') {
+        statusText = 'Present';
+      } else if (item.status == 'Absent') statusText = 'Absent';
       else if (item.status == 'Late') statusText = 'Late';
       else statusText = item.status;
 
@@ -975,7 +977,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       primaryXAxis: CategoryAxis(labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
       primaryYAxis: NumericAxis(labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
       title: ChartTitle(text: 'Weekly Attendance Trend', textStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
-      legend: Legend(isVisible: false),
+      legend: const Legend(isVisible: false),
       series: [
         LineSeries<WeeklyTrendData, String>(
           dataSource: weeklyTrendData,
@@ -1078,7 +1080,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'All Facility Clock-In (Live Feed) - ${_selectedDateRange}',
+                'All Facility Clock-In (Live Feed) - $_selectedDateRange',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -1167,13 +1169,13 @@ class DashboardScreenState extends State<DashboardScreen> {
                   if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
                   if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
 
-                  return timeA!.compareTo(timeB!);
+                  return timeA.compareTo(timeB);
                 });
 
 
                 if (facilityClockInData.isEmpty) {
                   return Center(
-                      child: Text("No Clock-Ins for ${_selectedDateRange}",
+                      child: Text("No Clock-Ins for $_selectedDateRange",
                           style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
                 }
                 return SingleChildScrollView(
@@ -1248,7 +1250,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ],
                 )
               else
-                SizedBox.shrink(), // No icon if clockIn is 'N/A'
+                const SizedBox.shrink(), // No icon if clockIn is 'N/A'
             ],
           ),
         ],
@@ -1346,7 +1348,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           dateB = DateTime(0); // Fallback in case of parsing error
         }
 
-        int dateComparison = dateB!.compareTo(dateA!); // Reverse order for dates (descending)
+        int dateComparison = dateB.compareTo(dateA); // Reverse order for dates (descending)
         if (dateComparison != 0) {
           return dateComparison; // Dates are different, return date comparison
         }
@@ -1369,7 +1371,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
         if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
 
-        return timeA!.compareTo(timeB!); // Ascending order for times
+        return timeA.compareTo(timeB); // Ascending order for times
       });
       dataSubject.add(allClockInData);
     }
@@ -1616,16 +1618,14 @@ class DashboardScreenState extends State<DashboardScreen> {
             continue;
           }
 
-          if (startDateTimestamp != null && endDateTimestamp != null) {
-            DateTime startDate = startDateTimestamp.toDate();
-            DateTime endDate = endDateTimestamp.toDate();
-            DateTime now = DateTime.now();
-            if (now.isAfter(startDate.subtract(const Duration(days: 1))) && now.isBefore(endDate.add(const Duration(days: 1)))) {
-              onLeave(); // Increment on leave count
-              return false; // Indicate not just 'present' - was handled as on leave
-            }
+          DateTime startDate = startDateTimestamp.toDate();
+          DateTime endDate = endDateTimestamp.toDate();
+          DateTime now = DateTime.now();
+          if (now.isAfter(startDate.subtract(const Duration(days: 1))) && now.isBefore(endDate.add(const Duration(days: 1)))) {
+            onLeave(); // Increment on leave count
+            return false; // Indicate not just 'present' - was handled as on leave
           }
-        }
+                }
       } else {
         print("Warning: Could not get Staff Document Reference to check for Leave Requests.");
       }

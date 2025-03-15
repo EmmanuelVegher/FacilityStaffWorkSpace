@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../widgets/button.dart';
-import '../../widgets/drawer.dart';
 import '../../widgets/drawer2.dart';
 
 class CreateActivityPage extends StatefulWidget {
@@ -20,13 +19,13 @@ class CreateActivityPage extends StatefulWidget {
 class _CreateActivityPageState extends State<CreateActivityPage> {
   String _userRole = 'User'; // Default role
   String _selectedReportType = 'Daily';
-  TextEditingController _indicatorController = TextEditingController();
+  final TextEditingController _indicatorController = TextEditingController();
   String _selectedResponseType = 'Input Box';
   String? _selectedThematicDepartment; // For Thematic Activity Department Dropdown
   List<String> _departments = []; // To store departments from "Designation"
   String? _selectedAssignedDepartment; // For Other Activity Department Dropdown
   DateTime? _selectedDate; // For Date Picker in Other Activity
-  TextEditingController _activityNameController = TextEditingController(); // For Activity Name in Other Activity
+  final TextEditingController _activityNameController = TextEditingController(); // For Activity Name in Other Activity
   List<Map<String, dynamic>> _selectedAssignedUsers = []; // Modified to store full name also
   List<Map<String, dynamic>> _staffListForDepartment = []; // To store staff based on selected department
   int _selectedIndex = 0; // For bottom navigation bar
@@ -36,8 +35,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
   String? _selectedFacilityName;
   List<String> _facilityNames = [];
 
-  List<String> _reportTypes = ['Daily', 'Weekly', 'Monthly'];
-  List<String> _responseTypes = ['Input Box', 'Numerator/Denominator'];
+  final List<String> _reportTypes = ['Daily', 'Weekly', 'Monthly'];
+  final List<String> _responseTypes = ['Input Box', 'Numerator/Denominator'];
 
   // Edit Mode Variables
   bool _isEditThematicMode = false;
@@ -174,17 +173,17 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
     });
     if (department.isNotEmpty) {
       try {
-        Query<Map<String, dynamic>> staffQuery = FirebaseFirestore.instance.collection('Staff') as CollectionReference<Map<String, dynamic>>;
+        Query<Map<String, dynamic>> staffQuery = FirebaseFirestore.instance.collection('Staff');
         staffQuery = staffQuery.where('department', isEqualTo: department);
         if (facilityName != null && facilityName.isNotEmpty) {
           staffQuery = staffQuery.where('location', isEqualTo: facilityName);
         }
 
-        final QuerySnapshot<Map<String, dynamic>> staffSnapshot = await staffQuery.get() as QuerySnapshot<Map<String, dynamic>>;
+        final QuerySnapshot<Map<String, dynamic>> staffSnapshot = await staffQuery.get();
 
         setState(() {
           _staffListForDepartment = staffSnapshot.docs.map((doc) {
-            final data = doc.data()!;
+            final data = doc.data();
             final firstName = data['firstName'] as String? ?? '';
             final lastName = data['lastName'] as String? ?? '';
             final fullName = '$firstName $lastName';
@@ -254,14 +253,14 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
   }
 
   Widget _buildReportsSection() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return const Padding(
+      padding: EdgeInsets.all(16.0),
       child: Column(
         children: [
-          const Text("Thematic Reports", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text("Thematic Reports", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           Expanded(child: ThematicReportsScreen()),
-          const SizedBox(height: 20),
-          const Text("Other Reports", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 20),
+          Text("Other Reports", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           Expanded(child: OtherReportsScreen()),
         ],
       ),
@@ -661,6 +660,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 }
 
 class ThematicReportsScreen extends StatelessWidget {
+  const ThematicReportsScreen({super.key});
+
   // Stream to fetch Thematic Reports
   Stream<List<Map<String, dynamic>>> _thematicReportsStream() {
     return FirebaseFirestore.instance.collection('Designation').snapshots().asyncMap((departmentSnapshots) async {
@@ -802,6 +803,8 @@ class ThematicReportsScreen extends StatelessWidget {
 }
 
 class OtherReportsScreen extends StatelessWidget {
+  const OtherReportsScreen({super.key});
+
 
   Stream<List<Map<String, dynamic>>> _otherReportsStream() {
     return FirebaseFirestore.instance.collection('Designation').snapshots().asyncMap((departmentSnapshots) async {

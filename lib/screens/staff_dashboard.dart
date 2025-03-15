@@ -45,7 +45,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   String? _errorMessage;
   bool _isLoading = false;
   bool _isLoadingBestPlayer = false;
-  bool _isLoadingClockInData = false;
+  final bool _isLoadingClockInData = false;
 
   String _selectedDepartment = 'All Departments';
   String _selectedMonth = 'January';
@@ -70,7 +70,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   String? _currentUserState;
   String? _currentUserLocation;
   String? _currentUserStaffCategory;
-  Map<String, Map<String, dynamic>> _bestPlayerCache = {};
+  final Map<String, Map<String, dynamic>> _bestPlayerCache = {};
   int _totalSurveysCountedForBestPlayer = 0; // Added survey count variable
 
   void _resetLogoutTimer() {
@@ -995,7 +995,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ) {
     final timeFormat = DateFormat('hh:mm a');
     List<Map<String, dynamic>> chartData = _attendanceData.map((record) {
-      int earlyLateMinutes = DateHelper.calculateEarlyLateTime(record.clockInTime);
+      // **Corrected Time Calculation Logic Here**
+      int earlyLateMinutes = _calculateEarlyLateTimeCorrected(record.clockInTime); // Using the corrected function
       return {
         'date': DateFormat('dd-MMM').format(record.date),
         'earlyLateMinutes': earlyLateMinutes,
@@ -1012,12 +1013,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
             vertical:
             16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildEarlyLateClockInsChartContent(
+        child: _buildEarlyLateClockInsChartContent( // Using the rewritten chart content function
             fontSizeFactor, cardMarginFactor, chartData, screenWidth), // Pass screenWidth
       ),
     );
   }
 
+  // **Rewritten _buildEarlyLateClockInsChartContent Function**
   Widget _buildEarlyLateClockInsChartContent(double fontSizeFactor, double cardMarginFactor, List<Map<String, dynamic>> chartData, double screenWidth) {
     double chartTextScaleFactor = screenWidth > 1200 ? 1.0 : screenWidth > 800 ? 0.9 : 0.8; // Scale factor for text
     return Column(
@@ -1081,9 +1083,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 yValueMapper: (data, _) => data['earlyLateMinutes'] as int,
                 name: 'Early/Late Minutes',
                 pointColorMapper: (data, _) =>
-                (data['earlyLateMinutes'] as int) >= 0
+                (data['earlyLateMinutes'] as int) > 0 // Corrected condition: > 0 for late (red)
                     ? Colors.red
-                    : Colors.green,
+                    : (data['earlyLateMinutes'] as int) < 0 // < 0 for early (green)
+                    ? Colors.green
+                    : Colors.grey, // 0 for on-time (grey, or you can choose another color)
                 dataLabelSettings: const DataLabelSettings(isVisible: false),
               ),
             ],
@@ -1092,6 +1096,36 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ],
     );
   }
+
+
+  // **Corrected Time Calculation Function**
+  int _calculateEarlyLateTimeCorrected(String? clockInTimeStr) {
+    if (clockInTimeStr == null || clockInTimeStr == 'N/A') {
+      return 0; // Or handle 'N/A' as needed, maybe return null or a specific value
+    }
+
+    DateFormat timeFormat = DateFormat('hh:mm a'); // Use the correct format
+
+    try {
+      DateTime clockInTime = timeFormat.parse(clockInTimeStr);
+      DateTime standardStartTime = timeFormat.parse('08:00 AM'); // Standard start time is 8:00 AM
+
+      // Combine clockInTime and standardStartTime with today's date for accurate comparison
+      DateTime now = DateTime.now();
+      DateTime clockInDateTime = DateTime(now.year, now.month, now.day, clockInTime.hour, clockInTime.minute);
+      DateTime standardStartDateTime = DateTime(now.year, now.month, now.day, standardStartTime.hour, standardStartTime.minute);
+
+
+      // Calculate the difference in minutes
+      int differenceInMinutes = clockInDateTime.difference(standardStartDateTime).inMinutes;
+      return differenceInMinutes;
+
+    } catch (e) {
+      print("Error parsing clock-in time: $e");
+      return 0; // Return 0 in case of parsing error, or handle as needed
+    }
+  }
+
 
   Widget _buildDatePickerInAppBar(
       String label,
@@ -1479,11 +1513,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           print("Processing Survey Document ID: ${surveyDoc.id}"); // Log Survey Doc ID
 
           final surveyDataFull = surveyDoc.data();
-
-          if (surveyDataFull == null) {
-            print("Survey data is null for document: ${surveyDoc.id}");
-            continue;
-          }
           print("Full Survey Data: $surveyDataFull");
 
           if (surveyDataFull.containsKey('surveyData')) {
@@ -1636,7 +1665,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
                   if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
 
-                  return timeA!.compareTo(timeB!);
+                  return timeA.compareTo(timeB);
                 });
 
 
@@ -1715,7 +1744,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   ],
                 )
               else
-                SizedBox.shrink(), // No icon if clockIn is 'N/A'
+                const SizedBox.shrink(), // No icon if clockIn is 'N/A'
             ],
           ),
         ],

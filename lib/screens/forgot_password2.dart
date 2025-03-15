@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../widgets/drawer.dart';
 import '../widgets/drawer2.dart';
 
 class ForgotPasswordPage2 extends StatefulWidget {
@@ -76,7 +75,7 @@ class _ForgotPasswordPage2State extends State<ForgotPasswordPage2> with SingleTi
       drawer: drawer2(context,),
       appBar: AppBar(
         title: const Text('Forgot Password', style: TextStyle(color: Colors.white)),
-        iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+        iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
         ),

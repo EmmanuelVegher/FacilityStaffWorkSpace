@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
-
+import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +24,6 @@ import 'dart:math';
 
 import '../../services/location_services.dart';
 import '../../widgets/drawer.dart';
-import '../../widgets/drawer2.dart';
 import '../../widgets/geo_utils.dart';
 import '../../widgets/header_widget.dart';
 
@@ -33,13 +33,41 @@ class GeofenceModel {
   final double latitude;
   final double longitude;
   final double radius;
+  final String category;
+  final String stateName;
 
   GeofenceModel({
     required this.name,
     required this.latitude,
     required this.longitude,
     required this.radius,
+    required this.category,
+    required this.stateName,
   });
+
+  factory GeofenceModel.fromFirestore(
+      Map<String, dynamic> firestoreData, String stateName) {
+    return GeofenceModel(
+      name: firestoreData['LocationName'] ?? 'Unknown Location',
+      latitude:
+      GeofenceModel._parseNum(firestoreData['Latitude'])?.toDouble() ?? 0.0,
+      longitude: GeofenceModel._parseNum(firestoreData['Longitude'])?.toDouble() ??
+          0.0,
+      radius:
+      GeofenceModel._parseNum(firestoreData['Radius'])?.toDouble() ?? 100.0,
+      category: firestoreData['category'] ?? 'General',
+      stateName: stateName,
+    );
+  }
+
+  static num? _parseNum(dynamic value) {
+    if (value is num) {
+      return value;
+    } else if (value is String) {
+      return num.tryParse(value);
+    }
+    return null;
+  }
 }
 
 class LeaveRequestModel {
@@ -176,9 +204,13 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   final RxInt _remainingMaternityLeaveBalance = 0.obs;
   final RxInt _remainingAnnualLeaveBalance = 0.obs;
   RxInt expandedPanelIndex = (-1).obs;
+  String googleApiKey2 = "AIzaSyBZMjfaZ7Cpd_wHjyxfx3tVKql4x4fS2KE";
 
   final _markedDates = <DateTime>[].obs;
   final _nigerianHolidays = <DateTime, String>{}.obs;
+
+  final RxInt _pendingHolidayLeavesCount = 0.obs; // New RxInt for pending holiday leaves
+  final RxInt _approvedHolidayLeavesCount = 0.obs; // New RxInt for approved holiday leaves
 
 
   RxDouble lati = 0.0.obs;
@@ -207,6 +239,8 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   Rx<LocationPermission> isLocationPermissionGranted =
       LocationPermission.denied.obs;
   late StreamSubscription<LocationData> subscription; // Initialize subscription here
+  RxString currentStateDisplay =
+      "".obs;
 
   String _selectedLeaveType = 'Annual';
   RemainingLeaveModel? _remainingLeaves1;
@@ -215,7 +249,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   final List<LeaveRequestModel> _leaveRequests1 = [];
   final bool _firebaseInitialized1 = false;
   // Use RxString for selectedSupervisor to observe changes
-  RxString _selectedSupervisor = RxString('');
+  final RxString _selectedSupervisor = RxString('');
   String? _selectedSupervisorEmail;
   BioModel? _bioInfo1;
   LeaveRequestModel? _leaveRequestInfo;
@@ -243,6 +277,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   final _bioInfo = Rxn<BioModel>();
   final _firebaseInitialized = false.obs;
   List<String> attachments = [];
+  List<GeofenceModel> cachedGeofences = [];
   bool isHTML = false;
   String? _currentUserId;
 
@@ -250,14 +285,16 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   @override
   void initState() {
     super.initState();
-    subscription = Stream<LocationData>.empty().listen((_) {}); // Initialize with an empty stream
+    subscription = const Stream<LocationData>.empty().listen((_) {}); // Initialize with an empty stream
 
     _loadBioData();
     _loadAttendanceDates();
     _loadNigerianHolidays();
     _initFirebase().then((_) => _init()).then((_) {
       _startLocationService(); // Start location service after Firebase and BioData are initialized
+      getCurrentLocation();
       _getUserLocation(); // Get initial location
+      _updateLocation();
     });
     _tabController = TabController(length: 2, vsync: this);
 
@@ -322,6 +359,24 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
     }
   }
 
+  Future<void> _updateHolidayLeaveCounts() async {
+    int pendingCount = 0;
+    int approvedCount = 0;
+
+    for (var leaveRequest in _leaveRequests) {
+      if (leaveRequest.type == 'Holiday') {
+        if (leaveRequest.status == 'Pending') {
+          pendingCount++;
+        } else if (leaveRequest.status == 'Approved') {
+          approvedCount++;
+        }
+      }
+    }
+    _pendingHolidayLeavesCount.value = pendingCount; // Update RxInt for pending count
+    _approvedHolidayLeavesCount.value = approvedCount; // Update RxInt for approved count
+  }
+
+
 
   Future<void> _init() async {
     if (_firebaseInitialized.value == false) return;
@@ -343,6 +398,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
           await syncUnsyncedLeaveRequests();
           _checkAndUpdateLeaveStatus();
           _calculateAndStoreRemainingLeave();
+          _updateHolidayLeaveCounts(); // Call the new function here
         }
       });
 
@@ -367,7 +423,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
         .collection('Leave Request');
 
     yield* leaveRequestCollection.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => LeaveRequestModel.fromJson(doc.data() as Map<String, dynamic>)).toList();
+      return snapshot.docs.map((doc) => LeaveRequestModel.fromJson(doc.data())).toList();
     });
   }
 
@@ -645,104 +701,110 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     return await Geolocator.getCurrentPosition();
   }
 
-  Future<void> _getUserLocation() async {
-    print("Geolocator Dependency here");
+  Future<void> _getUserLocation1() async {
+    print("Fetching user location...");
+
     try {
-      Position? position = await getCurrentLocation();
-      if (position != null) {
-        print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
-        lati.value = position.latitude;
-        longi.value = position.longitude;
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.high,
+      );
 
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
+      print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
+      lati.value = position.latitude;
+      longi.value = position.longitude;
 
+      // Get location details using reverse geocoding
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      print("placemarks ==$placemarks");
 
-        if (placemarks.isNotEmpty) {
-          Placemark placemark = placemarks[0];
-          location.value =
-          "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
-          administrativeArea.value = placemark.administrativeArea!;
+      if (placemarks.isNotEmpty) {
+        Placemark placemark = placemarks.first;
+        location.value =
+        "${placemark.street}, ${placemark.subLocality}, ${placemark.subAdministrativeArea}, ${placemark.locality}, ${placemark.administrativeArea}, ${placemark.postalCode}, ${placemark.country}";
+        administrativeArea.value = placemark.administrativeArea ?? '';
 
-          print("location.valuesssss==${location.value}");
-          print("placemark.administrativeArea==${placemark.administrativeArea}");
-          print("administrativeArea.value ==${administrativeArea.value}");
-
-        } else {
-          location.value = "Location not found";
-          administrativeArea.value = "";
-          await _updateLocationUsingGeofencing2(position.latitude,position.longitude);
-        }
-
-
-        if (administrativeArea.value != '') {
-          List<GeofenceModel> offices = [];
-          final locationsSnapshot = await FirebaseFirestore.instance.collection('Locations').where('state', isEqualTo: administrativeArea.value).get();
-          offices = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
-            name: locationModel.locationName ?? '',
-            latitude: locationModel.latitude ?? 0.0,
-            longitude: locationModel.longitude ?? 0.0,
-            radius: locationModel.radius?.toDouble() ?? 0.0,
-          )).toList(); // Removed .cast<LocationModel>()
-
-          print("Officessss == $offices");
-
-          isInsideAnyGeofence.value = false;
-          for (GeofenceModel office in offices) {
-            double distance = GeoUtils.haversine(
-                position.latitude, position.longitude,office.latitude, office.longitude);
-
-            if (distance <= office.radius) {
-              print('Entered office: ${office.name}');
-
-              location.value = office.name;
-              isInsideAnyGeofence.value = true;
-              break;
-            }
-          }
-
-          if (!isInsideAnyGeofence.value) {
-            List<Placemark> placemark = await placemarkFromCoordinates(
-                position.latitude, position.longitude);
-
-            location.value =
-            "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
-
-            print("Location from map === ${location.value}");
-          }
-        }
-        else if(administrativeArea.value == '' && location.value != 0.0){
-          await _updateLocationUsingGeofencing();
-        }
-        else {
-          List<Placemark> placemark = await placemarkFromCoordinates(
-              position.latitude, position.longitude);
-
-          location.value =
-          "${placemark[0].street},${placemark[0].subLocality},${placemark[0].subAdministrativeArea},${placemark[0].locality},${placemark[0].administrativeArea},${placemark[0].postalCode},${placemark[0].country}";
-
-          print("Unable to get administrative area. Using default location.");
-
-        }
-
+        print("Location details: ${location.value}");
+        print("Administrative area: ${administrativeArea.value}");
+      } else {
+        location.value = "Location not found";
+        administrativeArea.value = "";
+        await _updateLocationUsingGeofencing2(position.latitude, position.longitude);
       }
 
-    } catch (e) {
+      // Check if the user is inside any geofenced office location
+      if (administrativeArea.value.isNotEmpty) {
+        List<GeofenceModel> offices = [];
+        final locationsSnapshot = await FirebaseFirestore.instance
+            .collection('Locations')
+            .where('state', isEqualTo: administrativeArea.value)
+            .get();
 
-      if(lati.value != 0.0 && administrativeArea.value == ''){
+        offices = locationsSnapshot.docs.map((doc) => LocationModel.fromJson(doc.data())).map((locationModel) => GeofenceModel(
+          name: locationModel.locationName ?? '',
+          latitude: locationModel.latitude ?? 0.0,
+          longitude: locationModel.longitude ?? 0.0,
+          radius: locationModel.radius?.toDouble() ?? 0.0,
+          category: locationModel.category ?? '',
+          stateName: locationModel.state ?? '',
+        )).toList();
+
+        print("Fetched geofence locations: $offices");
+
+        isInsideAnyGeofence.value = false;
+        for (GeofenceModel office in offices) {
+          double distance = GeoUtils.haversine(
+            position.latitude,
+            position.longitude,
+            office.latitude,
+            office.longitude,
+          );
+
+          if (distance <= office.radius) {
+            print('Entered office: ${office.name}');
+            location.value = office.name;
+            isInsideAnyGeofence.value = true;
+            break;
+          }
+        }
+
+        if (!isInsideAnyGeofence.value) {
+          print("User is not inside any geofenced location. Using reverse geocoding.");
+          List<Placemark> placemark = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          location.value =
+          "${placemark.first.street}, ${placemark.first.subLocality}, ${placemark.first.subAdministrativeArea}, ${placemark.first.locality}, ${placemark.first.administrativeArea}, ${placemark.first.postalCode}, ${placemark.first.country}";
+        }
+      } else {
+        if (location.value.isNotEmpty) {
+          await _updateLocationUsingGeofencing();
+        } else {
+          List<Placemark> placemark = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          location.value =
+          "${placemark.first.street}, ${placemark.first.subLocality}, ${placemark.first.subAdministrativeArea}, ${placemark.first.locality}, ${placemark.first.administrativeArea}, ${placemark.first.postalCode}, ${placemark.first.country}";
+          print("Could not determine administrative area. Using fallback location.");
+        }
+      }
+    } catch (e) {
+      print("Error getting location: $e");
+
+      if (lati.value != 0.0 && administrativeArea.value.isEmpty) {
         await _updateLocationUsingGeofencing();
-      }else if(lati.value == 0.0 && administrativeArea.value == '') {
+      } else if (lati.value == 0.0 && administrativeArea.value.isEmpty) {
         Timer(const Duration(seconds: 10), () async {
           if (lati.value == 0.0 && longi.value == 0.0) {
-            print("Location not obtained within 10 seconds. Using default1.");
+            print("Location not obtained within 10 seconds. Using default location.");
             _getLocationDetailsFromLocationModel();
           }
         });
-      }
-      else{
-
+      } else {
         dev.log('Error getting location: $e');
         Fluttertoast.showToast(
           msg: "Error getting location: $e",
@@ -752,12 +814,114 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           timeInSecForIosWeb: 1,
           textColor: Colors.white,
           fontSize: 16.0,
-        );}
+        );
+      }
     }
   }
 
+  Future<void> _getUserLocation() async {
+    print("Fetching user location...");
 
-  Future<void> _updateLocation() async {
+    try {
+      // Get user's current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.high,
+      );
+
+      print('Latitude: \${position.latitude}, Longitude: \${position.longitude}');
+      lati.value = position.latitude;
+      longi.value = position.longitude;
+      accuracy.value = position.accuracy;
+      altitude.value = position.altitude;
+      speed.value = position.speed;
+      speedAccuracy.value = position.speedAccuracy;
+      heading.value = position.heading;
+      time.value = position.timestamp.millisecondsSinceEpoch.toDouble();
+      isMock.value = position.isMocked;
+
+      // Reverse geocoding using Google Maps API
+      String apiKey = "AIzaSyDrEiP6HeIv5C2_Fo5szYDkpkYGdoOvcPg"; // Replace with your API key
+      String url =
+          "https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$apiKey";
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        print("Geocoding API error: \${response.body}");
+        location.value = "Geocoding failed";
+        return;
+      }
+
+      var data = json.decode(response.body);
+      String state = _extractState(data);
+      if (state.isEmpty) {
+        location.value = "State not found";
+        return;
+      }
+
+      print("Extracted State: \$state");
+      administrativeArea.value = state;
+
+      List<GeofenceModel> offices = await _fetchGeofenceLocations(state);
+      if (offices.isEmpty) {
+        location.value = "No geofence locations found for \$state";
+        return;
+      }
+
+      _checkGeofence(offices, position.latitude, position.longitude);
+    } catch (e) {
+      print("Error getting location: \$e");
+      Fluttertoast.showToast(
+        msg: "Error getting location: \$e",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
+  }
+
+  String _extractState(Map<String, dynamic> data) {
+    List<dynamic> addressComponents = data["results"][0]["address_components"];
+    for (var component in addressComponents) {
+      if (component["types"].contains("administrative_area_level_1")) {
+        return component["long_name"];
+      }
+    }
+    return "";
+  }
+
+  Future<List<GeofenceModel>> _fetchGeofenceLocations(String state) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('Location').doc(state).collection(state).get();
+      return snapshot.docs.map((doc) => GeofenceModel.fromFirestore(doc.data(), state)).toList();
+    } catch (e) {
+      print("Error fetching geofence locations: \$e");
+      return [];
+    }
+  }
+
+  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude) {
+    isInsideAnyGeofence.value = false;
+
+    for (GeofenceModel office in offices) {
+      double distance = GeoUtils.haversine(latitude, longitude, office.latitude, office.longitude);
+      if (distance <= office.radius) {
+        print('Entered office: \${office.name}');
+        location.value = office.name;
+        isInsideAnyGeofence.value = true;
+        isCircularProgressBarOn.value = false;
+        return;
+      }
+    }
+
+    location.value = "Not inside any geofence";
+    isCircularProgressBarOn.value = false;
+  }
+
+
+
+
+  Future<void> _updateLocation1() async {
     try{
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -790,7 +954,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           name: locationModel.locationName ?? '',
           latitude: locationModel.latitude ?? 0.0,
           longitude: locationModel.longitude ?? 0.0,
-          radius: locationModel.radius?.toDouble() ?? 0.0,
+          radius: locationModel.radius?.toDouble() ?? 0.0, category: locationModel.category ?? '', stateName: locationModel.state ?? '',
         )).toList();
 
 
@@ -866,6 +1030,109 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   }
 
+  Future<String?> _getUserState() async {
+    try {
+      String? userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return null;
+
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists && userDoc.data() != null) {
+        return userDoc["state"] as String?;
+      }
+    } catch (e) {
+      dev.log("Error fetching user state: $e");
+    }
+    return null;
+  }
+
+  Future<String> _determineGeofenceLocation(double latitude, double longitude) async {
+    String geofenceName = "";
+    String? userState = await _getUserState();
+
+    for (GeofenceModel geofence in cachedGeofences) {
+      double distance = GeoUtils.haversine(latitude, longitude, geofence.latitude, geofence.longitude);
+      if (distance <= geofence.radius) {
+        currentStateDisplay.value = (geofence.stateName == userState) ? geofence.name : geofence.stateName;
+        return geofence.name;
+      }
+    }
+
+    currentStateDisplay.value = userState ?? (administrativeArea.value.isNotEmpty ? administrativeArea.value : "State Unknown");
+    return geofenceName;
+  }
+
+  String? getUserId() {
+    print("Current UUID === ${FirebaseAuth.instance.currentUser?.uid}");
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
+
+
+  Future<void> _updateLocation() async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        lati.value,
+        longi.value,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark placemark = placemarks[0];
+        location.value =
+        "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
+        administrativeArea.value = placemark.administrativeArea!;
+      } else {
+        location.value = "Location not found";
+        administrativeArea.value = "";
+      }
+
+      String geofenceLocationName =
+      await _determineGeofenceLocation(lati.value, longi.value);
+      if (geofenceLocationName.isNotEmpty) {
+        location.value = geofenceLocationName;
+        isInsideAnyGeofence.value = true;
+      } else {
+        // Use placemarker address if not in geofence
+        location.value = location.value.isNotEmpty && location.value != "Location not found"
+            ? location.value
+            : "Location not found"; // Fallback if placemarker also failed
+        isInsideAnyGeofence.value = false;
+        // currentStateDisplay.value = administrativeArea.value.isNotEmpty
+        //     ? administrativeArea.value
+        //     : "State Unknown";
+      }
+      isCircularProgressBarOn.value = false;
+    } catch (e) {
+      // currentStateDisplay.value = administrativeArea.value.isNotEmpty
+      //     ? administrativeArea.value
+      //     : "State Unknown";
+      if (lati.value != 0.0 && administrativeArea.value == '') {
+        await _updateLocationUsingGeofencing();
+      } else if (lati.value == 0.0 && administrativeArea.value == '') {
+        print("Location not obtained within 10 seconds.");
+        Timer(const Duration(seconds: 10), () {
+          if (lati.value == 0.0 && longi.value == 0.0) {
+            print("Location not obtained within 10 seconds. Using default.");
+            _getLocationDetailsFromLocationModel();
+          }
+        });
+      } else {
+        dev.log("$e");
+        Fluttertoast.showToast(
+          msg: "Error: $e",
+          toastLength: Toast.LENGTH_LONG,
+          backgroundColor: Colors.black54,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+    }
+  }
+
 
   Future<void> _updateLocationUsingGeofencing() async {
 
@@ -877,7 +1144,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         name: locationModel.locationName ?? '',
         latitude: locationModel.latitude ?? 0.0,
         longitude: locationModel.longitude ?? 0.0,
-        radius: locationModel.radius?.toDouble() ?? 0.0,
+        radius: locationModel.radius?.toDouble() ?? 0.0, category: locationModel.category ?? '', stateName: locationModel.state ?? '',
       )).toList();
 
 
@@ -911,6 +1178,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       latitude: locationModel.latitude ?? 0.0,
       longitude: locationModel.longitude ?? 0.0,
       radius: locationModel.radius?.toDouble() ?? 0.0,
+      category: locationModel.category ?? '', stateName: locationModel.state ?? '',
+
     )).toList();
 
 
@@ -1111,14 +1380,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
 
       // Update leave balances
-      if (remainingLeave != null) {
-        _usedPaternityLeaves.value = _totalPaternityLeaves.value - (remainingLeave.paternityLeaveBalance ?? 0);
-        _usedMaternityLeaves.value = _totalMaternityLeaves.value - (remainingLeave.maternityLeaveBalance ?? 0);
-        _usedAnnualLeaves.value = _totalAnnualLeaves.value - (remainingLeave.annualLeaveBalance ?? 0);
-        _remainingPaternityLeaveBalance.value = remainingLeave.paternityLeaveBalance ?? 0;
-        _remainingMaternityLeaveBalance.value = remainingLeave.maternityLeaveBalance ?? 0;
-        _remainingAnnualLeaveBalance.value = remainingLeave.annualLeaveBalance ?? 0;
-      }
+      _usedPaternityLeaves.value = _totalPaternityLeaves.value - (remainingLeave.paternityLeaveBalance ?? 0);
+      _usedMaternityLeaves.value = _totalMaternityLeaves.value - (remainingLeave.maternityLeaveBalance ?? 0);
+      _usedAnnualLeaves.value = _totalAnnualLeaves.value - (remainingLeave.annualLeaveBalance ?? 0);
+      _remainingPaternityLeaveBalance.value = remainingLeave.paternityLeaveBalance ?? 0;
+      _remainingMaternityLeaveBalance.value = remainingLeave.maternityLeaveBalance ?? 0;
+      _remainingAnnualLeaveBalance.value = remainingLeave.annualLeaveBalance ?? 0;
 
       return remainingLeave;
     } catch (e) {
@@ -1288,8 +1555,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
   }
 
+  // Rewritten buildSupervisorDropdown to use Obx and remove StatefulWidget
   Widget buildSupervisorDropdown() {
-    return StreamBuilder<List<String?>>( // Wrap with Obx to rebuild on _selectedSupervisor change if needed in future
+    return StreamBuilder<List<String?>>(
       stream: (selectedBioDepartment != null && selectedBioState != null)
           ? getSupervisorsFromFirestore(selectedBioDepartment!, selectedBioState!)
           : Stream.value([]),
@@ -1300,38 +1568,38 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return Text('Error: ${snapshot.error}');
         } else {
           List<String?> supervisorNames = snapshot.data ?? [];
-          print("Selected Supervisor before Dropdown: ${_selectedSupervisor.value}"); // Print here
+          print("Selected Supervisor before Dropdown: ${_selectedSupervisor.value}");
 
           return SizedBox(
-            width: double.infinity,
-            child: DropdownButton<String?>(
-              isExpanded: true,
-              value: _selectedSupervisor.value.isNotEmpty ? _selectedSupervisor.value : null, // Use .value to access RxString value
-              items: supervisorNames.map((supervisorName) {
-                return DropdownMenuItem<String?>(
-                  value: supervisorName,
-                  child: Text(
-                    supervisorName ?? 'No Supervisor',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                );
-              }).toList(),
-              onChanged: (String? newValue) async {
-                if (newValue != null) {
-                  _selectedSupervisor.value = newValue; // Update RxString value
-                  print("Selected Caritas Supervisor: $_selectedSupervisor.value");
+              width: double.infinity,
+              child: Obx(() => DropdownButton<String?>( // Wrapped DropdownButton with Obx
+                isExpanded: true,
+                value: _selectedSupervisor.value.isNotEmpty ? _selectedSupervisor.value : null,
+                items: supervisorNames.map((supervisorName) {
+                  return DropdownMenuItem<String?>(
+                    value: supervisorName,
+                    child: Text(
+                      supervisorName ?? 'No Supervisor',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) async {
+                  if (newValue != null) {
+                    _selectedSupervisor.value = newValue;
+                    print("Selected Caritas Supervisor: $_selectedSupervisor.value");
 
-                  String? supervisorEmail = await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
-                  _selectedSupervisorEmail = supervisorEmail;
-                  print("Caritas Supervisor Email: $_selectedSupervisorEmail");
+                    String? supervisorEmail = await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
+                    _selectedSupervisorEmail = supervisorEmail;
+                    print("Caritas Supervisor Email: $_selectedSupervisorEmail");
 
-                } else {
-                  _selectedSupervisor.value = ''; // Clear selection if newValue is null
-                  _selectedSupervisorEmail = null;
-                }
-              },
-              hint: const Text('Select Supervisor'),
-            ),
+                  } else {
+                    _selectedSupervisor.value = '';
+                    _selectedSupervisorEmail = null;
+                  }
+                },
+                hint: const Text('Select Supervisor'),
+              ),)
           );
         }
       },
@@ -1388,6 +1656,22 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
+  Future<void> _deleteLeaveRequestFromFirebase(LeaveRequestModel leaveRequest) async {
+    print("leaveRequest.staffId == ${leaveRequest.staffId}");
+    print("leaveRequest.leaveRequestId == ${leaveRequest.leaveRequestId}");
+    try {
+      await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(leaveRequest.staffId)
+          .collection('Leave Request')
+          .doc(leaveRequest.leaveRequestId)
+          .delete();
+      print("Leave request deleted from Firebase: ${leaveRequest.leaveRequestId}");
+    } catch (e) {
+      print("Error deleting leave request from Firebase: $e");
+      throw e; // Re-throw the exception to be caught in the dialog
+    }
+  }
 
 
   Widget _buildLeaveSummaryItem(String leaveType, int used, int total, double fontSizeFactor, double paddingFactor) {
@@ -1416,7 +1700,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     );
   }
 
-  Widget _buildLeaveSummaryItem1(String leaveType, int used, int total, double fontSizeFactor, double paddingFactor) {
+  Widget _buildLeaveSummaryItem1(String leaveType, int approvedCount, int pendingCount, double fontSizeFactor, double paddingFactor) { // Modified function
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
       child: Column(
@@ -1426,9 +1710,17 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("No of $leaveType(s) observed:", style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.w500)),
-              Text("$used Observed", style: TextStyle(fontSize: 14 * fontSizeFactor))
+              Text("$approvedCount Approved", style: TextStyle(fontSize: 14 * fontSizeFactor)) // Display approved count
             ],
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("No of $leaveType(s) pending approvals:", style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.w500)),
+              Text("$pendingCount Pending", style: TextStyle(fontSize: 14 * fontSizeFactor)) // Display pending count
+            ],
+          ),
+
 
         ],
       ),
@@ -1535,7 +1827,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Geo-Cordinates Information:",
+                        "Geo-Coordinates Information:",
                         style: TextStyle(
                           fontFamily: "NexaBold",
                           fontSize: 18 * fontSizeFactor,
@@ -1588,21 +1880,14 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                           fontSize: 16 * fontSizeFactor,
                         ),
                       ),),),
-                      SizedBox(height: 10 * paddingFactor),
 
-                      IntrinsicWidth(child: Obx(() => Text(
-                        "Current State: ${administrativeArea.value}",
-                        style: TextStyle(
-                          fontFamily: "NexaBold",
-                          fontSize: 16 * fontSizeFactor,
-                        ),
-                      )),),
                     ],
                   ),
                 ),
               ),
             ),
             ),
+
             SizedBox(height: 10 * paddingFactor),
 
 
@@ -1638,8 +1923,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                         _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0) == _totalAnnualLeaves.value?
                         _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
                     ],
-                    _buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor),
-
+                    // _buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor),
+                    //
+                    _buildLeaveSummaryItem1("Holiday", _approvedHolidayLeavesCount.value, _pendingHolidayLeavesCount.value, fontSizeFactor, paddingFactor), // Updated here
 
                   ],
                 ),
@@ -1654,11 +1940,16 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       ),
 
 
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           _showApplyLeaveBottomSheet(context, fontSizeFactor, paddingFactor, marginFactor, iconSizeFactor, buttonPaddingFactor);
         },
-        child: Icon(Icons.add, size: 30 * iconSizeFactor),
+        label: const Text(
+          "Click HERE to Request Leave",
+          style: TextStyle(color: Colors.white, fontSize: 14.0),
+        ),
+        icon: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: Colors.red,
       ),
     );
 
@@ -1666,11 +1957,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
+
+
   Widget _buildSummaryItem(String label, int count, Color color, double fontSizeFactor) {
     return Column(
       children: [
         Text("$count", style: TextStyle(fontSize: 18 * fontSizeFactor, color: color, fontWeight: FontWeight.bold)),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 14 * fontSizeFactor)),
       ],
     );
@@ -1966,7 +2259,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               backgroundColor: Colors.grey,
               circularStrokeCap: CircularStrokeCap.round,
             )),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -2295,7 +2588,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
                     ),
 
-                    buildSupervisorDropdown(), // Use the same dropdown builder
+                    buildSupervisorDropdown(),
 
                     TextFormField(
                       controller: _reasonController,
@@ -2369,6 +2662,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
   Future<void> _handleUpdateLeaveRequest(BuildContext context, LeaveRequestModel leaveRequest, StateSetter setState, double fontSizeFactor, double paddingFactor) async{
+    String? staffId = FirebaseAuth.instance.currentUser?.uid;
+    if (staffId == null) {
+      dev.log("Error: No logged-in user found");
+      return;
+    }
+
+
     try {
       leaveRequest.type = _selectedLeaveType;
       leaveRequest.startDate = _selectedDateRange!.startDate;
@@ -2385,6 +2685,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       leaveRequest.staffDesignation = _bioInfo.value?.designation;
       leaveRequest.firstName = _bioInfo.value?.firstName;
       leaveRequest.lastName = _bioInfo.value?.lastName;
+      leaveRequest.staffId = staffId;
 
 
       final leaveRequestDocRef = FirebaseFirestore.instance
@@ -2452,17 +2753,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               child: Text("Yes", style: TextStyle(fontSize: 14 * fontSizeFactor)),
               onPressed: () async {
                 try {
+                  await _deleteLeaveRequestFromFirebase(leaveRequest); // Call Firebase delete function
 
-
-                  await FirebaseFirestore.instance
-                      .collection('Staff')
-                      .doc(leaveRequest.staffId)
-                      .collection('Leave Request')
-                      .doc(leaveRequest.leaveRequestId)
-                      .delete();
-
-
-                  _getLeaveData();
+                  _getLeaveData(); // Refresh leave data to update UI
 
                   if(mounted){
                     Navigator.pop(context);
@@ -2511,6 +2804,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   Future<void> _handleSaveAndSubmit(
       BuildContext context, StateSetter setState, double fontSizeFactor, double paddingFactor) async {
+
+    String? staffId = FirebaseAuth.instance.currentUser?.uid;
+    if (staffId == null) {
+      dev.log("Error: No logged-in user found");
+      return;
+    }
 
 
 
@@ -2581,7 +2880,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       ..startDate = _selectedDateRange!.startDate
       ..endDate = _selectedDateRange!.endDate ?? _selectedDateRange!.startDate
       ..reason = _reasonController.text
-      ..staffId = _bioInfo.value?.firebaseAuthId
+      ..staffId = staffId
       ..selectedSupervisor = _selectedSupervisor.value // Get value from RxString
       ..selectedSupervisorEmail = _selectedSupervisorEmail
       ..leaveDuration = leaveDuration
@@ -2694,7 +2993,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             'status':"Pending"
 
           });
-
 
           await sendEmailFromDevice(
             leaveRequest.selectedSupervisorEmail!,

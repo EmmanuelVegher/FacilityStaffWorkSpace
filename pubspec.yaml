@@ -65,6 +65,7 @@ dependencies:
   step_progress_indicator:
   shared_preferences: ^2.0.15
   location:
+  location_web:
   get:
   ntp:
   slide_to_act:

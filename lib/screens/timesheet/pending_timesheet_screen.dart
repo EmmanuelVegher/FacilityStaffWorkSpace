@@ -12,10 +12,8 @@ import 'package:flutter_email_sender/flutter_email_sender.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
 import 'package:pdf/pdf.dart';
-import 'package:refreshable_widget/refreshable_widget.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../pending_approvals.dart';
@@ -204,7 +202,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
         print("Error parsing date: $e, using current date as default.");
         timesheetDate1 = DateTime.now(); // Fallback to current date on error
       }
-      if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+      timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
       final staffId = widget.timesheetData['staffId'] ?? 'N/A';
       String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
@@ -296,7 +294,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
@@ -402,7 +400,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate);
@@ -540,7 +538,7 @@ $selectedBioFirstName $selectedBioLastName
       // await FlutterEmailSender.send(email); // Consider re-enabling if server approach has issues
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => PendingApprovalsPage()),
+        MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
       );
       platformResponse = 'success';
     } catch (error) {
@@ -573,7 +571,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
     final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
@@ -650,7 +648,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
@@ -722,7 +720,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate1);
@@ -753,7 +751,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate1);
@@ -790,7 +788,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate1);
@@ -823,7 +821,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate1);
@@ -854,7 +852,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing timesheet date: $e");
       timesheetDate1 = DateTime.now(); // Fallback to current date if parsing fails
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     final month = timesheetDate1.month;
@@ -886,7 +884,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing timesheet date: $e");
       timesheetDate1 = DateTime.now(); // Fallback to current date if parsing fails
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     // Extract timesheet entries
@@ -942,7 +940,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
@@ -1164,7 +1162,7 @@ $selectedBioFirstName $selectedBioLastName
   Future<Uint8List?> networkImageToByte(String imageUrl) async {
     log("networkImageToByte called for URL: $imageUrl");
 
-    if (imageUrl == null || imageUrl.isEmpty) { // Explicit null/empty check at start
+    if (imageUrl.isEmpty) { // Explicit null/empty check at start
       log("networkImageToByte received NULL or empty URL. Returning null.");
       return null;
     }
@@ -1363,7 +1361,7 @@ $selectedBioFirstName $selectedBioLastName
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
+                      builder: (context) => const PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
                     ),
                   ).then((_) => _fetchPendingApprovals());
                 } catch (e) {
@@ -1440,7 +1438,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
     String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
@@ -1510,7 +1508,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
@@ -1606,7 +1604,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
     //final daysInRange = getDaysInRange(timesheetDate1);
@@ -1792,7 +1790,7 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate == null) timesheetDate = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate ??= DateTime.now(); // Ensure not null after try-catch
 
 
     DateTime? timesheetDate1; // Make it nullable
@@ -1808,10 +1806,10 @@ $selectedBioFirstName $selectedBioLastName
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
-    if (timesheetDate1 == null) timesheetDate1 = DateTime.now(); // Ensure not null after try-catch
+    timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
 
-    final daysInRange = getDaysInRange(timesheetDate!);
+    final daysInRange = getDaysInRange(timesheetDate);
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';

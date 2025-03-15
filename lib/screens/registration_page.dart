@@ -774,7 +774,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
                       title: "Gender",
                       hint: '',
                       widget: DropdownButtonFormField<String>(
-                        decoration: InputDecoration(labelText: "Gender"),
+                        decoration: const InputDecoration(labelText: "Gender"),
                         value: _selectedGender,
                         items: _genderOptions.map((gender) => DropdownMenuItem(value: gender, child: Text(gender))).toList(),
                         onChanged: (value) {
@@ -791,7 +791,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
                       title: "Marital Status",
                       hint: '',
                       widget: DropdownButtonFormField<String>(
-                        decoration: InputDecoration(labelText: "Marital Status"),
+                        decoration: const InputDecoration(labelText: "Marital Status"),
                         value: _selectedMaritalStatus,
                         items: _maritalStatusOptions.map((status) => DropdownMenuItem(value: status, child: Text(status))).toList(),
                         onChanged: (value) {
@@ -816,7 +816,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
                             title: "Staff Category",
                             hint: '',
                             widget: DropdownButtonFormField<String>(
-                              decoration: InputDecoration(labelText: "Staff Category"),
+                              decoration: const InputDecoration(labelText: "Staff Category"),
                               value: _selectedCategory,
                               onChanged: (value) {
                                 setState(() {
@@ -939,7 +939,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
                             title: "Project",
                             hint: '',
                             widget: DropdownButtonFormField<String>(
-                              decoration: InputDecoration(labelText: "Project"),
+                              decoration: const InputDecoration(labelText: "Project"),
                               value: _selectedProject,
                               onChanged: (value) {
                                 setState(() {
@@ -966,7 +966,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
                       title: "Role",
                       hint: '',
                       widget: DropdownButtonFormField<String>(
-                        decoration: InputDecoration(labelText: "Role"),
+                        decoration: const InputDecoration(labelText: "Role"),
                         value: _selectedRole,
                         // Generate items based on the current staff category
                         items: _getRoleOptions(_selectedCategory)

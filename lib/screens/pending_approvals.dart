@@ -1,14 +1,11 @@
 import 'dart:developer';
 
-import 'package:attendanceappmailtool/screens/staff_timesheet.dart';
-import 'package:attendanceappmailtool/screens/timesheet/approval_timesheetpage.dart';
 import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../widgets/drawer.dart';
 import '../widgets/drawer2.dart';
 
 // Bio Model (Assuming this is your BioModel class definition)
@@ -546,7 +543,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                   ),
                   onPressed: () {
                     log("doc['staffId'] ==${doc['staffId']}");
-                    log("doc['staffId'] ==${doc}");
+                    log("doc['staffId'] ==$doc");
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -587,7 +584,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
         drawer: drawer2(context), // No IsarService needed now
         appBar: AppBar(
           title: const Text('Pending Approvals', style: TextStyle(color: Colors.white)),
-          iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+          iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),

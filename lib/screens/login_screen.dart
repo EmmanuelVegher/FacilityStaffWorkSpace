@@ -1,7 +1,5 @@
-import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'facial_recognition/Facial_recognition_page.dart';
 import 'forgot_password_page.dart';
 import 'loading_screen.dart';
 import 'registration_page.dart';
@@ -29,7 +27,7 @@ class _LoginPageState extends State<LoginPage>
   late Animation<double> _fadeAnimation;
 
   int _currentCharIndex = 0;
-  final String _title = "Facility Staff WorkSpace";
+  final String _title = "WorkSpace App";
   String _animatedText = "";
 
   @override

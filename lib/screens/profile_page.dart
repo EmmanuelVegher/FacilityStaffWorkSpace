@@ -293,7 +293,7 @@ class _ProfilePageState extends State<ProfilePage> {
           drawer: drawer(context,),
           appBar: AppBar(
             title: const Text('Profile page', style: TextStyle(color: Colors.white)),
-            iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+            iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
             flexibleSpace: Container(
               decoration: const BoxDecoration(gradient: appBarGradient),
             ),

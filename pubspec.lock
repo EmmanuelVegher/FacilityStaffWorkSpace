@@ -1382,7 +1382,7 @@ packages:
     source: hosted
     version: "5.0.0"
   location_web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: location_web
       sha256: e6435cfd175b0f6e94d6fdc43c104d13cec7e27b21a8cee00bd9516a3d6a4c81

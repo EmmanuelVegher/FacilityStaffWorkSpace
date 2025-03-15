@@ -8,7 +8,6 @@ import 'dart:js_util' as js_util;
 import 'package:fluttertoast/fluttertoast.dart';
 
 import '../components/clock_attendance.dart';
-import '../staff_dashboard.dart';
 
 // JS interop: functions defined in face_recognition.js
 @JS('captureDescriptorFromVideo')
@@ -18,7 +17,7 @@ external Future<dynamic> captureDescriptorFromVideo(String videoElementId);
 external Future<dynamic> compareFaceFromVideo(String videoElementId, dynamic trainingDescriptor, num threshold);
 
 class FacialRecognitionPage extends StatefulWidget {
-  const FacialRecognitionPage({Key? key}) : super(key: key);
+  const FacialRecognitionPage({super.key});
 
   @override
   _FacialRecognitionPageState createState() => _FacialRecognitionPageState();
@@ -96,7 +95,7 @@ class _FacialRecognitionPageState extends State<FacialRecognitionPage> {
         });
       } else {
         _storedFaceDescriptor = List<double>.from(
-            (embedding as List).map((e) => (e as num).toDouble()));
+            (embedding).map((e) => (e as num).toDouble()));
         print("Dart: _fetchTrainingStatus - _storedFaceDescriptor (from Firestore): $_storedFaceDescriptor");
         setState(() {
           _isTrainingRequired = false;
@@ -138,7 +137,7 @@ class _FacialRecognitionPageState extends State<FacialRecognitionPage> {
       List<double> faceDescriptor = [];
       if (jsDescriptor != null) {
         if (jsDescriptor is List) { // Check if it's already a List (unlikely for Float32Array, but safe check)
-          faceDescriptor = (jsDescriptor as List).cast<double>(); // Assuming it's already List<double> or can be cast
+          faceDescriptor = (jsDescriptor).cast<double>(); // Assuming it's already List<double> or can be cast
         } else {
           // Handle as JsObject (no need to cast, just use jsDescriptor directly)
           final jsArray = jsDescriptor; // No casting needed anymore

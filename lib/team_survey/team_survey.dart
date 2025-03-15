@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:animated_reorderable_list/animated_reorderable_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -10,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 
 import '../screens/staff_dashboard.dart';
-import 'best_player_chart_page.dart';
 
 // BioModel definition (plain Dart class) - No changes needed
 class BioModel {
@@ -532,7 +529,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
         gravity: ToastGravity.CENTER,
         timeInSecForIosWeb: 5,
       );
-      throw error; // Re-throw error to prevent navigation in _submitAndSyncOrNavigate
+      rethrow; // Re-throw error to prevent navigation in _submitAndSyncOrNavigate
     }
   }
 
@@ -851,7 +848,7 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
       print('Validation Error: $error');
       // Error messages are already shown via Fluttertoast in validations.
       // No need to show another general error here, just re-throw to stop submission process
-      throw error; // Re-throw to prevent Firestore submission in _submitAndSyncOrNavigate
+      rethrow; // Re-throw to prevent Firestore submission in _submitAndSyncOrNavigate
     }
   }
 

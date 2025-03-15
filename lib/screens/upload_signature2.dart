@@ -244,7 +244,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       drawer: drawer(context,), // You might need to adjust drawer for web if IsarService is removed
       appBar: AppBar(
         title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
-        iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+        iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
         ),

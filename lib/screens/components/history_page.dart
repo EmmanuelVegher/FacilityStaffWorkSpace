@@ -39,11 +39,11 @@ class _HistoryPageState extends State<HistoryPage> {
   Color primary = const Color(0xffeef444c);
   String? _selectedMonth;
   String? _selectedYear;
-  List<String> _months = [
+  final List<String> _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
-  List<String> _years = [];
+  final List<String> _years = [];
 
   static const Color wineColor = Color(0xFF722F37); // Deep wine color
   static const LinearGradient appBarGradient = LinearGradient(
@@ -139,7 +139,7 @@ class _HistoryPageState extends State<HistoryPage> {
       return Stream.value([]);
     }
 
-    String monthYearForQuery = '${_selectedMonth} ${_selectedYear}';
+    String monthYearForQuery = '$_selectedMonth $_selectedYear';
 
 
     return FirebaseFirestore.instance
@@ -149,7 +149,7 @@ class _HistoryPageState extends State<HistoryPage> {
         .snapshots()
         .map((snapshot) {
       final filteredDocs = snapshot.docs.where((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        Map<String, dynamic> data = doc.data();
         return data["month"] == monthYearForQuery;
       }).toList();
 
@@ -158,7 +158,7 @@ class _HistoryPageState extends State<HistoryPage> {
         print("Document ID: ${doc.id}, Data: ${doc.data()}");
       }
 
-      return filteredDocs.map((doc) => AttendanceModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)).toList();
+      return filteredDocs.map((doc) => AttendanceModel.fromFirestore(doc.data(), doc.id)).toList();
     });
   }
 
@@ -244,7 +244,7 @@ class _HistoryPageState extends State<HistoryPage> {
       child: Scaffold(
         appBar:AppBar(
           title: const Text('History', style: TextStyle(color: Colors.white)),
-          iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+          iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),
@@ -277,7 +277,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       decoration: InputDecoration(
                         labelText: 'Month',
                         labelStyle: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor),
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
                       value: _selectedMonth,
@@ -301,7 +301,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       decoration: InputDecoration(
                         labelText: 'Year',
                         labelStyle: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor),
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
                       value: _selectedYear,

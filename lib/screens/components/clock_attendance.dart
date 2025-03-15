@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:math';
 
@@ -15,7 +16,7 @@ import 'package:ntp/ntp.dart';
 import 'package:synchronized/synchronized.dart';
 import 'package:location/location.dart' as locationPkg;
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
-
+import 'package:http/http.dart' as http; // Import http package
 import '../../services/location_services.dart';
 import '../../team_survey/team_survey.dart';
 import '../../widgets/drawer.dart';
@@ -206,7 +207,7 @@ class _ClockAttendanceWebState extends State<ClockAttendanceWeb> {
   int _selectedIndex = 0;
   static const TextStyle optionStyle =
   TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
-  static List<Widget> _widgetOptions = <Widget>[
+  static final List<Widget> _widgetOptions = <Widget>[
     const AttendancePage(),
     const HistoryPage(),
   ];
@@ -314,7 +315,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
         drawer: drawer(context),
         appBar: AppBar(
           title: const Text('Attendance', style: TextStyle(color: Colors.white)),
-          iconTheme: IconThemeData(color: Colors.white), // Makes the drawer icon white
+          iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),
@@ -473,8 +474,11 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
                       sizes),
                   _buildStatusText("Is Location Mocked?:",
                       controller.isMock.value.toString(), screenSize, sizes),
+                  _buildStatusText("Current State:",
+                      controller.administrativeArea.value, screenSize, sizes),
                   _buildStatusText("Current Location:",
                       controller.location.value, screenSize, sizes),
+
                 ],
               ),
             ),
@@ -792,7 +796,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => PsychologicalMetricsPage(),
+                builder: (context) => const PsychologicalMetricsPage(),
               ),
             );
             return; // Stop clock-in process for now
@@ -818,8 +822,31 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
       ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () async {
-        await controller.clockOutUpdated(
-            controller.lati.value, controller.longi.value, controller.location.value);
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("Confirm Clock Out"),
+              content: const Text("Are you sure you want to clock out?"),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text("No"),
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close the dialog
+                  },
+                ),
+                TextButton(
+                  child: const Text("Yes"),
+                  onPressed: () async {
+                    Navigator.of(context).pop(); // Close the dialog
+                    await controller.clockOutUpdated(
+                        controller.lati.value, controller.longi.value, controller.location.value);
+                  },
+                ),
+              ],
+            );
+          },
+        );
       },
       child: SizedBox(
         width: MediaQuery.of(context).size.width * 1,
@@ -1275,17 +1302,16 @@ class ClockAttendanceWebController extends GetxController {
     await _initLocationServiceAndData();
   }
 
-
   Future<void> _initLocationServiceAndData() async {
     await getLocationStatus().then((_) async {
-      await _getLocation2();
       await _getUserLocation();
+      await _getLocation2();
       await _updateLocationUsingGeofencing();
       await _updateLocation();
       await getPermissionStatus().then((_) async {
         await _startLocationService().then((_) async {
           await _getLocation2();
-         // await _getUserLocation1();
+          // await _getUserLocation1();
           await _getUserLocation();
           await _updateLocationUsingGeofencing();
           await _updateLocation();
@@ -1516,7 +1542,7 @@ class ClockAttendanceWebController extends GetxController {
   }
 
 
-  Future<void> _loadNTPTime() async {
+  Future<void> _loadNTPTime1() async {
     try {
       ntpTime = await NTP.now(lookUpAddress: "pool.ntp.org");
     } catch (e) {
@@ -1752,14 +1778,10 @@ class ClockAttendanceWebController extends GetxController {
           forceAndroidLocationManager: true,
         );
 
-        if (position != null) {
-          lati.value = position.latitude;
-          longi.value = position.longitude;
-          print("locationData.latitude == ${position.latitude}");
-          _updateLocation();
-        } else {
-          print("_getLocation2: Geolocator also failed to get location.");
-        }
+        lati.value = position.latitude;
+        longi.value = position.longitude;
+        print("locationData.latitude == ${position.latitude}");
+        _updateLocation();
       } catch (geolocatorError) {
         print(
             "_getLocation2: Error getting location from geolocator: $geolocatorError");
@@ -1790,6 +1812,10 @@ class ClockAttendanceWebController extends GetxController {
         location.value = geofenceLocationName;
         isInsideAnyGeofence.value = true;
       } else {
+        // Use placemarker address if not in geofence
+        location.value = location.value.isNotEmpty && location.value != "Location not found"
+            ? location.value
+            : "Location not found"; // Fallback if placemarker also failed
         isInsideAnyGeofence.value = false;
         currentStateDisplay.value = administrativeArea.value.isNotEmpty
             ? administrativeArea.value
@@ -1894,13 +1920,56 @@ class ClockAttendanceWebController extends GetxController {
     );
   }
 
+  Future<DateTime> getGoogleServerTime() async {
+    try {
+      final response = await http.head(Uri.parse('https://time.google.com')); // Use http package for web compatibility
+
+      if (response.headers.containsKey('date')) {
+        final serverDate = response.headers['date'];
+        if (serverDate != null) {
+          return DateTime.parse(serverDate);
+        }
+      }
+      // If 'date' header is missing or invalid, fallback to device time, or handle as needed
+      print("Warning: 'date' header missing or invalid. Falling back to device time.");
+      return DateTime.now(); // Fallback to device time if header is not found
+    } catch (e) {
+      print("Error fetching server time: $e. Falling back to device time.");
+      return DateTime.now(); // Fallback to device time on error
+    }
+  }
+
+
+  Future<void> _loadNTPTime() async {
+    try {
+      ntpTime = await getGoogleServerTime(); // Use the new function
+    } catch (e) {
+      dev.log("Error getting server time: ${e.toString()}");
+      ntpTime = DateTime.now();
+    }
+  }
+
   Future<void> clockInUpdated(
-      BuildContext context, double newlatitude, double newlongitude, String newlocation) async { // Added context
+      BuildContext context, double newlatitude, double newlongitude, String newlocation) async {
     print("clockInUpdated");
 
     if (!isLoading.value) {
       await _clockInOutLock.synchronized(() async {
         try {
+          // Location Validation: Check if location is available
+          if (location.value.isEmpty || location.value == "Location not found") {
+            Fluttertoast.showToast(
+              msg: "Current Location is not available. Please wait and try again.",
+              toastLength: Toast.LENGTH_LONG,
+              backgroundColor: Colors.redAccent,
+              gravity: ToastGravity.BOTTOM,
+              timeInSecForIosWeb: 1,
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+            return; // Prevent saving if location is not available
+          }
+
           currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
           String? userId = firestoreService.getUserId();
 
@@ -1913,12 +1982,21 @@ class ClockAttendanceWebController extends GetxController {
 
           if (!attendanceData.exists) {
             if (newlatitude != 0.0) {
+              DateTime ntpClockInTime;
+              try {
+                ntpClockInTime = await getGoogleServerTime(); // Get server time for clock-in
+              } catch (e) {
+                dev.log("Error getting server time for clock-in: $e, using device time.");
+                ntpClockInTime = DateTime.now(); // Fallback to device time
+              }
+              final clockInTimeFormatted = DateFormat('hh:mm a').format(ntpClockInTime);
+
               final attendance = AttendanceModelFirestore(
                 Offline_DB_id: Random().nextInt(300) + 1,
-                clockIn: DateFormat('hh:mm a').format(DateTime.now()),
+                clockIn: clockInTimeFormatted, // Use server time or device time if server fails
                 date: currentDate,
                 clockInLatitude: newlatitude,
-                clockInLocation: newlocation,
+                clockInLocation: location.value, // Use validated location.value
                 clockInLongitude: newlongitude,
                 clockOut: "--/--",
                 clockOutLatitude: 0.0,
@@ -1937,8 +2015,7 @@ class ClockAttendanceWebController extends GetxController {
               await firestoreService.createAttendanceRecord(
                   userId, currentDate, attendance);
 
-              clockIn.value =
-                  DateFormat('hh:mm a').format(DateTime.now());
+              clockIn.value = clockInTimeFormatted; // Update UI with server time or device time
               clockInLocation.value = location.value;
               isClockedIn.value = true;
               _clockInStreamController.add(clockIn.value);
@@ -1967,6 +2044,7 @@ class ClockAttendanceWebController extends GetxController {
           } else {
             AttendanceModelFirestore lastAttendance =
             AttendanceModelFirestore.fromMap(attendanceData.data()!);
+
 
             if (lastAttendance.date != currentDate) {
               final clockInDateTime = DateFormat('dd-MMMM-yyyy hh:mm a').parse(
@@ -2000,12 +2078,21 @@ class ClockAttendanceWebController extends GetxController {
                   isLoading.value = false;
                 } else {
                   if (newlatitude != 0.0) {
+                    DateTime ntpClockInTime;
+                    try {
+                      ntpClockInTime = await getGoogleServerTime(); // Get server time for clock-in
+                    } catch (e) {
+                      dev.log("Error getting server time for clock-in: $e, using device time.");
+                      ntpClockInTime = DateTime.now(); // Fallback to device time
+                    }
+                    final clockInTimeFormatted = DateFormat('hh:mm a').format(ntpClockInTime);
+
                     final attendance = AttendanceModelFirestore(
                       Offline_DB_id: Random().nextInt(300) + 1,
-                      clockIn: DateFormat('hh:mm a').format(DateTime.now()),
+                      clockIn: clockInTimeFormatted, // Use NTP time or device time if server fails
                       date: currentDate,
                       clockInLatitude: newlatitude,
-                      clockInLocation: newlocation,
+                      clockInLocation: location.value, // Use validated location.value
                       clockInLongitude: newlongitude,
                       clockOut: "--/--",
                       clockOutLatitude: 0.0,
@@ -2023,12 +2110,12 @@ class ClockAttendanceWebController extends GetxController {
 
                     await firestoreService.createAttendanceRecord(
                         userId, currentDate, attendance);
-                    clockIn.value = DateFormat('hh:mm a').format(DateTime.now());
+                    clockIn.value = clockInTimeFormatted; // Update UI with NTP time or device time
                     clockInLocation.value = location.value;
                     isClockedIn.value = true;
 
                     _clockInStreamController
-                        .add(DateFormat('hh:mm a').format(DateTime.now()));
+                        .add(clockInTimeFormatted); // Use NTP time or device time if server fails
                     _clockInLocationStreamController.add(location.value);
                     Fluttertoast.showToast(
                       msg: "Clocking-In..",
@@ -2078,6 +2165,20 @@ class ClockAttendanceWebController extends GetxController {
     if (!isLoading.value) {
       await _clockInOutLock.synchronized(() async {
         try {
+          // Location Validation: Check if location is available
+          if (location.value.isEmpty || location.value == "Location not found") {
+            Fluttertoast.showToast(
+              msg: "Current Location is not available. Please wait and try again.",
+              toastLength: Toast.LENGTH_LONG,
+              backgroundColor: Colors.redAccent,
+              gravity: ToastGravity.BOTTOM,
+              timeInSecForIosWeb: 1,
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+            return; // Prevent saving if location is not available
+          }
+
           currentDate = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
           String? userId = firestoreService.getUserId();
           if (userId == null) {
@@ -2086,6 +2187,7 @@ class ClockAttendanceWebController extends GetxController {
 
           final attendanceData =
           await getLastAttendanceForDateFirestore(currentDate).get();
+
 
           if (attendanceData.exists) {
             AttendanceModelFirestore lastAttendance =
@@ -2124,18 +2226,27 @@ class ClockAttendanceWebController extends GetxController {
                   isLoading.value = false;
                 } else {
                   if (newlatitude != 0.0) {
+                    DateTime ntpClockOutTime;
+                    try {
+                      ntpClockOutTime = await getGoogleServerTime(); // Get server time for clock-out
+                    } catch (e) {
+                      dev.log("Error getting server time for clock-out: $e, using device time.");
+                      ntpClockOutTime = DateTime.now(); // Fallback to device time
+                    }
+                    final clockOutTimeFormatted = DateFormat('hh:mm a').format(ntpClockOutTime);
+
                     Map<String, dynamic> updateData = {
-                      'clockOut': DateFormat('hh:mm a').format(DateTime.now()),
+                      'clockOut': clockOutTimeFormatted, // Use NTP time or device time if server fails
                       'clockOutLatitude': newlatitude,
                       'clockOutLongitude': newlongitude,
-                      'clockOutLocation': newlocation,
+                      'clockOutLocation': location.value, // Use validated location.value
                       'isUpdated': true,
                       'durationWorked': _diffClockInOut(
                           lastAttendance.clockIn.toString(),
-                          DateFormat('h:mm a').format(DateTime.now())),
+                          clockOutTimeFormatted), // Use NTP formatted time or device time if server fails
                       'noOfHours': _diffHoursWorked(
                           lastAttendance.clockIn.toString(),
-                          DateFormat('h:mm a').format(DateTime.now())),
+                          clockOutTimeFormatted), // Use NTP formatted time or device time if server fails
                     };
 
                     await firestoreService.updateAttendanceRecord(
@@ -2144,12 +2255,12 @@ class ClockAttendanceWebController extends GetxController {
                       updateData,
                     );
 
-                    clockOut.value = DateFormat('hh:mm a').format(DateTime.now());
+                    clockOut.value = clockOutTimeFormatted; // Update UI with NTP time or device time
                     clockOutLocation.value = location.value;
                     isClockedIn.value = false;
 
                     _clockOutStreamController
-                        .add(DateFormat('hh:mm a').format(DateTime.now()));
+                        .add(clockOutTimeFormatted); // Use NTP time or device time if server fails
                     _clockOutLocationStreamController.add(location.value);
                     Fluttertoast.showToast(
                       msg: "Clocking-Out..",
@@ -2193,6 +2304,8 @@ class ClockAttendanceWebController extends GetxController {
       });
     }
   }
+
+
 
   showDialogBox() => showCupertinoDialog<String>(
     context: Get.context!,
@@ -2314,6 +2427,14 @@ class ClockAttendanceWebController extends GetxController {
                     ),
                   )),
                   const SizedBox(height: 10),
+                  IntrinsicWidth(child:  Obx(() => Text(
+                    "Current State: ${controller.administrativeArea.value}",
+                    style: TextStyle(
+                      fontFamily: "NexaBold",
+                      fontSize: screenWidth / 23,
+                    ),
+                  )),),
+                  SizedBox(height: 10 ),
                   Obx(() => Text(
                     "Current Location: ${controller.location.value}",
                     style: TextStyle(
@@ -2596,12 +2717,15 @@ class ClockAttendanceWebController extends GetxController {
   }
 
   Future<void> _getUserLocation() async {
-    try {
-      geolocator.Position position =
-      await geolocator.Geolocator.getCurrentPosition(
-          desiredAccuracy:
-          geolocator.LocationAccuracy.high);
+    print("Fetching user location...");
 
+    try {
+      // Get user's current position
+      Position position = await geolocator.Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.high,
+      );
+
+      print('Latitude: \${position.latitude}, Longitude: \${position.longitude}');
       lati.value = position.latitude;
       longi.value = position.longitude;
       accuracy.value = position.accuracy;
@@ -2612,19 +2736,83 @@ class ClockAttendanceWebController extends GetxController {
       time.value = position.timestamp.millisecondsSinceEpoch.toDouble();
       isMock.value = position.isMocked;
 
-      List<Placemark> placemark = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      if (placemark.isNotEmpty) {
-        location.value =
-        "${placemark[0].street}, ${placemark[0].subLocality}, ${placemark[0].subAdministrativeArea}, ${placemark[0].locality}, ${placemark[0].administrativeArea}, ${placemark[0].postalCode}, ${placemark[0].country}";
-        administrativeArea.value = placemark[0].administrativeArea ?? "";
+      // Reverse geocoding using Google Maps API
+      String apiKey = "AIzaSyDrEiP6HeIv5C2_Fo5szYDkpkYGdoOvcPg"; // Replace with your API key
+      String url =
+          "https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$apiKey";
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        print("Geocoding API error: \${response.body}");
+        location.value = "Geocoding failed";
+        return;
       }
-      await _updateLocationUsingGeofencing();
+
+      var data = json.decode(response.body);
+      String state = _extractState(data);
+      if (state.isEmpty) {
+        location.value = "State not found";
+        return;
+      }
+
+      print("Extracted State: \$state");
+      administrativeArea.value = state;
+
+      List<GeofenceModel> offices = await _fetchGeofenceLocations1(state);
+      if (offices.isEmpty) {
+        location.value = "No geofence locations found for \$state";
+        return;
+      }
+
+      _checkGeofence(offices, position.latitude, position.longitude);
     } catch (e) {
-      dev.log("Location Error: ${e.toString()}");
+      print("Error getting location: \$e");
+      Fluttertoast.showToast(
+        msg: "Error getting location: \$e",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
     }
+  }
+
+  String _extractState(Map<String, dynamic> data) {
+    List<dynamic> addressComponents = data["results"][0]["address_components"];
+    for (var component in addressComponents) {
+      if (component["types"].contains("administrative_area_level_1")) {
+        return component["long_name"];
+      }
+    }
+    return "";
+  }
+
+  Future<List<GeofenceModel>> _fetchGeofenceLocations1(String state) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('Location').doc(state).collection(state).get();
+      return snapshot.docs.map((doc) => GeofenceModel.fromFirestore(doc.data(), state)).toList();
+    } catch (e) {
+      print("Error fetching geofence locations: \$e");
+      return [];
+    }
+  }
+
+  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude) {
+    isInsideAnyGeofence.value = false;
+
+    for (GeofenceModel office in offices) {
+      double distance = GeoUtils.haversine(latitude, longitude, office.latitude, office.longitude);
+      if (distance <= office.radius) {
+        print('Entered office: \${office.name}');
+        location.value = office.name;
+        isInsideAnyGeofence.value = true;
+        isCircularProgressBarOn.value = false;
+        return;
+      }
+    }
+
+    location.value = "Not inside any geofence";
+    isCircularProgressBarOn.value = false;
   }
 }
 

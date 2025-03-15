@@ -2,7 +2,6 @@ import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import 'dashboard/state_ofice_dashboard.dart';
 
@@ -45,11 +44,11 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Text("Authenticating...", style: TextStyle(fontSize: 18)),
             SizedBox(height: 20),
             CircularProgressIndicator(),

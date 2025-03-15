@@ -321,7 +321,7 @@ class FirestoreService {
       if (snapshot.docs.isNotEmpty) {
         return BioModel.fromFirestore(snapshot.docs.first,null);
       } else {
-        print("_FirestoreService: getBioData: No documents found for firebaseAuthId: ${getUserId()} in ${staffCollection} collection."); // More specific log
+        print("_FirestoreService: getBioData: No documents found for firebaseAuthId: ${getUserId()} in $staffCollection collection."); // More specific log
         return null;
       }
     } catch (e) {
@@ -343,7 +343,7 @@ class FirestoreService {
       if (snapshot.docs.isNotEmpty) {
         return BioModel.fromFirestore(snapshot.docs.first,null);
       } else {
-        print("_FirestoreService: getBioInfoWithFirebaseAuth: No documents found for firebaseAuthId: $firebaseAuthUid in ${staffCollection} collection."); // More specific log
+        print("_FirestoreService: getBioInfoWithFirebaseAuth: No documents found for firebaseAuthId: $firebaseAuthUid in $staffCollection collection."); // More specific log
         return null;
       }
     } catch (e) {
@@ -366,14 +366,14 @@ class FirestoreService {
           .doc(bioModel.state)
           .collection(bioModel.state!) // Sub-collection named as state
           .doc(bioModel.location)
-          .collection(formattedDate) as CollectionReference<Map<String, dynamic>>; // Explicit cast here
+          .collection(formattedDate); // Explicit cast here
 
 
       final QuerySnapshot<Map<String, dynamic>> snapshot = await reportCollectionRef.get();
       List<Report> reports = [];
       for (var doc in snapshot.docs) {
         final reportData = doc.data();
-        if (reportData != null && reportData['reportType'] != null) {
+        if (reportData['reportType'] != null) {
           reports.add(Report.fromFirestore(doc, null));
         }
       }
@@ -583,14 +583,14 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           .doc(selectedBioState)
           .collection(selectedBioState!) // Sub-collection named as state
           .doc(selectedBioLocation)
-          .collection(formattedDate) as CollectionReference<Map<String, dynamic>>; // Explicit cast here
+          .collection(formattedDate); // Explicit cast here
 
 
       final QuerySnapshot<Map<String, dynamic>> snapshot = await reportCollectionRef.get();
       List<Report> reports = [];
       for (var doc in snapshot.docs) {
         final reportData = doc.data();
-        if (reportData != null && reportData['reportType'] != null) {
+        if (reportData['reportType'] != null) {
           reports.add(Report.fromFirestore(doc, null));
         }
       }
@@ -1242,14 +1242,14 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       if (
       selectedBioDepartment != null &&
           selectedBioState != null) {
-        print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data loaded, loading supervisor names - Department: ${selectedBioDepartment}, State: ${selectedBioState}");
+        print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data loaded, loading supervisor names - Department: $selectedBioDepartment, State: $selectedBioState");
         await _loadSupervisorNames(selectedBioDepartment!, selectedBioState!);
       } else {
         print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data or department/state is missing for supervisor loading!");
         if (bioData == null) {
           print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: bioData is NULL");
         } else {
-          print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Department: ${selectedBioDepartment}, State: ${selectedBioState}");
+          print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Department: $selectedBioDepartment, State: $selectedBioState");
         }
       }
     });
@@ -1787,7 +1787,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ... (Reporting Date, Report Type, Dropdowns, Reviewer Dropdown - same as before) ...
-                Row(children: [ /* ... */ ]),
+                const Row(children: [ /* ... */ ]),
                 const SizedBox(height: 20),
                 DropdownButtonFormField<String>(decoration: const InputDecoration(labelText: 'Report Type*'), value: _selectedReportType, items: ["Daily"].map((String value) { return DropdownMenuItem<String>(value: value, child: Text(value)); }).toList(), validator: (value) => value == null ? 'Report Type is required' : null, onChanged: isReadOnlySection ? null : (newValue) { if (newValue != null) { setState(() { _selectedReportType = newValue; _updateReportPeriodOptions(_selectedReportType); }); } }, disabledHint: _selectedReportType != null ? Text(_selectedReportType) : null,),
                 const SizedBox(height: 10),
