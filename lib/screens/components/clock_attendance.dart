@@ -1307,14 +1307,12 @@ class ClockAttendanceWebController extends GetxController {
       await _getUserLocation();
       await _getLocation2();
       await _updateLocationUsingGeofencing();
-      await _updateLocation();
       await getPermissionStatus().then((_) async {
         await _startLocationService().then((_) async {
           await _getLocation2();
           // await _getUserLocation1();
           await _getUserLocation();
           await _updateLocationUsingGeofencing();
-          await _updateLocation();
           await _loadInitialData(); // Load other data after location is ready
         });
 
@@ -1753,7 +1751,7 @@ class ClockAttendanceWebController extends GetxController {
           elapsedRealtimeUncertaintyNanos.value =
               locationData.elapsedRealtimeUncertaintyNanos ?? 0.0;
 
-          _updateLocation();
+          _getUserLocation();
           _getAttendanceSummary();
         } else {
           print("_getLocation2: Received null location data");
@@ -1781,7 +1779,7 @@ class ClockAttendanceWebController extends GetxController {
         lati.value = position.latitude;
         longi.value = position.longitude;
         print("locationData.latitude == ${position.latitude}");
-        _updateLocation();
+        _getUserLocation();
       } catch (geolocatorError) {
         print(
             "_getLocation2: Error getting location from geolocator: $geolocatorError");
@@ -1789,67 +1787,67 @@ class ClockAttendanceWebController extends GetxController {
     }
   }
 
-  Future<void> _updateLocation() async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        lati.value,
-        longi.value,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark placemark = placemarks[0];
-        location.value =
-        "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
-        administrativeArea.value = placemark.administrativeArea!;
-      } else {
-        location.value = "Location not found";
-        administrativeArea.value = "";
-      }
-
-      String geofenceLocationName =
-      await _determineGeofenceLocation(lati.value, longi.value);
-      if (geofenceLocationName.isNotEmpty) {
-        location.value = geofenceLocationName;
-        isInsideAnyGeofence.value = true;
-      } else {
-        // Use placemarker address if not in geofence
-        location.value = location.value.isNotEmpty && location.value != "Location not found"
-            ? location.value
-            : "Location not found"; // Fallback if placemarker also failed
-        isInsideAnyGeofence.value = false;
-        currentStateDisplay.value = administrativeArea.value.isNotEmpty
-            ? administrativeArea.value
-            : "State Unknown";
-      }
-      isCircularProgressBarOn.value = false;
-    } catch (e) {
-      currentStateDisplay.value = administrativeArea.value.isNotEmpty
-          ? administrativeArea.value
-          : "State Unknown";
-      if (lati.value != 0.0 && administrativeArea.value == '') {
-        await _updateLocationUsingGeofencing();
-      } else if (lati.value == 0.0 && administrativeArea.value == '') {
-        print("Location not obtained within 10 seconds.");
-        Timer(const Duration(seconds: 10), () {
-          if (lati.value == 0.0 && longi.value == 0.0) {
-            print("Location not obtained within 10 seconds. Using default.");
-            _getLocationDetailsFromLocationModel();
-          }
-        });
-      } else {
-        dev.log("$e");
-        Fluttertoast.showToast(
-          msg: "Error: $e",
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-      }
-    }
-  }
+  // Future<void> _updateLocation() async {
+  //   try {
+  //     List<Placemark> placemarks = await placemarkFromCoordinates(
+  //       lati.value,
+  //       longi.value,
+  //     );
+  //
+  //     if (placemarks.isNotEmpty) {
+  //       Placemark placemark = placemarks[0];
+  //       location.value =
+  //       "${placemark.street},${placemark.subLocality},${placemark.subAdministrativeArea},${placemark.locality},${placemark.administrativeArea},${placemark.postalCode},${placemark.country}";
+  //       administrativeArea.value = placemark.administrativeArea!;
+  //     } else {
+  //       location.value = "Location not found";
+  //       administrativeArea.value = "";
+  //     }
+  //
+  //     String geofenceLocationName =
+  //     await _determineGeofenceLocation(lati.value, longi.value);
+  //     if (geofenceLocationName.isNotEmpty) {
+  //       location.value = geofenceLocationName;
+  //       isInsideAnyGeofence.value = true;
+  //     } else {
+  //       // Use placemarker address if not in geofence
+  //       location.value = location.value.isNotEmpty && location.value != "Location not found"
+  //           ? location.value
+  //           : "Location not found"; // Fallback if placemarker also failed
+  //       isInsideAnyGeofence.value = false;
+  //       currentStateDisplay.value = administrativeArea.value.isNotEmpty
+  //           ? administrativeArea.value
+  //           : "State Unknown";
+  //     }
+  //     isCircularProgressBarOn.value = false;
+  //   } catch (e) {
+  //     currentStateDisplay.value = administrativeArea.value.isNotEmpty
+  //         ? administrativeArea.value
+  //         : "State Unknown";
+  //     if (lati.value != 0.0 && administrativeArea.value == '') {
+  //       await _updateLocationUsingGeofencing();
+  //     } else if (lati.value == 0.0 && administrativeArea.value == '') {
+  //       print("Location not obtained within 10 seconds.");
+  //       Timer(const Duration(seconds: 10), () {
+  //         if (lati.value == 0.0 && longi.value == 0.0) {
+  //           print("Location not obtained within 10 seconds. Using default.");
+  //           _getLocationDetailsFromLocationModel();
+  //         }
+  //       });
+  //     } else {
+  //       dev.log("$e");
+  //       Fluttertoast.showToast(
+  //         msg: "UpdateLocation Error: $e",
+  //         toastLength: Toast.LENGTH_LONG,
+  //         backgroundColor: Colors.black54,
+  //         gravity: ToastGravity.BOTTOM,
+  //         timeInSecForIosWeb: 1,
+  //         textColor: Colors.white,
+  //         fontSize: 16.0,
+  //       );
+  //     }
+  //   }
+  // }
 
   Future<void> getLocationStatus() async {
     bool isLocationEnabled = await geolocator.Geolocator.isLocationServiceEnabled();
