@@ -5,7 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
-
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 
 import 'package:pdf/pdf.dart';
@@ -85,6 +85,12 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   List<String> attachments = [];
   bool isHTML = false;
   List<Uint8List> checkSignatureImage = []; // Initialize as empty list
+
+    // Responsive Scaling Factors for PDF Text Sizes - Adjust these as needed
+  final double pdfTitleFontSizeFactor = 1.0; // Reduced from 20 to 16
+  final double pdfHeaderFontSizeFactor = 0.8; // Reduced from 12 to 10
+  final double pdfTableFontSizeFactor = 0.7; // Reduced from 12 to 9
+  final double pdfSignatureFontSizeFactor = 0.7; // Reduced from 12 to 9
 
   // Responsive scaling factors
   late double appBarHeightFactor;
@@ -185,7 +191,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     }
   }
 
-  Future<void> _createAndExportPDF() async {
+  Future<void> _createAndExportPDF1() async {
     final pdf = pw.Document(pageMode: PdfPageMode.outlines);
     String monthYear = DateFormat('MMMM, yyyy').format(
         DateTime(selectedYear, selectedMonth + 1));
@@ -234,6 +240,9 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
 
                 // Timesheet Table Section
                 pw.SizedBox(height: 10), // Adjust spacing
+                // Bio Info Section
+                _buildStaffInfo(context),
+                pw.SizedBox(height: 10), // Adjust spacing
                 _buildTimesheetTable(context),
 
                 // Signature Section
@@ -270,7 +279,70 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     }
   }
 
-  Future<void> sendEmailToSelf() async {
+  Future<void> _createAndExportPDF() async {
+    final pdf = pw.Document();
+    String monthYear =
+    DateFormat('MMMM, yyyy').format(DateTime(selectedYear, selectedMonth + 1));
+
+    try {
+      final ByteData logoBytes =
+      await rootBundle.load('assets/image/ccfn_logo.png');
+      final Uint8List logoImageData = logoBytes.buffer.asUint8List();
+      final pw.MemoryImage logoImage = pw.MemoryImage(logoImageData);
+
+      final supervisorNames = await _getSupervisorNames();
+      final signatureColumns = await _buildSignatureColumns(supervisorNames);
+
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(children: [
+                      pw.Text("CARITAS NIGERIA",
+                          style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 20 * pdfTitleFontSizeFactor)), // Reduced title size
+                      pw.SizedBox(height: 10),
+                      pw.Text("Monthly Time Sheet ($monthYear)",
+                          style: pw.TextStyle(
+                              fontSize: 14 * pdfHeaderFontSizeFactor)) // Reduced header size
+                    ]),
+                    pw.Image(logoImage, width: 50, height: 50),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+                _buildStaffInfo(context), // Added Staff Info here in _createAndExportPD
+                pw.SizedBox(height: 10),
+                _buildTimesheetTable(context),
+                pw.SizedBox(height: 10),
+                _buildSignatureSection(context, signatureColumns),
+              ],
+            );
+          },
+        ),
+      );
+
+      final Uint8List pdfBytes = await pdf.save();
+
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", "timesheet_${monthYear}_$selectedBioLastName.pdf")
+        ..click();
+
+      html.Url.revokeObjectUrl(url);
+    } catch (e) {
+      print("Error generating PDF: $e");
+    }
+  }
+
+
+  Future<void> sendEmailToSelf1() async {
     String monthYear1 = DateFormat('MMMM_yyyy').format(
         DateTime(selectedYear, selectedMonth + 1));
 
@@ -392,6 +464,132 @@ $selectedBioFirstName $selectedBioLastName
     );
   }
 
+  Future<void> sendEmailToSelf() async {
+    String monthYear1 =
+    DateFormat('MMMM_yyyy').format(DateTime(selectedYear, selectedMonth + 1));
+
+    final pdf = pw.Document(pageMode: PdfPageMode.outlines);
+    String monthYear =
+    DateFormat('MMMM, yyyy').format(DateTime(selectedYear, selectedMonth + 1));
+    final pageFormat = PdfPageFormat.a4.landscape;
+
+    try {
+      final supervisorNames = await _getSupervisorNames();
+      final signatureColumns = await _buildSignatureColumns(supervisorNames);
+      final logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
+      final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: pageFormat,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStaffInfo(context),
+                    pw.Column(children: [
+                      pw.Text("CARITAS NIGERIA",
+                          style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 20 * pdfTitleFontSizeFactor)), // Reduced title size
+                      pw.SizedBox(
+                        height: 10,
+                      ),
+                      pw.Text("Monthly Time Report ($monthYear)",
+                          style: pw.TextStyle(
+                              fontSize: 14 * pdfHeaderFontSizeFactor)) // Reduced header size
+                    ]),
+                    pw.Container(
+                      child: pw.Image(
+                        logoImage,
+                        width: 50,
+                        height: 50,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+
+                _buildStaffInfo(context),
+                pw.SizedBox(height: 10),
+                _buildTimesheetTable(context),
+                pw.SizedBox(height: 10),
+                _buildSignatureSection(context, signatureColumns),
+              ],
+            );
+          },
+        ),
+      );
+
+      Uint8List pdfBytes = await pdf.save();
+
+      attachments.clear();
+
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      attachments.add(url);
+
+      final Email email = Email(
+        body: '''
+Greetings $selectedBioFirstName,
+
+Please find attached your timesheet for $monthYear.
+**(WARNING: Direct PDF attachment in this web version may not work as expected due to browser limitations and library constraints.  If the attachment fails, please use the 'Save PDF' button to download the timesheet separately.)**
+
+Best regards,
+$selectedBioFirstName $selectedBioLastName
+''',
+        subject:
+        'Timesheet for $selectedBioFirstName $selectedBioLastName, $monthYear (Attempted PDF Attachment - Web Version)',
+        recipients: [selectedBioEmail!],
+        attachmentPaths: attachments,
+        isHTML: isHTML,
+      );
+      String platformResponse;
+
+      try {
+        await FlutterEmailSender.send(email);
+        platformResponse = 'success';
+      } catch (error) {
+        print("Error sending email (attachment may have failed): $error");
+        platformResponse = error.toString();
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(platformResponse,
+              style: TextStyle(fontSize: 14 * fontSizeFactor)),
+        ),
+      );
+      Fluttertoast.showToast(
+        msg:
+        "Email sent. Please check if PDF attachment is present (Attachment may fail in web version).",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 2,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    } catch (e) {
+      print("Error generating PDF for email: $e");
+      Fluttertoast.showToast(
+        msg: "Error generating PDF for email: $e",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.red,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
+  }
+
 
   Future<Map<String, String>> _getSupervisorNames() async {
     try {
@@ -457,11 +655,16 @@ $selectedBioFirstName $selectedBioLastName
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Name: $selectedBioFirstName $selectedBioLastName', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
-        pw.Text('Department: $selectedBioDepartment', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
-        pw.Text('Designation: $selectedBioDesignation', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
-        pw.Text('Location: $selectedBioLocation', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
-        pw.Text('State: $selectedBioState', style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+        pw.Text('Name: $selectedBioFirstName $selectedBioLastName',
+            style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+        pw.Text('Department: $selectedBioDepartment',
+            style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+        pw.Text('Designation: $selectedBioDesignation',
+            style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+        pw.Text('Location: $selectedBioLocation',
+            style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+        pw.Text('State: $selectedBioState',
+            style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
         pw.SizedBox(height: 20),
       ],
     );
@@ -480,7 +683,10 @@ $selectedBioFirstName $selectedBioLastName
     final projectData = [
       selectedProjectName ?? '',
       ...daysInRange.map((date) {
-        return _getDurationForDate3(date, selectedProjectName, selectedProjectName!).round().toString();
+        return _getDurationForDate3(
+            date, selectedProjectName, selectedProjectName!)
+            .round()
+            .toString();
       }),
       '0',
       '0%'
@@ -497,7 +703,9 @@ $selectedBioFirstName $selectedBioLastName
       final rowData = [
         category,
         ...daysInRange.map((date) {
-          return _getDurationForDate3(date, selectedProjectName, category).round().toString();
+          return _getDurationForDate3(date, selectedProjectName, category)
+              .round()
+              .toString();
         }),
         '0',
         '0%'
@@ -514,7 +722,9 @@ $selectedBioFirstName $selectedBioLastName
       row[daysInRange.length + 1] = rowTotal.round().toString();
 
       int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
-      double percentage = (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
+      double percentage = (workingDays * 8) != 0
+          ? (rowTotal / (workingDays * 8)) * 100
+          : 0;
       row[daysInRange.length + 2] = '${percentage.round()}%';
     }
 
@@ -539,14 +749,17 @@ $selectedBioFirstName $selectedBioLastName
     totalRow[daysInRange.length + 1] = grandTotalHours.toString();
 
     int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
-    double grandPercentage = (workingDays * 8) > 0 ? (grandTotalHours / (workingDays * 8)) * 100 : 0;
+    double grandPercentage = (workingDays * 8) > 0
+        ? (grandTotalHours / (workingDays * 8)) * 100
+        : 0;
     totalRow[daysInRange.length + 2] = '${grandPercentage.round()}%';
 
     return pw.Table(
       border: pw.TableBorder.all(),
       columnWidths: {
         0: const pw.FixedColumnWidth(250),
-        for (int i = 1; i <= daysInRange.length; i++) i: const pw.FixedColumnWidth(80),
+        for (int i = 1; i <= daysInRange.length; i++)
+          i: const pw.FixedColumnWidth(80),
         daysInRange.length + 1: const pw.FixedColumnWidth(200),
         daysInRange.length + 2: const pw.FixedColumnWidth(200),
       },
@@ -554,16 +767,17 @@ $selectedBioFirstName $selectedBioLastName
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: tableHeaders
-              .map((header) =>
-              pw.Center(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.all(1.0),
-                  child: pw.Text(
-                    header,
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * tableFontSizeFactor),
-                  ),
-                ),
-              ))
+              .map((header) => pw.Center(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(
+                header,
+                style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 12 * pdfHeaderFontSizeFactor), // Reduced header size
+              ),
+            ),
+          ))
               .toList(),
         ),
         ...allRows.map((rowData) {
@@ -574,29 +788,34 @@ $selectedBioFirstName $selectedBioLastName
                 .map((entry) {
               final i = entry.key;
               final data = entry.value;
-              final isWeekendColumn = i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]);
+              final isWeekendColumn =
+                  i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]);
 
               return pw.Container(
                 color: isWeekendColumn ? PdfColors.grey900 : null,
                 padding: const pw.EdgeInsets.all(1.0),
                 alignment: pw.Alignment.center,
-                child: pw.Text(data, style: pw.TextStyle(fontSize: 12 * tableFontSizeFactor)),
+                child: pw.Text(data,
+                    style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
               );
             }).toList(),
           );
         }),
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          children: totalRow.map((data) => pw.Center(child: pw.Padding(
-              padding: const pw.EdgeInsets.all(1.0),
-              child: pw.Text(data,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * tableFontSizeFactor)))))
+          children: totalRow
+              .map((data) => pw.Center(
+              child: pw.Padding(
+                  padding: const pw.EdgeInsets.all(1.0),
+                  child: pw.Text(data,
+                      style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 12 * pdfHeaderFontSizeFactor))))) // Reduced header size
               .toList(),
         ),
       ],
     );
   }
-
 
 
   Future<Uint8List?> networkImageToByte(String imageUrl) async {
@@ -612,75 +831,93 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-  Future<List<pw.Widget>> _buildSignatureColumns(Map<String, String> supervisorData) async {
-    final staffSig = (supervisorData['staffSignature'] != null && supervisorData['staffSignature']!.isNotEmpty)
+  Future<List<pw.Widget>> _buildSignatureColumns(
+      Map<String, String> supervisorData) async {
+    final staffSig =
+    (supervisorData['staffSignature'] != null && supervisorData['staffSignature']!.isNotEmpty)
         ? await networkImageToByte(supervisorData['staffSignature']!)
         : await networkImageToByte(staffSignatureLink!);
 
-    final coordSig = (supervisorData['projectCoordinatorSignature'] != null && supervisorData['projectCoordinatorSignature']!.isNotEmpty)
+    final coordSig = (supervisorData['projectCoordinatorSignature'] != null &&
+        supervisorData['projectCoordinatorSignature']!.isNotEmpty)
         ? await networkImageToByte(supervisorData['projectCoordinatorSignature']!)
         : null;
 
-    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null && supervisorData['caritasSupervisorSignature']!.isNotEmpty)
+    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null &&
+        supervisorData['caritasSupervisorSignature']!.isNotEmpty)
         ? await networkImageToByte(supervisorData['caritasSupervisorSignature']!)
         : null;
 
-    final staffName = '${selectedBioFirstName?.toUpperCase() ?? 'UNKNOWN'} ${selectedBioLastName?.toUpperCase() ?? ''}'.trim();
-    final projectCoordinatorName = supervisorData['projectCoordinatorName']?.toUpperCase() ?? 'UNKNOWN';
-    final caritasSupervisorName = supervisorData['caritasSupervisorName']?.toUpperCase() ?? 'UNKNOWN';
+    final staffName =
+    '${selectedBioFirstName?.toUpperCase() ?? 'UNKNOWN'} ${selectedBioLastName?.toUpperCase() ?? ''}'
+        .trim();
+    final projectCoordinatorName =
+        supervisorData['projectCoordinatorName']?.toUpperCase() ?? 'UNKNOWN';
+    final caritasSupervisorName =
+        supervisorData['caritasSupervisorName']?.toUpperCase() ?? 'UNKNOWN';
 
     final staffSignatureDate = supervisorData['staffSignatureDate'] ?? formattedDate;
-    final facilitySupervisorSignatureDate = supervisorData['facilitySupervisorSignatureDate'] ?? 'UNKNOWN';
-    final caritasSupervisorSignatureDate = supervisorData['caritasSupervisorSignatureDate'] ?? 'UNKNOWN';
+    final facilitySupervisorSignatureDate =
+        supervisorData['facilitySupervisorSignatureDate'] ?? 'UNKNOWN';
+    final caritasSupervisorSignatureDate =
+        supervisorData['caritasSupervisorSignatureDate'] ?? 'UNKNOWN';
 
     return [
-      _buildSingleSignatureColumn('Name of Staff', staffName, staffSig, staffSignatureDate),
-      _buildSingleSignatureColumn('Name of Project Coordinator', projectCoordinatorName, coordSig, facilitySupervisorSignatureDate),
-      _buildSingleSignatureColumn('Name of Caritas Supervisor', caritasSupervisorName, caritasSig, caritasSupervisorSignatureDate),
+      _buildSingleSignatureColumn(
+          'Name of Staff', staffName, staffSig, staffSignatureDate),
+      _buildSingleSignatureColumn('Name of Project Coordinator',
+          projectCoordinatorName, coordSig, facilitySupervisorSignatureDate),
+      _buildSingleSignatureColumn('Name of Caritas Supervisor',
+          caritasSupervisorName, caritasSig, caritasSupervisorSignatureDate),
     ];
   }
 
-  pw.Widget _buildSingleSignatureColumn(String title, String name, Uint8List? imageBytes, String date) {
+  pw.Widget _buildSingleSignatureColumn(
+      String title, String name, Uint8List? imageBytes, String date) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12 * fontSizeFactor)),
+        pw.Text(title,
+            style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 12 * pdfSignatureFontSizeFactor)), // Reduced signature section size
         pw.SizedBox(height: 10),
-        pw.Text(name, style: pw.TextStyle(fontSize: 12 * fontSizeFactor)),
+        pw.Text(name,
+            style: pw.TextStyle(fontSize: 12 * pdfSignatureFontSizeFactor)), // Reduced signature section size
         pw.SizedBox(height: 10),
         pw.Container(
-          height: 100 * fontSizeFactor,
-          width: 150 * fontSizeFactor,
+          height: 100 * pdfSignatureFontSizeFactor, // Reduced signature section size
+          width: 150 * pdfSignatureFontSizeFactor, // Reduced signature section size
           decoration: pw.BoxDecoration(
             border: pw.Border.all(),
           ),
           child: pw.Center(
             child: imageBytes != null
                 ? pw.Image(pw.MemoryImage(imageBytes))
-                : pw.Text("Signature", style: pw.TextStyle(fontSize: 10 * fontSizeFactor)),
+                : pw.Text("Signature",
+                style: pw.TextStyle(fontSize: 10 * pdfSignatureFontSizeFactor)), // Reduced signature section size
           ),
         ),
         pw.SizedBox(height: 10),
-        pw.Text("Date: $date", style: pw.TextStyle(fontSize: 12 * fontSizeFactor)),
+        pw.Text("Date: $date",
+            style: pw.TextStyle(fontSize: 12 * pdfSignatureFontSizeFactor)), // Reduced signature section size
       ],
     );
   }
 
-
-
-  pw.Widget _buildSignatureSection(pw.Context context, List<pw.Widget> signatureColumns) {
-    return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text('Signature & Date',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 30 * fontSizeFactor)),
-          pw.Divider(),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: signatureColumns,
-          ),
-        ]
-    );
+  pw.Widget _buildSignatureSection(
+      pw.Context context, List<pw.Widget> signatureColumns) {
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      pw.Text('Signature & Date',
+          style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 16 * pdfHeaderFontSizeFactor)), // Further reduced signature header size
+      pw.Divider(),
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: signatureColumns,
+      ),
+    ]);
   }
 
   String _getDurationForDate2(DateTime date, String? projectName,
