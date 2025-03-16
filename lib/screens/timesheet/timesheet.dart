@@ -55,6 +55,8 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   List<AttendanceModel> attendanceData = [];
   GlobalKey _globalKey = GlobalKey(); // Define the GlobalKey
   ScrollController _scrollController = ScrollController(); // Add a scroll controller
+  ScrollController _horizontalScrollController =
+  ScrollController(); // Controller for horizontal scrolling
 
   List<String?> projectNames = []; // Store project names from Isar
   List<String?> supervisorNames = []; // Store project names from Isar
@@ -109,8 +111,20 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   }
 
   Future<void> _initScreen() async {
+    setState(() {
+      _pageLoading = true; // Start loading
+    });
     await _loadInitialData();
-    _startInitialTimer();
+    await _loadBioData(); // Load bio data first
+    if (bioData != null && bioData!.department != null && bioData!.state != null) {
+      await getSupervisor(bioData!.firebaseAuthId!, selectedYear, selectedMonth);
+      await _loadSupervisorNames(bioData!.department!, bioData!.state!);
+    } else {
+      _showErrorToast("Bio data or department/state is missing!");
+    }
+    setState(() {
+      _pageLoading = false; // Stop loading after bio data and initial data are loaded
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -128,6 +142,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     await _loadProjectNames();
     await _loadAttendanceData();
     _scrollController = ScrollController();
+    _horizontalScrollController = ScrollController(); // Initialize horizontal scroll controller
   }
 
   void _startInitialTimer() {
@@ -1509,18 +1524,26 @@ $selectedBioFirstName $selectedBioLastName
           selectedBioPhone = data['mobile'] ?? '';
           staffSignatureLink = data['signatureLink'] ?? '';
           selectedFirebaseId = userId; // Store the Firebase UUID
+          bioData = BioModel.fromJson(data); // Assign bioData here
         });
 
-        await getSupervisor(
-            userId, selectedYear, selectedMonth);
-        _loadSupervisorNames(data['department'], data['state']);
+
       } else {
         print("No bio data found for user ID: $userId");
+        _showErrorToast("No bio data found for user. Please ensure your profile is complete.");
       }
     } catch (e) {
       print("Error loading bio data: $e");
+      _showErrorToast("Error loading bio data. Please check your internet connection.");
+    } finally {
+      if (mounted) { // Check if the widget is still mounted before setting state
+        setState(() {
+          _pageLoading = false; // Ensure loading stops even on error
+        });
+      }
     }
   }
+
 
 
   getDateFromUser() async {
@@ -2119,8 +2142,8 @@ $selectedBioFirstName $selectedBioLastName
       // role == "User"
       //     ?
       drawer(this.context),
-      // : drawer2(this.context, IsarService()),
-      body: _isLoading // Conditional rendering based on loading state
+
+      body: _pageLoading // Conditional rendering based on loading state
           ? const Center(
           child: CircularProgressIndicator()) // Show loading indicator
           :
@@ -2166,6 +2189,7 @@ $selectedBioFirstName $selectedBioLastName
               padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
               child: Row(
                 children: [
+                  SizedBox(width: 10 * marginFactor),
                   const Text(
                     'Select Month:',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -2225,2219 +2249,2257 @@ $selectedBioFirstName $selectedBioLastName
             Divider(height: 20 * marginFactor),
             // Attendance Sheet in a Container with 50% screen height
             Container(
-              //height: MediaQuery.of(context).size.height * 0.5, // Adjusted height for better visibility
-                child: RepaintBoundary(
-                    key: _globalKey,
-                    child: Column(
-                        children: [
-                          SingleChildScrollView(
-                            controller: _scrollController,
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(), // Smooth scrolling effect
-                            padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
-                            dragStartBehavior: DragStartBehavior.start,
-                            clipBehavior: Clip.hardEdge,
-                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                            child:
-                            // SizedBox( // <-- Use SizedBox to constrain the width
-                            //     width: totalContentWidth(), // Calculate this dynamically
-                            //     child:
-                            Column(
-                              children: [
-                                Column(
-                                  children: [
-                                    // Header Row
-                                    Row(
+
+                child: Row(
+                    mainAxisSize: MainAxisSize.min, // Or MainAxisSize.max depending on layout needs
+                    children:[
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios),
+                        onPressed: () {
+                          _horizontalScrollController.animateTo(
+                            _horizontalScrollController.offset - 200, // Adjust scroll amount
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+
+                      Expanded(
+                        child:RepaintBoundary(
+                            key: _globalKey,
+                            child: Column(
+                                children: [
+                                  SingleChildScrollView(
+                                    controller: _horizontalScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(), // Smooth scrolling effect
+                                    padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
+                                    dragStartBehavior: DragStartBehavior.start,
+                                    clipBehavior: Clip.hardEdge,
+                                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                                    child:
+                                    // SizedBox( // <-- Use SizedBox to constrain the width
+                                    //     width: totalContentWidth(), // Calculate this dynamically
+                                    //     child:
+                                    Column(
                                       children: [
-                                        Container(
-                                          width: 150,
-                                          // Set a width for the "Project Name" header
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.blue.shade100,
-                                          child: const Text(
-                                            'Project Name',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        ...daysInRange.map((date) {
-                                          return Container(
-                                            width: 50,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: isWeekend(date) ? Colors.grey
-                                                .shade300 : Colors.blue
-                                                .shade100,
-                                            child: Text(
-                                              DateFormat('dd MMM').format(date),
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          );
-                                        }),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.blue.shade100,
-                                          child: const Text(
-                                            'Total Hours',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.blue.shade100,
-                                          child: const Text(
-                                            'Percentage',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 150,
-                                          // Keep the fixed width if you need it
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: projectNames.isEmpty
-                                              ? const Text('No projects found')
-                                              : DropdownButton<String>(
-                                            value: selectedProjectName,
-                                            isExpanded: true,
-                                            // This will expand the dropdown to the Container's width
-                                            items: projectNames.map((
-                                                projectName) {
-                                              return DropdownMenuItem<String>(
-                                                value: projectName,
-                                                child: FittedBox( // Use FittedBox to wrap the Text
-                                                  fit: BoxFit.scaleDown,
-                                                  // Scales down text to fit
-                                                  alignment: Alignment
-                                                      .centerLeft,
-                                                  // Align text to the left
-                                                  child: Text(projectName ??
-                                                      'No Project Name'),
-                                                ),
-                                              );
-                                            }).toList(),
-                                            onChanged: (String? newValue) {
-                                              setState(() {
-                                                selectedProjectName = newValue;
-                                              });
-                                            },
-                                            hint: const Text('Select Project'),
-                                          ),
-                                        ),
-                                        ...daysInRange.map((date) {
-                                          bool weekend = isWeekend(date);
-                                          String hours = _getDurationForDate2(
-                                              date, selectedProjectName,
-                                              selectedProjectName!);
-                                          return Container(
-                                            width: 50,
-                                            // Set a fixed width for each day
-                                            decoration: BoxDecoration(
-                                              color: weekend ? Colors.grey
-                                                  .shade300 : Colors.white,
-                                              border: Border.all(
-                                                  color: Colors.black12),
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment
-                                                  .center,
+                                        Column(
+                                          children: [
+                                            // Header Row
+                                            Row(
                                               children: [
-                                                weekend
-                                                    ? const SizedBox
-                                                    .shrink() // No hours on weekends
-                                                    : Text(
-                                                  hours,
-                                                  // Placeholder, replace with Isar data
-                                                  style: const TextStyle(
-                                                      color: Colors.blueAccent),
+                                                Container(
+                                                  width: 150,
+                                                  // Set a width for the "Project Name" header
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.blue.shade100,
+                                                  child: const Text(
+                                                    'Project Name',
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                ...daysInRange.map((date) {
+                                                  return Container(
+                                                    width: 50,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: isWeekend(date) ? Colors.grey
+                                                        .shade300 : Colors.blue
+                                                        .shade100,
+                                                    child: Text(
+                                                      DateFormat('dd MMM').format(date),
+                                                      style: const TextStyle(
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  );
+                                                }),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.blue.shade100,
+                                                  child: const Text(
+                                                    'Total Hours',
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.blue.shade100,
+                                                  child: const Text(
+                                                    'Percentage',
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
                                                 ),
                                               ],
                                             ),
-                                          );
-                                        }),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: Text(
-                                            //'$totalHours hrs',
-                                            "${calculateTotalHours1(
-                                                selectedProjectName)
-                                                .round()} hrs",
+                                            const Divider(),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 150,
+                                                  // Keep the fixed width if you need it
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: projectNames.isEmpty
+                                                      ? const Text('No projects found')
+                                                      : DropdownButton<String>(
+                                                    value: selectedProjectName,
+                                                    isExpanded: true,
+                                                    // This will expand the dropdown to the Container's width
+                                                    items: projectNames.map((
+                                                        projectName) {
+                                                      return DropdownMenuItem<String>(
+                                                        value: projectName,
+                                                        child: FittedBox( // Use FittedBox to wrap the Text
+                                                          fit: BoxFit.scaleDown,
+                                                          // Scales down text to fit
+                                                          alignment: Alignment
+                                                              .centerLeft,
+                                                          // Align text to the left
+                                                          child: Text(projectName ??
+                                                              'No Project Name'),
+                                                        ),
+                                                      );
+                                                    }).toList(),
+                                                    onChanged: (String? newValue) {
+                                                      setState(() {
+                                                        selectedProjectName = newValue;
+                                                      });
+                                                    },
+                                                    hint: const Text('Select Project'),
+                                                  ),
+                                                ),
+                                                ...daysInRange.map((date) {
+                                                  bool weekend = isWeekend(date);
+                                                  String hours = _getDurationForDate2(
+                                                      date, selectedProjectName,
+                                                      selectedProjectName!);
+                                                  return Container(
+                                                    width: 50,
+                                                    // Set a fixed width for each day
+                                                    decoration: BoxDecoration(
+                                                      color: weekend ? Colors.grey
+                                                          .shade300 : Colors.white,
+                                                      border: Border.all(
+                                                          color: Colors.black12),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisAlignment: MainAxisAlignment
+                                                          .center,
+                                                      children: [
+                                                        weekend
+                                                            ? const SizedBox
+                                                            .shrink() // No hours on weekends
+                                                            : Text(
+                                                          hours,
+                                                          // Placeholder, replace with Isar data
+                                                          style: const TextStyle(
+                                                              color: Colors.blueAccent),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: Text(
+                                                    //'$totalHours hrs',
+                                                    "${calculateTotalHours1(
+                                                        selectedProjectName)
+                                                        .round()} hrs",
 
-                                            style: const TextStyle(
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.bold),
-                                          ),
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: Text(
+                                                    // '${percentageWorked.toStringAsFixed(2)}%',
+                                                    '${calculatePercentageWorked1(
+                                                        selectedProjectName).round()}%',
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const Divider(),
+                                            // "Out-of-office" Header Row
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 150,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: const Text(
+                                                    'Out-of-office',
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 18),
+                                                  ),
+                                                ),
+                                                ...List.generate(
+                                                    daysInRange.length, (index) {
+                                                  return Container(
+                                                    width: 50,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: const Text(
+                                                      '', // Placeholder for out-of-office data, can be replaced later
+                                                    ),
+                                                  );
+                                                }),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: const Text(
+                                                    '', // Placeholder for total hours
+                                                  ),
+                                                ),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: const Text(
+                                                    '', // Placeholder for percentage
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            // Rows for out-of-office categories
+                                            ...[
+                                              'Annual leave',
+                                              'Holiday',
+                                              'Paternity',
+                                              'Maternity'
+                                            ].map((category) {
+                                              double outOfOfficeHours = calculateCategoryHours(
+                                                  category);
+                                              double outOfOfficePercentage = calculateCategoryPercentage(
+                                                  category);
+                                              return Row(
+                                                children: [
+                                                  Container(
+                                                    width: 150,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: Text(
+                                                      category,
+                                                      style: const TextStyle(
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                  ...daysInRange.map((date) {
+                                                    bool weekend = isWeekend(date);
+                                                    String offDayHours = _getDurationForDate2(
+                                                        date, selectedProjectName,
+                                                        category);
+
+
+                                                    return Container(
+                                                      width: 50,
+                                                      // Set a fixed width for each day
+                                                      decoration: BoxDecoration(
+                                                        color: weekend ? Colors.grey
+                                                            .shade300 : Colors.white,
+                                                        border: Border.all(
+                                                            color: Colors.black12),
+                                                      ),
+                                                      child: Column(
+                                                        mainAxisAlignment: MainAxisAlignment
+                                                            .center,
+                                                        children: [
+                                                          weekend
+                                                              ? const SizedBox
+                                                              .shrink() // No hours on weekends
+                                                              : Text(
+                                                            offDayHours,
+                                                            // Placeholder, replace with Isar data
+                                                            style: const TextStyle(
+                                                                color: Colors
+                                                                    .blueAccent),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  }),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: Text(
+                                                      //'${outOfOfficeHours.toStringAsFixed(1)} hrs',
+                                                      "${calculateCategoryHours1(category)
+                                                          .round()} hrs",
+                                                      style: const TextStyle(
+                                                          color: Colors.green,
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: Text(
+                                                      //'${outOfOfficePercentage.toStringAsFixed(1)}%',
+                                                      '${calculateCategoryPercentage(
+                                                          category).round()}%',
+                                                      style: const TextStyle(
+                                                          color: Colors.green,
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            }),
+                                            // Attendance Rows
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 150,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: const Text(
+                                                    'Total',
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 20),
+                                                  ),
+                                                ),
+                                                ...List.generate(
+                                                    daysInRange.length, (index) {
+                                                  return Container(
+                                                    width: 50,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: const Text(
+                                                      '', // Placeholder for out-of-office data, can be replaced later
+                                                    ),
+                                                  );
+                                                }),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: Text(
+                                                    // '$totalGrandHours hrs',
+                                                    "${calculateGrandTotalHours1()
+                                                        .toStringAsFixed(0)} hrs",
+                                                    // Or .round().toString() if grand total should also be rounded.
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  width: 100,
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  color: Colors.white,
+                                                  child: Text(
+                                                    //'${grandPercentageWorked.toStringAsFixed(2)}%',
+                                                    '${calculateGrandPercentageWorked()
+                                                        .round()}%',
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+
+                                          ],
                                         ),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: Text(
-                                            // '${percentageWorked.toStringAsFixed(2)}%',
-                                            '${calculatePercentageWorked1(
-                                                selectedProjectName).round()}%',
-                                            style: const TextStyle(
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
+
+
                                       ],
                                     ),
-                                    const Divider(),
-                                    // "Out-of-office" Header Row
-                                    Row(
+                                    //),
+                                  ),
+                                  SizedBox(height: 5 * marginFactor),
+                                  //Signature and Detials
+
+                                  const Divider(),
+                                  Text('Signature & Date', style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
+                                  const Divider(),
+                                  Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
                                       children: [
-                                        Container(
-                                          width: 150,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: const Text(
-                                            'Out-of-office',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18),
-                                          ),
-                                        ),
-                                        ...List.generate(
-                                            daysInRange.length, (index) {
-                                          return Container(
-                                            width: 50,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: Colors.white,
-                                            child: const Text(
-                                              '', // Placeholder for out-of-office data, can be replaced later
-                                            ),
-                                          );
-                                        }),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: const Text(
-                                            '', // Placeholder for total hours
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: const Text(
-                                            '', // Placeholder for percentage
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    // Rows for out-of-office categories
-                                    ...[
-                                      'Annual leave',
-                                      'Holiday',
-                                      'Paternity',
-                                      'Maternity'
-                                    ].map((category) {
-                                      double outOfOfficeHours = calculateCategoryHours(
-                                          category);
-                                      double outOfOfficePercentage = calculateCategoryPercentage(
-                                          category);
-                                      return Row(
-                                        children: [
-                                          Container(
-                                            width: 150,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: Colors.white,
-                                            child: Text(
-                                              category,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                          ...daysInRange.map((date) {
-                                            bool weekend = isWeekend(date);
-                                            String offDayHours = _getDurationForDate2(
-                                                date, selectedProjectName,
-                                                category);
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.02 : 0.02),),
 
-
-                                            return Container(
-                                              width: 50,
-                                              // Set a fixed width for each day
-                                              decoration: BoxDecoration(
-                                                color: weekend ? Colors.grey
-                                                    .shade300 : Colors.white,
-                                                border: Border.all(
-                                                    color: Colors.black12),
-                                              ),
+                                            Expanded( // Wrap Container with Expanded
+                                              child:Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.25 : 0.25),
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.all(8.0),
+                                              //color: Colors.white,
                                               child: Column(
                                                 mainAxisAlignment: MainAxisAlignment
                                                     .center,
+                                                // Vertically center the content
+                                                crossAxisAlignment: CrossAxisAlignment
+                                                    .center,
                                                 children: [
-                                                  weekend
-                                                      ? const SizedBox
-                                                      .shrink() // No hours on weekends
-                                                      : Text(
-                                                    offDayHours,
-                                                    // Placeholder, replace with Isar data
-                                                    style: const TextStyle(
-                                                        color: Colors
-                                                            .blueAccent),
+                                                  Text('Name of Staff',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  Text(
+                                                    '${selectedBioFirstName.toString()
+                                                        .toUpperCase()} ${selectedBioLastName
+                                                        .toString().toUpperCase()}',
+                                                    style: TextStyle(
+                                                      fontSize: 16 * fontSizeFactor,
+                                                      // fontWeight: FontWeight.bold,
+                                                      fontFamily: "NexaLight",
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  // Adjust path and size accordingly
+                                                ],
+                                              ),
+                                            ),),
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                            // Signature of Staff
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.all(8.0),
+                                              //  color: Colors.grey.shade200,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
+                                                  SizedBox(height: 5 * marginFactor),
+
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final staffSignature = data['staffSignature']; // Assuming this stores the image URL
+                                                        //final facilitySupervisorSignatureStatus = data['staffSignature']; // Assuming you store the date
+
+                                                        if (staffSignature != null) {
+                                                          // caritasSupervisorSignature is a URL/path to the image
+                                                          return Container(
+                                                            margin: const EdgeInsets
+                                                                .only(
+                                                              top: 20,
+                                                              bottom: 24,
+                                                            ),
+                                                            height: MediaQuery
+                                                                .of(context)
+                                                                .size
+                                                                .width *
+                                                                (MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .shortestSide < 600
+                                                                    ? 0.30
+                                                                    : 0.15),
+                                                            width: MediaQuery
+                                                                .of(context)
+                                                                .size
+                                                                .width *
+                                                                (MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .shortestSide < 600
+                                                                    ? 0.30
+                                                                    : 0.30),
+                                                            alignment: Alignment.center,
+                                                            decoration: BoxDecoration(
+                                                              borderRadius: BorderRadius
+                                                                  .circular(20),
+                                                              //color: Colors.grey.shade300,
+                                                            ),
+                                                            child:
+                                                            //Image.network(Uri.decodeFull(staffSignature!)),
+
+                                                            CachedNetworkImage(
+                                                              imageUrl: staffSignature!,
+                                                              placeholder: (context, url) => const CircularProgressIndicator(),
+                                                              errorWidget: (context, url, error) => const Icon(Icons.error),
+                                                            ),
+
+                                                          );
+                                                        }
+                                                        else
+                                                        if (staffSignature == null &&
+                                                            staffSignatureLink ==
+                                                                null) {
+                                                          return GestureDetector(
+                                                            onTap: () {
+                                                              _pickImage();
+                                                            },
+
+                                                            child: Container(
+                                                              margin: const EdgeInsets
+                                                                  .only(
+                                                                top: 20,
+                                                                bottom: 24,
+                                                              ),
+                                                              height: MediaQuery
+                                                                  .of(context)
+                                                                  .size
+                                                                  .width *
+                                                                  (MediaQuery
+                                                                      .of(context)
+                                                                      .size
+                                                                      .shortestSide <
+                                                                      600
+                                                                      ? 0.30
+                                                                      : 0.15),
+                                                              width: MediaQuery
+                                                                  .of(context)
+                                                                  .size
+                                                                  .width *
+                                                                  (MediaQuery
+                                                                      .of(context)
+                                                                      .size
+                                                                      .shortestSide <
+                                                                      600
+                                                                      ? 0.30
+                                                                      : 0.30),
+                                                              alignment: Alignment
+                                                                  .center,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: BorderRadius
+                                                                    .circular(20),
+                                                                //color: Colors.grey.shade300,
+                                                              ),
+                                                              child: RefreshableWidget<
+                                                                  List<Uint8List>?>(
+                                                                refreshCall: () async {
+                                                                  return await _readImagesFromDatabase();
+                                                                },
+                                                                refreshRate: const Duration(
+                                                                    seconds: 1),
+                                                                errorWidget: Icon(
+                                                                  Icons.upload_file,
+                                                                  size: 80,
+                                                                  color: Colors.grey
+                                                                      .shade300,
+                                                                ),
+                                                                loadingWidget: Icon(
+                                                                  Icons.upload_file,
+                                                                  size: 80,
+                                                                  color: Colors.grey
+                                                                      .shade300,
+                                                                ),
+                                                                builder: (context,
+                                                                    value) {
+                                                                  if (value != null &&
+                                                                      value
+                                                                          .isNotEmpty) {
+                                                                    return ListView
+                                                                        .builder(
+                                                                      itemCount: value
+                                                                          .length,
+                                                                      itemBuilder: (
+                                                                          context,
+                                                                          index) =>
+                                                                          Container(
+                                                                            margin: const EdgeInsets
+                                                                                .only(
+                                                                              top: 20,
+                                                                              bottom: 24,
+                                                                            ),
+                                                                            height: MediaQuery
+                                                                                .of(
+                                                                                context)
+                                                                                .size
+                                                                                .width *
+                                                                                (MediaQuery
+                                                                                    .of(
+                                                                                    context)
+                                                                                    .size
+                                                                                    .shortestSide <
+                                                                                    600
+                                                                                    ? 0.30
+                                                                                    : 0.15),
+                                                                            width: MediaQuery
+                                                                                .of(
+                                                                                context)
+                                                                                .size
+                                                                                .width *
+                                                                                (MediaQuery
+                                                                                    .of(
+                                                                                    context)
+                                                                                    .size
+                                                                                    .shortestSide <
+                                                                                    600
+                                                                                    ? 0.30
+                                                                                    : 0.30),
+                                                                            alignment: Alignment
+                                                                                .center,
+                                                                            decoration: BoxDecoration(
+                                                                              borderRadius: BorderRadius
+                                                                                  .circular(
+                                                                                  20),
+                                                                              //color: Colors.grey.shade300,
+                                                                            ),
+                                                                            child: Image
+                                                                                .memory(
+                                                                                value
+                                                                                    .first),
+                                                                          ),
+
+
+                                                                    );
+                                                                  } else {
+                                                                    return Column(
+                                                                      mainAxisAlignment: MainAxisAlignment
+                                                                          .center,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .upload_file,
+                                                                          size: MediaQuery
+                                                                              .of(
+                                                                              context)
+                                                                              .size
+                                                                              .width *
+                                                                              (MediaQuery
+                                                                                  .of(
+                                                                                  context)
+                                                                                  .size
+                                                                                  .shortestSide <
+                                                                                  600
+                                                                                  ? 0.075
+                                                                                  : 0.05),
+                                                                          color: Colors
+                                                                              .grey
+                                                                              .shade600,
+                                                                        ),
+                                                                        const SizedBox(
+                                                                            height: 8),
+                                                                        const Text(
+                                                                          "Click to Upload Signature Image Here",
+                                                                          style: TextStyle(
+                                                                            fontSize: 14,
+                                                                            color: Colors
+                                                                                .grey,
+                                                                            fontWeight: FontWeight
+                                                                                .bold,
+                                                                          ),
+                                                                          textAlign: TextAlign
+                                                                              .center,
+                                                                        ),
+                                                                      ],
+                                                                    );
+                                                                  }
+                                                                },
+                                                              ),
+                                                            ),
+                                                          );
+                                                        } else
+                                                        if (staffSignature == null &&
+                                                            staffSignatureLink !=
+                                                                null) {
+                                                          return Column(
+                                                            children: [
+                                                              Container(
+                                                                margin: const EdgeInsets
+                                                                    .only(
+                                                                  top: 20,
+                                                                  bottom: 24,
+                                                                ),
+                                                                height: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.15),
+                                                                width: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.30),
+                                                                alignment: Alignment
+                                                                    .center,
+                                                                decoration: BoxDecoration(
+                                                                  borderRadius: BorderRadius
+                                                                      .circular(20),
+                                                                  //color: Colors.grey.shade300,
+                                                                ),
+                                                                child: Image.network(
+                                                                    staffSignatureLink!),
+                                                              ),
+
+
+                                                            ],
+                                                          );
+                                                        } else
+                                                        if (staffSignature != null &&
+                                                            staffSignatureLink !=
+                                                                null) {
+                                                          return Column(
+                                                            children: [
+                                                              Container(
+                                                                margin: const EdgeInsets
+                                                                    .only(
+                                                                  top: 20,
+                                                                  bottom: 24,
+                                                                ),
+                                                                height: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.15),
+                                                                width: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.30),
+                                                                alignment: Alignment
+                                                                    .center,
+                                                                decoration: BoxDecoration(
+                                                                  borderRadius: BorderRadius
+                                                                      .circular(20),
+                                                                  //color: Colors.grey.shade300,
+                                                                ),
+                                                                child: Image.network(
+                                                                    staffSignatureLink!),
+                                                              ),
+
+                                                            ],
+                                                          );
+                                                        }
+                                                        else {
+                                                          return Column(
+                                                            children: [
+                                                              Container(
+                                                                margin: const EdgeInsets
+                                                                    .only(
+                                                                  top: 20,
+                                                                  bottom: 24,
+                                                                ),
+                                                                height: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.15),
+                                                                width: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.30),
+                                                                alignment: Alignment
+                                                                    .center,
+                                                                decoration: BoxDecoration(
+                                                                  borderRadius: BorderRadius
+                                                                      .circular(20),
+                                                                  //color: Colors.grey.shade300,
+                                                                ),
+                                                                child: Image.network(
+                                                                    staffSignatureLink!),
+                                                              ),
+
+
+                                                            ],
+                                                          );
+                                                        }
+                                                      }
+                                                      else {
+                                                        if (staffSignatureLink ==
+                                                            null) {
+                                                          return GestureDetector(
+                                                            onTap: () {
+                                                              _pickImage();
+                                                            },
+
+                                                            child: Container(
+                                                              margin: const EdgeInsets
+                                                                  .only(
+                                                                top: 20,
+                                                                bottom: 24,
+                                                              ),
+                                                              height: MediaQuery
+                                                                  .of(context)
+                                                                  .size
+                                                                  .width *
+                                                                  (MediaQuery
+                                                                      .of(context)
+                                                                      .size
+                                                                      .shortestSide <
+                                                                      600
+                                                                      ? 0.30
+                                                                      : 0.15),
+                                                              width: MediaQuery
+                                                                  .of(context)
+                                                                  .size
+                                                                  .width *
+                                                                  (MediaQuery
+                                                                      .of(context)
+                                                                      .size
+                                                                      .shortestSide <
+                                                                      600
+                                                                      ? 0.30
+                                                                      : 0.30),
+                                                              alignment: Alignment
+                                                                  .center,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: BorderRadius
+                                                                    .circular(20),
+                                                                //color: Colors.grey.shade300,
+                                                              ),
+                                                              child: RefreshableWidget<
+                                                                  List<Uint8List>?>(
+                                                                refreshCall: () async {
+                                                                  return await _readImagesFromDatabase();
+                                                                },
+                                                                refreshRate: const Duration(
+                                                                    seconds: 1),
+                                                                errorWidget: Icon(
+                                                                  Icons.upload_file,
+                                                                  size: 80,
+                                                                  color: Colors.grey
+                                                                      .shade300,
+                                                                ),
+                                                                loadingWidget: Icon(
+                                                                  Icons.upload_file,
+                                                                  size: 80,
+                                                                  color: Colors.grey
+                                                                      .shade300,
+                                                                ),
+                                                                builder: (context,
+                                                                    value) {
+                                                                  if (value != null &&
+                                                                      value
+                                                                          .isNotEmpty) {
+                                                                    return ListView
+                                                                        .builder(
+                                                                      itemCount: value
+                                                                          .length,
+                                                                      itemBuilder: (
+                                                                          context,
+                                                                          index) =>
+                                                                          Container(
+                                                                            margin: const EdgeInsets
+                                                                                .only(
+                                                                              top: 20,
+                                                                              bottom: 24,
+                                                                            ),
+                                                                            height: MediaQuery
+                                                                                .of(
+                                                                                context)
+                                                                                .size
+                                                                                .width *
+                                                                                (MediaQuery
+                                                                                    .of(
+                                                                                    context)
+                                                                                    .size
+                                                                                    .shortestSide <
+                                                                                    600
+                                                                                    ? 0.30
+                                                                                    : 0.15),
+                                                                            width: MediaQuery
+                                                                                .of(
+                                                                                context)
+                                                                                .size
+                                                                                .width *
+                                                                                (MediaQuery
+                                                                                    .of(
+                                                                                    context)
+                                                                                    .size
+                                                                                    .shortestSide <
+                                                                                    600
+                                                                                    ? 0.30
+                                                                                    : 0.30),
+                                                                            alignment: Alignment
+                                                                                .center,
+                                                                            decoration: BoxDecoration(
+                                                                              borderRadius: BorderRadius
+                                                                                  .circular(
+                                                                                  20),
+                                                                              //color: Colors.grey.shade300,
+                                                                            ),
+                                                                            child: Image
+                                                                                .memory(
+                                                                                value
+                                                                                    .first),
+                                                                          ),
+
+
+                                                                    );
+                                                                  } else {
+                                                                    return Column(
+                                                                      mainAxisAlignment: MainAxisAlignment
+                                                                          .center,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .upload_file,
+                                                                          size: MediaQuery
+                                                                              .of(
+                                                                              context)
+                                                                              .size
+                                                                              .width *
+                                                                              (MediaQuery
+                                                                                  .of(
+                                                                                  context)
+                                                                                  .size
+                                                                                  .shortestSide <
+                                                                                  600
+                                                                                  ? 0.075
+                                                                                  : 0.05),
+                                                                          color: Colors
+                                                                              .grey
+                                                                              .shade600,
+                                                                        ),
+                                                                        const SizedBox(
+                                                                            height: 8),
+                                                                        const Text(
+                                                                          "Click to Upload Signature Image Here",
+                                                                          style: TextStyle(
+                                                                            fontSize: 14,
+                                                                            color: Colors
+                                                                                .grey,
+                                                                            fontWeight: FontWeight
+                                                                                .bold,
+                                                                          ),
+                                                                          textAlign: TextAlign
+                                                                              .center,
+                                                                        ),
+                                                                      ],
+                                                                    );
+                                                                  }
+                                                                },
+                                                              ),
+                                                            ),
+                                                          );
+                                                        } else if (staffSignatureLink !=
+                                                            null) {
+                                                          return Column(
+                                                            children: [
+                                                              Container(
+                                                                margin: const EdgeInsets
+                                                                    .only(
+                                                                  top: 20,
+                                                                  bottom: 24,
+                                                                ),
+                                                                height: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.15),
+                                                                width: MediaQuery
+                                                                    .of(context)
+                                                                    .size
+                                                                    .width *
+                                                                    (MediaQuery
+                                                                        .of(context)
+                                                                        .size
+                                                                        .shortestSide <
+                                                                        600
+                                                                        ? 0.30
+                                                                        : 0.30),
+                                                                alignment: Alignment
+                                                                    .center,
+                                                                decoration: BoxDecoration(
+                                                                  borderRadius: BorderRadius
+                                                                      .circular(20),
+                                                                  //color: Colors.grey.shade300,
+                                                                ),
+                                                                child: Image.network(
+                                                                    staffSignatureLink!),
+                                                              ),
+
+
+                                                            ],
+                                                          );
+                                                        }
+                                                      }
+                                                      return const Text(
+                                                          "Loading Signature...");
+                                                    },
+                                                  ),
+
+                                                  // Adjust path and size accordingly
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                            // Date of Signature of Staff
+
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Column(
+                                                children: [
+                                                  const Text('Date', style: TextStyle(
+                                                      fontWeight: FontWeight.bold, fontSize: 20 ),),
+                                                  SizedBox(height: 5 * marginFactor),
+
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final staffSignatureDate = data['staffSignatureDate']; // Assuming this stores the image URL
+                                                        //  final caritasSupervisorDate = data['date']; // Assuming you store the date
+
+                                                        if (staffSignatureDate !=
+                                                            null) {
+                                                          // caritasSupervisorSignature is a URL/path to the image
+                                                          return Column(
+                                                            children: [
+                                                              //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
+                                                              Text(staffSignatureDate
+                                                                  .toString()),
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return Text(
+                                                              formattedDate,
+                                                              style: const TextStyle(
+                                                                  fontWeight: FontWeight
+                                                                      .bold));
+                                                        }
+                                                      } else {
+                                                        return Text(formattedDate,
+                                                            style: const TextStyle(
+                                                                fontWeight: FontWeight
+                                                                    .bold));
+                                                      }
+                                                    },
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.02 : 0.02),),
+
+
+                                          ],
+                                        ),
+                                        SizedBox(width: MediaQuery
+                                            .of(context)
+                                            .size
+                                            .width * (MediaQuery
+                                            .of(context)
+                                            .size
+                                            .shortestSide < 600 ? 0.005 : 0.005)),
+                                        const Divider(),
+                                        //Second - Project Coordinator Section
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            //Name of Project Cordinator
+                                            Expanded( // Wrap Container with Expanded
+                                              child:
+                                              Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width *
+                                                  (MediaQuery
+                                                      .of(context)
+                                                      .size
+                                                      .shortestSide < 600
+                                                      ? 0.30
+                                                      : 0.25),
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.all(8.0),
+                                              //  color: Colors.grey.shade200,
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment
+                                                    .start,
+                                                children: [
+                                                  // Email of Project Cordinator
+                                                  Text(
+                                                    'Name of Facility Supervisor',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  //
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final facilitySupervisor = data['facilitySupervisor']; // Assuming this stores the image URL
+                                                        //final caritasSupervisorDate = data['date'];
+                                                        //Assuming you store the date
+                                                        print("facilitySupervisor == $facilitySupervisor");
+
+                                                        if (facilitySupervisor == null) {
+                                                          // caritasSupervisorSignature is a URL/path to the image
+                                                          return  buildFacilitySupervisorDropdown();
+                                                        } else {
+                                                          return Text(
+                                                            "$facilitySupervisor",style: TextStyle(
+                                                            fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
+                                                        }
+                                                      } else {
+                                                        return buildFacilitySupervisorDropdown();
+                                                      }
+                                                    },
+                                                  ),
+                                                  //
+
+
+                                                  SizedBox(height: 5 * marginFactor),
+                                                ],
+                                              ),
+                                            ),),
+
+
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                            //Signature of Project Cordinator
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.all(8.0),
+                                              //color: Colors.grey.shade200,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final facilitySupervisorSignature = data['facilitySupervisorSignature']; // Assuming this stores the image URL
+                                                        final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus']; // Assuming you store the date
+                                                        final facilitySupervisorRejectionReason = data['facilitySupervisorRejectionReason']; // Assuming you store the date
+
+                                                        if (facilitySupervisorSignature != null && facilitySupervisorSignatureStatus == "Approved") {
+                                                          return Container(
+                                                            margin: const EdgeInsets.only(
+                                                              top: 20,
+                                                              bottom: 24,
+                                                            ),
+                                                            constraints: BoxConstraints(
+                                                              maxHeight: MediaQuery.of(context).size.width *
+                                                                  (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
+                                                              maxWidth: MediaQuery.of(context).size.width *
+                                                                  (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
+                                                            ),
+                                                            alignment: Alignment.center,
+                                                            decoration: BoxDecoration(
+                                                              borderRadius: BorderRadius.circular(20),
+                                                              // color: Colors.grey.shade300, // Uncomment if needed
+                                                            ),
+                                                            child: Column(
+                                                              mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
+                                                              children: [
+                                                                Flexible(
+                                                                  child: Image.network(
+                                                                    facilitySupervisorSignature!,
+                                                                    fit: BoxFit.contain,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(height: 8),
+                                                                Row(
+                                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                                  children: [
+                                                                    const Icon(Icons.check_circle, color: Colors.green),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          );
+                                                        }
+
+                                                        else if(facilitySupervisorSignature !=
+                                                            null && facilitySupervisorSignatureStatus == "Rejected"){
+                                                          return Column(
+                                                            children: [
+                                                              const Text("Awaiting Facility Supervisor Signature"),
+                                                              const SizedBox(height: 8),
+                                                              if (facilitySupervisorSignatureStatus == "Rejected")
+                                                                Row(
+                                                                  children: [
+                                                                    const Icon(Icons.cancel, color: Colors.red),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    const SizedBox(width: 15),
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        showDialog(
+                                                                          context: context,
+                                                                          builder: (context) {
+                                                                            return AlertDialog(
+                                                                              title: const Text("Reason for Rejection"),
+                                                                              content: Text(facilitySupervisorRejectionReason ?? "No reason provided."),
+                                                                              actions: [
+                                                                                TextButton(
+                                                                                  onPressed: () {
+                                                                                    Navigator.of(context).pop();
+                                                                                  },
+                                                                                  child: const Text("Close"),
+                                                                                ),
+                                                                              ],
+                                                                            );
+                                                                          },
+                                                                        );
+                                                                      },
+                                                                      child: const Icon(
+                                                                        Icons.info_outline,
+                                                                        color: Colors.blue,
+                                                                        size: 20,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                )
+                                                              else
+                                                                Row(
+                                                                  children: [
+                                                                    const Icon(Icons.check_circle, color: Colors.green),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                            ],
+                                                          );
+                                                        }
+                                                        else {
+                                                          return Column(
+                                                            children: [
+                                                              const Text("Awaiting Facility Supervisor Signature"),
+                                                              const SizedBox(height: 8),
+                                                              if (facilitySupervisorSignatureStatus == "Pending")
+                                                                Row(
+                                                                  children: [
+                                                                    const Icon(Icons.access_time, color: Colors.orange),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                )
+                                                              else if (facilitySupervisorSignatureStatus == "Rejected")
+                                                                Row(
+                                                                  children: [
+                                                                    const Icon(Icons.cancel, color: Colors.red),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    const SizedBox(width: 15),
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        showDialog(
+                                                                          context: context,
+                                                                          builder: (context) {
+                                                                            return AlertDialog(
+                                                                              title: const Text("Reason for Return"),
+                                                                              content: Text(facilitySupervisorRejectionReason ?? "No reason provided."),
+                                                                              actions: [
+                                                                                TextButton(
+                                                                                  onPressed: () {
+                                                                                    Navigator.of(context).pop();
+                                                                                  },
+                                                                                  child: const Text("Close"),
+                                                                                ),
+                                                                              ],
+                                                                            );
+                                                                          },
+                                                                        );
+                                                                      },
+                                                                      child: const Icon(
+                                                                        Icons.info_outline,
+                                                                        color: Colors.blue,
+                                                                        size: 20,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                )
+                                                              else
+                                                                Row(
+                                                                  children: [
+                                                                    const Icon(Icons.check_circle, color: Colors.green),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$facilitySupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                            ],
+                                                          );
+
+                                                        }
+                                                      } else {
+                                                        return const Text(
+                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature");
+                                                      }
+                                                    },
+                                                  ), // Adjust path and size accordingly
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(height: 5 * marginFactor),
+                                            //Date of Project Signature Date
+
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Column(
+                                                children: [
+                                                  const Text('Date', style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 20 ,),),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final facilitySupervisorDate = data['facilitySupervisorSignatureDate']; // Assuming this stores the image URL
+                                                        //  final caritasSupervisorDate = data['date']; // Assuming you store the date
+
+                                                        if (facilitySupervisorDate !=
+                                                            null) {
+                                                          // caritasSupervisorSignature is a URL/path to the image
+                                                          return Column(
+                                                            children: [
+                                                              //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
+                                                              Text(
+                                                                  facilitySupervisorDate
+                                                                      .toString()),
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return const Text(
+                                                              "Awaiting Facility Supervisor Date");
+                                                        }
+                                                      } else {
+                                                        return const Text(
+                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature Date");
+                                                      }
+                                                    },
                                                   ),
                                                 ],
                                               ),
-                                            );
-                                          }),
-                                          Container(
-                                            width: 100,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: Colors.white,
-                                            child: Text(
-                                              //'${outOfOfficeHours.toStringAsFixed(1)} hrs',
-                                              "${calculateCategoryHours1(category)
-                                                  .round()} hrs",
-                                              style: const TextStyle(
-                                                  color: Colors.green,
-                                                  fontWeight: FontWeight.bold),
                                             ),
-                                          ),
-                                          Container(
-                                            width: 100,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: Colors.white,
-                                            child: Text(
-                                              //'${outOfOfficePercentage.toStringAsFixed(1)}%',
-                                              '${calculateCategoryPercentage(
-                                                  category).round()}%',
-                                              style: const TextStyle(
-                                                  color: Colors.green,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                    // Attendance Rows
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 150,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: const Text(
-                                            'Total',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 20),
-                                          ),
+                                            //SizedBox(width:MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.02 : 0.02),),
+                                          ],
                                         ),
-                                        ...List.generate(
-                                            daysInRange.length, (index) {
-                                          return Container(
-                                            width: 50,
-                                            alignment: Alignment.center,
-                                            padding: const EdgeInsets.all(8.0),
-                                            color: Colors.white,
-                                            child: const Text(
-                                              '', // Placeholder for out-of-office data, can be replaced later
-                                            ),
-                                          );
-                                        }),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: Text(
-                                            // '$totalGrandHours hrs',
-                                            "${calculateGrandTotalHours1()
-                                                .toStringAsFixed(0)} hrs",
-                                            // Or .round().toString() if grand total should also be rounded.
-                                            style: const TextStyle(
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 100,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(8.0),
-                                          color: Colors.white,
-                                          child: Text(
-                                            //'${grandPercentageWorked.toStringAsFixed(2)}%',
-                                            '${calculateGrandPercentageWorked()
-                                                .round()}%',
-                                            style: const TextStyle(
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-
-                                  ],
-                                ),
-
-
-                              ],
-                            ),
-                            //),
-                          ),
-                          SizedBox(height: 5 * marginFactor),
-                          //Signature and Detials
-
-                          const Divider(),
-                          Text('Signature & Date', style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
-                          const Divider(),
-                          Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.02 : 0.02),),
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.25 : 0.25),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //color: Colors.white,
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .center,
-                                        // Vertically center the content
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .center,
-                                        children: [
-                                          Text('Name of Staff',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
-                                          SizedBox(height: 5 * marginFactor),
-                                          Text(
-                                            '${selectedBioFirstName.toString()
-                                                .toUpperCase()} ${selectedBioLastName
-                                                .toString().toUpperCase()}',
-                                            style: TextStyle(
-                                              fontSize: 16 * fontSizeFactor,
-                                              // fontWeight: FontWeight.bold,
-                                              fontFamily: "NexaLight",
-                                            ),
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-                                          // Adjust path and size accordingly
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
-                                    // Signature of Staff
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.35 : 0.35),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //  color: Colors.grey.shade200,
-                                      child: Column(
-                                        children: [
-                                          Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
-                                          SizedBox(height: 5 * marginFactor),
-
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final staffSignature = data['staffSignature']; // Assuming this stores the image URL
-                                                //final facilitySupervisorSignatureStatus = data['staffSignature']; // Assuming you store the date
-
-                                                if (staffSignature != null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return Container(
-                                                    margin: const EdgeInsets
-                                                        .only(
-                                                      top: 20,
-                                                      bottom: 24,
-                                                    ),
-                                                    height: MediaQuery
-                                                        .of(context)
-                                                        .size
-                                                        .width *
-                                                        (MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .shortestSide < 600
-                                                            ? 0.30
-                                                            : 0.15),
-                                                    width: MediaQuery
-                                                        .of(context)
-                                                        .size
-                                                        .width *
-                                                        (MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .shortestSide < 600
-                                                            ? 0.30
-                                                            : 0.30),
-                                                    alignment: Alignment.center,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius
-                                                          .circular(20),
-                                                      //color: Colors.grey.shade300,
-                                                    ),
-                                                    child:
-                                                    //Image.network(Uri.decodeFull(staffSignature!)),
-
-                                                    CachedNetworkImage(
-                                                      imageUrl: staffSignature!,
-                                                      placeholder: (context, url) => const CircularProgressIndicator(),
-                                                      errorWidget: (context, url, error) => const Icon(Icons.error),
-                                                    ),
-
-                                                  );
-                                                }
-                                                else
-                                                if (staffSignature == null &&
-                                                    staffSignatureLink ==
-                                                        null) {
-                                                  return GestureDetector(
-                                                    onTap: () {
-                                                      _pickImage();
-                                                    },
-
-                                                    child: Container(
-                                                      margin: const EdgeInsets
-                                                          .only(
-                                                        top: 20,
-                                                        bottom: 24,
-                                                      ),
-                                                      height: MediaQuery
+                                        SizedBox(width: MediaQuery
+                                            .of(context)
+                                            .size
+                                            .width * (MediaQuery
+                                            .of(context)
+                                            .size
+                                            .shortestSide < 600 ? 0.005 : 0.005)),
+                                        const Divider(),
+                                        // Third - CARITAS Supervisor Section
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            // Name of CARITAS Supervisor
+                                            Expanded(
+                                                child:Container(
+                                                  width: MediaQuery
+                                                      .of(context)
+                                                      .size
+                                                      .width *
+                                                      (MediaQuery
                                                           .of(context)
                                                           .size
-                                                          .width *
-                                                          (MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .shortestSide <
-                                                              600
-                                                              ? 0.30
-                                                              : 0.15),
-                                                      width: MediaQuery
-                                                          .of(context)
-                                                          .size
-                                                          .width *
-                                                          (MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .shortestSide <
-                                                              600
-                                                              ? 0.30
-                                                              : 0.30),
-                                                      alignment: Alignment
-                                                          .center,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius: BorderRadius
-                                                            .circular(20),
-                                                        //color: Colors.grey.shade300,
-                                                      ),
-                                                      child: RefreshableWidget<
-                                                          List<Uint8List>?>(
-                                                        refreshCall: () async {
-                                                          return await _readImagesFromDatabase();
-                                                        },
-                                                        refreshRate: const Duration(
-                                                            seconds: 1),
-                                                        errorWidget: Icon(
-                                                          Icons.upload_file,
-                                                          size: 80,
-                                                          color: Colors.grey
-                                                              .shade300,
-                                                        ),
-                                                        loadingWidget: Icon(
-                                                          Icons.upload_file,
-                                                          size: 80,
-                                                          color: Colors.grey
-                                                              .shade300,
-                                                        ),
-                                                        builder: (context,
-                                                            value) {
-                                                          if (value != null &&
-                                                              value
-                                                                  .isNotEmpty) {
-                                                            return ListView
-                                                                .builder(
-                                                              itemCount: value
-                                                                  .length,
-                                                              itemBuilder: (
-                                                                  context,
-                                                                  index) =>
-                                                                  Container(
-                                                                    margin: const EdgeInsets
-                                                                        .only(
-                                                                      top: 20,
-                                                                      bottom: 24,
-                                                                    ),
-                                                                    height: MediaQuery
-                                                                        .of(
-                                                                        context)
-                                                                        .size
-                                                                        .width *
-                                                                        (MediaQuery
-                                                                            .of(
-                                                                            context)
-                                                                            .size
-                                                                            .shortestSide <
-                                                                            600
-                                                                            ? 0.30
-                                                                            : 0.15),
-                                                                    width: MediaQuery
-                                                                        .of(
-                                                                        context)
-                                                                        .size
-                                                                        .width *
-                                                                        (MediaQuery
-                                                                            .of(
-                                                                            context)
-                                                                            .size
-                                                                            .shortestSide <
-                                                                            600
-                                                                            ? 0.30
-                                                                            : 0.30),
-                                                                    alignment: Alignment
-                                                                        .center,
-                                                                    decoration: BoxDecoration(
-                                                                      borderRadius: BorderRadius
-                                                                          .circular(
-                                                                          20),
-                                                                      //color: Colors.grey.shade300,
-                                                                    ),
-                                                                    child: Image
-                                                                        .memory(
-                                                                        value
-                                                                            .first),
-                                                                  ),
-
-
-                                                            );
-                                                          } else {
-                                                            return Column(
-                                                              mainAxisAlignment: MainAxisAlignment
-                                                                  .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .upload_file,
-                                                                  size: MediaQuery
-                                                                      .of(
-                                                                      context)
-                                                                      .size
-                                                                      .width *
-                                                                      (MediaQuery
-                                                                          .of(
-                                                                          context)
-                                                                          .size
-                                                                          .shortestSide <
-                                                                          600
-                                                                          ? 0.075
-                                                                          : 0.05),
-                                                                  color: Colors
-                                                                      .grey
-                                                                      .shade600,
-                                                                ),
-                                                                const SizedBox(
-                                                                    height: 8),
-                                                                const Text(
-                                                                  "Click to Upload Signature Image Here",
-                                                                  style: TextStyle(
-                                                                    fontSize: 14,
-                                                                    color: Colors
-                                                                        .grey,
-                                                                    fontWeight: FontWeight
-                                                                        .bold,
-                                                                  ),
-                                                                  textAlign: TextAlign
-                                                                      .center,
-                                                                ),
-                                                              ],
-                                                            );
-                                                          }
-                                                        },
-                                                      ),
-                                                    ),
-                                                  );
-                                                } else
-                                                if (staffSignature == null &&
-                                                    staffSignatureLink !=
-                                                        null) {
-                                                  return Column(
+                                                          .shortestSide < 600
+                                                          ? 0.30
+                                                          : 0.25),
+                                                  alignment: Alignment.center,
+                                                  padding: const EdgeInsets.all(8.0),
+                                                  //color: Colors.grey.shade200,
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment
+                                                        .start,
                                                     children: [
-                                                      Container(
-                                                        margin: const EdgeInsets
-                                                            .only(
-                                                          top: 20,
-                                                          bottom: 24,
-                                                        ),
-                                                        height: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.15),
-                                                        width: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.30),
-                                                        alignment: Alignment
-                                                            .center,
-                                                        decoration: BoxDecoration(
-                                                          borderRadius: BorderRadius
-                                                              .circular(20),
-                                                          //color: Colors.grey.shade300,
-                                                        ),
-                                                        child: Image.network(
-                                                            staffSignatureLink!),
-                                                      ),
-
-
-                                                    ],
-                                                  );
-                                                } else
-                                                if (staffSignature != null &&
-                                                    staffSignatureLink !=
-                                                        null) {
-                                                  return Column(
-                                                    children: [
-                                                      Container(
-                                                        margin: const EdgeInsets
-                                                            .only(
-                                                          top: 20,
-                                                          bottom: 24,
-                                                        ),
-                                                        height: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.15),
-                                                        width: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.30),
-                                                        alignment: Alignment
-                                                            .center,
-                                                        decoration: BoxDecoration(
-                                                          borderRadius: BorderRadius
-                                                              .circular(20),
-                                                          //color: Colors.grey.shade300,
-                                                        ),
-                                                        child: Image.network(
-                                                            staffSignatureLink!),
-                                                      ),
-
-                                                    ],
-                                                  );
-                                                }
-                                                else {
-                                                  return Column(
-                                                    children: [
-                                                      Container(
-                                                        margin: const EdgeInsets
-                                                            .only(
-                                                          top: 20,
-                                                          bottom: 24,
-                                                        ),
-                                                        height: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.15),
-                                                        width: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.30),
-                                                        alignment: Alignment
-                                                            .center,
-                                                        decoration: BoxDecoration(
-                                                          borderRadius: BorderRadius
-                                                              .circular(20),
-                                                          //color: Colors.grey.shade300,
-                                                        ),
-                                                        child: Image.network(
-                                                            staffSignatureLink!),
-                                                      ),
-
-
-                                                    ],
-                                                  );
-                                                }
-                                              }
-                                              else {
-                                                if (staffSignatureLink ==
-                                                    null) {
-                                                  return GestureDetector(
-                                                    onTap: () {
-                                                      _pickImage();
-                                                    },
-
-                                                    child: Container(
-                                                      margin: const EdgeInsets
-                                                          .only(
-                                                        top: 20,
-                                                        bottom: 24,
-                                                      ),
-                                                      height: MediaQuery
-                                                          .of(context)
-                                                          .size
-                                                          .width *
-                                                          (MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .shortestSide <
-                                                              600
-                                                              ? 0.30
-                                                              : 0.15),
-                                                      width: MediaQuery
-                                                          .of(context)
-                                                          .size
-                                                          .width *
-                                                          (MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .shortestSide <
-                                                              600
-                                                              ? 0.30
-                                                              : 0.30),
-                                                      alignment: Alignment
-                                                          .center,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius: BorderRadius
-                                                            .circular(20),
-                                                        //color: Colors.grey.shade300,
-                                                      ),
-                                                      child: RefreshableWidget<
-                                                          List<Uint8List>?>(
-                                                        refreshCall: () async {
-                                                          return await _readImagesFromDatabase();
-                                                        },
-                                                        refreshRate: const Duration(
-                                                            seconds: 1),
-                                                        errorWidget: Icon(
-                                                          Icons.upload_file,
-                                                          size: 80,
-                                                          color: Colors.grey
-                                                              .shade300,
-                                                        ),
-                                                        loadingWidget: Icon(
-                                                          Icons.upload_file,
-                                                          size: 80,
-                                                          color: Colors.grey
-                                                              .shade300,
-                                                        ),
-                                                        builder: (context,
-                                                            value) {
-                                                          if (value != null &&
-                                                              value
-                                                                  .isNotEmpty) {
-                                                            return ListView
-                                                                .builder(
-                                                              itemCount: value
-                                                                  .length,
-                                                              itemBuilder: (
-                                                                  context,
-                                                                  index) =>
-                                                                  Container(
-                                                                    margin: const EdgeInsets
-                                                                        .only(
-                                                                      top: 20,
-                                                                      bottom: 24,
-                                                                    ),
-                                                                    height: MediaQuery
-                                                                        .of(
-                                                                        context)
-                                                                        .size
-                                                                        .width *
-                                                                        (MediaQuery
-                                                                            .of(
-                                                                            context)
-                                                                            .size
-                                                                            .shortestSide <
-                                                                            600
-                                                                            ? 0.30
-                                                                            : 0.15),
-                                                                    width: MediaQuery
-                                                                        .of(
-                                                                        context)
-                                                                        .size
-                                                                        .width *
-                                                                        (MediaQuery
-                                                                            .of(
-                                                                            context)
-                                                                            .size
-                                                                            .shortestSide <
-                                                                            600
-                                                                            ? 0.30
-                                                                            : 0.30),
-                                                                    alignment: Alignment
-                                                                        .center,
-                                                                    decoration: BoxDecoration(
-                                                                      borderRadius: BorderRadius
-                                                                          .circular(
-                                                                          20),
-                                                                      //color: Colors.grey.shade300,
-                                                                    ),
-                                                                    child: Image
-                                                                        .memory(
-                                                                        value
-                                                                            .first),
-                                                                  ),
-
-
-                                                            );
-                                                          } else {
-                                                            return Column(
-                                                              mainAxisAlignment: MainAxisAlignment
-                                                                  .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .upload_file,
-                                                                  size: MediaQuery
-                                                                      .of(
-                                                                      context)
-                                                                      .size
-                                                                      .width *
-                                                                      (MediaQuery
-                                                                          .of(
-                                                                          context)
-                                                                          .size
-                                                                          .shortestSide <
-                                                                          600
-                                                                          ? 0.075
-                                                                          : 0.05),
-                                                                  color: Colors
-                                                                      .grey
-                                                                      .shade600,
-                                                                ),
-                                                                const SizedBox(
-                                                                    height: 8),
-                                                                const Text(
-                                                                  "Click to Upload Signature Image Here",
-                                                                  style: TextStyle(
-                                                                    fontSize: 14,
-                                                                    color: Colors
-                                                                        .grey,
-                                                                    fontWeight: FontWeight
-                                                                        .bold,
-                                                                  ),
-                                                                  textAlign: TextAlign
-                                                                      .center,
-                                                                ),
-                                                              ],
-                                                            );
-                                                          }
-                                                        },
-                                                      ),
-                                                    ),
-                                                  );
-                                                } else if (staffSignatureLink !=
-                                                    null) {
-                                                  return Column(
-                                                    children: [
-                                                      Container(
-                                                        margin: const EdgeInsets
-                                                            .only(
-                                                          top: 20,
-                                                          bottom: 24,
-                                                        ),
-                                                        height: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.15),
-                                                        width: MediaQuery
-                                                            .of(context)
-                                                            .size
-                                                            .width *
-                                                            (MediaQuery
-                                                                .of(context)
-                                                                .size
-                                                                .shortestSide <
-                                                                600
-                                                                ? 0.30
-                                                                : 0.30),
-                                                        alignment: Alignment
-                                                            .center,
-                                                        decoration: BoxDecoration(
-                                                          borderRadius: BorderRadius
-                                                              .circular(20),
-                                                          //color: Colors.grey.shade300,
-                                                        ),
-                                                        child: Image.network(
-                                                            staffSignatureLink!),
-                                                      ),
-
-
-                                                    ],
-                                                  );
-                                                }
-                                              }
-                                              return const Text(
-                                                  "Loading Signature...");
-                                            },
-                                          ),
-
-                                          // Adjust path and size accordingly
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
-                                    // Date of Signature of Staff
-
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.30 : 0.30),
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        children: [
-                                          const Text('Date', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20 ),),
-                                          SizedBox(height: 5 * marginFactor),
-
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final staffSignatureDate = data['staffSignatureDate']; // Assuming this stores the image URL
-                                                //  final caritasSupervisorDate = data['date']; // Assuming you store the date
-
-                                                if (staffSignatureDate !=
-                                                    null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return Column(
-                                                    children: [
-                                                      //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
-                                                      Text(staffSignatureDate
-                                                          .toString()),
-                                                    ],
-                                                  );
-                                                } else {
-                                                  return Text(
-                                                      formattedDate,
-                                                      style: const TextStyle(
-                                                          fontWeight: FontWeight
-                                                              .bold));
-                                                }
-                                              } else {
-                                                return Text(formattedDate,
-                                                    style: const TextStyle(
-                                                        fontWeight: FontWeight
-                                                            .bold));
-                                              }
-                                            },
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.02 : 0.02),),
-
-
-                                  ],
-                                ),
-                                SizedBox(width: MediaQuery
-                                    .of(context)
-                                    .size
-                                    .width * (MediaQuery
-                                    .of(context)
-                                    .size
-                                    .shortestSide < 600 ? 0.005 : 0.005)),
-                                const Divider(),
-                                //Second - Project Coordinator Section
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.02 : 0.02),),
-                                    //Name of Project Cordinator
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width *
-                                          (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.30
-                                              : 0.25),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //  color: Colors.grey.shade200,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .start,
-                                        children: [
-                                          // Email of Project Cordinator
-                                          Text(
-                                            'Name of Facility Supervisor',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-                                          //
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final facilitySupervisor = data['facilitySupervisor']; // Assuming this stores the image URL
-                                                //final caritasSupervisorDate = data['date'];
-                                                //Assuming you store the date
-                                                print("facilitySupervisor == $facilitySupervisor");
-
-                                                if (facilitySupervisor == null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return  buildFacilitySupervisorDropdown();
-                                                } else {
-                                                  return Text(
-                                                      "$facilitySupervisor",style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
-                                                }
-                                              } else {
-                                                return buildFacilitySupervisorDropdown();
-                                              }
-                                            },
-                                          ),
-                                          //
-
-
-                                          SizedBox(height: 5 * marginFactor),
-                                        ],
-                                      ),
-                                    ),
-
-
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
-                                    //Signature of Project Cordinator
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.35 : 0.35),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //color: Colors.grey.shade200,
-                                      child: Column(
-                                        children: [
-                                          Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final facilitySupervisorSignature = data['facilitySupervisorSignature']; // Assuming this stores the image URL
-                                                final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus']; // Assuming you store the date
-                                                final facilitySupervisorRejectionReason = data['facilitySupervisorRejectionReason']; // Assuming you store the date
-
-                                                if (facilitySupervisorSignature != null && facilitySupervisorSignatureStatus == "Approved") {
-                                                  return Container(
-                                                    margin: const EdgeInsets.only(
-                                                      top: 20,
-                                                      bottom: 24,
-                                                    ),
-                                                    constraints: BoxConstraints(
-                                                      maxHeight: MediaQuery.of(context).size.width *
-                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                                      maxWidth: MediaQuery.of(context).size.width *
-                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                                    ),
-                                                    alignment: Alignment.center,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius.circular(20),
-                                                      // color: Colors.grey.shade300, // Uncomment if needed
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
-                                                      children: [
-                                                        Flexible(
-                                                          child: Image.network(
-                                                            facilitySupervisorSignature!,
-                                                            fit: BoxFit.contain,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        Row(
-                                                          mainAxisAlignment: MainAxisAlignment.center,
-                                                          children: [
-                                                            const Icon(Icons.check_circle, color: Colors.green),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }
-
-                                                else if(facilitySupervisorSignature !=
-                                                    null && facilitySupervisorSignatureStatus == "Rejected"){
-                                                  return Column(
-                                                    children: [
-                                                      const Text("Awaiting Facility Supervisor Signature"),
-                                                      const SizedBox(height: 8),
-                                                      if (facilitySupervisorSignatureStatus == "Rejected")
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.cancel, color: Colors.red),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                            const SizedBox(width: 15),
-                                                            GestureDetector(
-                                                              onTap: () {
-                                                                showDialog(
-                                                                  context: context,
-                                                                  builder: (context) {
-                                                                    return AlertDialog(
-                                                                      title: const Text("Reason for Rejection"),
-                                                                      content: Text(facilitySupervisorRejectionReason ?? "No reason provided."),
-                                                                      actions: [
-                                                                        TextButton(
-                                                                          onPressed: () {
-                                                                            Navigator.of(context).pop();
-                                                                          },
-                                                                          child: const Text("Close"),
-                                                                        ),
-                                                                      ],
-                                                                    );
-                                                                  },
-                                                                );
-                                                              },
-                                                              child: const Icon(
-                                                                Icons.info_outline,
-                                                                color: Colors.blue,
-                                                                size: 20,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        )
-                                                      else
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.check_circle, color: Colors.green),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                    ],
-                                                  );
-                                                }
-                                                else {
-                                                  return Column(
-                                                    children: [
-                                                      const Text("Awaiting Facility Supervisor Signature"),
-                                                      const SizedBox(height: 8),
-                                                      if (facilitySupervisorSignatureStatus == "Pending")
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.access_time, color: Colors.orange),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        )
-                                                      else if (facilitySupervisorSignatureStatus == "Rejected")
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.cancel, color: Colors.red),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                            const SizedBox(width: 15),
-                                                            GestureDetector(
-                                                              onTap: () {
-                                                                showDialog(
-                                                                  context: context,
-                                                                  builder: (context) {
-                                                                    return AlertDialog(
-                                                                      title: const Text("Reason for Return"),
-                                                                      content: Text(facilitySupervisorRejectionReason ?? "No reason provided."),
-                                                                      actions: [
-                                                                        TextButton(
-                                                                          onPressed: () {
-                                                                            Navigator.of(context).pop();
-                                                                          },
-                                                                          child: const Text("Close"),
-                                                                        ),
-                                                                      ],
-                                                                    );
-                                                                  },
-                                                                );
-                                                              },
-                                                              child: const Icon(
-                                                                Icons.info_outline,
-                                                                color: Colors.blue,
-                                                                size: 20,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        )
-                                                      else
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.check_circle, color: Colors.green),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$facilitySupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                    ],
-                                                  );
-
-                                                }
-                                              } else {
-                                                return const Text(
-                                                    "Timesheet Yet to be submitted for Project Cordinator's Signature");
-                                              }
-                                            },
-                                          ), // Adjust path and size accordingly
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(height: 5 * marginFactor),
-                                    //Date of Project Signature Date
-
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.30 : 0.30),
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        children: [
-                                          const Text('Date', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20 ,),),
-                                          SizedBox(height: 5 * marginFactor),
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final facilitySupervisorDate = data['facilitySupervisorSignatureDate']; // Assuming this stores the image URL
-                                                //  final caritasSupervisorDate = data['date']; // Assuming you store the date
-
-                                                if (facilitySupervisorDate !=
-                                                    null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return Column(
-                                                    children: [
-                                                      //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                       Text(
-                                                          facilitySupervisorDate
-                                                              .toString()),
+                                                        'Name of CARITAS Supervisor',
+                                                        style: TextStyle(
+                                                          fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                      ),
+
+                                                      SizedBox(height: 5 * marginFactor),
+                                                      StreamBuilder<DocumentSnapshot>(
+                                                        // Stream the supervisor signature
+                                                        stream: FirebaseFirestore.instance
+                                                            .collection("Staff")
+                                                            .doc(
+                                                            selectedFirebaseId) // Replace with how you get the staff document ID
+                                                            .collection("TimeSheets")
+                                                            .doc(
+                                                            DateFormat('MMMM_yyyy').format(
+                                                                DateTime(selectedYear,
+                                                                    selectedMonth +
+                                                                        1))) // Replace monthYear with the timesheet document ID
+                                                            .snapshots(),
+                                                        builder: (context, snapshot) {
+                                                          if (snapshot.hasData &&
+                                                              snapshot.data!.exists) {
+                                                            final data = snapshot.data!
+                                                                .data() as Map<
+                                                                String,
+                                                                dynamic>;
+
+                                                            final caritasSupervisor = data['caritasSupervisor']; // Assuming this stores the image URL
+                                                            //final caritasSupervisorDate = data['date'];
+                                                            //Assuming you store the date
+                                                            print("caritasSupervisor == $caritasSupervisor");
+
+                                                            if (caritasSupervisor == null) {
+                                                              // caritasSupervisorSignature is a URL/path to the image
+                                                              return  buildSupervisorDropdown();
+                                                            } else {
+                                                              return Text(
+                                                                "$caritasSupervisor",style: TextStyle(
+                                                                fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
+                                                            }
+                                                          } else {
+                                                            return buildSupervisorDropdown();
+                                                          }
+                                                        },
+                                                      ),
+                                                      SizedBox(height: 5 * marginFactor),
+
                                                     ],
-                                                  );
-                                                } else {
-                                                  return const Text(
-                                                      "Awaiting Facility Supervisor Date");
-                                                }
-                                              } else {
-                                                return const Text(
-                                                    "Timesheet Yet to be submitted for Project Cordinator's Signature Date");
-                                              }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    //SizedBox(width:MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.02 : 0.02),),
-                                  ],
-                                ),
-                                SizedBox(width: MediaQuery
-                                    .of(context)
-                                    .size
-                                    .width * (MediaQuery
-                                    .of(context)
-                                    .size
-                                    .shortestSide < 600 ? 0.005 : 0.005)),
-                                const Divider(),
-                                // Third - CARITAS Supervisor Section
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.02 : 0.02),),
-                                    // Name of CARITAS Supervisor
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width *
-                                          (MediaQuery
-                                              .of(context)
-                                              .size
-                                              .shortestSide < 600
-                                              ? 0.30
-                                              : 0.25),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //color: Colors.grey.shade200,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .start,
-                                        children: [
-                                          Text(
-                                            'Name of CARITAS Supervisor',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
-                                            ),
-
-                                          SizedBox(height: 5 * marginFactor),
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                                final caritasSupervisor = data['caritasSupervisor']; // Assuming this stores the image URL
-                                                //final caritasSupervisorDate = data['date'];
-                                                //Assuming you store the date
-                                                print("caritasSupervisor == $caritasSupervisor");
-
-                                                if (caritasSupervisor == null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return  buildSupervisorDropdown();
-                                                } else {
-                                                  return Text(
-                                                      "$caritasSupervisor",style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
-                                                }
-                                              } else {
-                                                return buildSupervisorDropdown();
-                                              }
-                                            },
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-
-                                        ],
-                                      ),
-                                    ),
-
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
-                                    //Signature of CARITAS Supervisor
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.35 : 0.35),
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(8.0),
-                                      //color: Colors.grey.shade200,
-                                      child: Column(
-                                        children: [
-                                          Text('Signature', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
-                                          ),
-                                          SizedBox(height: 5 * marginFactor),
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
-                                                final caritasSupervisorSignature = data['caritasSupervisorSignature']; // Assuming this stores the image URL
-                                                final caritasSupervisorSignatureStatus = data['caritasSupervisorSignatureStatus']; // Assuming you store the date
-                                                final caritasSupervisorRejectionReason = data['caritasSupervisorRejectionReason'];
-                                                final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus'];
-
-                                                // if (caritasSupervisorSignature !=
-                                                //     null) {
-                                                //   // caritasSupervisorSignature is a URL/path to the image
-                                                //   return Container(
-                                                //     margin: const EdgeInsets
-                                                //         .only(
-                                                //       top: 20,
-                                                //       bottom: 24,
-                                                //     ),
-                                                //     height: MediaQuery
-                                                //         .of(context)
-                                                //         .size
-                                                //         .width *
-                                                //         (MediaQuery
-                                                //             .of(context)
-                                                //             .size
-                                                //             .shortestSide < 600
-                                                //             ? 0.30
-                                                //             : 0.15),
-                                                //     width: MediaQuery
-                                                //         .of(context)
-                                                //         .size
-                                                //         .width *
-                                                //         (MediaQuery
-                                                //             .of(context)
-                                                //             .size
-                                                //             .shortestSide < 600
-                                                //             ? 0.30
-                                                //             : 0.30),
-                                                //     alignment: Alignment.center,
-                                                //     decoration: BoxDecoration(
-                                                //       borderRadius: BorderRadius
-                                                //           .circular(20),
-                                                //       //color: Colors.grey.shade300,
-                                                //     ),
-                                                //     child: Image.network(
-                                                //         caritasSupervisorSignature!),
-                                                //   );
-                                                // }
-
-                                                if (caritasSupervisorSignature != null && caritasSupervisorSignatureStatus == "Approved") {
-                                                  return Container(
-                                                    margin: const EdgeInsets.only(
-                                                      top: 20,
-                                                      bottom: 24,
-                                                    ),
-                                                    constraints: BoxConstraints(
-                                                      maxHeight: MediaQuery.of(context).size.width *
-                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                                      maxWidth: MediaQuery.of(context).size.width *
-                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                                    ),
-                                                    alignment: Alignment.center,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius.circular(20),
-                                                      // color: Colors.grey.shade300, // Uncomment if needed
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
-                                                      children: [
-                                                        Flexible(
-                                                          child: Image.network(
-                                                            caritasSupervisorSignature!,
-                                                            fit: BoxFit.contain,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        Row(
-                                                          mainAxisAlignment: MainAxisAlignment.center,
-                                                          children: [
-                                                            const Icon(Icons.check_circle, color: Colors.green),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              "$caritasSupervisorSignatureStatus",
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }
-
-
-
-                                                else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Pending") {
-                                                  return Column(
-                                                    children: [
-                                                    const Text(
-                                                    "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
-                                                    // style: TextStyle(fontWeight: FontWeight.bold),
-                                                    softWrap: true,
-                                                    overflow: TextOverflow.visible,
                                                   ),
-                                              const SizedBox(height: 8),
-                                              facilitySupervisorSignatureStatus == "Pending"
-                                              ? Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets.only(top: 0.0),
-                                              child: Icon(Icons.access_time, color: Colors.orange),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                              child: Padding(
-                                              padding: const EdgeInsets.only(top: 0.0),
-                                              child: Text(
-                                              "$facilitySupervisorSignatureStatus (Awaiting Approval from Facility Supervisor)",
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              ),
-                                              ),
-                                              ],
-                                              )
-                                                  : facilitySupervisorSignatureStatus == "Rejected"
-                                              ? Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets.only(top: 0.0),
-                                              child: Icon(Icons.cancel, color: Colors.red),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                              child: Padding(
-                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                              child: Text(
-                                              "$facilitySupervisorSignatureStatus (Approval Rejected by Facility Supervisor)",
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              GestureDetector(
-                                              onTap: () {
-                                              showDialog(
-                                              context: context,
-                                              builder: (context) {
-                                              return AlertDialog(
-                                              title: const Text("Reason for Rejection"),
-                                              content: Text(
-                                              facilitySupervisorSignatureStatus ?? "No reason provided.",
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              actions: [
-                                              TextButton(
-                                              onPressed: () {
-                                              Navigator.of(context).pop();
-                                              },
-                                              child: const Text("Close"),
-                                              ),
-                                              ],
-                                              );
-                                              },
-                                              );
-                                              },
-                                              child: const Icon(
-                                              Icons.info_outline,
-                                              color: Colors.blue,
-                                              size: 20,
-                                              ),
-                                              ),]
-                                              )
-                                                  : Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets.only(top: 0.0),
-                                              child: Icon(Icons.check_circle, color: Colors.green),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                              child: Padding(
-                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                              child: Text(
-                                              "$facilitySupervisorSignatureStatus",
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              ),
-                                              ),
-                                              ],
-                                              ),
-                                              ],
-                                              );
-                                              }
-                                              else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Rejected") {
-                                              return Column(
-                                              children: [
-                                              const Text(
-                                              "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
-                                              // style: TextStyle(fontWeight: FontWeight.w100),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              const SizedBox(height: 8),
-                                              facilitySupervisorSignatureStatus == "Rejected"
-                                              ? const Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                              Padding(
-                                              padding: EdgeInsets.only(top: 0.0),
-                                              child: Icon(Icons.cancel, color: Colors.red),
-                                              ),
-                                              SizedBox(width: 8),
-                                              Expanded(
-                                              child: Padding(
-                                              padding: EdgeInsets.only(bottom: 0.0),
-                                              child: Text(
-                                              "(Approval Rejected by Facility Supervisor)",
-                                              style: TextStyle(fontWeight: FontWeight.bold),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              ),
-                                              ),
-                                              SizedBox(width: 8),
-
-                                              ],
-                                              )
-                                                  : Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets.only(top: 0.0),
-                                              child: Icon(Icons.check_circle, color: Colors.green),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                              child: Padding(
-                                              padding: const EdgeInsets.only(bottom: 0.0),
-                                              child: Text(
-                                              "$facilitySupervisorSignatureStatus",
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                              softWrap: true,
-                                              overflow: TextOverflow.visible,
-                                              ),
-                                              ),
-                                              ),
-                                              ],
-                                              ),
-                                              ],
-                                              );
-                                              }
+                                                ),
+                                            ),
 
 
-                                              else {
-                                              return Column(
-                                              children: [
-                                              const Text(
-                                              "Awaiting Caritas Supervisor Signature"),
-                                              const SizedBox(height: 8),
-                                              caritasSupervisorSignatureStatus ==
-                                              "Pending"
-                                              ?
-                                              Row(
-                                              //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets
-                                                  .only(
-                                              top: 0.0),
-                                              child:
-                                              Icon(Icons
-                                                  .access_time,
-                                              color: Colors
-                                                  .orange),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Padding(
-                                              padding: const EdgeInsets
-                                                  .only(
-                                              top: 0.0),
-                                              child: Text(
-                                              "$caritasSupervisorSignatureStatus",
-                                              style: const TextStyle(
-                                              fontWeight: FontWeight
-                                                  .bold),
-                                              ),
-                                              ),
-                                              ]
-                                              )
-                                                  : caritasSupervisorSignatureStatus ==
-                                              "Rejected" ?
-                                              Row(
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets
-                                                  .only(
-                                              top: 0.0),
-                                              child:
-                                              Icon(Icons.cancel,
-                                              color: Colors
-                                                  .red),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Padding(
-                                              padding: const EdgeInsets
-                                                  .only(
-                                              bottom: 0.0),
-                                              child: Text(
-                                              "$caritasSupervisorSignatureStatus",
-                                              style: const TextStyle(
-                                              fontWeight: FontWeight
-                                                  .bold),
-                                              ),
-                                              ),
-                                              const SizedBox(width:8),
-                                              GestureDetector(
-                                              onTap: () {
-                                              showDialog(
-                                              context: context,
-                                              builder: (context) {
-                                              return AlertDialog(
-                                              title: const Text("Reason for Rejection"),
-                                              content: Text(caritasSupervisorRejectionReason ?? "No reason provided."),
-                                              actions: [
-                                              TextButton(
-                                              onPressed: () {
-                                              Navigator.of(context).pop();
-                                              },
-                                              child: const Text("Close"),
-                                              ),
-                                              ],
-                                              );
-                                              },
-                                              );
-                                              },
-                                              child: const Icon(
-                                              Icons.info_outline,
-                                              color: Colors.blue,
-                                              size: 20,
-                                              ),
-                                              ),
-                                              ]
-                                              )
-                                                  : Row(
-                                              children: [
-                                              const Padding(
-                                              padding: EdgeInsets
-                                                  .only(
-                                              top: 0.0),
-                                              child:
-                                              Icon(Icons
-                                                  .check_circle,
-                                              color: Colors
-                                                  .green),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Padding(
-                                              padding: const EdgeInsets
-                                                  .only(
-                                              bottom: 0.0),
-                                              child: Text(
-                                              "$caritasSupervisorSignatureStatus",
-                                              style: const TextStyle(
-                                              fontWeight: FontWeight
-                                                  .bold),
-                                              ),
-                                              ),
-                                              ]
-                                              ),
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                            //Signature of CARITAS Supervisor
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.all(8.0),
+                                              //color: Colors.grey.shade200,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(
+                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+                                                        final caritasSupervisorSignature = data['caritasSupervisorSignature']; // Assuming this stores the image URL
+                                                        final caritasSupervisorSignatureStatus = data['caritasSupervisorSignatureStatus']; // Assuming you store the date
+                                                        final caritasSupervisorRejectionReason = data['caritasSupervisorRejectionReason'];
+                                                        final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus'];
+
+                                                        // if (caritasSupervisorSignature !=
+                                                        //     null) {
+                                                        //   // caritasSupervisorSignature is a URL/path to the image
+                                                        //   return Container(
+                                                        //     margin: const EdgeInsets
+                                                        //         .only(
+                                                        //       top: 20,
+                                                        //       bottom: 24,
+                                                        //     ),
+                                                        //     height: MediaQuery
+                                                        //         .of(context)
+                                                        //         .size
+                                                        //         .width *
+                                                        //         (MediaQuery
+                                                        //             .of(context)
+                                                        //             .size
+                                                        //             .shortestSide < 600
+                                                        //             ? 0.30
+                                                        //             : 0.15),
+                                                        //     width: MediaQuery
+                                                        //         .of(context)
+                                                        //         .size
+                                                        //         .width *
+                                                        //         (MediaQuery
+                                                        //             .of(context)
+                                                        //             .size
+                                                        //             .shortestSide < 600
+                                                        //             ? 0.30
+                                                        //             : 0.30),
+                                                        //     alignment: Alignment.center,
+                                                        //     decoration: BoxDecoration(
+                                                        //       borderRadius: BorderRadius
+                                                        //           .circular(20),
+                                                        //       //color: Colors.grey.shade300,
+                                                        //     ),
+                                                        //     child: Image.network(
+                                                        //         caritasSupervisorSignature!),
+                                                        //   );
+                                                        // }
+
+                                                        if (caritasSupervisorSignature != null && caritasSupervisorSignatureStatus == "Approved") {
+                                                          return Container(
+                                                            margin: const EdgeInsets.only(
+                                                              top: 20,
+                                                              bottom: 24,
+                                                            ),
+                                                            constraints: BoxConstraints(
+                                                              maxHeight: MediaQuery.of(context).size.width *
+                                                                  (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
+                                                              maxWidth: MediaQuery.of(context).size.width *
+                                                                  (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
+                                                            ),
+                                                            alignment: Alignment.center,
+                                                            decoration: BoxDecoration(
+                                                              borderRadius: BorderRadius.circular(20),
+                                                              // color: Colors.grey.shade300, // Uncomment if needed
+                                                            ),
+                                                            child: Column(
+                                                              mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
+                                                              children: [
+                                                                Flexible(
+                                                                  child: Image.network(
+                                                                    caritasSupervisorSignature!,
+                                                                    fit: BoxFit.contain,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(height: 8),
+                                                                Row(
+                                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                                  children: [
+                                                                    const Icon(Icons.check_circle, color: Colors.green),
+                                                                    const SizedBox(width: 8),
+                                                                    Text(
+                                                                      "$caritasSupervisorSignatureStatus",
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          );
+                                                        }
 
 
-                                              ],
-                                              );
-                                              }
+
+                                                        else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Pending") {
+                                                          return Column(
+                                                            children: [
+                                                              const Text(
+                                                                "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
+                                                                // style: TextStyle(fontWeight: FontWeight.bold),
+                                                                softWrap: true,
+                                                                overflow: TextOverflow.visible,
+                                                              ),
+                                                              const SizedBox(height: 8),
+                                                              facilitySupervisorSignatureStatus == "Pending"
+                                                                  ? Row(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  const Padding(
+                                                                    padding: EdgeInsets.only(top: 0.0),
+                                                                    child: Icon(Icons.access_time, color: Colors.orange),
+                                                                  ),
+                                                                  const SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Padding(
+                                                                      padding: const EdgeInsets.only(top: 0.0),
+                                                                      child: Text(
+                                                                        "$facilitySupervisorSignatureStatus (Awaiting Approval from Facility Supervisor)",
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        softWrap: true,
+                                                                        overflow: TextOverflow.visible,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              )
+                                                                  : facilitySupervisorSignatureStatus == "Rejected"
+                                                                  ? Row(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  children: [
+                                                                    const Padding(
+                                                                      padding: EdgeInsets.only(top: 0.0),
+                                                                      child: Icon(Icons.cancel, color: Colors.red),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    Expanded(
+                                                                      child: Padding(
+                                                                        padding: const EdgeInsets.only(bottom: 0.0),
+                                                                        child: Text(
+                                                                          "$facilitySupervisorSignatureStatus (Approval Rejected by Facility Supervisor)",
+                                                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                          softWrap: true,
+                                                                          overflow: TextOverflow.visible,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        showDialog(
+                                                                          context: context,
+                                                                          builder: (context) {
+                                                                            return AlertDialog(
+                                                                              title: const Text("Reason for Rejection"),
+                                                                              content: Text(
+                                                                                facilitySupervisorSignatureStatus ?? "No reason provided.",
+                                                                                softWrap: true,
+                                                                                overflow: TextOverflow.visible,
+                                                                              ),
+                                                                              actions: [
+                                                                                TextButton(
+                                                                                  onPressed: () {
+                                                                                    Navigator.of(context).pop();
+                                                                                  },
+                                                                                  child: const Text("Close"),
+                                                                                ),
+                                                                              ],
+                                                                            );
+                                                                          },
+                                                                        );
+                                                                      },
+                                                                      child: const Icon(
+                                                                        Icons.info_outline,
+                                                                        color: Colors.blue,
+                                                                        size: 20,
+                                                                      ),
+                                                                    ),]
+                                                              )
+                                                                  : Row(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  const Padding(
+                                                                    padding: EdgeInsets.only(top: 0.0),
+                                                                    child: Icon(Icons.check_circle, color: Colors.green),
+                                                                  ),
+                                                                  const SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Padding(
+                                                                      padding: const EdgeInsets.only(bottom: 0.0),
+                                                                      child: Text(
+                                                                        "$facilitySupervisorSignatureStatus",
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        softWrap: true,
+                                                                        overflow: TextOverflow.visible,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          );
+                                                        }
+                                                        else if (caritasSupervisorSignatureStatus == "Pending" && facilitySupervisorSignatureStatus == "Rejected") {
+                                                          return Column(
+                                                            children: [
+                                                              const Text(
+                                                                "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
+                                                                // style: TextStyle(fontWeight: FontWeight.w100),
+                                                                softWrap: true,
+                                                                overflow: TextOverflow.visible,
+                                                              ),
+                                                              const SizedBox(height: 8),
+                                                              facilitySupervisorSignatureStatus == "Rejected"
+                                                                  ? const Row(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  Padding(
+                                                                    padding: EdgeInsets.only(top: 0.0),
+                                                                    child: Icon(Icons.cancel, color: Colors.red),
+                                                                  ),
+                                                                  SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Padding(
+                                                                      padding: EdgeInsets.only(bottom: 0.0),
+                                                                      child: Text(
+                                                                        "(Approval Rejected by Facility Supervisor)",
+                                                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                                                        softWrap: true,
+                                                                        overflow: TextOverflow.visible,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(width: 8),
+
+                                                                ],
+                                                              )
+                                                                  : Row(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  const Padding(
+                                                                    padding: EdgeInsets.only(top: 0.0),
+                                                                    child: Icon(Icons.check_circle, color: Colors.green),
+                                                                  ),
+                                                                  const SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Padding(
+                                                                      padding: const EdgeInsets.only(bottom: 0.0),
+                                                                      child: Text(
+                                                                        "$facilitySupervisorSignatureStatus",
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        softWrap: true,
+                                                                        overflow: TextOverflow.visible,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          );
+                                                        }
 
 
-                                              } else {
-                                              return const Text(
-                                              "Timesheet Yet to be submitted for Caritas Supervisor's Signature");
-                                              }
-                                            },
-                                          ), // Adjust path and size accordingly
-                                        ],
-                                      ),
-                                    ),
+                                                        else {
+                                                          return Column(
+                                                            children: [
+                                                              const Text(
+                                                                  "Awaiting Caritas Supervisor Signature"),
+                                                              const SizedBox(height: 8),
+                                                              caritasSupervisorSignatureStatus ==
+                                                                  "Pending"
+                                                                  ?
+                                                              Row(
+                                                                //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                                  children: [
+                                                                    const Padding(
+                                                                      padding: EdgeInsets
+                                                                          .only(
+                                                                          top: 0.0),
+                                                                      child:
+                                                                      Icon(Icons
+                                                                          .access_time,
+                                                                          color: Colors
+                                                                              .orange),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .only(
+                                                                          top: 0.0),
+                                                                      child: Text(
+                                                                        "$caritasSupervisorSignatureStatus",
+                                                                        style: const TextStyle(
+                                                                            fontWeight: FontWeight
+                                                                                .bold),
+                                                                      ),
+                                                                    ),
+                                                                  ]
+                                                              )
+                                                                  : caritasSupervisorSignatureStatus ==
+                                                                  "Rejected" ?
+                                                              Row(
+                                                                  children: [
+                                                                    const Padding(
+                                                                      padding: EdgeInsets
+                                                                          .only(
+                                                                          top: 0.0),
+                                                                      child:
+                                                                      Icon(Icons.cancel,
+                                                                          color: Colors
+                                                                              .red),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .only(
+                                                                          bottom: 0.0),
+                                                                      child: Text(
+                                                                        "$caritasSupervisorSignatureStatus",
+                                                                        style: const TextStyle(
+                                                                            fontWeight: FontWeight
+                                                                                .bold),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(width:8),
+                                                                    GestureDetector(
+                                                                      onTap: () {
+                                                                        showDialog(
+                                                                          context: context,
+                                                                          builder: (context) {
+                                                                            return AlertDialog(
+                                                                              title: const Text("Reason for Rejection"),
+                                                                              content: Text(caritasSupervisorRejectionReason ?? "No reason provided."),
+                                                                              actions: [
+                                                                                TextButton(
+                                                                                  onPressed: () {
+                                                                                    Navigator.of(context).pop();
+                                                                                  },
+                                                                                  child: const Text("Close"),
+                                                                                ),
+                                                                              ],
+                                                                            );
+                                                                          },
+                                                                        );
+                                                                      },
+                                                                      child: const Icon(
+                                                                        Icons.info_outline,
+                                                                        color: Colors.blue,
+                                                                        size: 20,
+                                                                      ),
+                                                                    ),
+                                                                  ]
+                                                              )
+                                                                  : Row(
+                                                                  children: [
+                                                                    const Padding(
+                                                                      padding: EdgeInsets
+                                                                          .only(
+                                                                          top: 0.0),
+                                                                      child:
+                                                                      Icon(Icons
+                                                                          .check_circle,
+                                                                          color: Colors
+                                                                              .green),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .only(
+                                                                          bottom: 0.0),
+                                                                      child: Text(
+                                                                        "$caritasSupervisorSignatureStatus",
+                                                                        style: const TextStyle(
+                                                                            fontWeight: FontWeight
+                                                                                .bold),
+                                                                      ),
+                                                                    ),
+                                                                  ]
+                                                              ),
 
-                                    SizedBox(width: MediaQuery
-                                        .of(context)
-                                        .size
-                                        .width * (MediaQuery
-                                        .of(context)
-                                        .size
-                                        .shortestSide < 600 ? 0.01 : 0.009)),
 
-                                    //Date of CARITAS Supervisor
-                                    Container(
-                                      width: MediaQuery
-                                          .of(context)
-                                          .size
-                                          .width * (MediaQuery
-                                          .of(context)
-                                          .size
-                                          .shortestSide < 600 ? 0.30 : 0.30),
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        children: [
-                                          const Text('Date', style: TextStyle(
-                                            fontWeight: FontWeight.bold, fontSize: 20),),
-                                          SizedBox(height: 5 * marginFactor),
-                                          StreamBuilder<DocumentSnapshot>(
-                                            // Stream the supervisor signature
-                                            stream: FirebaseFirestore.instance
-                                                .collection("Staff")
-                                                .doc(
-                                                selectedFirebaseId) // Replace with how you get the staff document ID
-                                                .collection("TimeSheets")
-                                                .doc(
-                                                DateFormat('MMMM_yyyy').format(
-                                                    DateTime(selectedYear,
-                                                        selectedMonth +
-                                                            1))) // Replace monthYear with the timesheet document ID
-                                                .snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasData &&
-                                                  snapshot.data!.exists) {
-                                                final data = snapshot.data!
-                                                    .data() as Map<
-                                                    String,
-                                                    dynamic>;
+                                                            ],
+                                                          );
+                                                        }
 
-                                                final caritasSupervisorDate = data['caritasSupervisorSignatureDate']; // Assuming this stores the image URL
-                                                //  final caritasSupervisorDate = data['date']; // Assuming you store the date
 
-                                                if (caritasSupervisorDate !=
-                                                    null) {
-                                                  // caritasSupervisorSignature is a URL/path to the image
-                                                  return Column(
-                                                    children: [
-                                                      //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
-                                                      Text(
-                                                          caritasSupervisorDate
-                                                              .toString()),
-                                                    ],
+                                                      } else {
+                                                        return const Text(
+                                                            "Timesheet Yet to be submitted for Caritas Supervisor's Signature");
+                                                      }
+                                                    },
+                                                  ), // Adjust path and size accordingly
+                                                ],
+                                              ),
+                                            ),
+
+                                            SizedBox(width: MediaQuery
+                                                .of(context)
+                                                .size
+                                                .width * (MediaQuery
+                                                .of(context)
+                                                .size
+                                                .shortestSide < 600 ? 0.01 : 0.009)),
+
+                                            //Date of CARITAS Supervisor
+                                            Container(
+                                              width: MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .width * (MediaQuery
+                                                  .of(context)
+                                                  .size
+                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Column(
+                                                children: [
+                                                  const Text('Date', style: TextStyle(
+                                                      fontWeight: FontWeight.bold, fontSize: 20),),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    // Stream the supervisor signature
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection("Staff")
+                                                        .doc(
+                                                        selectedFirebaseId) // Replace with how you get the staff document ID
+                                                        .collection("TimeSheets")
+                                                        .doc(
+                                                        DateFormat('MMMM_yyyy').format(
+                                                            DateTime(selectedYear,
+                                                                selectedMonth +
+                                                                    1))) // Replace monthYear with the timesheet document ID
+                                                        .snapshots(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data!.exists) {
+                                                        final data = snapshot.data!
+                                                            .data() as Map<
+                                                            String,
+                                                            dynamic>;
+
+                                                        final caritasSupervisorDate = data['caritasSupervisorSignatureDate']; // Assuming this stores the image URL
+                                                        //  final caritasSupervisorDate = data['date']; // Assuming you store the date
+
+                                                        if (caritasSupervisorDate !=
+                                                            null) {
+                                                          // caritasSupervisorSignature is a URL/path to the image
+                                                          return Column(
+                                                            children: [
+                                                              //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
+                                                              Text(
+                                                                  caritasSupervisorDate
+                                                                      .toString()),
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return const Text(
+                                                              "Awaiting Caritas Supervisor Date");
+                                                        }
+                                                      } else {
+                                                        return const Text(
+                                                            "Timesheet Yet to be submitted for Caritas Signature Date");
+                                                      }
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(height: 5 * marginFactor),
+                                        const Divider(),
+                                        StreamBuilder<DocumentSnapshot>(
+                                          // Stream the supervisor signature
+                                          stream: FirebaseFirestore.instance
+                                              .collection("Staff")
+                                              .doc(
+                                              selectedFirebaseId) // Replace with how you get the staff document ID
+                                              .collection("TimeSheets")
+                                              .doc(DateFormat('MMMM_yyyy').format(
+                                              DateTime(selectedYear, selectedMonth +
+                                                  1))) // Replace monthYear with the timesheet document ID
+                                              .snapshots(),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.hasData &&
+                                                snapshot.data!.exists) {
+                                              final data = snapshot.data!.data() as Map<
+                                                  String,
+                                                  dynamic>;
+
+                                              final caritasSupervisorSignature = data['caritasSupervisorSignature']; // Assuming this stores the image URL
+                                              final facilitySupervisorSignature = data['facilitySupervisorSignature'];
+                                              final staffSignature = data['staffSignature']; // Assuming you store the date
+
+                                              if (caritasSupervisorSignature != null &&
+                                                  facilitySupervisorSignature != null &&
+                                                  staffSignature != null) {
+                                                // caritasSupervisorSignature is a URL/path to the image
+                                                return
+                                                  ElevatedButton(
+                                                    onPressed: sendEmailToSelf,
+                                                    // Call the save function
+                                                    child: const Text(
+                                                        'Email Signed Timesheet to Self'),
                                                   );
-                                                } else {
-                                                  return const Text(
-                                                      "Awaiting Caritas Supervisor Date");
-                                                }
                                               } else {
-                                                return const Text(
-                                                    "Timesheet Yet to be submitted for Caritas Signature Date");
+                                                return ElevatedButton(
+                                                  onPressed: _saveTimesheetToFirestore,
+                                                  // Call the save function
+                                                  child: const Text('Submit Timesheet'),
+                                                );
                                               }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 5 * marginFactor),
-                                const Divider(),
-                                StreamBuilder<DocumentSnapshot>(
-                                  // Stream the supervisor signature
-                                  stream: FirebaseFirestore.instance
-                                      .collection("Staff")
-                                      .doc(
-                                      selectedFirebaseId) // Replace with how you get the staff document ID
-                                      .collection("TimeSheets")
-                                      .doc(DateFormat('MMMM_yyyy').format(
-                                      DateTime(selectedYear, selectedMonth +
-                                          1))) // Replace monthYear with the timesheet document ID
-                                      .snapshots(),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData &&
-                                        snapshot.data!.exists) {
-                                      final data = snapshot.data!.data() as Map<
-                                          String,
-                                          dynamic>;
+                                            } else {
+                                              return ElevatedButton(
+                                                onPressed: _saveTimesheetToFirestore,
+                                                // Call the save function
+                                                child: const Text('Submit Timesheet'),
+                                              );
+                                            }
+                                          },
+                                        ),
 
-                                      final caritasSupervisorSignature = data['caritasSupervisorSignature']; // Assuming this stores the image URL
-                                      final facilitySupervisorSignature = data['facilitySupervisorSignature'];
-                                      final staffSignature = data['staffSignature']; // Assuming you store the date
-
-                                      if (caritasSupervisorSignature != null &&
-                                          facilitySupervisorSignature != null &&
-                                          staffSignature != null) {
-                                        // caritasSupervisorSignature is a URL/path to the image
-                                        return
-                                          ElevatedButton(
-                                            onPressed: sendEmailToSelf,
-                                            // Call the save function
-                                            child: const Text(
-                                                'Email Signed Timesheet to Self'),
-                                          );
-                                      } else {
-                                        return ElevatedButton(
-                                          onPressed: _saveTimesheetToFirestore,
-                                          // Call the save function
-                                          child: const Text('Submit Timesheet'),
-                                        );
-                                      }
-                                    } else {
-                                      return ElevatedButton(
-                                        onPressed: _saveTimesheetToFirestore,
-                                        // Call the save function
-                                        child: const Text('Submit Timesheet'),
-                                      );
-                                    }
-                                  },
-                                ),
-
-                                SizedBox(height: MediaQuery
-                                    .of(context)
-                                    .size
-                                    .width * (MediaQuery
-                                    .of(context)
-                                    .size
-                                    .shortestSide < 600 ? 0.020 : 0.020)),
-                              ]
-                          ),
-                        ]
-                    )
+                                        SizedBox(height: MediaQuery
+                                            .of(context)
+                                            .size
+                                            .width * (MediaQuery
+                                            .of(context)
+                                            .size
+                                            .shortestSide < 600 ? 0.020 : 0.020)),
+                                      ]
+                                  ),
+                                ]
+                            )
 
 
+                        )
+                      ),
+                           IconButton(
+                        icon: Icon(Icons.arrow_forward_ios),
+                        onPressed: () {
+                          _horizontalScrollController.animateTo(
+                            _horizontalScrollController.offset + 200, // Adjust scroll amount
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                      ),
+
+                    ]
                 )
+
+
 
             ),
 
