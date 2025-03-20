@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:date_picker_timeline/date_picker_widget.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +8,16 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-
+import 'package:file_picker/file_picker.dart';
+import 'package:mime_type/mime_type.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:video_player/video_player.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Storage
+//import 'package:firebase_ml_vision/firebase_ml_vision.dart'; // Import Firebase ML Vision
+import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import '../../widgets/button.dart';
-import '../../widgets/drawer.dart'; // Import async for StreamSubscription
-
+import '../../widgets/drawer.dart';
 
 // Models
 // bio_model.dart
@@ -43,7 +48,9 @@ class BioModel {
     this.mobile,
   });
 
-  factory BioModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot, SnapshotOptions? options) {
+  factory BioModel.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
     final data = snapshot.data();
     return BioModel(
       firebaseAuthId: data?['firebaseAuthId'],
@@ -77,7 +84,6 @@ class BioModel {
   }
 }
 
-
 // report_model.dart
 class ReportEntry {
   String key;
@@ -90,7 +96,7 @@ class ReportEntry {
   String? supervisorEmail;
   String? supervisorApprovalStatus;
   String? supervisorFeedBackComment;
-
+  List<String>? attachments; // ADDED: Attachments field in ReportEntry
 
   ReportEntry({
     this.key = "",
@@ -103,6 +109,7 @@ class ReportEntry {
     this.supervisorEmail,
     this.supervisorApprovalStatus,
     this.supervisorFeedBackComment,
+    this.attachments, // Initialize attachments
   });
 
   factory ReportEntry.fromMap(Map<String, dynamic> map) {
@@ -117,6 +124,8 @@ class ReportEntry {
       supervisorEmail: map['supervisorEmail'],
       supervisorApprovalStatus: map['supervisorApprovalStatus'],
       supervisorFeedBackComment: map['supervisorFeedBackComment'],
+      attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(), // Deserialize attachments
+
     );
   }
 
@@ -130,8 +139,11 @@ class ReportEntry {
       if (reviewStatus != null) 'reviewStatus': reviewStatus,
       if (supervisorName != null) 'supervisorName': supervisorName,
       if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
-      if (supervisorApprovalStatus != null) 'supervisorApprovalStatus': supervisorApprovalStatus,
-      if (supervisorFeedBackComment != null) 'supervisorFeedBackComment': supervisorFeedBackComment,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
+      if (attachments != null) 'attachments': attachments, // Serialize attachments
     };
   }
 }
@@ -146,7 +158,8 @@ class Report {
   String? reportFeedbackComment;
   List<String>? attachments;
   bool? isSynced;
-  List<ReportEntry>? reportEntries;
+  // Modified reportEntries to be a Map as per requirement
+  Map<String, Map<String, List<ReportEntry>>>? reportEntries;
 
   Report({
     this.id,
@@ -161,7 +174,9 @@ class Report {
     this.reportEntries,
   });
 
-  factory Report.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot, SnapshotOptions? options) {
+  factory Report.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
     final data = snapshot.data();
     return Report(
       id: snapshot.id,
@@ -171,9 +186,24 @@ class Report {
       reportingMonth: data?['reportingMonth'],
       reportStatus: data?['reportStatus'],
       reportFeedbackComment: data?['reportFeedbackComment'],
-      attachments: (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      attachments:
+      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       isSynced: data?['isSynced'],
-      reportEntries: (data?['reportEntries'] as List<dynamic>?)?.map((entryData) => ReportEntry.fromMap(entryData as Map<String, dynamic>)).toList(),
+      // Deserialize reportEntries correctly
+      reportEntries: (data?['reportEntries'] as Map<String, dynamic>?)?.map(
+            (username, indicatorMap) => MapEntry(
+          username,
+          (indicatorMap as Map<String, dynamic>).map(
+                (indicator, entryList) => MapEntry(
+              indicator,
+              (entryList as List<dynamic>)
+                  .map((entryData) =>
+                  ReportEntry.fromMap(entryData as Map<String, dynamic>))
+                  .toList(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -187,7 +217,19 @@ class Report {
       if (reportFeedbackComment != null) 'reportFeedbackComment': reportFeedbackComment,
       if (attachments != null) 'attachments': attachments,
       if (isSynced != null) 'isSynced': isSynced,
-      if (reportEntries != null) 'reportEntries': reportEntries!.map((e) => e.toMap()).toList(),
+      // Serialize reportEntries correctly
+      if (reportEntries != null)
+        'reportEntries': reportEntries!.map(
+              (username, indicatorMap) => MapEntry(
+            username,
+            indicatorMap.map(
+                  (indicator, entryList) => MapEntry(
+                indicator,
+                entryList.map((e) => e.toMap()).toList(),
+              ),
+            ),
+          ),
+        ),
     };
   }
 }
@@ -214,7 +256,9 @@ class Task {
     this.reviewedBy, // ADDED: Include in constructor
   });
 
-  factory Task.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot, SnapshotOptions? options) {
+  factory Task.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
     final data = snapshot.data();
     return Task(
       id: null, // Firestore doesn't use integer IDs, document ID is used instead
@@ -223,7 +267,8 @@ class Task {
       taskDescription: data?['taskDescription'],
       isSynced: data?['isSynced'],
       taskStatus: data?['taskStatus'],
-      attachments: (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      attachments:
+      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       reviewedBy: data?['reviewedBy'], // ADDED: Retrieve from Firestore data
     );
   }
@@ -240,7 +285,6 @@ class Task {
     };
   }
 }
-
 
 class FacilityStaffModel {
   String? id;
@@ -265,7 +309,9 @@ class FacilityStaffModel {
     this.staffCategory,
   });
 
-  factory FacilityStaffModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot, SnapshotOptions? options) {
+  factory FacilityStaffModel.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
     final data = snapshot.data();
     return FacilityStaffModel(
       id: snapshot.id,
@@ -294,8 +340,6 @@ class FacilityStaffModel {
   }
 }
 
-
-
 // Firestore Service (updated for web and Firestore)
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -304,6 +348,7 @@ class FirestoreService {
   final String staffCollection = 'Staff';
   final String bioCollection = 'BioData';
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance; // Firebase Storage instance
 
   String? getUserId() {
     print("Current UUID === ${_auth.currentUser?.uid}");
@@ -313,15 +358,17 @@ class FirestoreService {
   // BioData Operations (same as before)
   Future<BioModel?> getBioData() async {
     try {
-      final snapshot = await _firestore.collection(staffCollection) // Use staffCollection here
+      final snapshot = await _firestore
+          .collection(staffCollection) // Use staffCollection here
           .where('firebaseAuthId', isEqualTo: getUserId())
           .limit(1)
           .get();
 
       if (snapshot.docs.isNotEmpty) {
-        return BioModel.fromFirestore(snapshot.docs.first,null);
+        return BioModel.fromFirestore(snapshot.docs.first, null);
       } else {
-        print("_FirestoreService: getBioData: No documents found for firebaseAuthId: ${getUserId()} in $staffCollection collection."); // More specific log
+        print(
+            "_FirestoreService: getBioData: No documents found for firebaseAuthId: ${getUserId()} in $staffCollection collection."); // More specific log
         return null;
       }
     } catch (e) {
@@ -336,14 +383,16 @@ class FirestoreService {
     if (firebaseAuthUid == null) return null;
 
     try {
-      final snapshot = await _firestore.collection(staffCollection) // Use staffCollection here
+      final snapshot = await _firestore
+          .collection(staffCollection) // Use staffCollection here
           .where('firebaseAuthId', isEqualTo: firebaseAuthUid)
           .limit(1)
           .get();
       if (snapshot.docs.isNotEmpty) {
-        return BioModel.fromFirestore(snapshot.docs.first,null);
+        return BioModel.fromFirestore(snapshot.docs.first, null);
       } else {
-        print("_FirestoreService: getBioInfoWithFirebaseAuth: No documents found for firebaseAuthId: $firebaseAuthUid in $staffCollection collection."); // More specific log
+        print(
+            "_FirestoreService: getBioInfoWithFirebaseAuth: No documents found for firebaseAuthId: $firebaseAuthUid in $staffCollection collection."); // More specific log
         return null;
       }
     } catch (e) {
@@ -368,8 +417,8 @@ class FirestoreService {
           .doc(bioModel.location)
           .collection(formattedDate); // Explicit cast here
 
-
-      final QuerySnapshot<Map<String, dynamic>> snapshot = await reportCollectionRef.get();
+      final QuerySnapshot<Map<String, dynamic>> snapshot =
+      await reportCollectionRef.get();
       List<Report> reports = [];
       for (var doc in snapshot.docs) {
         final reportData = doc.data();
@@ -384,7 +433,6 @@ class FirestoreService {
       return [];
     }
   }
-
 
   Future<void> saveReport1(Report report, BioModel? bioModel, String department) async {
     if (bioModel == null || bioModel.state == null || bioModel.location == null) {
@@ -401,33 +449,33 @@ class FirestoreService {
           .collection(formattedDate)
           .doc(department); // Document ID is the department
 
-
-      await reportDocRef.set(report.toFirestore(), SetOptions(merge: true)); // Use set with merge to update or create
-
+      await reportDocRef.set(report.toFirestore(),
+          SetOptions(merge: true)); // Use set with merge to update or create
     } catch (e) {
       print("Error saving report: $e");
       print("Error details: $e"); // More detailed error log
     }
   }
 
-
   Future<void> pushReportToFirebase1(Report report) async {
     // Logic for pushing report, if needed, might be similar to saveReport but ensure sync status update
     // For this example, saveReport handles both save and update.
-    print("Push to Firebase function is not directly applicable in Firestore's set operation. Using saveReport.");
+    print(
+        "Push to Firebase function is not directly applicable in Firestore's set operation. Using saveReport.");
   }
 
   Future<void> updateReportSyncStatus1(String reportId, bool isSynced) async {
     // Firestore handles sync implicitly with offline capabilities, explicit sync status might not be needed
-    print("Update sync status function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Update sync status function is not directly applicable in Firestore. Sync is handled automatically.");
   }
 
   Future<List<Report>> getUnsyncedReports1() async {
     // Firestore handles sync implicitly, getting unsynced reports might not be directly applicable
-    print("Get unsynced reports function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Get unsynced reports function is not directly applicable in Firestore. Sync is handled automatically.");
     return []; // Return empty list as Firestore handles sync
   }
-
 
   // Task Operations
   Future<List<Task>> getTasksByDate1(DateTime date) async {
@@ -436,14 +484,13 @@ class FirestoreService {
           .collection(tasksCollection)
           .where('date', isEqualTo: DateTime(date.year, date.month, date.day))
           .get();
-      return snapshot.docs.map((doc) => Task.fromFirestore(doc,null)).toList();
+      return snapshot.docs.map((doc) => Task.fromFirestore(doc, null)).toList();
     } catch (e) {
       print("Error fetching tasks by date: $e");
       print("Error details: $e"); // More detailed error log
       return [];
     }
   }
-
 
   Future<void> saveTask1(Task task) async {
     try {
@@ -463,7 +510,7 @@ class FirestoreService {
           .limit(1)
           .get();
       if (snapshot.docs.isNotEmpty) {
-        return Task.fromFirestore(snapshot.docs.first,null);
+        return Task.fromFirestore(snapshot.docs.first, null);
       }
       return null;
     } catch (e) {
@@ -472,7 +519,6 @@ class FirestoreService {
       return null;
     }
   }
-
 
   Future<void> pushTaskToFirebase1(Task task) async {
     try {
@@ -486,7 +532,10 @@ class FirestoreService {
 
   Future<void> updateTaskSyncStatus1(String taskId, bool isSynced) async {
     try {
-      await _firestore.collection(tasksCollection).doc(taskId).update({'isSynced': isSynced});
+      await _firestore
+          .collection(tasksCollection)
+          .doc(taskId)
+          .update({'isSynced': isSynced});
     } catch (e) {
       print("Error updating task sync status: $e");
       print("Error details: $e"); // More detailed error log
@@ -495,10 +544,10 @@ class FirestoreService {
 
   Future<List<Task>> getUnsyncedTasks1() async {
     // Firestore handles sync implicitly, getting unsynced tasks might not be directly applicable
-    print("Get unsynced tasks function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Get unsynced tasks function is not directly applicable in Firestore. Sync is handled automatically.");
     return [];
   }
-
 
   Future<void> deleteTask1(String taskId) async {
     try {
@@ -509,15 +558,17 @@ class FirestoreService {
     }
   }
 
-
   // Facility Staff Operations (same as before)
   Future<List<FacilityStaffModel>> getFacilityListForSpecificFacility1() async {
     try {
       final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
           .collection(staffCollection)
-          .where('facilityName', isEqualTo: 'Your Facility Name') // Replace with actual facility name logic
+          .where('facilityName',
+          isEqualTo: 'Your Facility Name') // Replace with actual facility name logic
           .get();
-      return snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null)).toList();
+      return snapshot.docs
+          .map((doc) => FacilityStaffModel.fromFirestore(doc, null))
+          .toList();
     } catch (e) {
       print("Error fetching facility staff list: $e");
       print("Error details: $e"); // More detailed error log
@@ -527,37 +578,75 @@ class FirestoreService {
 
   // Supervisor Operations (same as before)
   Stream<List<String?>> getSupervisorStream1(String department, String state) {
-    return _firestore.collection(staffCollection)
+    return _firestore
+        .collection(staffCollection)
         .where('department', isEqualTo: department)
         .where('state', isEqualTo: state)
         .where('designation', isEqualTo: 'Supervisor')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null).name).toList());
+        .map((snapshot) => snapshot.docs
+        .map((doc) => FacilityStaffModel.fromFirestore(doc, null).name)
+        .toList());
   }
 
-  Future<List<String?>> getSupervisorEmailFromFirestore1(String department, String supervisorName) async {
+  Future<List<String?>> getSupervisorEmailFromFirestore1(
+      String department, String supervisorName) async {
     try {
-      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore.collection(staffCollection)
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
+          .collection(staffCollection)
           .where('department', isEqualTo: department)
           .where('name', isEqualTo: supervisorName)
           .where('designation', isEqualTo: 'Supervisor')
           .limit(1)
           .get();
-      return snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null).email).toList();
+      return snapshot.docs
+          .map((doc) => FacilityStaffModel.fromFirestore(doc, null).email)
+          .toList();
     } catch (e) {
       print("Error fetching supervisor email from Firestore: $e");
       print("Error details: $e"); // More detailed error log
       return [];
     }
   }
-}
 
+  // Function to upload file to Firebase Storage and get download URL
+  Future<String?> uploadFileToStorage(String filePath, String fileName, {StreamController<double>? progressStream}) async {
+    try {
+      File file = File(filePath);
+      if (!file.existsSync()) {
+        print("File does not exist at path: $filePath");
+        return null;
+      }
+
+      Reference storageReference = _storage.ref().child('attachments/$fileName');
+      UploadTask uploadTask = storageReference.putFile(
+        file,
+        SettableMetadata(contentType: mime(filePath)), // Set content type
+      );
+
+      if (progressStream != null) {
+        uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+          double progress = snapshot.bytesTransferred / snapshot.totalBytes;
+          progressStream.add(progress);
+        });
+      }
+
+      TaskSnapshot taskSnapshot = await uploadTask.whenComplete(() {});
+      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print("Error uploading file to storage: $e");
+      return null;
+    }
+  }
+}
 
 class DailyActivityMonitoringPage extends StatefulWidget {
   const DailyActivityMonitoringPage({super.key});
 
   @override
-  _DailyActivityMonitoringPageState createState() => _DailyActivityMonitoringPageState();
+  _DailyActivityMonitoringPageState createState() =>
+      _DailyActivityMonitoringPageState();
 }
 
 class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPage> {
@@ -567,8 +656,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   final String staffCollection = 'Staff';
   final String bioCollection = 'BioData';
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-
+  final FirestoreService _firestoreService = FirestoreService(); // Initialize FirestoreService
 
   // Report Operations
   Future<List<Report>> getReportsByDate(DateTime date, BioModel? bioModel) async {
@@ -603,6 +691,33 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
+  Future<List<Report>> getAllReportsForDate(DateTime date, BioModel? bioModel, String department) async {
+    if (selectedBioState == null || selectedBioLocation == null) {
+      print("BioModel data is incomplete, cannot fetch reports.");
+      return [];
+    }
+
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(date);
+
+      // Use collectionGroup correctly
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
+          .collectionGroup(selectedFirebaseId!) // This queries all subcollections named `selectedFirebaseId!`
+          .where('department', isEqualTo: department)
+          .where('date', isEqualTo: formattedDate)
+          .get();
+
+      List<Report> reports = snapshot.docs.map((doc) => Report.fromFirestore(doc, null)).toList();
+
+      return reports;
+    } catch (e) {
+      print("Error fetching all reports for date: $e");
+      return [];
+    }
+  }
+
+
+
   Future<void> saveReport(Report report, BioModel? bioModel, String department) async {
     if (selectedBioState == null || selectedBioLocation == null) {
       print("BioModel data is incomplete, cannot save report.");
@@ -631,21 +746,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   Future<void> pushReportToFirebase(Report report) async {
     // Logic for pushing report, if needed, might be similar to saveReport but ensure sync status update
     // For this example, saveReport handles both save and update.
-    print("Push to Firebase function is not directly applicable in Firestore's set operation. Using saveReport.");
+    print(
+        "Push to Firebase function is not directly applicable in Firestore's set operation. Using saveReport.");
   }
 
   Future<void> updateReportSyncStatus(String reportId, bool isSynced) async {
     // Firestore handles sync implicitly with offline capabilities, explicit sync status might not be needed
-    print("Update sync status function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Update sync status function is not directly applicable in Firestore. Sync is handled automatically.");
   }
 
   Future<List<Report>> getUnsyncedReports() async {
     // Firestore handles sync implicitly, getting unsynced reports might not be directly applicable
-    print("Get unsynced reports function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Get unsynced reports function is not directly applicable in Firestore. Sync is handled automatically.");
     return []; // Return empty list as Firestore handles sync
   }
-
-
 
   // Task Operations
   Future<List<Task>> getTasksByDate(DateTime date) async {
@@ -673,7 +789,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-
   Future<void> saveTask(Task task) async {
     try {
       await _firestore.collection(tasksCollection).add(task.toFirestore());
@@ -692,7 +807,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           .limit(1)
           .get();
       if (snapshot.docs.isNotEmpty) {
-        return Task.fromFirestore(snapshot.docs.first,null);
+        return Task.fromFirestore(snapshot.docs.first, null);
       }
       return null;
     } catch (e) {
@@ -701,7 +816,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       return null;
     }
   }
-
 
   Future<void> pushTaskToFirebase(Task task) async {
     try {
@@ -715,7 +829,10 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   Future<void> updateTaskSyncStatus(String taskId, bool isSynced) async {
     try {
-      await _firestore.collection(tasksCollection).doc(taskId).update({'isSynced': isSynced});
+      await _firestore
+          .collection(tasksCollection)
+          .doc(taskId)
+          .update({'isSynced': isSynced});
     } catch (e) {
       print("Error updating task sync status: $e");
       print("Error details: $e"); // More detailed error log
@@ -724,10 +841,10 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   Future<List<Task>> getUnsyncedTasks() async {
     // Firestore handles sync implicitly, getting unsynced tasks might not be directly applicable
-    print("Get unsynced tasks function is not directly applicable in Firestore. Sync is handled automatically.");
+    print(
+        "Get unsynced tasks function is not directly applicable in Firestore. Sync is handled automatically.");
     return [];
   }
-
 
   Future<void> deleteTask(String taskId) async {
     try {
@@ -738,15 +855,17 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-
-  // Facility Staff Operations (same as before)
+  // Facility Staff Operations
   Future<List<FacilityStaffModel>> getFacilityListForSpecificFacility() async {
     try {
       final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
           .collection(staffCollection)
-          .where('facilityName', isEqualTo: 'Your Facility Name') // Replace with actual facility name logic
+          .where('facilityName',
+          isEqualTo: 'Your Facility Name') // Replace with actual facility name logic
           .get();
-      return snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null)).toList();
+      return snapshot.docs
+          .map((doc) => FacilityStaffModel.fromFirestore(doc, null))
+          .toList();
     } catch (e) {
       print("Error fetching facility staff list: $e");
       print("Error details: $e"); // More detailed error log
@@ -754,127 +873,43 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-  // Supervisor Operations (same as before)
+  // Supervisor Operations
   Stream<List<String?>> getSupervisorStream(String department, String state) {
-    return _firestore.collection(staffCollection)
+    return _firestore
+        .collection(staffCollection)
         .where('department', isEqualTo: department)
         .where('state', isEqualTo: state)
         .where('designation', isEqualTo: 'Supervisor')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null).name).toList());
+        .map((snapshot) => snapshot.docs
+        .map((doc) => FacilityStaffModel.fromFirestore(doc, null).name)
+        .toList());
   }
 
-  Future<List<String?>> getSupervisorEmailFromFirestore2(String department, String supervisorName) async {
+  Future<List<String?>> getSupervisorEmailFromFirestore2(
+      String department, String supervisorName) async {
     try {
-      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore.collection(staffCollection)
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
+          .collection(staffCollection)
           .where('department', isEqualTo: department)
           .where('name', isEqualTo: supervisorName)
           .where('designation', isEqualTo: 'Supervisor')
           .limit(1)
           .get();
-      return snapshot.docs.map((doc) => FacilityStaffModel.fromFirestore(doc,null).email).toList();
+      return snapshot.docs
+          .map((doc) => FacilityStaffModel.fromFirestore(doc, null).email)
+          .toList();
     } catch (e) {
       print("Error fetching supervisor email from Firestore: $e");
       print("Error details: $e"); // More detailed error log
       return [];
     }
   }
-  // Define lists of report indicators for each report type
-  List<String> tbReportIndicators = [
-    "Total Number Newly Tested HIV Positive (HTS TST POSITIVE)",
-    "TX NEW (Tx New is the number of new patients COMMENCED on ARVs during the week)",
-    "No of new ART patients (TX NEW) clinically screened for TB",
-    "Number of Presumptive cases Identified (among those TESTED Positive) (Subset of indicator 'Newly Tested HIV Positive')",
-    "Number of Presumptive cases evaluated for LF LAM, GeneXpert, or other Test (among the HTS TST POS)",
-    "Number of Patients with MTB detected or confirmed TB Positive Including LF LAM or other test",
-    "Number of patients Commenced on TB treatment after GeneXpert or LF LAM Diagnosis",
-    "Number of patients Less than 5 Years of age commenced on TB treatment after GeneXpert or LF LAM Diagnosis",
-    "Total Number of Tx_New screened Negative",
-    "Total Number of Tx New Eligible for TPT (INH)",
-    "Total Number of Tx New Commenced on TPT (INH)",
-    "ART patients already on treatment who came for drug refill ( Facility and other streams)",
-    "ART patients already on treatment who came for drug refill ( Facility and other streams) screened for TB",
-    "ART patients already on treatment who came for drug refill ( Facility and other streams) Screened positive ( Presumptive TB )",
-    "ART patients already on treatment who came for drug refill ( Facility and other streams) evaluated for TB",
-    "Number of ART Patients already on treatment tested positive for TB",
-    "Number of ART Patients already on treatment started TB Treatment",
-    "Number of ART patients Less than 5 Years already on treatment started TB Treatment",
-    "ART patients already on treatment who came for drug refill ( Facility and other streams) Screened Negative ( Non presumptive Presumptive TB )",
-    "ART patients already on treatment Completed IPT or already commenced IPT ( Subset of the Indicator above)",
-    "ART patients already on treatment Eligible for IPT",
-    "ART patients already on treatment Started on IPT",
-    "TB STAT for the week (Number of Client started on TB treatment both HIV POS & Negative)",
-    "Comments"
-  ];
 
-  List<String> vlReportIndicators = [
-    "Number of clients that had their samples collected and documented in the Lab VL register",
-    "Number of samples logged in through LIMS NMRS with generated manifest sent to the PCR lab",
-    "Number of viral load results entered into the VL Register",
-    "Comments"
-  ];
-
-  List<String> pharmTechReportIndicators = [
-    "Number of Drug pickup as documented in the Daily Pharmacy worksheet",
-    "Number of clients that had completed Tuberculosis Preventive Therapy (TPT)",
-    "Number of commodity consumption data entered into NMRS commodity module",
-    "Number of Patients with completed Adverse Drug Reaction screening form",
-    "Comments"
-  ];
-
-  List<String> trackingAssistantReportIndicators = [
-    "Number of Clients with a scheduled appointment",
-    "Number of clients with a scheduled appointment given a reminder call of the expected appointment",
-    "Number of clients with a scheduled appointment who missed appointment",
-    "Number of clients with same day tracking for missed appointment",
-    "Number of patient who are IIT that were tracked back",
-    "Number of verbal autopsy done",
-    "Comments"
-  ];
-
-  List<String> artNurseReportIndicators = [
-    "proportion of Newly Diagnosed patients with baseline CD4 Test done (Denominator is 'Number of the Newly Diagnosed HIV Positive Clients')",
-    "Number of those with baseline CD4 with CD4<200 cells/mm3",
-    "Proportion of TB LF-LAM Screening done on individuals with CD4<200 cells/mm3 (Denominator is 'Number of those with baseline CD4 with CD4<200 cells/mm3')",
-    "Number of TB LF-LAM Positive",
-    "Proportion of Xpert Testing done for all TB LF-Lam positives individuals (Denominator is 'Number of TB LF-LAM Positive')",
-    "Number of TB LF-LAM/Xpert testing Concurrence",
-    "Proportion of CrAg Screening done for individual with CD4<200 cells/mm3 (Denominator is 'Number of TB LF-LAM/Xpert testing Concurrence')",
-    "Number of CrAg Screening Positive",
-    "Proportion of CrAg CSF done (Denominator is 'Number of CrAg Screening Positive')",
-    "Number of diagnosed CCM",
-    "Number of un-suppressed clients commenced on EAC",
-    "Number of Unsuppressed clients in a cohort completing EAC",
-    "Number of EID sample collected for eligible infants within 2 months of birth",
-    "Number of AYP (Adolescents and Young Persons) enrolled into OTZ program",
-    "Comments"
-  ];
-
-  List<String> htsReportIndicators = [
-    "Number of the Newly Diagnosed HIV Positive Clients",
-    "Number of Index clients with partners and family members tested",
-    "Comments"
-  ];
-
-  List<String> siReportIndicators = [
-    "Number of Tx_New Clients Entries entered on NMRS (EMR)",
-    "Number of Existing Clients Entries entered on NMRS (EMR)",
-    "Number of Viral Load results Entry on NMRS (EMR)",
-    "Number of ANC Records Entry on NMRS (EMR)",
-    "Number of Data entry for HTS on NMRS (EMR)",
-    "Number of patients on ART having fingerprints captured on NMRS (EMR)",
-    "Comments"
-  ];
-
-  // Initialize TextEditingControllers for each indicator for each report type.
-  // These controllers will hold the values entered by the user and will be populated when editing a record.
-  final Map<String, TextEditingController> tbReportControllers = {};
-  final Map<String, TextEditingController> vlReportControllers = {};
-  final Map<String, TextEditingController> pharmTechReportControllers = {};
-  final Map<String, TextEditingController> trackingAssistantReportControllers = {};
-  final Map<String, TextEditingController> artNurseReportControllers = {};
-  final Map<String, TextEditingController> htsReportControllers = {};
-  final Map<String, TextEditingController> siReportControllers = {};
+  // Initialize TextEditingControllers dynamically
+  final Map<String, Map<String, TextEditingController>> reportControllers = {};
+  final Map<String, Map<String, String?>> reportUsernames = {};
+  final Map<String, Map<String, String?>> reportEditedUsernames = {};
 
   // Maps to store the username of who entered the data for each indicator.
   Map<String, String?> tbReportUsernames = {};
@@ -894,7 +929,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   Map<String, String?> htsReportEditedUsernames = {};
   Map<String, String?> siReportEditedUsernames = {};
 
-
   String _currentUsername = ""; // Stores the current logged-in user's name.
 
   String _selectedReportType = "Daily"; // Default report type.
@@ -902,44 +936,36 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   String? _selectedMonthForWeekly; // Selected month for weekly report.
   List<String> _reportPeriodOptions = []; // Options for report period dropdown.
   List<String> _monthlyOptions = []; // Options for month dropdown.
-  final Map<String, bool> _isEditingReportSection = {}; // Tracks if a report section is in editing mode.
-  final Map<String, Report?> _loadedReports = {}; // Stores loaded reports for the selected date.
+  final Map<String, bool> _isEditingReportSection =
+  {}; // Tracks if a report section is in editing mode.
+  final Map<String, Report?> _loadedReports =
+  {}; // Stores loaded reports for the selected date.
   List<Task> _tasksForDate = []; // Stores tasks for the selected date.
+  Map<String, List<Report>> _allReportsForDate = {}; // Stores all reports for the selected date, grouped by department
 
   Task? _taskBeingEdited; // Track the task being edited
 
   //final TaskController _taskController = Get.put(TaskController());
   //late NotifyHelper notifyHelper;
-  final DateTime _selectedDate = DateTime.now(); // Currently selected date (not used for reporting date).
-  DateTime _selectedReportingDate = DateTime.now(); // Date for which reports are being viewed/entered.
+  final DateTime _selectedDate =
+  DateTime.now(); // Currently selected date (not used for reporting date).
+  DateTime _selectedReportingDate =
+  DateTime.now(); // Date for which reports are being viewed/entered.
   bool _isLoading = true; // Loading indicator flag.
   Color _datePickerSelectionColor = Colors.red;
   Color _datePickerSelectedTextColor = Colors.white;
 
-  final FirestoreService _firestoreService = FirestoreService(); // Initialize FirestoreService
-
-  // Global keys for form validation for each report section.
-  final GlobalKey<FormState> _htsFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _artNurseFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _trackingAssistantFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _tbFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _vlFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _pharmacyFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _siFormKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _genericFormKey =
+  GlobalKey<FormState>(); // Single generic form key
 
   // Track StreamSubscriptions for database watchers to refresh data on changes.
   final List<StreamSubscription> _reportWatchers = [];
-
 
   //Controllers for Task BottomSheet
   final TextEditingController _taskTitleController = TextEditingController();
   final TextEditingController _taskDescriptionController = TextEditingController();
   String? _selectedSupervisor;
-  final List<String> _supervisorOptions = ["Supervisor 1", "Supervisor 2", "Supervisor 3"]; // Example options
 
-
-  String? _selectedCaritasSupervisor; // Renamed to be specific to Caritas Supervisor
-  String? _selectedCaritasSupervisorEmail;
   List<String?> supervisorNames = []; // Store supervisor names from Firestore
 
   String? selectedProjectName;
@@ -956,27 +982,31 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   String? selectedFirebaseId;
   String? selectedSupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
+
   // Add ImagePicker instance
   final ImagePicker _picker = ImagePicker();
   // State to hold attachments for reports and tasks
-  final Map<String, List<String>> _reportAttachments = {}; // Key is reportType, Value is list of file paths
-  List<String> _taskBottomSheetAttachments = []; // Attachments for task in bottom sheet
-  final Map<int, List<String>> _taskCardAttachments = {}; // Key is task ID, Value is list of file paths
+  final Map<String, List<AttachmentData>> _reportAttachmentsData =
+  {}; // Key is reportType, Value is list of AttachmentData
+  List<AttachmentData> _taskBottomSheetAttachmentsData = []; // Attachments for task in bottom sheet
+  final Map<int, List<AttachmentData>> _taskCardAttachmentsData =
+  {}; // Key is task ID, Value is list of AttachmentData
 
   List<FacilityStaffModel> _staffList = []; // For staff list dropdown
   bool _isLoadingStaffList = true; // Track loading state of staff list
   FacilityStaffModel? _selectedReviewer; // To store selected reviewer from dropdown
 
-
-
+  // NEW: State to hold thematic report definitions
+  List<Map<String, dynamic>> _thematicReportDefinitions = [];
 
   @override
   void initState() {
     super.initState();
 
-    _loadBioData().then((_){
-      _loadStaffList1();
+    _loadBioData().then((_) {
+      _loadStaffList();
       _initializeAsync();
+      _loadThematicReportDefinitions(); // Load thematic report definitions on init
     });
 
     _monthlyOptions = _generateMonthlyOptions();
@@ -988,7 +1018,55 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       });
     });
   }
+// NEW: Function to load thematic report definitions from Firestore
+  Future<void> _loadThematicReportDefinitions() async {
+    _thematicReportDefinitions.clear();
+    try {
+      DocumentSnapshot<Map<String, dynamic>> thematicReportDoc =
+      await FirebaseFirestore.instance
+          .collection('CreateReport')
+          .doc('ThematicReport')
+          .get();
 
+      if (thematicReportDoc.exists) {
+        Map<String, dynamic> thematicReportData = thematicReportDoc.data()!;
+        Map<String, dynamic> thematicReportIndicators =
+        (thematicReportData['ThematicReportIndicators'] ?? {})
+        as Map<String, dynamic>;
+
+        List<Map<String, dynamic>> processedDefinitions = [];
+        thematicReportIndicators.forEach((departmentName, designationMap) {
+          if (designationMap is Map<String, dynamic>) {
+            designationMap.forEach((designationName, indicatorsDynamic) {
+              if (indicatorsDynamic is List<dynamic>) {
+                List<String> indicators = indicatorsDynamic.cast<String>();
+                processedDefinitions.add({
+                  'department': departmentName,
+                  'designation': designationName,
+                  'indicators': indicators,
+                });
+              }
+            });
+          }
+        });
+        // Sort definitions by department and then by designation
+        processedDefinitions.sort((a, b) {
+          int departmentComparison = a['department'].compareTo(b['department']);
+          if (departmentComparison != 0) {
+            return departmentComparison;
+          }
+          return a['designation'].compareTo(b['designation']);
+        });
+        _thematicReportDefinitions = processedDefinitions;
+      }
+
+      setState(() {});
+      print(
+          "Loaded ${_thematicReportDefinitions.length} thematic report definitions.");
+    } catch (e) {
+      print("Error loading thematic report definitions: $e");
+    }
+  }
 
   @override
   void dispose() {
@@ -998,43 +1076,123 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     super.dispose();
   }
 
-  // Future<void> _loadStaffList() async {
-  //   try {
-  //     final List<FacilityStaffModel> staff =
-  //     await _firestoreService.getFacilityListForSpecificFacility();
-  //     setState(() {
-  //       _staffList1 = staff;
-  //       _isLoadingStaffList = false;
-  //     });
-  //   } catch (error) {
-  //     print('Error loading staff list: $error');
-  //     setState(() {
-  //       _isLoadingStaffList = false;
-  //     });
-  //   }
-  // }
-
-
-  // Function to handle media picking (image or video)
-  Future<void> _handleMedia(ImageSource source, {bool isVideo = false, String? reportType, Task? task}) async {
-    final XFile? pickedFile = isVideo
-        ? await _picker.pickVideo(source: source)
-        : await _picker.pickImage(source: source,maxWidth: 800, maxHeight: 800); // added maxWidth and maxHeight for better memory management
-    if (pickedFile != null) {
-      setState(() {
-        if (reportType != null) {
-          _reportAttachments[reportType] = (_reportAttachments[reportType] ?? [])..add(pickedFile.path);
-        } else if (task == null) { // Assuming task == null means it's for the task bottom sheet
-          _taskBottomSheetAttachments.add(pickedFile.path);
-        } else        _taskCardAttachments[task.id ?? -1] = (_taskCardAttachments[task.id ?? -1] ?? [])..add(pickedFile.path);
-
-      });
+  // Function to handle media picking (image or document) - Modified to offer document option
+  Future<void> _handleMedia(ImageSource? imgSource, {String? reportType, Task? task}) async {
+    if (imgSource != null) {
+      // Handle image capture/gallery selection
+      final XFile? pickedImage = await _picker.pickImage(source: imgSource, maxWidth: 800, maxHeight: 800);
+      if (pickedImage != null) {
+        _addAttachment(pickedImage, reportType: reportType, task: task);
+      }
+    } else {
+      // Handle document selection
+      FilePickerResult? pickedDocument = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'xlsx', 'xls', 'doc', 'docx', 'txt', 'csv', 'ppt', 'pptx', 'odt', 'ods'], // Define allowed document types
+      );
+      if (pickedDocument != null && pickedDocument.files.isNotEmpty) {
+        PlatformFile file = pickedDocument.files.single;
+        String? mimeType = mime(file.name);
+        XFile xFile = XFile.fromData(file.bytes!, name: file.name, mimeType: mimeType);
+        _addAttachment(xFile, reportType: reportType, task: task);
+      }
     }
   }
 
+
+  void _addAttachment(XFile pickedFile, {String? reportType, Task? task}) {
+    if (pickedFile == null) return;
+
+    String fileName = pickedFile.name;
+
+    AttachmentData attachment = AttachmentData(
+      file: pickedFile,
+      uploadProgress: 0, // Initial progress
+      isUploading: false, // Not uploading yet
+      downloadUrl: null,
+      fileName: fileName,
+    );
+
+    print("_addAttachment: Attachment created, fileName: $fileName, pickedFile is null? ${pickedFile == null}"); // ADDED LOG - Check pickedFile right after picking
+    print("_addAttachment: Attachment created, attachment.file is null? ${attachment.file == null}"); // ADDED LOG - Check attachment.file after creating AttachmentData
+
+    setState(() {
+      if (reportType != null) {
+        _reportAttachmentsData[reportType] =
+        (_reportAttachmentsData[reportType] ?? [])..add(attachment);
+      } else if (task == null) {
+        // Assuming task == null means it's for the task bottom sheet
+        _taskBottomSheetAttachmentsData.add(attachment);
+      } else {
+        _taskCardAttachmentsData[task.id ?? -1] =
+        (_taskCardAttachmentsData[task.id ?? -1] ?? [])..add(attachment);
+      }
+    });
+  }
+
+
+  // New Widget to build the report data table
+  Widget _buildReportDataTable(String reportTypeKey, List<String> indicators) {
+    Report? loadedReport = _loadedReports[reportTypeKey];
+    if (loadedReport == null || loadedReport.reportEntries == null || loadedReport.reportEntries!.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16.0),
+        child: Text("No data available for table view."),
+      );
+    }
+
+    List<String> usernames = loadedReport.reportEntries!.keys.toList();
+    List<TableRow> tableRows = [];
+
+    // Header row
+    List<Widget> headerCells = [
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      ...usernames.map((username) => Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(username, style: const TextStyle(fontWeight: FontWeight.bold)),
+      )),
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("Total", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    ];
+    tableRows.add(TableRow(children: headerCells));
+
+    // Data rows
+    for (String indicator in indicators) {
+      List<Widget> dataCells = [
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator)),
+      ];
+      int indicatorTotal = 0;
+      for (String username in usernames) {
+        String value = loadedReport.reportEntries![username]![indicator]?.first.value ?? "0";
+        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(value)));
+        indicatorTotal += int.tryParse(value) ?? 0;
+      }
+      dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(indicatorTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold))));
+      tableRows.add(TableRow(children: dataCells));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Table(
+        border: TableBorder.all(),
+        columnWidths: const <int, TableColumnWidth>{
+          0: FixedColumnWidth(250), // Indicator column width
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: tableRows,
+      ),
+    );
+  }
+
+
   // Widget to display attachments in a grid view
-// Widget to display attachments in a grid view
-  Widget _buildAttachmentGrid(List<String> attachments, {String? reportType, Task? task}) {
+// Widget to display attachments in a grid view (Progress bar removed)
+  Widget _buildAttachmentGrid(List<AttachmentData> attachmentsData, {String? reportType, Task? task}) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1043,25 +1201,74 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: attachments.length,
+      itemCount: attachmentsData.length,
       itemBuilder: (context, index) {
-        final attachmentPath = attachments[index];
-        bool isVideo = attachmentPath.toLowerCase().endsWith('.mp4') || attachmentPath.toLowerCase().endsWith('.mov'); // Basic video check
+        final attachmentData = attachmentsData[index];
+        final fileName = attachmentData.fileName;
+        String? mimeType = attachmentData.file?.mimeType; // Get mime type from XFile
+        bool isVideo = mimeType != null && mimeType.startsWith('video/');
+        bool isImage = mimeType != null && mimeType.startsWith('image/');
+        bool isDocument = !isImage && !isVideo; // Treat everything else as document
 
-        Widget thumbnailWidget; // Widget for thumbnail
+        Widget thumbnailWidget;
+
 
         if (isVideo) {
           thumbnailWidget = AspectRatio(
             aspectRatio: 1,
             child: Container(
-              color: Colors.black, // Placeholder for video thumbnail
+              color: Colors.black,
               child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 40)),
             ),
           );
-        } else if (kIsWeb) {
-          thumbnailWidget = Image.network(attachmentPath, fit: BoxFit.cover); // Use Image.network for web images
+        } else if (isImage) { // Image from XFile bytes
+          thumbnailWidget = AspectRatio(
+            aspectRatio: 1,
+            child: FutureBuilder<Uint8List>(
+              future: attachmentData.file!.readAsBytes(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                } else if (snapshot.hasError) {
+                  return const Icon(Icons.error_outline, color: Colors.red);
+                } else {
+                  return const Center(child: CircularProgressIndicator());
+                }
+              },
+            ),
+          );
+        } else if (isDocument) {
+          // Document Preview - Show document icon
+          thumbnailWidget = AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              color: Colors.grey[200],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.insert_drive_file, size: 40, color: Colors.grey[700]),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      fileName,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         } else {
-          thumbnailWidget = Image.file(File(attachmentPath), fit: BoxFit.cover); // Use Image.file for non-web images
+          // Fallback for unknown types
+          thumbnailWidget = AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              color: Colors.grey[300],
+              child: const Center(child: Icon(Icons.attach_file, size: 40, color: Colors.grey)),
+            ),
+          );
         }
 
 
@@ -1069,21 +1276,25 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           children: [
             GestureDetector(
               onTap: () {
-                // Implement full-screen view or preview if needed
-                isVideo?Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => FullScreenVideo(videoPath: attachmentPath),
-                  ),
-                ):
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => FullScreenImage(imagePath: attachmentPath),
-                  ),
-                );
+                if (isVideo) {
+                  // For web, video preview might need different approach
+                  // For now, just show a message or handle as needed
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video preview not fully implemented in web yet.')));
+                } else if (isImage) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImageFromMemory(imageData: thumbnailWidget as AspectRatio), // Pass Image.memory widget
+                    ),
+                  );
+                } else if (isDocument) {
+                  // For web, document open might need different approach
+                  // For now, just show a message or handle as needed
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document open not fully implemented in web yet.')));
+                  //_openDocument(attachmentPath); // Open document on tap - Original implementation for file path
+                }
               },
-              child: thumbnailWidget, // Use the determined thumbnailWidget here
+              child: thumbnailWidget,
             ),
             Positioned(
               bottom: 0,
@@ -1127,6 +1338,10 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
+
+
+
+
   void _handleChangeAttachment(int index, {String? reportType, Task? task}) async {
     showModalBottomSheet(
       context: context,
@@ -1137,7 +1352,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             title: const Text('Choose Image from Gallery'),
             onTap: () {
               Navigator.pop(context);
-              _replaceAttachment(index, ImageSource.gallery, isVideo: false, reportType: reportType, task: task);
+              _replaceAttachment(index, ImageSource.gallery,
+                  reportType: reportType, task: task);
             },
           ),
           ListTile(
@@ -1145,23 +1361,17 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             title: const Text('Take a Photo'),
             onTap: () {
               Navigator.pop(context);
-              _replaceAttachment(index, ImageSource.camera, isVideo: false, reportType: reportType, task: task);
+              _replaceAttachment(index, ImageSource.camera,
+                  reportType: reportType, task: task);
             },
           ),
           ListTile(
-            leading: const Icon(Icons.videocam),
-            title: const Text('Record Video'),
+            leading: const Icon(Icons.attach_file),
+            title: const Text('Choose Document'),
             onTap: () {
               Navigator.pop(context);
-              _replaceAttachment(index, ImageSource.camera, isVideo: true, reportType: reportType, task: task);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.video_library),
-            title: const Text('Choose Video from Gallery'),
-            onTap: () {
-              Navigator.pop(context);
-              _replaceAttachment(index, ImageSource.gallery, isVideo: true, reportType: reportType, task: task);
+              _replaceAttachment(index, null,
+                  isDocument: true, reportType: reportType, task: task);
             },
           ),
         ],
@@ -1169,59 +1379,112 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
-
-  Future<void> _replaceAttachment(int index, ImageSource source, {bool isVideo = false, String? reportType, Task? task}) async {
-    final XFile? pickedFile = isVideo
-        ? await _picker.pickVideo(source: source)
-        : await _picker.pickImage(source: source,maxWidth: 800, maxHeight: 800); // added maxWidth and maxHeight for better memory management
-
-    if (pickedFile != null) {
-      setState(() {
-        if (reportType != null) {
-          if (_reportAttachments[reportType] != null && _reportAttachments[reportType]!.length > index) {
-            _reportAttachments[reportType]![index] = pickedFile.path;
-          }
-        } else if (task == null) {
-          if (_taskBottomSheetAttachments.length > index) {
-            _taskBottomSheetAttachments[index] = pickedFile.path;
-          }
-        } else        if (_taskCardAttachments[task.id ?? -1] != null && _taskCardAttachments[task.id ?? -1]!.length > index) {
-          _taskCardAttachments[task.id ?? -1]![index] = pickedFile.path;
-        }
-
-      });
+  Future<void> _replaceAttachment(int index, ImageSource? imgSource,
+      {bool isDocument = false, String? reportType, Task? task}) async {
+    if (!isDocument) {
+      // Replace with image
+      final XFile? pickedFile =
+      await _picker.pickImage(source: imgSource!, maxWidth: 800, maxHeight: 800);
+      if (pickedFile != null) {
+        _updateAttachment(index, pickedFile,
+            reportType: reportType, task: task);
+      }
+    } else {
+      // Replace with document
+      FilePickerResult? pickedDocument = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'pdf',
+          'xlsx',
+          'xls',
+          'doc',
+          'docx',
+          'txt',
+          'csv',
+          'ppt',
+          'pptx',
+          'odt',
+          'ods'
+        ],
+      );
+      if (pickedDocument != null && pickedDocument.files.isNotEmpty) {
+        PlatformFile file = pickedDocument.files.single;
+        String? mimeType = mime(file.name);
+        XFile xFile = XFile.fromData(file.bytes!, name: file.name, mimeType: mimeType);
+        _updateAttachment(index, xFile,
+            reportType: reportType, task: task);
+      }
     }
+  }
+
+  void _updateAttachment(int index, XFile newFile,
+      {String? reportType, Task? task}) {
+    setState(() {
+      if (reportType != null) {
+        if (_reportAttachmentsData[reportType] != null &&
+            _reportAttachmentsData[reportType]!.length > index) {
+          _reportAttachmentsData[reportType]![index] = AttachmentData(
+            file: newFile,
+            uploadProgress: 0,
+            isUploading: false,
+            downloadUrl: null,
+            fileName: newFile.name,
+          );
+        }
+      } else if (task == null) {
+        if (_taskBottomSheetAttachmentsData.length > index) {
+          _taskBottomSheetAttachmentsData[index] = AttachmentData(
+            file: newFile,
+            uploadProgress: 0,
+            isUploading: false,
+            downloadUrl: null,
+            fileName: newFile.name,
+          );
+        }
+      } else if (_taskCardAttachmentsData[task.id ?? -1] != null &&
+          _taskCardAttachmentsData[task.id ?? -1]!.length > index) {
+        _taskCardAttachmentsData[task.id ?? -1]![index] = AttachmentData(
+          file: newFile,
+          uploadProgress: 0,
+          isUploading: false,
+          downloadUrl: null,
+          fileName: newFile.name,
+        );
+      }
+    });
   }
 
   void _handleDeleteAttachment(int index, {String? reportType, Task? task}) {
     setState(() {
       if (reportType != null) {
-        if (_reportAttachments[reportType] != null && _reportAttachments[reportType]!.length > index) {
-          _reportAttachments[reportType]!.removeAt(index);
-          if (_reportAttachments[reportType]!.isEmpty) {
-            _reportAttachments.remove(reportType); // Remove the list if it becomes empty
+        if (_reportAttachmentsData[reportType] != null &&
+            _reportAttachmentsData[reportType]!.length > index) {
+          _reportAttachmentsData[reportType]!.removeAt(index);
+          if (_reportAttachmentsData[reportType]!.isEmpty) {
+            _reportAttachmentsData.remove(
+                reportType); // Remove the list if it becomes empty
           }
         }
       } else if (task == null) {
-        if (_taskBottomSheetAttachments.length > index) {
-          _taskBottomSheetAttachments.removeAt(index);
+        if (_taskBottomSheetAttachmentsData.length > index) {
+          _taskBottomSheetAttachmentsData.removeAt(index);
         }
-      } else      if (_taskCardAttachments[task.id ?? -1] != null && _taskCardAttachments[task.id ?? -1]!.length > index) {
-        _taskCardAttachments[task.id ?? -1]!.removeAt(index);
-        if (_taskCardAttachments[task.id ?? -1]!.isEmpty) {
-          _taskCardAttachments.remove(task.id ?? -1); // Remove the list if it becomes empty
+      } else if (_taskCardAttachmentsData[task.id ?? -1] != null &&
+          _taskCardAttachmentsData[task.id ?? -1]!.length > index) {
+        _taskCardAttachmentsData[task.id ?? -1]!.removeAt(index);
+        if (_taskCardAttachmentsData[task.id ?? -1]!.isEmpty) {
+          _taskCardAttachmentsData.remove(
+              task.id ?? -1); // Remove the list if it becomes empty
         }
       }
-
     });
   }
-
 
   // Async initialization to ensure controllers are initialized before loading reports.
   Future<void> _initializeAsync() async {
     print("_initializeAsync: Starting initialization");
     await _loadBioDataForSupervisor();
-    await _initializeControllers();
+//    await _initializeControllers();
     await _fetchUsername();
     await _loadReportsForSelectedDate();
     await _loadTasksForSelectedDate();
@@ -1230,78 +1493,55 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     if (selectedBioState != null && selectedBioLocation != null) {
       _initializeReportWatchers();
     } else {
-      print("_initializeAsync: BioData is not fully loaded, skipping report watchers initialization.");
+      print(
+          "_initializeAsync: BioData is not fully loaded, skipping report watchers initialization.");
     }
 
     print("_initializeAsync: Controllers initialized");
   }
 
   Future<void> _loadBioDataForSupervisor() async {
-    print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Loading bio data for supervisor");
+    print(
+        "_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Loading bio data for supervisor");
     await _loadBioData().then((_) async {
-      if (
-      selectedBioDepartment != null &&
-          selectedBioState != null) {
-        print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data loaded, loading supervisor names - Department: $selectedBioDepartment, State: $selectedBioState");
+      if (selectedBioDepartment != null && selectedBioState != null) {
+        print(
+            "_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data loaded, loading supervisor names - Department: $selectedBioDepartment, State: $selectedBioState");
         await _loadSupervisorNames(selectedBioDepartment!, selectedBioState!);
       } else {
-        print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data or department/state is missing for supervisor loading!");
+        print(
+            "_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Bio data or department/state is missing for supervisor loading!");
         if (bioData == null) {
-          print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: bioData is NULL");
+          print(
+              "_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: bioData is NULL");
         } else {
-          print("_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Department: $selectedBioDepartment, State: $selectedBioState");
+          print(
+              "_DailyActivityMonitoringPageState: _loadBioDataForSupervisor: Department: $selectedBioDepartment, State: $selectedBioState");
         }
       }
     });
   }
 
-
   Future<void> _loadSupervisorNames(String department, String state) async {
-    print("_DailyActivityMonitoringPageState: _loadSupervisorNames: Fetching supervisor names for department: $department, state: $state");
-    supervisorNames =
-    await _firestoreService.getSupervisorEmailFromFirestore1(department, 'Supervisor Name');
-    print("_DailyActivityMonitoringPageState: _loadSupervisorNames: Supervisor names list after fetch: $supervisorNames");
+    print(
+        "_DailyActivityMonitoringPageState: _loadSupervisorNames: Fetching supervisor names for department: $department, state: $state");
+    supervisorNames = await _firestoreService.getSupervisorEmailFromFirestore1(
+        department, 'Supervisor Name');
+    print(
+        "_DailyActivityMonitoringPageState: _loadSupervisorNames: Supervisor names list after fetch: $supervisorNames");
     if (supervisorNames.isNotEmpty) {
       setState(() {
-        print("_DailyActivityMonitoringPageState: _loadSupervisorNames: setState called to rebuild UI with supervisor names - List is NOT empty");
+        print(
+            "_DailyActivityMonitoringPageState: _loadSupervisorNames: setState called to rebuild UI with supervisor names - List is NOT empty");
       });
     } else {
-      print("_DailyActivityMonitoringPageState: _loadSupervisorNames: No supervisors found for department: $department, state: $state - List is empty");
+      print(
+          "_DailyActivityMonitoringPageState: _loadSupervisorNames: No supervisors found for department: $department, state: $state - List is empty");
     }
   }
 
   BioModel? bioData;
 
-  Future<void> _loadBioData1() async {
-    print("_DailyActivityMonitoringPageState: _loadBioData: Loading bio data");
-
-    bioData = await _firestoreService.getBioData();
-    if (bioData != null) {
-      print("_DailyActivityMonitoringPageState: _loadBioData: Bio data loaded: ${bioData!.firstName} ${bioData!.lastName}, Department: ${bioData!.department}, State: ${bioData!.state}");
-      setState(() {
-        selectedBioFirstName = bioData!.firstName;
-        selectedBioLastName = bioData!.lastName;
-        selectedBioDepartment = bioData!.department;
-        selectedBioState = bioData!.state;
-        selectedBioDesignation = bioData!.designation;
-        selectedBioLocation = bioData!.location;
-        selectedBioStaffCategory = bioData!.staffCategory;
-        selectedSignatureLink = bioData!.signatureLink;
-        selectedBioEmail = bioData!.emailAddress;
-        selectedBioPhone = bioData!.mobile;
-
-        selectedFirebaseId = bioData!.firebaseAuthId;
-      });
-    } else {
-      print("_DailyActivityMonitoringPageState: _loadBioData: No bio data found!");
-      print("No bio data found!");
-      // **DEBUGGING SUGGESTION:** After "No bio data found!" log, add the following to check Firestore directly:
-      // 1. Verify if the 'Staff' collection exists in your Firebase project.
-      // 2. Check if there are any documents in the 'Staff' collection.
-      // 3. Confirm if any document has 'firebaseAuthId' field matching the 'Current UUID' logged earlier.
-      // 4. Double-check Firestore security rules to ensure read access is allowed for your user.
-    }
-  }
 
   Future<void> _loadBioData() async {
     String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
@@ -1312,10 +1552,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
 
     try {
-      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(userId)
-          .get();
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot =
+      await FirebaseFirestore.instance.collection('Staff').doc(userId).get();
 
       if (docSnapshot.exists && docSnapshot.data() != null) {
         Map<String, dynamic> data = docSnapshot.data()!;
@@ -1331,13 +1569,11 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           selectedBioPhone = data['mobile'] ?? '';
           selectedSignatureLink = data['signatureLink'] ?? '';
           selectedFirebaseId = userId; // Store the Firebase UUID
-
         });
 
         print("selectedBioDepartment ===$selectedBioDepartment");
         print("selectedBioState ===$selectedBioState");
         print("selectedBioLocation ===$selectedBioLocation");
-
       } else {
         print("No bio data found for user ID: $userId");
       }
@@ -1346,9 +1582,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-
-
-  Future<void> _loadStaffList1() async {
+  // Function to load staff list (Corrected function name)
+  Future<void> _loadStaffList() async { // Corrected function name
     setState(() {
       _isLoadingStaffList = true;
     });
@@ -1422,15 +1657,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     // }
     print("_loadReportsForSelectedDate: Loading reports for date: $_selectedReportingDate");
     _loadedReports.clear();
-    _reportAttachments.clear();
+    _reportAttachmentsData.clear(); // Clear attachment data
     _isEditingReportSection.clear();
-    await _loadBioData(); // Ensure bioData is loaded before fetching reports
-    // if (bioData == null) {
-    //   print("_loadReportsForSelectedDate: BioData is null, cannot load reports.");
-    //   return;
-    // }
+    reportControllers.clear(); // Clear controllers on date change
+    reportUsernames.clear();
+    reportEditedUsernames.clear();
 
-    List<Report> reports = await getReportsByDate(_selectedReportingDate, bioData);
+    List<Report> reports = await getReportsByDate(_selectedReportingDate, bioData,); // Example department, adjust as needed
     print("_loadReportsForSelectedDate: Fetched reports count: ${reports.length}");
     print("Loaded Reports: $reports");
 
@@ -1440,15 +1673,32 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         _loadedReports[report.reportType!] = report;
         _isEditingReportSection[report.reportType!] = true;
         if (report.attachments != null) {
-          _reportAttachments[report.reportType!] = List<String>.from(report.attachments!);
+          _reportAttachmentsData[report.reportType!] = report.attachments!.map((url) => AttachmentData.fromUrl(url)).toList(); // Convert URLs to AttachmentData
         }
-        print("_loadReportsForSelectedDate: Loaded report for ${report.reportType}: ${_loadedReports[report.reportType!]}");
+        print(
+            "_loadReportsForSelectedDate: Loaded report for ${report.reportType}: ${_loadedReports[report.reportType!]}");
       }
       _updateControllerValuesFromLoadedReports();
     });
     print("_loadReportsForSelectedDate: Report loading and controller update complete.");
   }
 
+  Future<void> _loadAllReportsForSelectedDate() async {
+    _allReportsForDate.clear();
+    await _loadBioData();
+    if (bioData == null) {
+      print("_loadAllReportsForSelectedDate: BioData is null, cannot load reports.");
+      return;
+    }
+
+    final departments = ["Laboratory", "Care and Treatment", "Pharmacy and Logistics", "Prevention", "Strategic Information"]; // Example departments, adjust as needed
+
+    for (String department in departments) {
+      List<Report> reports = await getAllReportsForDate(_selectedReportingDate, bioData, department);
+      _allReportsForDate[department] = reports;
+    }
+    setState(() {}); // Rebuild UI to display the table
+  }
 
   Future<void> _loadTasksForSelectedDate() async {
     print("_loadTasksForSelectedDate: Loading tasks for date: $_selectedReportingDate");
@@ -1456,86 +1706,90 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     print("Loaded Tasks === $tasks");
     setState(() {
       _tasksForDate = tasks;
-      _taskCardAttachments.clear();
+      _taskCardAttachmentsData.clear();
       for (var task in tasks) {
         if (task.attachments != null) {
-          _taskCardAttachments[task.id ?? -1] = List<String>.from(task.attachments!);
+          _taskCardAttachmentsData[task.id ?? -1] = task.attachments!.map((url) => AttachmentData.fromUrl(url)).toList(); // Convert URLs to AttachmentData
         }
       }
     });
     print("_loadTasksForSelectedDate: Fetched tasks count: ${_tasksForDate.length}");
   }
 
-
-  // Updates the TextEditingController values from the loaded reports.
+  // Updates the TextEditingController values from the loaded reports. (Modified to be dynamic)
   void _updateControllerValuesFromLoadedReports() {
-    print("_updateControllerValuesFromLoadedReports: Updating controllers from loaded reports");
-    _updateControllersFromReport(_loadedReports["tb_report"], tbReportControllers, tbReportIndicators, tbReportUsernames, tbReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["vl_report"], vlReportControllers, vlReportIndicators, vlReportUsernames, vlReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["pharmacy_report"], pharmTechReportControllers, pharmTechReportIndicators, pharmTechReportUsernames, pharmTechReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["tracking_report"], trackingAssistantReportControllers, trackingAssistantReportIndicators, trackingAssistantReportUsernames, trackingAssistantReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["art_nurse_report"], artNurseReportControllers, artNurseReportIndicators, artNurseReportUsernames, artNurseReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["hts_report"], htsReportControllers, htsReportIndicators, htsReportUsernames, htsReportEditedUsernames);
-    _updateControllersFromReport(_loadedReports["si_report"], siReportControllers, siReportIndicators, siReportUsernames, siReportEditedUsernames);
-    print("_updateControllerValuesFromLoadedReports: Controller update process completed.");
+    _thematicReportDefinitions.forEach((definition) {
+      String reportTypeKey = "${definition['department']}_${definition['designation']}"
+          .toLowerCase()
+          .replaceAll(' ', '_');
+      List<String> indicators =
+      List<String>.from(definition['indicators'] ?? []); // Ensure indicators are loaded
+
+      if (!_isControllerMapInitialized(reportTypeKey)) {
+        _initializeControllerMap(reportTypeKey, indicators);
+      }
+      _updateControllersFromReport(
+          _loadedReports[reportTypeKey],
+          reportControllers[reportTypeKey]!,
+          indicators,
+          reportUsernames[reportTypeKey]!,
+          reportEditedUsernames[reportTypeKey]!);
+    });
   }
 
-  // Helper function to update controllers for a specific report type from a loaded report.
-  void _updateControllersFromReport(Report? report, Map<String, TextEditingController> controllers, List<String> indicators, Map<String, String?> usernames, Map<String, String?> editedUsernames) {
+  bool _isControllerMapInitialized(String reportTypeKey) {
+    return reportControllers.containsKey(reportTypeKey);
+  }
+
+
+  // Helper function to update controllers for a specific report type from a loaded report. (Modified to be dynamic)
+  void _updateControllersFromReport(
+      Report? report,
+      Map<String, TextEditingController> controllers,
+      List<String> indicators,
+      Map<String, String?> usernames,
+      Map<String, String?> editedUsernames) {
     String reportType = report?.reportType ?? 'unknown';
-    print("_updateControllersFromReport: Updating controllers for report type: $reportType");
     if (report != null && report.reportEntries != null) {
-      print("_updateControllersFromReport: Report entries found, processing entries.");
-      for (var entry in report.reportEntries!) {
-        print("_updateControllersFromReport: Entry Key from report: ${entry.key}");
-        if (controllers.containsKey(entry.key)) {
-          print("_updateControllersFromReport: Found controller for key: ${entry.key}");
-          print("_updateControllersFromReport: Current controller value for ${entry.key}: '${controllers[entry.key]!.text}'");
-          print("_updateControllersFromReport: Setting controller value for ${entry.key} to: '${entry.value}'");
-          controllers[entry.key]!.text = entry.value;
-          usernames[entry.key] = entry.enteredBy;
-          editedUsernames[entry.key] = entry.editedBy;
-          print("_updateControllersFromReport: Controller value for ${entry.key} updated to: '${controllers[entry.key]!.text}'");
-        } else {
-          print("_updateControllersFromReport: No controller found for key: ${entry.key}");
+      // Assuming reportEntries is now Map<String, Map<String, List<ReportEntry>>>
+      final username = _currentUsername; // Use current username as key
+      if (report.reportEntries![username] != null) {
+        for (var indicatorEntry in report.reportEntries![username]!.entries) {
+          final indicatorName = indicatorEntry.key;
+          final entryList = indicatorEntry.value; // List of ReportEntry for this indicator
+          if (entryList.isNotEmpty) {
+            final entry = entryList.first; // Assuming only one entry per indicator for now
+            if (controllers.containsKey(indicatorName)) {
+              controllers[indicatorName]!.text = entry.value;
+              usernames[indicatorName] = entry.enteredBy;
+              editedUsernames[indicatorName] = entry.editedBy;
+            }
+          }
         }
       }
-      print("_updateControllersFromReport: All report entries processed for report type: $reportType");
     } else {
-      print("_updateControllersFromReport: No report found or report entries are null for report type: $reportType. Resetting controllers.");
       _resetControllers(controllers, indicators, usernames, editedUsernames);
     }
-    print("_updateControllersFromReport: Controller update for report type: $reportType finished.");
   }
 
 
-  // Initializes all TextEditingControllers for all report types and indicators.
-  Future<void> _initializeControllers() async {
-    print("_initializeControllers: Initializing all controllers");
-    _initializeControllerMap(tbReportIndicators, tbReportControllers);
-    _initializeControllerMap(vlReportIndicators, vlReportControllers);
-    _initializeControllerMap(pharmTechReportIndicators, pharmTechReportControllers);
-    _initializeControllerMap(trackingAssistantReportIndicators, trackingAssistantReportControllers);
-    _initializeControllerMap(artNurseReportIndicators, artNurseReportControllers);
-    _initializeControllerMap(htsReportIndicators, htsReportControllers);
-    _initializeControllerMap(siReportIndicators, siReportControllers);
-    print("_initializeControllers: All controllers initialized.");
-  }
-
-  // Helper function to initialize a map of TextEditingControllers for a given list of indicators.
-  void _initializeControllerMap(List<String> indicators, Map<String, TextEditingController> controllers) {
+  // Initializes all TextEditingControllers dynamically based on indicators from Firestore.
+  void _initializeControllerMap(String reportTypeKey, List<String> indicators) {
+    reportControllers[reportTypeKey] = {};
+    reportUsernames[reportTypeKey] = {};
+    reportEditedUsernames[reportTypeKey] = {};
     for (String indicator in indicators) {
-      controllers[indicator] = TextEditingController();
+      reportControllers[reportTypeKey]![indicator] = TextEditingController();
     }
   }
-
 
   // Updates the report period options based on the selected report type (currently only "Daily").
   void _updateReportPeriodOptions(String reportType) {
     setState(() {
       _selectedReportPeriod = null;
       _selectedMonthForWeekly = null;
-      _reportPeriodOptions = reportType == "Daily" ? ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"] : [];
+      _reportPeriodOptions =
+      reportType == "Daily" ? ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"] : [];
     });
   }
 
@@ -1550,8 +1804,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return months;
   }
 
-
-  // Builds a single indicator text field, either as read-only text or editable TextFormField.
+// Builds a single indicator text field, either as read-only text or editable TextFormField.
   Widget _buildIndicatorTextField({
     required Map<String, TextEditingController> controllers,
     required String indicator,
@@ -1561,12 +1814,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     required VoidCallback onEditPressed,
     required String reportType, // Add reportType here
   }) {
-    TextInputType keyboardType = indicator == "Comments" ? TextInputType.multiline : TextInputType.number; // Set keyboard type based on indicator.
+    TextInputType keyboardType = indicator == "Comments"
+        ? TextInputType.multiline
+        : TextInputType.number; // Set keyboard type based on indicator.
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: isReadOnly
-          ? Column( // Display as Text widgets when read-only
+          ? Column(
+        // Display as Text widgets when read-only
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           RichText(
@@ -1575,16 +1831,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               children: <TextSpan>[
                 TextSpan(text: "$indicator: "),
                 TextSpan(
-                  text: controllers[indicator]!.text.isNotEmpty ? controllers[indicator]!.text : 'Not Entered', // Display value or "Not Entered"
+                  text: controllers[indicator]!.text.isNotEmpty
+                      ? controllers[indicator]!.text
+                      : 'Not Entered', // Display value or "Not Entered"
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: controllers[indicator]!.text.isNotEmpty ? Colors.black : Colors.red, // Conditional color
+                    color: controllers[indicator]!.text.isNotEmpty
+                        ? Colors.black
+                        : Colors.red, // Conditional color
                   ),
                 ),
               ],
             ),
           ),
-          if (usernames[indicator] != null && usernames[indicator]!.isNotEmpty) // Display "Entered by" username if available.
+          if (usernames[indicator] != null &&
+              usernames[indicator]!.isNotEmpty)
+          // Display "Entered by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -1592,7 +1854,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 style: const TextStyle(color: Colors.red, fontSize: 12.0),
               ),
             ),
-          if (editedUsernames[indicator] != null && editedUsernames[indicator]!.isNotEmpty) // Display "Edited by" username if available.
+          if (editedUsernames[indicator] != null &&
+              editedUsernames[indicator]!.isNotEmpty)
+          // Display "Edited by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -1602,17 +1866,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             ),
           // Display review fields when in ReadOnly mode
           if (isReadOnly)
-            _buildReviewFieldsReadOnly(indicator: indicator, reportType: reportType), // Call helper function to build review fields
+            _buildReviewFieldsReadOnly(
+                indicator: indicator,
+                reportType:
+                reportType), // Call helper function to build review fields
         ],
       )
-          : Column( // Display as TextFormField when editable
+          : Column(
+        // Display as TextFormField when editable
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
                 flex: 2,
-                child: Text(indicator, style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(indicator,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               Expanded(
                 flex: 1,
@@ -1624,22 +1893,33 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    suffixIcon: isReadOnly ? IconButton( // Show edit icon only in read-only mode.
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 8),
+                    suffixIcon: isReadOnly
+                        ? IconButton(
+                      // Show edit icon only in read-only mode.
                       icon: const Icon(Icons.edit),
                       onPressed: onEditPressed, // Callback to switch to edit mode.
-                    ) : null,
+                    )
+                        : null,
                   ),
-                  onChanged: (value) { // Set onChanged to track entered/edited by usernames
+                  onChanged: (value) {
+                    // Set onChanged to track entered/edited by usernames
                     setState(() {
-                      if (value.isNotEmpty && (usernames[indicator] == null || usernames[indicator]!.isEmpty )) {
+                      if (value.isNotEmpty &&
+                          (usernames[indicator] == null ||
+                              usernames[indicator]!.isEmpty)) {
                         usernames[indicator] = _currentUsername; // Update Entered By username on first change if empty
-                        editedUsernames[indicator] = null; // Reset edited by if newly entered
-                      } else if (value.isNotEmpty && value != controllers[indicator]!.text) {
+                        editedUsernames[indicator] =
+                        null; // Reset edited by if newly entered
+                      } else if (value.isNotEmpty &&
+                          value != controllers[indicator]!.text) {
                         editedUsernames[indicator] = _currentUsername; // Update Edited By username on subsequent change
                       } else if (value.isEmpty) {
-                        usernames[indicator] = null; // Clear usernames when field is cleared
-                        editedUsernames[indicator] = null; // Clear edited usernames when field is cleared
+                        usernames[indicator] =
+                        null; // Clear usernames when field is cleared
+                        editedUsernames[indicator] =
+                        null; // Clear edited usernames when field is cleared
                       }
                     });
                   },
@@ -1647,7 +1927,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               ),
             ],
           ),
-          if (usernames[indicator] != null && usernames[indicator]!.isNotEmpty) // Display "Entered by" username if available.
+          if (usernames[indicator] != null &&
+              usernames[indicator]!.isNotEmpty)
+          // Display "Entered by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -1655,7 +1937,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 style: const TextStyle(color: Colors.red, fontSize: 12.0),
               ),
             ),
-          if (editedUsernames[indicator] != null && editedUsernames[indicator]!.isNotEmpty) // Display "Edited by" username if available.
+          if (editedUsernames[indicator] != null &&
+              editedUsernames[indicator]!.isNotEmpty)
+          // Display "Edited by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -1673,37 +1957,44 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   Widget _buildReviewFieldsReadOnly({required String indicator, required String reportType}) {
     Report? loadedReport = _loadedReports[reportType];
     if (loadedReport != null) {
-      ReportEntry? reportEntry = loadedReport.reportEntries?.firstWhere(
-            (entry) => entry.key == indicator,
-        orElse: () => ReportEntry(key: indicator, value: ''), // Provide a default ReportEntry
-      );
-
-      if (reportEntry != null) {
-        return Padding(
-          padding: const EdgeInsets.only(top: 8.0, left: 10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (reportEntry.reviewedBy != null && reportEntry.reviewedBy!.isNotEmpty)
-                _buildReadOnlyField("To Be Reviewed by", reportEntry.reviewedBy!),
-              if (reportEntry.reviewStatus != null && reportEntry.reviewStatus!.isNotEmpty)
-                _buildReadOnlyField("Review Status", reportEntry.reviewStatus!),
-              if (reportEntry.supervisorName != null && reportEntry.supervisorName!.isNotEmpty)
-                _buildReadOnlyField("Supervisor Name", reportEntry.supervisorName!),
-              if (reportEntry.supervisorEmail != null && reportEntry.supervisorEmail!.isNotEmpty)
-                _buildReadOnlyField("Supervisor Email", reportEntry.supervisorEmail!),
-              if (reportEntry.supervisorApprovalStatus != null && reportEntry.supervisorApprovalStatus!.isNotEmpty)
-                _buildReadOnlyField("Supervisor Approval Status", reportEntry.supervisorApprovalStatus!),
-              if (reportEntry.supervisorFeedBackComment != null && reportEntry.supervisorFeedBackComment!.isNotEmpty)
-                _buildReadOnlyField("Supervisor Feedback Comment", reportEntry.supervisorFeedBackComment!),
-            ],
-          ),
+      // Assuming reportEntries is now Map<String, Map<String, List<ReportEntry>>>
+      final username = _currentUsername; // Use current username as key
+      if (loadedReport.reportEntries![username] != null && loadedReport.reportEntries![username]![indicator] != null) {
+        ReportEntry? reportEntry = loadedReport.reportEntries![username]![indicator]!.firstWhere(
+              (entry) => entry.key == indicator,
+          orElse: () => ReportEntry(key: indicator, value: ''),
         );
+
+        if (reportEntry != null) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (reportEntry.reviewedBy != null && reportEntry.reviewedBy!.isNotEmpty)
+                  _buildReadOnlyField("To Be Reviewed by", reportEntry.reviewedBy!),
+                if (reportEntry.reviewStatus != null && reportEntry.reviewStatus!.isNotEmpty)
+                  _buildReadOnlyField("Review Status", reportEntry.reviewStatus!),
+                if (reportEntry.supervisorName != null && reportEntry.supervisorName!.isNotEmpty)
+                  _buildReadOnlyField("Supervisor Name", reportEntry.supervisorName!),
+                if (reportEntry.supervisorEmail != null && reportEntry.supervisorEmail!.isNotEmpty)
+                  _buildReadOnlyField("Supervisor Email", reportEntry.supervisorEmail!),
+                if (reportEntry.supervisorApprovalStatus != null &&
+                    reportEntry.supervisorApprovalStatus!.isNotEmpty)
+                  _buildReadOnlyField(
+                      "Supervisor Approval Status", reportEntry.supervisorApprovalStatus!),
+                if (reportEntry.supervisorFeedBackComment != null &&
+                    reportEntry.supervisorFeedBackComment!.isNotEmpty)
+                  _buildReadOnlyField("Supervisor Feedback Comment",
+                      reportEntry.supervisorFeedBackComment!),
+              ],
+            ),
+          );
+        }
       }
     }
     return const SizedBox.shrink();
   }
-
 
   // Helper function to build read-only text fields for review data
   Widget _buildReadOnlyField(String label, String value) {
@@ -1726,175 +2017,34 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     Report? existingReport = _loadedReports[reportType];
     if (existingReport == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report not found!')),
-      );
+          const SnackBar(content: Text('Report not found!')));
       return;
     }
 
     // Update report status to 'Pending Review'
     existingReport.reportStatus = 'Pending Review';
     try {
-      await saveReport(existingReport, bioData, reportType); // Save updated report status to Firestore
+      await saveReport(existingReport, bioData,
+          reportType); // Save updated report status to Firestore
       // Push report to Firebase (already saved in Firestore, so this might be redundant or can be adjusted based on your sync needs)
       // await _firestoreService.pushReportToFirebase(existingReport); // Consider if you need a separate 'push' step
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${titleCase(reportType.replaceAll('_', ' '))} Report sent for review!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '${titleCase(reportType.replaceAll('_', ' '))} Report sent for review!')));
       setState(() {
-        _isEditingReportSection[reportType] = true; // Keep in read-only mode after sending for review
+        _isEditingReportSection[reportType] =
+        true; // Keep in read-only mode after sending for review
         _loadReportsForSelectedDate(); // Refresh report to update status in UI
       });
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending ${titleCase(reportType.replaceAll('_', ' '))} Report for review.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Error sending ${titleCase(reportType.replaceAll('_', ' '))} Report for review.')));
       print("Error sending report to Firestore: $e");
     }
   }
 
 
-
-// _buildReportSection (Modified for Save, Edit, Update buttons)
-  Widget _buildReportSection({
-    required GlobalKey<FormState> formKey,
-    required String title,
-    required List<String> indicators,
-    required Map<String, TextEditingController> controllers,
-    required Map<String, String?> usernames,
-    required Map<String, String?> editedUsernames,
-    required String reportType,
-    required Future<void> Function() onSubmit,
-    String? selectedReportPeriodValue,
-    String? selectedMonthForWeeklyValue,
-  }) {
-    bool isReadOnlySection = _loadedReports[reportType] != null && (_isEditingReportSection[reportType] ?? true);
-    String buttonText = isReadOnlySection ? 'Edit $title' : _loadedReports[reportType] != null ? 'Update $title' : 'Save $title';
-    String reportStatus = _loadedReports[reportType]?.reportStatus ?? 'Pending';
-    String? statusText = _loadedReports[reportType] != null ? _getReportStatusText(reportStatus) : null;
-
-    return ExpansionTile(
-      leading: _getIndicatorCompletionStatus(reportType, controllers, indicators),
-      title: statusText != null ? Text("$title - $statusText", style: const TextStyle(fontWeight: FontWeight.bold,fontSize:24,color:Colors.green)) : Text(title, style: const TextStyle(fontWeight: FontWeight.bold,fontSize:24)),
-      onExpansionChanged: (expanded) { /* ... same as before ... */ },
-      initiallyExpanded: false,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ... (Reporting Date, Report Type, Dropdowns, Reviewer Dropdown - same as before) ...
-                const Row(children: [ /* ... */ ]),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(decoration: const InputDecoration(labelText: 'Report Type*'), value: _selectedReportType, items: ["Daily"].map((String value) { return DropdownMenuItem<String>(value: value, child: Text(value)); }).toList(), validator: (value) => value == null ? 'Report Type is required' : null, onChanged: isReadOnlySection ? null : (newValue) { if (newValue != null) { setState(() { _selectedReportType = newValue; _updateReportPeriodOptions(_selectedReportType); }); } }, disabledHint: _selectedReportType != null ? Text(_selectedReportType) : null,),
-                const SizedBox(height: 10),
-                if (_selectedReportType == "Daily") Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ DropdownButtonFormField<String>(decoration: const InputDecoration(labelText: 'Reporting Month*'), value: selectedMonthForWeeklyValue, items: _monthlyOptions.map((String value) { return DropdownMenuItem<String>(value: value, child: Text(value)); }).toList(), validator: (value) => value == null ? 'Reporting Month is required' : null, onChanged: isReadOnlySection ? null : (newValue) { setState(() { _selectedMonthForWeekly = newValue; }); }, disabledHint: selectedMonthForWeeklyValue != null ? Text(selectedMonthForWeeklyValue) : (_selectedMonthForWeekly != null? Text(_selectedMonthForWeekly!) : null),), const SizedBox(height: 10), DropdownButtonFormField<String>(decoration: const InputDecoration(labelText: 'Reporting Week*'), value: selectedReportPeriodValue, items: _reportPeriodOptions.map((String value) { return DropdownMenuItem<String>(value: value, child: Text(value)); }).toList(), validator: (value) => value == null ? 'Reporting Week is required' : null, onChanged: isReadOnlySection ? null : (newValue) { setState(() { _selectedReportPeriod = newValue; }); }, disabledHint: selectedReportPeriodValue != null ? Text(selectedReportPeriodValue) : (_selectedReportPeriod != null ? Text(_selectedReportPeriod!) : null),), const SizedBox(height: 20), ],),
-                _isLoadingStaffList ? const CircularProgressIndicator() : DropdownButtonFormField<FacilityStaffModel>(decoration: const InputDecoration(labelText: 'Select Reviewer*'), value: _selectedReviewer, hint: const Text("Select Reviewer*"), validator: (value) => value == null ? 'Reviewer is required' : null, onChanged: isReadOnlySection ? null : (FacilityStaffModel? newValue) { setState(() { _selectedReviewer = newValue; }); }, items: _staffList.map<DropdownMenuItem<FacilityStaffModel>>((FacilityStaffModel staff) { return DropdownMenuItem<FacilityStaffModel>(value: staff, child: Text(staff.name ?? 'Unnamed Staff')); }).toList(), disabledHint: _selectedReviewer != null ? Text(_selectedReviewer!.name ?? 'Reviewer Selected') : null,),
-                const SizedBox(height: 10),
-                if (reportStatus == "Approved") StreamBuilder<List<String?>>(stream: selectedBioDepartment != null && selectedBioState != null ? getSupervisorStream(selectedBioDepartment!, selectedBioState!) : Stream.value([]), builder: (context, snapshot) { if (snapshot.connectionState == ConnectionState.waiting) { return const CircularProgressIndicator(); } else if (snapshot.hasError) { return Text('Error: ${snapshot.error}'); } else { List<String?> supervisorNames = snapshot.data ?? []; return DropdownButtonFormField<String?>(decoration: const InputDecoration(labelText: 'Select Supervisor'), value: _selectedSupervisor, items: supervisorNames.map((supervisorName) { return DropdownMenuItem<String?>(value: supervisorName, child: Text(supervisorName ?? 'No Supervisor')); }).toList(), onChanged: isReadOnlySection ? null : (String? newValue) async { setState(() { _selectedSupervisor = newValue; }); if (newValue != null && bioData?.department != null) { List<String?> supervisorsemail = await getSupervisorEmailFromFirestore2(selectedBioDepartment!, newValue); setState(() { _selectedSupervisorEmail = supervisorsemail[0]; }); } }, hint: const Text('Select Supervisor'), disabledHint: _selectedSupervisor != null ? Text(_selectedSupervisor!) : null,); } },),
-                const SizedBox(height: 20),
-                ...indicators.map((indicator) => _buildIndicatorTextField(controllers: controllers, indicator: indicator, usernames: usernames, editedUsernames: editedUsernames, isReadOnly: isReadOnlySection, onEditPressed: () { setState(() { _isEditingReportSection[reportType] = false; }); }, reportType: reportType,)),
-                const SizedBox(height: 20),
-                Center(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: ()  {
-                          if (formKey.currentState!.validate()) {
-                            onSubmit();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please fill all required fields marked with *')),
-                            );
-                          }
-                        },
-                        child: Text(buttonText), // Dynamic button text
-                      ),
-                      if (isReadOnlySection) // Conditionally show buttons in readOnly mode
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () => setState(() {_isEditingReportSection[reportType] = false;}),
-                              child: const Text("Edit"),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton(
-                              onPressed: () => _sendReportToReviewer(reportType), // Call send to reviewer function
-                              child: const Text("Send To Reviewer"),
-                            ),
-                          ],
-                        ),
-                      const SizedBox(height: 8),
-                      if (statusText != null)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text("Supervisor's Approval Status: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text(reportStatus, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(width:4),
-                            _getReportStatusIcon(reportStatus),
-
-                          ],
-                        ),
-                      const SizedBox(height: 10),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children:[
-                            const Text('Click to Add Attachment -->', style: TextStyle(fontWeight: FontWeight.bold)),
-                            IconButton(
-                              icon: const Icon(Icons.attach_file),
-                              onPressed: () { /* ... Attachment Bottom Sheet ... */
-                                showModalBottomSheet(
-                                  context: context,
-                                  builder: (context) => Wrap(
-                                    children: <Widget>[
-                                      ListTile(
-                                        leading: const Icon(Icons.photo_library),
-                                        title: const Text('Choose Image from Gallery'),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _handleMedia(ImageSource.gallery, reportType: reportType);
-                                        },
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.videocam),
-                                        title: const Text('Choose Video from Gallery'),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _handleMedia(ImageSource.gallery, isVideo: true, reportType: reportType);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ]
-                      ),
-                      if (_reportAttachments[reportType] != null && _reportAttachments[reportType]!.isNotEmpty)
-                        _buildAttachmentGrid(_reportAttachments[reportType]!, reportType: reportType),
-                      const SizedBox(height: 10),
-                      Column(
-                        children: [
-                          _getIndicatorCompletionStatus(reportType, controllers, indicators),
-                          _buildStatusDescription(_getIndicatorCompletionStatus(reportType, controllers, indicators)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildStatusDescription(Widget statusIcon) {
     String description = "";
@@ -1907,11 +2057,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         description = "Not Filled";
       }
     }
-    return Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey));
+    return Text(description,
+        style: const TextStyle(fontSize: 12, color: Colors.grey));
   }
 
   // Determines the report completion status based on whether indicators are filled and returns an appropriate icon.
-  Widget _getIndicatorCompletionStatus(String reportType, Map<String, TextEditingController> controllers, List<String> indicators) {
+  Widget _getIndicatorCompletionStatus(
+      String reportType,
+      Map<String, TextEditingController> controllers,
+      List<String> indicators) {
     bool allFilled = true;
     bool anyFilled = false;
     for (String indicator in indicators) {
@@ -1929,7 +2083,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     } else {
       return const Icon(Icons.remove);
     }
-
   }
 
   Widget _getReportStatusIcon(String status) {
@@ -1954,43 +2107,160 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return null; // Or return "Unknown Status" if you prefer a default text
   }
 
+  Future<String?> uploadFileToStorage(
+      String filePath, String fileName,
+      {XFile? xFile, StreamController<double>? progressStream}) async {
 
-  // Saves the report data to Firestore database. Handles both new saves and updates to existing reports.
-  Future<void> _saveReportToFirestore(String reportType, Map<String, TextEditingController> controllers, List<String> indicators, Map<String, String?> editedUsernames) async {
-    if (_selectedReportType.isEmpty || _selectedReportPeriod == null || _selectedMonthForWeekly == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select Report Type, Reporting Week, and Reporting Month')),
-      );
+    print("Starting upload for file: $fileName, path: $filePath");
+
+    try {
+      Uint8List? fileBytes;
+      String? contentType = mime(fileName);
+
+      if (kIsWeb) {
+        print("Running on Web, using XFile for upload.");
+
+        if (xFile == null) {
+          print("Error: XFile is null, cannot proceed with web upload.");
+          return null;
+        }
+
+        fileBytes = await xFile.readAsBytes();
+        contentType ??= xFile.mimeType ?? "application/octet-stream"; // Ensure content type
+
+        print("Using content-type: $contentType");
+      } else {
+        File file = File(filePath);
+        if (!file.existsSync()) {
+          print("Error: File does not exist at path: ${file.path}");
+          return null;
+        }
+        contentType = mime(filePath);
+      }
+
+      Reference storageReference =
+      FirebaseStorage.instance.ref().child('attachments/$fileName');
+
+      UploadTask uploadTask;
+
+      if (kIsWeb && fileBytes != null) {
+        uploadTask = storageReference.putData(
+          fileBytes,
+          SettableMetadata(contentType: contentType),
+        );
+      } else {
+        uploadTask = storageReference.putFile(
+          File(filePath),
+          SettableMetadata(contentType: contentType),
+        );
+      }
+
+      if (progressStream != null) {
+        uploadTask.snapshotEvents.listen((snapshot) {
+          double progress = snapshot.bytesTransferred / snapshot.totalBytes;
+          progressStream.add(progress);
+        });
+      }
+
+      TaskSnapshot taskSnapshot = await uploadTask;
+      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      print("Upload complete. Download URL: $downloadUrl");
+      return downloadUrl;
+    } catch (e) {
+      print("Error uploading file: $e");
+      return null;
+    }
+  }
+
+  // Saves the report data to Firestore database. (Modified for dynamic indicators and Firebase Storage)
+  Future<void> _saveReportToFirestore(
+      String reportType,
+      Map<String, TextEditingController> controllers,
+      List<String> indicators,
+      Map<String, String?> editedUsernames) async {
+    if (_selectedReportType.isEmpty ||
+        _selectedReportPeriod == null ||
+        _selectedMonthForWeekly == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Please select Report Type, Reporting Week, and Reporting Month')));
       return;
     }
     if (_selectedReviewer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer')),
-      );
+          const SnackBar(content: Text('Please select a Reviewer')));
       return;
     }
     if (selectedBioState == null || selectedBioLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('BioData is incomplete, cannot save report.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('BioData is incomplete, cannot save report.')));
       return;
     }
 
+    // Restructure reportEntries as per requirement
+    Map<String, Map<String, List<ReportEntry>>> structuredReportEntries = {};
+    String currentUsername = _currentUsername; // Get current username
 
-    List<ReportEntry> reportDataEntries = [];
+    Map<String, List<ReportEntry>> indicatorMap = {}; // Map for indicators
     Report? existingReport = _loadedReports[reportType];
     Map<String, String?> currentEnteredBy = {};
     Map<String, String?> currentEditedBy = {};
 
+    List<String> reportAttachmentUrls = []; // List to hold report-level attachment URLs
+    List<AttachmentData> reportAttachmentsToUpload = _reportAttachmentsData[reportType] ?? [];
+
+    // Upload attachments and collect URLs
+    for (var attachmentData in reportAttachmentsToUpload) {
+      if (attachmentData.file != null && attachmentData.downloadUrl == null) {
+        String fileExtension = attachmentData.fileName.split('.').last.toLowerCase();
+        String fileName = (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension))
+            ? 'image_${currentUsername}_$reportType.$fileExtension'
+            : 'document_${currentUsername}_$reportType.$fileExtension';
+
+        // String? url = await uploadFileToStorage(
+        //   kIsWeb ? attachmentData.file!.path : attachmentData.file!.path,
+        //   fileName,
+        // );
+        // Ensure Web uploads handle XFile properly
+        String? url = await uploadFileToStorage(
+          attachmentData.file!.path,
+          fileName,
+          xFile: kIsWeb ? attachmentData.file : null,
+        );
+
+        if (url != null) {
+          reportAttachmentUrls.add(url);
+          attachmentData.downloadUrl = url;
+          _processImageWithMachineLearning(attachmentData.file!.path);
+          print("File uploaded successfully: $fileName");
+        } else {
+          print("Upload failed for ${attachmentData.fileName}");
+        }
+      } else if (attachmentData.downloadUrl != null) {
+        reportAttachmentUrls.add(attachmentData.downloadUrl!);
+      }
+    }
+
     for (String indicator in indicators) {
-      String? existingValue = existingReport?.reportEntries?.firstWhere((entry) => entry.key == indicator, orElse: () => ReportEntry(key: indicator, value: '')).value;
+      // ... (Data processing logic for each indicator - same as before) ...
+      String? existingValue = existingReport?.reportEntries
+          ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
+          ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.value : null
+          : null;
+
+
       String currentValue = controllers[indicator]!.text.trim();
-      String? enteredByUser = existingReport?.reportEntries?.firstWhere((entry) => entry.key == indicator, orElse: () => ReportEntry(key: indicator, value: '')).enteredBy;
+      String? enteredByUser = existingReport?.reportEntries
+          ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
+          ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.enteredBy : null
+          : null;
+
 
       String? finalEnteredBy = enteredByUser;
       String? finalEditedBy = editedUsernames[indicator];
 
-      if (currentValue.isNotEmpty && (existingValue == null || existingValue.isEmpty) ) {
+      if (currentValue.isNotEmpty && (existingValue == null || existingValue.isEmpty)) {
         finalEnteredBy = _currentUsername;
         finalEditedBy = null;
       } else if (currentValue.isNotEmpty && currentValue != existingValue) {
@@ -2000,7 +2270,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           finalEnteredBy = _currentUsername;
         }
       } else {
-        if(existingValue != null && existingValue.isNotEmpty){
+        if (existingValue != null && existingValue.isNotEmpty) {
           finalEnteredBy = enteredByUser;
           finalEditedBy = editedUsernames[indicator];
         } else {
@@ -2009,67 +2279,206 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         }
       }
 
-
-      reportDataEntries.add(
-        ReportEntry(
-          key: indicator,
-          value: currentValue,
-          enteredBy: finalEnteredBy,
-          editedBy: finalEditedBy,
-          reviewedBy: _selectedReviewer?.name,
-          reviewStatus: "Pending",
-        ),
-      );
+      List<ReportEntry> entryList = []; // List for ReportEntry
+      entryList.add(ReportEntry( // Add ReportEntry to the list
+        key: indicator,
+        value: currentValue,
+        enteredBy: finalEnteredBy,
+        editedBy: finalEditedBy,
+        reviewedBy: _selectedReviewer?.name,
+        reviewStatus: "Pending",
+        attachments: indicator == indicators.last ? reportAttachmentUrls : null, // Attach report-level attachments only to the last indicator's entry to avoid duplication - adjust if needed.
+      ));
+      indicatorMap[indicator] = entryList; // Assign list to indicator key
       currentEnteredBy[indicator] = finalEnteredBy;
       currentEditedBy[indicator] = finalEditedBy;
     }
+    structuredReportEntries[currentUsername] = indicatorMap; // Assign indicator map to username
 
-    final report = Report(
-      reportType: reportType,
-      date: _selectedReportingDate,
-      reportingWeek: _selectedReportPeriod!,
-      reportingMonth: _selectedMonthForWeekly!,
-      reportEntries: reportDataEntries,
-      isSynced:false,
-      reportStatus:"Pending",
-      attachments: _reportAttachments[reportType] ?? [],
-    );
+    // Show a loading dialog
+    Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
 
     try {
-      await saveReport(report, bioData, reportType); // Save to Firestore
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${titleCase(reportType.replaceAll('_', ' '))} Report saved successfully!')),
+
+
+      final report = Report(
+        reportType: reportType,
+        date: _selectedReportingDate,
+        reportingWeek: _selectedReportPeriod!,
+        reportingMonth: _selectedMonthForWeekly!,
+        reportEntries: structuredReportEntries, // Use structured report entries
+        isSynced: false,
+        reportStatus: "Pending",
+        attachments: null, // Attachments are now inside ReportEntry
       );
 
 
-
+      String department = reportType.split('_')[0]; // Extract department from reportType
+      String designation = reportType.split('_')[1]; // Extract designation from reportType
+      await saveReport(report, bioData, reportType);
+      Get.back(); // Dismiss loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '${titleCase(reportType.replaceAll('_', ' '))} Report saved successfully!')));
       setState(() {
-        if(reportType == "tb_report") tbReportUsernames = currentEnteredBy; tbReportEditedUsernames = currentEditedBy;
-        if(reportType == "vl_report") vlReportUsernames = currentEnteredBy; vlReportEditedUsernames = currentEditedBy;
-        if(reportType == "pharmacy_report") pharmTechReportUsernames = currentEnteredBy; pharmTechReportEditedUsernames = currentEditedBy;
-        if(reportType == "tracking_report") trackingAssistantReportUsernames = currentEnteredBy; trackingAssistantReportEditedUsernames = currentEditedBy;
-        if(reportType == "art_nurse_report") artNurseReportUsernames = currentEnteredBy; artNurseReportEditedUsernames = currentEditedBy;
-        if(reportType == "hts_report") htsReportUsernames = currentEnteredBy; htsReportEditedUsernames = currentEditedBy;
-        if(reportType == "si_report") siReportUsernames = currentEnteredBy; siReportEditedUsernames = currentEditedBy;
-
+        reportUsernames[reportType] = currentEnteredBy; // Update usernames dynamically
+        reportEditedUsernames[reportType] = currentEditedBy;
         _isEditingReportSection[reportType] = true;
         _loadReportsForSelectedDate();
       });
-
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving ${titleCase(reportType.replaceAll('_', ' '))} Report.')),
-      );
+      Get.back(); // Dismiss loading dialog in case of error
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Error saving ${titleCase(reportType.replaceAll('_', ' '))} Report.')));
       print("Error saving report to Firestore: $e");
     }
+  }
 
+  // _addTaskToIsar (Modified for Firestore and editing logic and Firebase Storage)
+  _addTaskToIsar({bool isEditing = false}) async {
+    String title = _taskTitleController.text;
+    String description = _taskDescriptionController.text;
+    FacilityStaffModel? reviewer = _selectedReviewer;
+
+    if (title.isNotEmpty && description.isNotEmpty && reviewer != null) {
+      Task task;
+      // Show a loading dialog
+      Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
+
+
+      List<String> attachmentUrls = [];
+      List<AttachmentData> attachmentsToUpload = _taskBottomSheetAttachmentsData;
+
+      try {
+
+        for (var attachmentData in attachmentsToUpload) {
+          if (attachmentData.file != null && attachmentData.downloadUrl == null) {
+            String fileName = 'task_attachment_${DateTime.now().millisecondsSinceEpoch}_${attachmentData.fileName}';
+            String? url = await _firestoreService.uploadFileToStorage(
+              kIsWeb ? attachmentData.file!.path : attachmentData.file!.path,
+              fileName,
+            );
+            if (url != null) {
+              attachmentUrls.add(url);
+              attachmentData.downloadUrl = url;
+              if (attachmentData.file!.mimeType != null && attachmentData.file!.mimeType!.startsWith('image/')) {
+                // Simulate Machine Learning processing for images
+                String? imageDescription = await _processImageWithMachineLearning(attachmentData.file!.path); // Pass local file path for ML
+                print("Image Description (Task): $imageDescription");
+              }
+            } else {
+              // Handle upload error for a specific file
+              print("Upload failed for ${attachmentData.fileName}");
+              // Optionally: decide how to handle partial failures. For now, continue saving task data.
+            }
+          } else if (attachmentData.downloadUrl != null) {
+            attachmentUrls.add(attachmentData.downloadUrl!); // Use existing URL if already uploaded
+          }
+        }
+
+
+        if (isEditing && _taskBeingEdited != null) {
+          task = _taskBeingEdited!
+            ..taskDescription = description
+            ..taskStatus = _taskBeingEdited!.taskStatus ?? "Pending"
+            ..attachments = _taskCardAttachmentsData[_taskBeingEdited!.id ?? -1]?.where((ad) => ad.downloadUrl != null).map((ad) => ad.downloadUrl!).toList() ?? [];
+
+          if (_taskBeingEdited!.id != null) {
+            await deleteTask(_taskBeingEdited!.id.toString()); // Delete old task for update
+          }
+          Task newTask = Task() // Create new task with updated info
+            ..date = _selectedReportingDate
+            ..taskTitle = title
+            ..taskDescription = description
+            ..isSynced = false
+            ..taskStatus = "Pending"
+            ..attachments = _taskCardAttachmentsData[_taskBeingEdited!.id ?? -1]?.where((ad) => ad.downloadUrl != null).map((ad) => ad.downloadUrl!).toList() ?? []
+            ..reviewedBy = reviewer.name; // Add reviewer info
+          await saveTask(newTask);
+          Get.back(); // Dismiss loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Task updated successfully!')));
+        } else {
+
+          Task newTask = Task()
+            ..date = _selectedReportingDate
+            ..taskTitle = title
+            ..taskDescription = description
+            ..isSynced = false
+            ..taskStatus = "Pending"
+            ..attachments = attachmentUrls // Use uploaded URLs
+            ..reviewedBy = reviewer.name; // Add reviewer info
+
+          await saveTask(newTask);
+          Get.back(); // Dismiss loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Task added successfully!')));
+        }
+
+
+        Task? savedTask = await getTaskByTitleAndDate(title, _selectedReportingDate);
+        if (savedTask != null) {
+          _taskCardAttachmentsData[savedTask.id ?? -1] =
+              List.from(_taskBottomSheetAttachmentsData);
+          _taskBottomSheetAttachmentsData.clear();
+        }
+
+        _taskTitleController.clear();
+        _taskDescriptionController.clear();
+        _taskBeingEdited = null;
+        _loadTasksForSelectedDate();
+        _selectedReviewer = null; // Reset Reviewer after save/update
+      } catch (e) {
+        Get.back(); // Dismiss loading dialog in case of error
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Error saving Task.')));
+        print("Error saving Task to Firestore: $e");
+      }
+
+
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Please fill in all task details and select a Reviewer')));
+    }
   }
 
 
+
+  //  _processImageWithMachineLearning using google_mlkit_image_labeling
+  Future<String?> _processImageWithMachineLearning(String imagePath) async {
+    try {
+      final inputImage = InputImage.fromFilePath(imagePath);
+      final imageLabeler = ImageLabeler(options: ImageLabelerOptions(confidenceThreshold: 0.7)); // Adjust confidenceThreshold as needed
+      final List<ImageLabel> labels = await imageLabeler.processImage(inputImage);
+      imageLabeler.close(); // Close the labeler
+
+      if (labels.isNotEmpty) {
+        String description = "Image Analysis:\n";
+        for (ImageLabel label in labels) {
+          final String text = label.label;
+          final double confidence = label.confidence;
+          description += "- $text (Confidence: ${(confidence * 100).toStringAsFixed(2)}%)\n";
+        }
+        return description;
+      } else {
+        return "No labels found in the image.";
+      }
+    } catch (e) {
+      print("Error processing image with ML Kit Image Labeling: $e");
+      return "Error analyzing image.";
+    }
+  }
+
   // Resets the TextEditingControllers and associated usernames for a given report section.
-  void _resetControllers(Map<String, TextEditingController> controllers, List<String> indicators, Map<String, String?> usernames, Map<String, String?> editedUsernames) {
+  void _resetControllers(
+      Map<String, TextEditingController> controllers,
+      List<String> indicators,
+      Map<String, String?> usernames,
+      Map<String, String?> editedUsernames) {
     for (String indicator in indicators) {
       controllers[indicator]!.clear();
       usernames[indicator] = null;
@@ -2078,20 +2487,410 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     setState(() {});
   }
 
+  // Save functions for each report type, now dynamically calling _saveReportToFirestore
+  Future<void> _saveDynamicReport(String reportTypeKey, List<String> indicators) async {
+    if (_selectedReviewer == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Please select a Reviewer for ${titleCase(reportTypeKey.replaceAll('_', ' '))} Report')));
+      return;
+    }
+
+    print("_saveDynamicReport: Starting save for reportTypeKey: $reportTypeKey"); // ADDED LOG
+    print("_saveDynamicReport: _reportAttachmentsData for $reportTypeKey: ${_reportAttachmentsData[reportTypeKey]}"); // ADDED LOG - Inspect attachments list
+
+    await _saveReportToFirestore(
+        reportTypeKey, reportControllers[reportTypeKey]!, indicators, reportEditedUsernames[reportTypeKey]!);
+  }
+
+  //Check if current user has entries
+  bool _hasCurrentUserEntries(Report? loadedReport) {
+    if (loadedReport == null || loadedReport.reportEntries == null) {
+      return false;
+    }
+    return loadedReport.reportEntries!.containsKey(_currentUsername);
+  }
+
+// Builds expandable widget for each designation (Modified to conditionally show "Send to Reviewer" button)
+  Widget _buildDesignationExpandable(
+      String designationName, List<String> indicators, String reportTypeKey) {
+    bool isReadOnlySection = _loadedReports[reportTypeKey] != null &&
+        (_isEditingReportSection[reportTypeKey] ?? true);
+    bool hasEntries = _hasCurrentUserEntries(_loadedReports[reportTypeKey]); // Check if current user has entries
+
+    Report? loadedReport = _loadedReports[reportTypeKey];
+    List<AttachmentData> allReportEntryAttachments = [];
+
+    if (isReadOnlySection && loadedReport != null && loadedReport.reportEntries != null) {
+      loadedReport.reportEntries!.forEach((username, indicatorMap) {
+        indicatorMap.forEach((indicator, entryList) {
+          for (var entry in entryList) {
+            if (entry.attachments != null && entry.attachments!.isNotEmpty) {
+              allReportEntryAttachments.addAll(entry.attachments!.map((url) => AttachmentData.fromUrl(url)));
+            }
+          }
+        });
+      });
+    }
+
+
+    return ExpansionTile(
+      title: Text(designationName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Form(
+            key: _genericFormKey, // Using a generic form key here
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ... (rest of your existing form elements - Reporting Date, Report Type, Dropdowns, Reviewer, Supervisor) ...
+                Row(
+                  children: [
+                    const Text("Reporting Date: ",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 10),
+                    Text(
+                      DateFormat('yyyy-MM-dd').format(_selectedReportingDate),
+                      style: const TextStyle(decoration: TextDecoration.underline),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Report Type*'),
+                  value: _selectedReportType,
+                  items: ["Daily"].map((String value) {
+                    return DropdownMenuItem<String>(value: value, child: Text(value));
+                  }).toList(),
+                  validator: (value) =>
+                  value == null ? 'Report Type is required' : null,
+                  onChanged: isReadOnlySection
+                      ? null
+                      : (newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedReportType = newValue;
+                        _updateReportPeriodOptions(_selectedReportType);
+                      });
+                    }
+                  },
+                  disabledHint: _selectedReportType != null
+                      ? Text(_selectedReportType)
+                      : null,
+                ),
+                const SizedBox(height: 10),
+                if (_selectedReportType == "Daily")
+                // ... (rest of your Daily report type dropdowns - Reporting Month, Reporting Week) ...
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'Reporting Month*'),
+                        value: _selectedMonthForWeekly,
+                        items: _monthlyOptions.map((String value) {
+                          return DropdownMenuItem<String>(
+                              value: value, child: Text(value));
+                        }).toList(),
+                        validator: (value) =>
+                        value == null ? 'Reporting Month is required' : null,
+                        onChanged: isReadOnlySection
+                            ? null
+                            : (newValue) {
+                          setState(() {
+                            _selectedMonthForWeekly = newValue;
+                          });
+                        },
+                        disabledHint: _selectedMonthForWeekly != null
+                            ? Text(_selectedMonthForWeekly!)
+                            : null,
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'Reporting Week*'),
+                        value: _selectedReportPeriod,
+                        items: _reportPeriodOptions.map((String value) {
+                          return DropdownMenuItem<String>(
+                              value: value, child: Text(value));
+                        }).toList(),
+                        validator: (value) =>
+                        value == null ? 'Reporting Week is required' : null,
+                        onChanged: isReadOnlySection
+                            ? null
+                            : (newValue) {
+                          setState(() {
+                            _selectedReportPeriod = newValue;
+                          });
+                        },
+                        disabledHint: _selectedReportPeriod != null
+                            ? Text(_selectedReportPeriod!)
+                            : null,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                _isLoadingStaffList
+                    ? const CircularProgressIndicator()
+                    : DropdownButtonFormField<FacilityStaffModel>(
+                  decoration:
+                  const InputDecoration(labelText: 'Select Reviewer*'),
+                  value: _selectedReviewer,
+                  hint: const Text("Select Reviewer*"),
+                  validator: (value) =>
+                  value == null ? 'Reviewer is required' : null,
+                  onChanged: isReadOnlySection
+                      ? null
+                      : (FacilityStaffModel? newValue) {
+                    setState(() {
+                      _selectedReviewer = newValue;
+                    });
+                  },
+                  items: _staffList.map<DropdownMenuItem<FacilityStaffModel>>(
+                          (FacilityStaffModel staff) {
+                        return DropdownMenuItem<FacilityStaffModel>(
+                            value: staff, child: Text(staff.name ?? 'Unnamed Staff'));
+                      }).toList(),
+                  disabledHint: _selectedReviewer != null
+                      ? Text(_selectedReviewer!.name ?? 'Reviewer Selected')
+                      : null,
+                ),
+                const SizedBox(height: 10),
+                if ( _loadedReports[reportTypeKey]?.reportStatus == "Approved")
+                  StreamBuilder<List<String?>>(
+                    stream: selectedBioDepartment != null && selectedBioState != null
+                        ? getSupervisorStream(selectedBioDepartment!, selectedBioState!)
+                        : Stream.value([]),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircularProgressIndicator();
+                      } else if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      } else {
+                        List<String?> supervisorNames = snapshot.data ?? [];
+                        return DropdownButtonFormField<String?>(
+                          decoration:
+                          const InputDecoration(labelText: 'Select Supervisor'),
+                          value: _selectedSupervisor,
+                          items: supervisorNames.map((supervisorName) {
+                            return DropdownMenuItem<String?>(
+                                value: supervisorName,
+                                child: Text(supervisorName ?? 'No Supervisor'));
+                          }).toList(),
+                          onChanged: isReadOnlySection
+                              ? null
+                              : (String? newValue) async {
+                            setState(() {
+                              _selectedSupervisor = newValue;
+                            });
+                            if (newValue != null && bioData?.department != null) {
+                              List<String?> supervisorsemail =
+                              await getSupervisorEmailFromFirestore2(
+                                  selectedBioDepartment!, newValue);
+                              setState(() {
+                                _selectedSupervisorEmail = supervisorsemail[0];
+                              });
+                            }
+                          },
+                          hint: const Text('Select Supervisor'),
+                          disabledHint: _selectedSupervisor != null
+                              ? Text(_selectedSupervisor!)
+                              : null,
+                        );
+                      }
+                    },
+                  ),
+                const SizedBox(height: 20),
+                ...indicators.map((indicator) {
+                  return _buildIndicatorTextField(
+                    controllers: reportControllers[reportTypeKey]!,
+                    indicator: indicator,
+                    usernames: reportUsernames[reportTypeKey]!,
+                    editedUsernames: reportEditedUsernames[reportTypeKey]!,
+                    isReadOnly: isReadOnlySection,
+                    onEditPressed: () {
+                      setState(() {
+                        _isEditingReportSection[reportTypeKey] = false;
+                      });
+                    },
+                    reportType: reportTypeKey,
+                  );
+                }).toList(),
+                const SizedBox(height: 20),
+                Center(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      // Conditionally render the "Update" button based on edit mode
+                      if (!isReadOnlySection)
+                        ElevatedButton(
+                          onPressed: () {
+                            if (_genericFormKey.currentState!.validate()) { // Validate generic form
+                              _saveDynamicReport(reportTypeKey, indicators);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'Please fill all required fields marked with *')));
+                            }
+                          },
+                          child: Text(_loadedReports[reportTypeKey] != null
+                              ? 'Update ${designationName} Report'
+                              : 'Save ${designationName} Report'),
+                        ),
+                      if (isReadOnlySection)
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () => setState(() {
+                                  _isEditingReportSection[reportTypeKey] = false;
+                                }),
+                                child: const Text("Edit"),
+                              ),
+                              const SizedBox(width: 10),
+                              //Conditionally render "Send to Reviewer" button
+                              if (hasEntries)
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      _sendReportToReviewer(reportTypeKey),
+                                  child: const Text("Send To Reviewer"),
+                                ),
+                            ].whereType<Widget>().toList() // Remove null if condition is false to avoid error
+                        ),
+                      const SizedBox(height: 8),
+                      if (_loadedReports[reportTypeKey]?.reportStatus != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text("Supervisor's Approval Status: ",
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text(_loadedReports[reportTypeKey]!.reportStatus!,
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 4),
+                            _getReportStatusIcon(_loadedReports[reportTypeKey]!.reportStatus!),
+                          ],
+                        ),
+                      const SizedBox(height: 10),
+                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Text('Click to Add Attachment -->',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.attach_file),
+                          onPressed: () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (context) => Wrap(
+                                children: <Widget>[
+                                  ListTile(
+                                    leading: const Icon(Icons.photo_library),
+                                    title: const Text('Choose Image from Gallery'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleMedia(ImageSource.gallery,
+                                          reportType: reportTypeKey);
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.camera_alt),
+                                    title: const Text('Take a Photo'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleMedia(ImageSource.camera,
+                                          reportType: reportTypeKey);
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.attach_file),
+                                    title: const Text('Choose Document'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleMedia(null,
+                                          reportType: reportTypeKey);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ]),
+                      if (_reportAttachmentsData[reportTypeKey] != null &&
+                          _reportAttachmentsData[reportTypeKey]!.isNotEmpty)
+                        _buildAttachmentGrid(_reportAttachmentsData[reportTypeKey]!,
+                            reportType: reportTypeKey),
+                      const SizedBox(height: 10),
+                      Column(
+                        children: [
+                          _getIndicatorCompletionStatus(
+                              reportTypeKey, reportControllers[reportTypeKey]!, indicators),
+                          _buildStatusDescription(_getIndicatorCompletionStatus(
+                              reportTypeKey, reportControllers[reportTypeKey]!, indicators)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Show attachments from ReportEntry when in read-only mode
+                if (isReadOnlySection && allReportEntryAttachments.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Report Attachments:", style: TextStyle(fontWeight: FontWeight.bold)),
+                        _buildAttachmentGrid(allReportEntryAttachments, reportType: reportTypeKey),
+                      ],
+                    ),
+                  ),
+
+                // Add the data table here, after the read-only report section
+                _buildReportDataTable(reportTypeKey, indicators),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+
+  // Builds expandable widget for each department
+  Widget _buildDepartmentExpandable(
+      String departmentName, List<Map<String, dynamic>> designationReports) {
+    return ExpansionTile(
+      title: Text(departmentName,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      children: designationReports.map((designationReport) {
+        String designationName = designationReport['designation'] as String;
+        List<String> indicators =
+        List<String>.from(designationReport['indicators'] as List);
+        String reportTypeKey = "${designationReport['department']}_${designationReport['designation']}"
+            .toLowerCase()
+            .replaceAll(' ', '_');
+
+        return _buildDesignationExpandable(designationName, indicators, reportTypeKey);
+      }).toList(),
+    );
+  }
+
   // Initializes database watchers using StreamSubscriptions to listen for changes in reports for the selected date.
   void _initializeReportWatchers() {
     if (bioData == null || bioData!.state == null || bioData!.location == null) {
-      print("_initializeReportWatchers: BioData is incomplete, cannot initialize watchers.");
+      print(
+          "_initializeReportWatchers: BioData is incomplete, cannot initialize watchers.");
       return;
     }
     _reportWatchers.clear();
 
     // Watcher for TB Report
-    _reportWatchers.add(_firestoreService._firestore.collection(FirestoreService().reportsCollection)
+    _reportWatchers.add(_firestoreService._firestore
+        .collection(FirestoreService().reportsCollection)
         .doc(bioData?.state) // State Document
         .collection(bioData?.state ?? '') // State Sub-collection
         .doc(bioData?.location) // Location Document
-        .collection(DateFormat('dd-MMM-yyyy').format(_selectedReportingDate)) // Date Sub-collection
+        .collection(DateFormat('dd-MMM-yyyy').format(_selectedReportingDate))
         .doc("Care and Treatment") // Department Document - TB Report is under Care and Treatment
         .snapshots()
         .listen((_) {
@@ -2100,7 +2899,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }));
 
     // Watcher for VL Report
-    _reportWatchers.add(_firestoreService._firestore.collection(FirestoreService().reportsCollection)
+    _reportWatchers.add(_firestoreService._firestore
+        .collection(FirestoreService().reportsCollection)
         .doc(bioData?.state)
         .collection(bioData?.state ?? '')
         .doc(bioData?.location)
@@ -2113,7 +2913,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }));
 
     // Watcher for Pharmacy Report
-    _reportWatchers.add(_firestoreService._firestore.collection(FirestoreService().reportsCollection)
+    _reportWatchers.add(_firestoreService._firestore
+        .collection(FirestoreService().reportsCollection)
         .doc(bioData?.state)
         .collection(bioData?.state ?? '')
         .doc(bioData?.location)
@@ -2130,7 +2931,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     final reportTypes = ["tracking_report", "art_nurse_report", "hts_report"];
 
     for (int i = 0; i < reportTypes.length; i++) {
-      _reportWatchers.add(_firestoreService._firestore.collection(FirestoreService().reportsCollection)
+      _reportWatchers.add(_firestoreService._firestore
+          .collection(FirestoreService().reportsCollection)
           .doc(bioData?.state)
           .collection(bioData?.state ?? '')
           .doc(bioData?.location)
@@ -2138,14 +2940,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           .doc(preventionDepartments[i]) // All Prevention reports are under Prevention Department
           .snapshots()
           .listen((_) {
-        _showDatabaseChangeDialog("${titleCase(reportTypes[i].replaceAll('_', ' '))} Report");
+        _showDatabaseChangeDialog(
+            "${titleCase(reportTypes[i].replaceAll('_', ' '))} Report");
         _loadReportsForSelectedDate();
       }));
     }
 
-
     // Watcher for SI Report
-    _reportWatchers.add(_firestoreService._firestore.collection(FirestoreService().reportsCollection)
+    _reportWatchers.add(_firestoreService._firestore
+        .collection(FirestoreService().reportsCollection)
         .doc(bioData?.state)
         .collection(bioData?.state ?? '')
         .doc(bioData?.location)
@@ -2157,7 +2960,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       _loadReportsForSelectedDate();
     }));
   }
-
 
   // Shows an AlertDialog to notify the user that a report has been updated in the database.
   void _showDatabaseChangeDialog(String reportName) {
@@ -2235,7 +3037,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 print("Selected Caritas Supervisor: $newValue");
 
                 if (newValue != null) {
-                  String? supervisorEmail = await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
+                  String? supervisorEmail =
+                  await getSupervisorEmailFromFirestore(selectedBioState!, newValue);
                   setState(() {
                     _selectedSupervisorEmail = supervisorEmail;
                   });
@@ -2250,9 +3053,11 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
-  Future<String?> getSupervisorEmailFromFirestore(String state, String supervisorName) async {
+  Future<String?> getSupervisorEmailFromFirestore(
+      String state, String supervisorName) async {
     try {
-      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot =
+      await FirebaseFirestore.instance
           .collection('Supervisors')
           .doc(state)
           .collection(state)
@@ -2279,90 +3084,19 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-  Stream<List<String?>> getSupervisorsFromFirestore(String department, String state) {
+  Stream<List<String?>> getSupervisorsFromFirestore(
+      String department, String state) {
     return FirebaseFirestore.instance
         .collection('Supervisors')
         .doc(state)
         .collection(state)
         .where('department', isEqualTo: department)
         .snapshots()
-        .map((snapshot) =>
-        snapshot.docs.map((doc) => doc['supervisor'] as String?).toList());
+        .map((snapshot) => snapshot.docs
+        .map((doc) => doc['supervisor'] as String?)
+        .toList());
   }
 
-
-
-
-  // Save functions for each report type, calling _saveReportToFirestore with correct parameters.
-  Future<void> _saveHtsReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for HTS Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("hts_report", htsReportControllers, htsReportIndicators, htsReportEditedUsernames);
-  }
-
-  Future<void> _saveArtNurseReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for ART Nurse Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("art_nurse_report", artNurseReportControllers, artNurseReportIndicators, artNurseReportEditedUsernames);
-  }
-
-  Future<void> _saveTrackingAssistantReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for Tracking Assistant Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("tracking_report", trackingAssistantReportControllers, trackingAssistantReportIndicators, trackingAssistantReportEditedUsernames);
-  }
-
-  Future<void> _saveTbReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for TB Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("tb_report", tbReportControllers, tbReportIndicators, tbReportEditedUsernames);
-  }
-
-  Future<void> _saveVlReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for VL Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("vl_report", vlReportControllers, vlReportIndicators, vlReportEditedUsernames);
-  }
-
-  Future<void> _savePharmacyReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for Pharmacy Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("pharmacy_report", pharmTechReportControllers, pharmTechReportIndicators, pharmTechReportEditedUsernames);
-  }
-
-  Future<void> _saveSiReport() async {
-    if (_selectedReviewer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Reviewer for SI Report')),
-      );
-      return;
-    }
-    await _saveReportToFirestore("si_report", siReportControllers, siReportIndicators, siReportEditedUsernames);
-  }
 
 
   // AppBar for the page.
@@ -2371,7 +3105,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       backgroundColor: Colors.white,
       title: Text(
         "Task Management",
-        style: TextStyle(color: Get.isDarkMode ? Colors.white : Colors.grey[600], fontFamily: "NexaBold"),
+        style: TextStyle(
+            color: Get.isDarkMode ? Colors.white : Colors.grey[600],
+            fontFamily: "NexaBold"),
       ),
       elevation: 0.5,
       iconTheme: IconThemeData(color: Get.isDarkMode ? Colors.white : Colors.black87),
@@ -2384,7 +3120,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
-
   // Date Bar
   _addDateBar() {
     DateTime threeYearsAgo = DateTime.now().subtract(const Duration(days: 3 * 365));
@@ -2393,7 +3128,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     DateTime endDate = threeYearsAgo.add(const Duration(days: 365 * 3 + 30));
 
     List<DateTime> futureDates = [];
-    for (DateTime date = tomorrow; date.isBefore(endDate.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+    for (DateTime date = tomorrow;
+    date.isBefore(endDate.add(const Duration(days: 1)));
+    date = date.add(const Duration(days: 1))) {
       futureDates.add(DateTime(date.year, date.month, date.day));
     }
 
@@ -2415,14 +3152,20 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                           text: "${DateFormat('d').format(_selectedReportingDate)},",
                           style: TextStyle(
                               color: Colors.red,
-                              fontSize: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.080 : 0.060),
+                              fontSize: MediaQuery.of(context).size.width *
+                                  (MediaQuery.of(context).size.shortestSide < 600
+                                      ? 0.080
+                                      : 0.060),
                               fontFamily: "NexaBold"),
                           children: [
                             TextSpan(
                               text: DateFormat(" MMMM, yyyy").format(_selectedReportingDate),
                               style: TextStyle(
                                   color: Get.isDarkMode ? Colors.white : Colors.black,
-                                  fontSize: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.050 : 0.030),
+                                  fontSize: MediaQuery.of(context).size.width *
+                                      (MediaQuery.of(context).size.shortestSide < 600
+                                          ? 0.050
+                                          : 0.030),
                                   fontFamily: "NexaBold"),
                             ),
                           ],
@@ -2436,50 +3179,50 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                         "Reporting Date",
                         style: TextStyle(
                           fontFamily: "NexaBold",
-                          fontSize: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.050 : 0.030),
+                          fontSize: MediaQuery.of(context).size.width *
+                              (MediaQuery.of(context).size.shortestSide < 600
+                                  ? 0.050
+                                  : 0.030),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              Row(
-                  children:[
-                    const Text(
-                      "Change Date HERE -->",
-                      style: TextStyle(color: Colors.black, fontSize: 12),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today, color: Colors.red),
-                      onPressed: () async {
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedReportingDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                          selectableDayPredicate: (day) {
-                            return day.isBefore(DateTime.now().add(const Duration(days: 1)));
-                          },
-                        );
-                        if (pickedDate != null && pickedDate != _selectedReportingDate) {
-                          if (pickedDate.isAfter(DateTime.now())) {
-                            _showFutureDateDialog();
-                            return;
-                          }
-                          setState(() {
-                            _selectedReportingDate = pickedDate;
-                            _datePickerSelectionColor = Colors.red;
-                            _datePickerSelectedTextColor = Colors.white;
-                            _loadReportsForSelectedDate();
-                            _loadTasksForSelectedDate();
-                            _initializeReportWatchers();
-                          });
-                        }
+              Row(children: [
+                const Text(
+                  "Change Date HERE -->",
+                  style: TextStyle(color: Colors.black, fontSize: 12),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today, color: Colors.red),
+                  onPressed: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedReportingDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                      selectableDayPredicate: (day) {
+                        return day.isBefore(DateTime.now().add(const Duration(days: 1)));
                       },
-                    ),
-                  ]
-              ),
-
+                    );
+                    if (pickedDate != null && pickedDate != _selectedReportingDate) {
+                      if (pickedDate.isAfter(DateTime.now())) {
+                        _showFutureDateDialog();
+                        return;
+                      }
+                      setState(() {
+                        _selectedReportingDate = pickedDate;
+                        _datePickerSelectionColor = Colors.red;
+                        _datePickerSelectedTextColor = Colors.white;
+                        _loadReportsForSelectedDate();
+                        _loadTasksForSelectedDate();
+                        _initializeReportWatchers();
+                      });
+                    }
+                  },
+                ),
+              ]),
             ],
           ),
           DatePicker(
@@ -2488,9 +3231,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             controller: DatePickerController(),
             width: 70,
             height: 90,
-            monthTextStyle: const TextStyle(fontSize: 12, fontFamily: "NexaBold", color: Colors.black),
-            dayTextStyle: const TextStyle(fontSize: 13, fontFamily: "NexaLight", color: Colors.black),
-            dateTextStyle: const TextStyle(fontSize: 18, fontFamily: "NexaBold", color: Colors.black),
+            monthTextStyle: const TextStyle(
+                fontSize: 12, fontFamily: "NexaBold", color: Colors.black),
+            dayTextStyle: const TextStyle(
+                fontSize: 13, fontFamily: "NexaLight", color: Colors.black),
+            dateTextStyle: const TextStyle(
+                fontSize: 18, fontFamily: "NexaBold", color: Colors.black),
             selectedTextColor: _datePickerSelectedTextColor,
             selectionColor: _datePickerSelectionColor,
             deactivatedColor: Colors.grey.shade400,
@@ -2533,12 +3279,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     if (isEditing) {
       _taskTitleController.text = taskToEdit.taskTitle ?? '';
       _taskDescriptionController.text = taskToEdit.taskDescription ?? '';
-      _taskBottomSheetAttachments = _taskCardAttachments[taskToEdit.id ?? -1] ?? [];
+      _taskBottomSheetAttachmentsData = _taskCardAttachmentsData[taskToEdit.id ?? -1] ?? [];
       _taskBeingEdited = taskToEdit;
     } else {
       _taskTitleController.clear();
       _taskDescriptionController.clear();
-      _taskBottomSheetAttachments = [];
+      _taskBottomSheetAttachmentsData = [];
       _taskBeingEdited = null;
     }
 
@@ -2599,7 +3345,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Text("Other Activities To Be Reviewed By: ", style: TextStyle(fontSize: 16)),
+                  const Text("Other Activities To Be Reviewed By: ",
+                      style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 10),
                   _isLoadingStaffList
                       ? const CircularProgressIndicator()
@@ -2611,20 +3358,23 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                         _selectedReviewer = newValue;
                       });
                     },
-                    items: _staffList.map<DropdownMenuItem<FacilityStaffModel>>((FacilityStaffModel staff) {
-                      return DropdownMenuItem<FacilityStaffModel>(
-                        value: staff,
-                        child: Text(staff.name ?? 'Unnamed Staff'),
-                      );
-                    }).toList(),
+                    items: _staffList
+                        .map<DropdownMenuItem<FacilityStaffModel>>(
+                            (FacilityStaffModel staff) {
+                          return DropdownMenuItem<FacilityStaffModel>(
+                            value: staff,
+                            child: Text(staff.name ?? 'Unnamed Staff'),
+                          );
+                        }).toList(),
                   ),
                 ],
               ),
               Center(
-                child:  Row(
+                child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children:[
-                      const Text('Click to Add Attachment -->', style: TextStyle(fontWeight: FontWeight.bold)),
+                    children: [
+                      const Text('Click to Add Attachment -->',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       IconButton(
                         icon: const Icon(Icons.attach_file),
                         onPressed: () {
@@ -2641,11 +3391,19 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                                   },
                                 ),
                                 ListTile(
-                                  leading: const Icon(Icons.video_library),
-                                  title: const Text('Choose Video from Gallery'),
+                                  leading: const Icon(Icons.camera_alt),
+                                  title: const Text('Take a Photo'),
                                   onTap: () {
                                     Navigator.pop(context);
-                                    _handleMedia(ImageSource.gallery, isVideo: true);
+                                    _handleMedia(ImageSource.camera);
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.attach_file),
+                                  title: const Text('Choose Document'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _handleMedia(null); // null imgSource for document selection
                                   },
                                 ),
                               ],
@@ -2653,12 +3411,10 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                           );
                         },
                       ),
-                    ]
-                ),
-
+                    ]),
               ),
-              if (_taskBottomSheetAttachments.isNotEmpty)
-                _buildAttachmentGrid(_taskBottomSheetAttachments),
+              if (_taskBottomSheetAttachmentsData.isNotEmpty)
+                _buildAttachmentGrid(_taskBottomSheetAttachmentsData),
               const SizedBox(height: 20),
               MyButton(
                 label: isEditing ? "Update Task" : "Add Task",
@@ -2674,71 +3430,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
-
-  // _addTaskToIsar (Modified for Firestore and editing logic)
-  _addTaskToIsar({bool isEditing = false}) async {
-    String title = _taskTitleController.text;
-    String description = _taskDescriptionController.text;
-    FacilityStaffModel? reviewer = _selectedReviewer;
-
-    if (title.isNotEmpty && description.isNotEmpty && reviewer != null) {
-      Task task;
-      if (isEditing && _taskBeingEdited != null) {
-        task = _taskBeingEdited!
-          ..taskDescription = description
-          ..taskStatus = _taskBeingEdited!.taskStatus ?? "Pending"
-          ..attachments = _taskCardAttachments[_taskBeingEdited!.id ?? -1] ?? [];
-
-        if (_taskBeingEdited!.id != null) {
-          await deleteTask(_taskBeingEdited!.id.toString()); // Delete old task for update
-        }
-        Task newTask = Task() // Create new task with updated info
-          ..date = _selectedReportingDate
-          ..taskTitle = title
-          ..taskDescription = description
-          ..isSynced = false
-          ..taskStatus = "Pending"
-          ..attachments = _taskCardAttachments[_taskBeingEdited!.id ?? -1] ?? []
-          ..reviewedBy = reviewer.name; // Add reviewer info
-        await saveTask(newTask);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task updated successfully!')),
-        );
-
-      } else {
-        Task newTask = Task()
-          ..date = _selectedReportingDate
-          ..taskTitle = title
-          ..taskDescription = description
-          ..isSynced = false
-          ..taskStatus = "Pending"
-          ..attachments = _taskBottomSheetAttachments
-          ..reviewedBy = reviewer.name; // Add reviewer info
-
-        await saveTask(newTask);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task added successfully!')),
-        );
-      }
-
-      Task? savedTask = await getTaskByTitleAndDate(title, _selectedReportingDate);
-      if (savedTask != null) {
-        _taskCardAttachments[savedTask.id ?? -1] = List.from(_taskBottomSheetAttachments);
-        _taskBottomSheetAttachments.clear();
-      }
-
-      _taskTitleController.clear();
-      _taskDescriptionController.clear();
-      _taskBeingEdited = null;
-      _loadTasksForSelectedDate();
-      _selectedReviewer = null; // Reset Reviewer after save/update
-
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all task details and select a Reviewer')),
-      );
-    }
-  }
 
   Widget _buildTaskCard(Task task) {
     return Card(
@@ -2760,8 +3451,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               style: TextStyle(fontSize: 14, color: Colors.grey[700]),
             ),
             const SizedBox(height: 10),
-            if (_taskCardAttachments[task.id ?? -1] != null && _taskCardAttachments[task.id ?? -1]!.isNotEmpty)
-              _buildAttachmentGrid(_taskCardAttachments[task.id ?? -1]!, task: task),
+            if (_taskCardAttachmentsData[task.id ?? -1] != null &&
+                _taskCardAttachmentsData[task.id ?? -1]!.isNotEmpty)
+              _buildAttachmentGrid(_taskCardAttachmentsData[task.id ?? -1]!, task: task),
             const SizedBox(height: 16.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2772,13 +3464,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text("Supervisor's Approval Status: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text("Supervisor's Approval Status: ",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(
                         task.taskStatus ?? "Pending",
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(width: 4.0),
-
                       _getTaskStatusIcon(task.taskStatus ?? "Pending"),
                     ],
                   ),
@@ -2802,7 +3494,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                     _deleteTask(task);
                   },
                   icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                  label: const Text("Delete", style: TextStyle(fontSize: 14, color: Colors.red)),
+                  label: const Text("Delete",
+                      style: TextStyle(fontSize: 14, color: Colors.red)),
                 ),
               ],
             )
@@ -2811,9 +3504,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
     );
   }
-
-
-
 
   Widget _getTaskStatusIcon(String status) {
     if (status == "Pending") {
@@ -2825,7 +3515,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
     return const Icon(Icons.help_outline);
   }
-
 
   _deleteTask(Task task) async {
     bool? confirmDelete = await showDialog<bool>(
@@ -2851,9 +3540,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     if (confirmDelete == true) {
       await deleteTask(task.id.toString());
       _loadTasksForSelectedDate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task deleted successfully!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Task deleted successfully!')));
     }
   }
 
@@ -2863,11 +3551,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return text.substring(0, 1).toUpperCase() + text.substring(1).toLowerCase();
   }
 
-
   @override
   Widget build(BuildContext context) {
+    // Group thematic report definitions by department
+    Map<String, List<Map<String, dynamic>>> departmentGroupedReports = {};
+    for (var definition in _thematicReportDefinitions) {
+      String departmentName = definition['department'];
+      if (!departmentGroupedReports.containsKey(departmentName)) {
+        departmentGroupedReports[departmentName] = [];
+      }
+      departmentGroupedReports[departmentName]!.add(definition);
+    }
+
     return Scaffold(
-      drawer: drawer(context,),
+      drawer: drawer(
+        context,
+      ),
       appBar: _appBar(),
       backgroundColor: Colors.white,
       body: Stack(
@@ -2895,98 +3594,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   const SizedBox(height: 10),
 
                   const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _htsFormKey,
-                    title: 'HTS Report',
-                    indicators: htsReportIndicators,
-                    controllers: htsReportControllers,
-                    usernames: htsReportUsernames,
-                    editedUsernames: htsReportEditedUsernames,
-                    reportType: "hts_report",
-                    onSubmit: _saveHtsReport,
-                    selectedReportPeriodValue: _loadedReports["hts_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["hts_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _artNurseFormKey,
-                    title: 'ART Nurse Report',
-                    indicators: artNurseReportIndicators,
-                    controllers: artNurseReportControllers,
-                    usernames: artNurseReportUsernames,
-                    editedUsernames: artNurseReportEditedUsernames,
-                    reportType: "art_nurse_report",
-                    onSubmit: _saveArtNurseReport,
-                    selectedReportPeriodValue: _loadedReports["art_nurse_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["art_nurse_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _trackingAssistantFormKey,
-                    title: 'Tracking Assistant Report',
-                    indicators: trackingAssistantReportIndicators,
-                    controllers: trackingAssistantReportControllers,
-                    usernames: trackingAssistantReportUsernames,
-                    editedUsernames: trackingAssistantReportEditedUsernames,
-                    reportType: "tracking_report",
-                    onSubmit: _saveTrackingAssistantReport,
-                    selectedReportPeriodValue: _loadedReports["tracking_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["tracking_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _tbFormKey,
-                    title: 'TB Report (Care and Treatment)',
-                    indicators: tbReportIndicators,
-                    controllers: tbReportControllers,
-                    usernames: tbReportUsernames,
-                    editedUsernames: tbReportEditedUsernames,
-                    reportType: "tb_report",
-                    onSubmit: _saveTbReport,
-                    selectedReportPeriodValue: _loadedReports["tb_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["tb_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _vlFormKey,
-                    title: 'VL Report (Laboratory)',
-                    indicators: vlReportIndicators,
-                    controllers: vlReportControllers,
-                    usernames: vlReportUsernames,
-                    editedUsernames: vlReportEditedUsernames,
-                    reportType: "vl_report",
-                    onSubmit: _saveVlReport,
-                    selectedReportPeriodValue: _loadedReports["vl_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["vl_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _pharmacyFormKey,
-                    title: 'Pharmacy Report (Pharmacy and Logistics)',
-                    indicators: pharmTechReportIndicators,
-                    controllers: pharmTechReportControllers,
-                    usernames: pharmTechReportUsernames,
-                    editedUsernames: pharmTechReportEditedUsernames,
-                    reportType: "pharmacy_report",
-                    onSubmit: _savePharmacyReport,
-                    selectedReportPeriodValue: _loadedReports["pharmacy_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["pharmacy_report"]?.reportingMonth,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildReportSection(
-                    formKey: _siFormKey,
-                    title: 'SI Report (Strategic Information)',
-                    indicators: siReportIndicators,
-                    controllers: siReportControllers,
-                    usernames: siReportUsernames,
-                    editedUsernames: siReportEditedUsernames,
-                    reportType: "si_report",
-                    onSubmit: _saveSiReport,
-                    selectedReportPeriodValue: _loadedReports["si_report"]?.reportingWeek,
-                    selectedMonthForWeeklyValue: _loadedReports["si_report"]?.reportingMonth,
-                  ),
+                  // Dynamically build department expandable widgets
+                  ...departmentGroupedReports.entries.map((entry) {
+                    String departmentName = entry.key;
+                    List<Map<String, dynamic>> designationReports = entry.value;
+                    return _buildDepartmentExpandable(departmentName, designationReports);
+                  }).toList(),
 
-                  const SizedBox(height: 30),
                   const Divider(),
                   const Divider(),
                   Text(
@@ -2997,25 +3611,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   const Divider(),
                   const SizedBox(height: 10),
                   if (_tasksForDate.isEmpty)
-                    const Text("No tasks added for this date.",style: TextStyle(fontWeight: FontWeight.bold))
+                    const Text("No tasks added for this date.",
+                        style: TextStyle(fontWeight: FontWeight.bold))
                   else
                     Column(
-                      children: _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
+                      children:
+                      _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
                     ),
                   const Divider(),
                   const Divider(),
-
-
                   const SizedBox(height: 20),
                   Row(
                     children: [
-
                       Expanded(
                         child: buildSupervisorDropdown(),
                       ),
-
                       const SizedBox(width: 20),
-
                       ElevatedButton(
                         onPressed: _submitActivityToSupervisor,
                         child: const Text("Submit Activity Report to Supervisor"),
@@ -3023,7 +3634,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                     ],
                   ),
                   const SizedBox(height: 100),
-
                 ],
               ),
             ),
@@ -3040,29 +3650,23 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         icon: const Icon(Icons.add, color: Colors.white),
         backgroundColor: Colors.red,
       ),
-
     );
   }
 
 
   Future<void> _submitActivityToSupervisor() async {
-
     if (_selectedSupervisor == null || _selectedSupervisor!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Supervisor')),
-      );
+          const SnackBar(content: Text('Please select a Supervisor')));
       return;
     }
 
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Activity submitted to supervisor!')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Activity submitted to supervisor!')));
 
     _loadReportsForSelectedDate();
     _loadTasksForSelectedDate();
   }
-
 }
 
 class FullScreenImage extends StatelessWidget {
@@ -3079,14 +3683,49 @@ class FullScreenImage extends StatelessWidget {
         },
         child: Center(
           child: kIsWeb // Conditional Image widget for FullScreenImage
-              ? Image.network(imagePath, fit: BoxFit.cover) // Use Image.network for web
-              : Image.file(File(imagePath), fit: BoxFit.cover), // Use Image.file for non-web
+              ? Image.network(imagePath,
+              fit: BoxFit.cover) // Use Image.network for web
+              : Image.file(File(imagePath),
+              fit: BoxFit.cover), // Use Image.file for non-web
         ),
       ),
     );
   }
 }
 
+class FullScreenImageFromMemory extends StatelessWidget {
+  final AspectRatio imageData; // Receive AspectRatio with Image.memory
+
+  const FullScreenImageFromMemory({required this.imageData, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GestureDetector(
+        onTap: () {
+          Navigator.pop(context);
+        },
+        child: Center(
+          child: imageData, // Display the Image.memory widget
+        ),
+      ),
+    );
+  }
+}
+
+class PdfPreviewScreen extends StatelessWidget {
+  final String pdfPath;
+
+  const PdfPreviewScreen({super.key, required this.pdfPath});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Document Preview')),
+      body: SfPdfViewer.file(File(pdfPath)),
+    );
+  }
+}
 
 class FullScreenVideo extends StatelessWidget {
   final String videoPath;
@@ -3169,5 +3808,30 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+}
+
+// Helper class to hold attachment data, including upload progress
+class AttachmentData {
+  XFile? file;
+  Stream<double>? progressStream;
+  double uploadProgress;
+  bool isUploading;
+  String? downloadUrl;
+  String fileName;
+
+  AttachmentData({
+    this.file,
+    this.progressStream,
+    this.uploadProgress = 0,
+    this.isUploading = false,
+    this.downloadUrl,
+    required this.fileName,
+  });
+
+  // Factory constructor to create AttachmentData from a URL (for existing attachments)
+  factory AttachmentData.fromUrl(String url) {
+    String fileNameFromUrl = url.split('/').last; // Extract filename from URL
+    return AttachmentData(downloadUrl: url, isUploading: false, uploadProgress: 1.0, fileName: fileNameFromUrl);
   }
 }

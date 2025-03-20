@@ -34,7 +34,8 @@ class UserDashboardPage extends StatefulWidget {
 }
 
 class _UserDashboardPageState extends State<UserDashboardPage> {
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  //DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
   String? formattedMonth;
   final String _reportMessage = '';
@@ -629,7 +630,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           child: Text(
             'Generate Analytics',
             style: TextStyle(
-                fontSize: 14 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
+                fontSize: 12 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
           ),
         ),
       ],
@@ -725,6 +726,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ) {
     return Card(
       elevation: 4,
+      color: Colors.white, // Set background color to white
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
@@ -855,6 +857,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ) {
     return Card(
       elevation: 4,
+      color: Colors.white, // Set background color to white
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
@@ -933,6 +936,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     List<LocationRecord> locationData1 = _getLocationData(_attendanceData);
     return Card(
       elevation: 4,
+      color: Colors.white, // Set background color to white
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
@@ -1006,6 +1010,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
     return Card(
       elevation: 4,
+      color: Colors.white, // Set background color to white
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
@@ -1332,6 +1337,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ) {
     return Card(
       elevation: 4,
+      color: Colors.white, // Set background color to white
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
       child: Padding(
@@ -1357,7 +1363,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         Text(
           'Team Player for the Current Month (Facility Votes)',
           style: TextStyle(
-              fontSize: 16 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
+              fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         _isLoadingBestPlayer
@@ -1429,6 +1435,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   axisLine: const AxisLine(width: 0),
                   labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                   isVisible: false),
+              tooltipBehavior: TooltipBehavior(enable: true), // Enable tooltips
               series: <CartesianSeries>[
                 BarSeries<MapEntry<String, int>, String>(
                   dataSource: firestoreBestPlayerCounts.entries.toList(),
@@ -1441,6 +1448,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                         return Text('${data.value}/$surveyCount votes'); // Display count and survey count
                       }
                   ),
+                  enableTooltip: true, // Enable tooltip for each bar
                 ),
               ],
             ),
@@ -1617,7 +1625,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
-                  fontSize: 16 * fontSizeFactor,
+                  fontSize: 14 * fontSizeFactor,
                 ),
               ),
               IconButton(onPressed: () {}, icon: Icon(Icons.more_vert, size: 24 * iconSizeFactor)),

@@ -773,14 +773,25 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
     );
   }
 
+  // Helper function to check if a given date is the last Thursday of the month
+  bool isLastThursdayOfMonth(DateTime date) {
+    final lastDayOfMonth = DateTime(date.year, date.month + 1, 0);
+    DateTime lastThursday = lastDayOfMonth;
+    while (lastThursday.weekday != DateTime.thursday) {
+      lastThursday = lastThursday.subtract(const Duration(days: 1));
+    }
+    return date.day == lastThursday.day && date.month == lastThursday.month && date.year == lastThursday.year;
+  }
+
+
   Widget _buildClockInImageButton(BuildContext context,
       ClockAttendanceWebController controller,
       ScreenSize screenSize,
       ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () async {
-        // Check if it's Friday and survey is needed
-        if (DateTime.now().weekday == DateTime.wednesday) {
+        // Check if it's last thursday of the month and survey is needed
+        if (isLastThursdayOfMonth(DateTime.now())) {
           final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
           if (!hasSurvey) {
             Fluttertoast.showToast(
@@ -792,7 +803,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
               textColor: Colors.white,
               fontSize: 16.0,
             );
-            // Navigate to PsychologicalMetricsPage if it's Friday and no survey
+            // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -1761,7 +1772,7 @@ class ClockAttendanceWebController extends GetxController {
         if (e is Exception &&
             e.toString().contains('kCLErrorLocationUnknown')) {
           print("Location Unknown Error detected, retrying...");
-          _getUserLocation1();
+          _getUserLocation();
         } else {
           print("_getLocation2: General error: $e");
         }
@@ -2747,8 +2758,9 @@ class ClockAttendanceWebController extends GetxController {
 
       var data = json.decode(response.body);
       String state = _extractState(data);
+      String location1 = _extractLocation(data);
       if (state.isEmpty) {
-        location.value = "State not found";
+        location.value = location1;
         return;
       }
 
@@ -2757,11 +2769,11 @@ class ClockAttendanceWebController extends GetxController {
 
       List<GeofenceModel> offices = await _fetchGeofenceLocations1(state);
       if (offices.isEmpty) {
-        location.value = "No geofence locations found for \$state";
+        location.value = location1;
         return;
       }
 
-      _checkGeofence(offices, position.latitude, position.longitude);
+      _checkGeofence(offices, position.latitude, position.longitude,location1);
     } catch (e) {
       print("Error getting location: \$e");
       Fluttertoast.showToast(
@@ -2785,6 +2797,13 @@ class ClockAttendanceWebController extends GetxController {
     return "";
   }
 
+  String _extractLocation(Map<String, dynamic> data) {
+    if (data['results'].isNotEmpty) {
+      return data['results'][0]['formatted_address'] ?? "Address not found";
+    }
+    return "";
+  }
+
   Future<List<GeofenceModel>> _fetchGeofenceLocations1(String state) async {
     try {
       final snapshot = await FirebaseFirestore.instance.collection('Location').doc(state).collection(state).get();
@@ -2795,7 +2814,7 @@ class ClockAttendanceWebController extends GetxController {
     }
   }
 
-  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude) {
+  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude,String location1) {
     isInsideAnyGeofence.value = false;
 
     for (GeofenceModel office in offices) {
@@ -2809,7 +2828,7 @@ class ClockAttendanceWebController extends GetxController {
       }
     }
 
-    location.value = "Not inside any geofence";
+    location.value = location1;
     isCircularProgressBarOn.value = false;
   }
 }

@@ -194,8 +194,8 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   late TabController _tabController;
 
   final RxInt _totalAnnualLeaves = 10.obs;
-  final RxInt _totalPaternityLeaves = 6.obs;
-  final RxInt _totalMaternityLeaves = 60.obs;
+  final RxInt _totalPaternityLeaves = 0.obs;
+  final RxInt _totalMaternityLeaves = 30.obs;
   final RxInt _totalHolidayLeaves = 0.obs;
   final RxInt _usedAnnualLeaves = 0.obs;
   final RxInt _usedPaternityLeaves = 0.obs;
@@ -263,6 +263,8 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1> with SingleTick
   String? selectedBioStaffCategory;
   String? selectedBioEmail;
   String? selectedBioPhone;
+  String? selectedGender;
+  String? selectedMaritalStatus;
   String? selectedFirebaseId;
   String? facilitySupervisor;
   String? caritasSupervisor;
@@ -580,14 +582,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     <td style="$tdStyle">${_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0)}</td>
     <td style="$tdStyle">${_remainingLeaves.value?.annualLeaveBalance ?? 0}</td>
   </tr>
-  ${_bioInfo.value?.maritalStatus == 'Married' && _bioInfo.value?.gender == 'Male' ? """
-    <tr>
-      <td style="$tdStyle">Paternity Leave</td>
-      <td style="$tdStyle">$_totalPaternityLeaves</td>
-      <td style="$tdStyle">${_totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0)}</td>
-      <td style="$tdStyle">${_remainingLeaves.value?.paternityLeaveBalance ?? 0}</td>
-    </tr>
-  """ : ''}
+
   ${_bioInfo.value?.maritalStatus == 'Married' && _bioInfo.value?.gender == 'Female' ? """
     <tr>
       <td style="$tdStyle">Maternity Leave</td>
@@ -852,8 +847,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
       var data = json.decode(response.body);
       String state = _extractState(data);
+      String location1 = _extractLocation(data);
+      print("location1===$location1");
       if (state.isEmpty) {
-        location.value = "State not found";
+        location.value = location1;
         return;
       }
 
@@ -862,11 +859,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
       List<GeofenceModel> offices = await _fetchGeofenceLocations(state);
       if (offices.isEmpty) {
-        location.value = "No geofence locations found for \$state";
+        location.value = location1;
         return;
       }
 
-      _checkGeofence(offices, position.latitude, position.longitude);
+      _checkGeofence(offices, position.latitude, position.longitude,location1);
     } catch (e) {
       print("Error getting location: \$e");
       Fluttertoast.showToast(
@@ -882,10 +879,19 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   String _extractState(Map<String, dynamic> data) {
     List<dynamic> addressComponents = data["results"][0]["address_components"];
+    print("addressComponents===${data["results"][0]}");
     for (var component in addressComponents) {
       if (component["types"].contains("administrative_area_level_1")) {
         return component["long_name"];
       }
+    }
+    return "";
+  }
+
+
+  String _extractLocation(Map<String, dynamic> data) {
+    if (data['results'].isNotEmpty) {
+      return data['results'][0]['formatted_address'] ?? "Address not found";
     }
     return "";
   }
@@ -900,7 +906,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
   }
 
-  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude) {
+  void _checkGeofence(List<GeofenceModel> offices, double latitude, double longitude,String location1) {
     isInsideAnyGeofence.value = false;
 
     for (GeofenceModel office in offices) {
@@ -914,7 +920,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       }
     }
 
-    location.value = "Not inside any geofence";
+    location.value = location1;
     isCircularProgressBarOn.value = false;
   }
 
@@ -1372,8 +1378,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           holidayLeaveBalance: _totalHolidayLeaves.value,
           dateUpdated: DateTime.now(),
           paternityLeaveBalance: (gender == 'Male' && maritalStatus == 'Married') ? _totalPaternityLeaves.value : 0,
-          maternityLeaveBalance: (gender == 'Female' && maritalStatus == 'Married') ? _totalMaternityLeaves.value : 0,
+          maternityLeaveBalance: (gender == 'Female') ? _totalMaternityLeaves.value : 0,
         );
+
+
 
         await remainingLeaveRef.set(remainingLeave.toJson());
         print("Created new remaining leave document for user.");
@@ -1540,10 +1548,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           selectedBioDesignation = data['designation'] ?? '';
           selectedBioLocation = data['location'] ?? '';
           selectedBioStaffCategory = data['staffCategory'] ?? '';
+          selectedGender = data['gender'] ?? '';
+          selectedMaritalStatus = data['maritalStatus'] ?? '';
           selectedBioEmail = data['emailAddress'] ?? '';
           selectedBioPhone = data['mobile'] ?? '';
           staffSignatureLink = data['signatureLink'] ?? '';
           selectedFirebaseId = userId; // Store the Firebase UUID
+
         });
 
 
@@ -1674,6 +1685,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
 
 
+
   Widget _buildLeaveSummaryItem(String leaveType, int used, int total, double fontSizeFactor, double paddingFactor) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
@@ -1764,12 +1776,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         _buildLeaveSummaryItem("Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value, fontSizeFactor, paddingFactor));
 
 
-    if (_bioInfo.value?.maritalStatus == 'Married') {
-      if (_bioInfo.value?.gender == 'Male') {
-        leaveSummaryItems.add(
-          _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor),
-        );
-      } else {
+    if (selectedMaritalStatus == 'Married') {
+      // if (_bioInfo.value?.gender == 'Male') {
+      //   leaveSummaryItems.add(
+      //     _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor),
+      //   );
+      // }
+      if (selectedGender == 'Female') {
         leaveSummaryItems.add(
           _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0) == _totalAnnualLeaves.value?
           _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
@@ -1894,8 +1907,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             Obx(() => _buildCircularPercentIndicator(
                 _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0),
                 _totalAnnualLeaves.value,
-                _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0),
-                _totalPaternityLeaves.value,
+                // _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0),
+                // _totalPaternityLeaves.value,
                 _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0),
                 _totalMaternityLeaves.value,
                 fontSizeFactor, circularIndicatorRadiusFactor, circularIndicatorLineWidthFactor
@@ -1916,12 +1929,17 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                     ),
 
 
-                    if (_bioInfo.value!.maritalStatus == 'Married') ...[
-                      if (_bioInfo.value!.gender == 'Male')
-                        _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor)
-                      else
-                        _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0) == _totalAnnualLeaves.value?
-                        _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
+                    if (selectedGender == 'Female') ...[
+                      // if (selectedGender == 'Female')
+                      //   _buildLeaveSummaryItem("Maternity", _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor)
+                     // if (selectedGender == 'Female')
+                     //    _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0)
+                     //        == _totalAnnualLeaves.value? _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):
+                     //    _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
+
+                      _buildLeaveSummaryItem("Maternity",
+                          _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
+
                     ],
                     // _buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor),
                     //
@@ -1979,19 +1997,21 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return StatefulBuilder(builder: (context, setState) {
             List<Widget> leaveTypeButtons = [];
 
-            if (_bioInfo.value?.maritalStatus == 'Married') {
-              if (_bioInfo.value?.gender == 'Male') {
-                leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, buttonPaddingFactor),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
-                ]);
-              } else {
+            //if (_bioInfo.value?.maritalStatus == 'Married') {
+              // if (_bioInfo.value?.gender == 'Male') {
+              //   leaveTypeButtons.addAll([
+              //     _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, buttonPaddingFactor),
+              //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
+              //   ]);
+              // } else
+              if (selectedGender == 'Female') {
                 leaveTypeButtons.addAll([
                   _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, buttonPaddingFactor),
                   _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
                 ]);
               }
-            } else {
+           // }
+            else {
               leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor));
             }
 
@@ -2119,7 +2139,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                             padding: EdgeInsets.symmetric(horizontal: 20 * buttonPaddingFactor, vertical: 12 * buttonPaddingFactor),
                             textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
                           ),
-                          child: const Text("Save Request"),
+                          child: const Text("Submit Request"),
                         ),
                       ],
                     ),
@@ -2198,7 +2218,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     return supervisorItems;
   }
 
-  Widget _buildCircularPercentIndicator(int usedAnnual,int remainingAnnual,int usedPaternity,int remainingPaternity,int usedMaternity,int remainingMaternity, double fontSizeFactor, double circularIndicatorRadiusFactor, double circularIndicatorLineWidthFactor) {
+  Widget _buildCircularPercentIndicator(int usedAnnual,int remainingAnnual,int usedMaternity,int remainingMaternity, double fontSizeFactor, double circularIndicatorRadiusFactor, double circularIndicatorLineWidthFactor) {
     RxInt totalLeaves = 0.obs;
     RxInt usedLeaves = 0.obs;
     final DateTime now = DateTime.now();
@@ -2206,31 +2226,36 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     final String fiscalYearShort = fiscalYear.toString().substring(2);
 
 
+
     totalLeaves.bindStream(
       (() async* {
-        if (_bioInfo.value?.maritalStatus == 'Married') {
-          if (_bioInfo.value?.gender == 'Male') {
-            yield remainingAnnual + remainingPaternity;
-          } else {
-
-            yield remainingMaternity;
-          }
+        if (selectedGender == 'Male') {
+         //  if (selectedGender == 'Male') {
+         //    yield remainingAnnual + 0;
+         //  } else
+         //
+         // {
+         //
+         //    yield remainingMaternity;
+         //  }
+          yield remainingAnnual + 0;
         } else {
 
-          yield remainingAnnual;
+          yield remainingAnnual +  remainingMaternity;
         }
       })(),
     );
 
     usedLeaves.bindStream(
       (() async* {
-        if (_bioInfo.value?.maritalStatus == 'Married') {
-          if (_bioInfo.value?.gender == 'Male') {
-            yield usedAnnual + usedPaternity;
-          } else {
+        if (selectedGender == 'Female') {
+          // if (_bioInfo.value?.gender == 'Male') {
+          //   yield usedAnnual + usedPaternity;
+          // } else
+        //  if (selectedGender == 'Female') {
 
             yield (usedMaternity + usedAnnual);
-          }
+          //}
         } else {
 
           yield usedAnnual;
@@ -2244,13 +2269,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         child: Column(
           children: [
             Obx(() => CircularPercentIndicator(
-
               radius: 100 * circularIndicatorRadiusFactor,
-
               lineWidth: 10 * circularIndicatorLineWidthFactor,
               percent: totalLeaves.value > 0
-                  ? usedLeaves.value / totalLeaves.value
-                  : 0,
+                  ? min(1.0, usedLeaves.value / totalLeaves.value) // Ensure it stays within 0.0 - 1.0
+                  : 0.0,
               center: Text(
                 "Total for FY$fiscalYearShort: ${totalLeaves.value}",
                 style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.w600),
@@ -2273,9 +2296,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       ),
     );
   }
-
-
-
 
   Widget _buildLeaveRequestsCard(double fontSizeFactor, double paddingFactor, double marginFactor, double iconSizeFactor) {
 
@@ -2324,7 +2344,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                   return ExpansionPanel(
                     headerBuilder: (BuildContext context, bool isExpanded) {
                       return ListTile(
-                          title: Text("FY $fiscalYear Out-of-Office Leave Section", style: TextStyle(fontSize: 16 * fontSizeFactor)),
+                          title: Text("FY $fiscalYear Leave Section", style: TextStyle(fontSize: 16 * fontSizeFactor)),
                           leading: isExpanded?Icon(Icons.remove,color: Colors.red, size: 24 * iconSizeFactor):Icon(Icons.add,color: Colors.green, size: 24 * iconSizeFactor)
                       );
                     },
@@ -2353,9 +2373,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       ),
     );
   }
-
-
-
 
   Widget _buildLeaveRequestTile(LeaveRequestModel leaveRequest, double fontSizeFactor, double paddingFactor, double iconSizeFactor){
     return ListTile(
@@ -2443,7 +2460,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
     );
   }
-
 
   String _getFiscalYear(DateTime date) {
     final year = date.month >= 10 ? date.year + 1 : date.year;
@@ -2904,7 +2920,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       if (mounted) {
         Navigator.pop(context);
         Fluttertoast.showToast(
-            msg: "Request saved locally.",
+            msg: "Request submitted.",
             toastLength: Toast.LENGTH_LONG,
             backgroundColor: Colors.black54,
             gravity: ToastGravity.BOTTOM,

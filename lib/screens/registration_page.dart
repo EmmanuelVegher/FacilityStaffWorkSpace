@@ -542,7 +542,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
           'location': locationName,
           'department': departmentName,
           'designation': designation,
-          'supervisorName': supervisorName,
+          'supervisor': supervisorName,
           'supervisorEmail': supervisorEmail,
           'role': _selectedRole,
           'gender': _selectedGender,

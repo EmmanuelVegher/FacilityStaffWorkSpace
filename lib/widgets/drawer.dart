@@ -182,26 +182,6 @@ Widget drawer(
           // ),
 
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(Icons.holiday_village_sharp,
-                size: drawerIconSize, color: Colors.red),
-            title: Text(
-              'Leave Request',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LeaveRequestsPage1()),
-              );
-            },
-          ),
 
           // const Divider(
           //   color: Colors.grey,
@@ -307,6 +287,28 @@ Widget drawer(
             },
           ),
 
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.holiday_village_sharp,
+                size: drawerIconSize, color: Colors.red),
+            title: Text(
+              'Leave Request',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LeaveRequestsPage1()),
+              );
+            },
+          ),
+
           const Divider(
             color: Colors.grey,
             height: 1,
@@ -384,29 +386,7 @@ Widget drawer(
           //   },
           // ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.password_rounded,
-              size: drawerIconSize,
-              color: Colors.purple,
-            ),
-            title: Text(
-              'Forgot Password',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
-              );
-            },
-          ),
+
 
           const Divider(
             color: Colors.grey,
@@ -453,6 +433,29 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+          ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.password_rounded,
+              size: drawerIconSize,
+              color: Colors.purple,
+            ),
+            title: Text(
+              'Forgot Password',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
               );
             },
           ),

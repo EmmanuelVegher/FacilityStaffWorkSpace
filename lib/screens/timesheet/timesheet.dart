@@ -711,7 +711,7 @@ $selectedBioFirstName $selectedBioLastName
     final outOfOfficeCategories = [
       'Annual leave',
       'Holiday',
-      'Paternity',
+     // 'Paternity',
       'Maternity'
     ];
     final outOfOfficeData = outOfOfficeCategories.map((category) {
@@ -1642,7 +1642,7 @@ $selectedBioFirstName $selectedBioLastName
     double categoriesTotal = [
       'Annual leave',
       'Holiday',
-      'Paternity',
+     // 'Paternity',
       'Maternity'
     ].fold<double>(0.0, (sum, category) {
       return sum + calculateCategoryHours1(category);
@@ -2488,11 +2488,12 @@ $selectedBioFirstName $selectedBioLastName
                                                 ),
                                               ],
                                             ),
+
                                             // Rows for out-of-office categories
                                             ...[
                                               'Annual leave',
                                               'Holiday',
-                                              'Paternity',
+                                             // 'Paternity',
                                               'Maternity'
                                             ].map((category) {
                                               double outOfOfficeHours = calculateCategoryHours(
