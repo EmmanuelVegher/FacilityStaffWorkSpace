@@ -1189,10 +1189,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
+  String? mimeTypeFromUrl(String url) {
+    final Uri uri = Uri.parse(url);
+    final String path = uri.path;
+    return mime(path);
+  }
 
   // Widget to display attachments in a grid view
 // Widget to display attachments in a grid view (Progress bar removed)
-  Widget _buildAttachmentGrid(List<AttachmentData> attachmentsData, {String? reportType, Task? task}) {
+  Widget _buildAttachmentGrid(List<AttachmentData> attachmentsData, {String? reportType, Task? task, bool isReadOnly = false}) { // ADDED: isReadOnly flag
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1206,9 +1211,11 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         final attachmentData = attachmentsData[index];
         final fileName = attachmentData.fileName;
         String? mimeType = attachmentData.file?.mimeType; // Get mime type from XFile
-        bool isVideo = mimeType != null && mimeType.startsWith('video/');
-        bool isImage = mimeType != null && mimeType.startsWith('image/');
+        String? urlMimeType = mimeTypeFromUrl(attachmentData.downloadUrl ?? ''); // Mime type from URL
+        bool isVideo = (mimeType != null && mimeType.startsWith('video/')) || (urlMimeType != null && urlMimeType.startsWith('video/'));
+        bool isImage = (mimeType != null && mimeType.startsWith('image/')) || (urlMimeType != null && urlMimeType.startsWith('image/'));
         bool isDocument = !isImage && !isVideo; // Treat everything else as document
+        final String? downloadUrl = attachmentData.downloadUrl;
 
         Widget thumbnailWidget;
 
@@ -1224,10 +1231,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         } else if (isImage) { // Image from XFile bytes
           thumbnailWidget = AspectRatio(
             aspectRatio: 1,
-            child: FutureBuilder<Uint8List>(
-              future: attachmentData.file!.readAsBytes(),
+            child: FutureBuilder<Uint8List?>( // Modified FutureBuilder to handle Uint8List?
+              future: downloadUrl == null && attachmentData.file != null ? attachmentData.file!.readAsBytes() : null, // Read bytes only if downloadUrl is null and file is available
               builder: (context, snapshot) {
-                if (snapshot.hasData) {
+                if (downloadUrl != null) {
+                  return Image.network(downloadUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.error_outline, color: Colors.red)); // Load from URL if available
+                } else if (snapshot.hasData && snapshot.data != null) { // Check for null data
                   return Image.memory(snapshot.data!, fit: BoxFit.cover);
                 } else if (snapshot.hasError) {
                   return const Icon(Icons.error_outline, color: Colors.red);
@@ -1280,14 +1289,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   // For web, video preview might need different approach
                   // For now, just show a message or handle as needed
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video preview not fully implemented in web yet.')));
-                } else if (isImage) {
+                } else if (isImage && downloadUrl != null) { // Use downloadUrl for image preview
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImage(imagePath: downloadUrl), // Pass download URL
+                    ),
+                  );
+                } else if (isImage && attachmentData.file != null) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => FullScreenImageFromMemory(imageData: thumbnailWidget as AspectRatio), // Pass Image.memory widget
                     ),
                   );
-                } else if (isDocument) {
+                }
+                else if (isDocument) {
                   // For web, document open might need different approach
                   // For now, just show a message or handle as needed
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document open not fully implemented in web yet.')));
@@ -1296,42 +1313,44 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               },
               child: thumbnailWidget,
             ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              child: InkWell(
-                onTap: () {
-                  _handleChangeAttachment(index, reportType: reportType, task: task);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Column(
-                    children: [
-                      Icon(Icons.edit, color: Colors.blue[700], size: 18),
-                      Text('Change', style: TextStyle(fontSize: 10, color: Colors.orange[700])),
-                    ],
+            if (!isReadOnly) // Conditionally show edit/delete options
+              Positioned(
+                bottom: 0,
+                left: 0,
+                child: InkWell(
+                  onTap: () {
+                    _handleChangeAttachment(index, reportType: reportType, task: task);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Column(
+                      children: [
+                        Icon(Icons.edit, color: Colors.blue[700], size: 18),
+                        Text('Change', style: TextStyle(fontSize: 10, color: Colors.orange[700])),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: InkWell(
-                onTap: () {
-                  _handleDeleteAttachment(index, reportType: reportType, task: task);
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(4.0),
-                  child: Column(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red, size: 18),
-                      Text('Delete', style: TextStyle(fontSize: 10, color: Colors.red)),
-                    ],
+            if (!isReadOnly) // Conditionally show edit/delete options
+              Positioned(
+                top: 0,
+                right: 0,
+                child: InkWell(
+                  onTap: () {
+                    _handleDeleteAttachment(index, reportType: reportType, task: task);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Column(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red, size: 18),
+                        Text('Delete', style: TextStyle(fontSize: 10, color: Colors.red)),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         );
       },
