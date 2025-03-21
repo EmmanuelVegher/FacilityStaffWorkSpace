@@ -18,6 +18,17 @@ import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Stor
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import '../../widgets/button.dart';
 import '../../widgets/drawer.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io' show File, Directory;
+import 'dart:convert';
+
+String? mimeTypeFromUrl(String url) {
+  final Uri uri = Uri.parse(url);
+  final String path = uri.path;
+  return mime(path);
+}
+
 
 // Models
 // bio_model.dart
@@ -96,7 +107,8 @@ class ReportEntry {
   String? supervisorEmail;
   String? supervisorApprovalStatus;
   String? supervisorFeedBackComment;
-  List<String>? attachments; // ADDED: Attachments field in ReportEntry
+  List<String>? attachments;
+  String? appAnalysis; // ADDED: appAnalysis field
 
   ReportEntry({
     this.key = "",
@@ -109,7 +121,8 @@ class ReportEntry {
     this.supervisorEmail,
     this.supervisorApprovalStatus,
     this.supervisorFeedBackComment,
-    this.attachments, // Initialize attachments
+    this.attachments,
+    this.appAnalysis, // Initialize appAnalysis
   });
 
   factory ReportEntry.fromMap(Map<String, dynamic> map) {
@@ -124,8 +137,8 @@ class ReportEntry {
       supervisorEmail: map['supervisorEmail'],
       supervisorApprovalStatus: map['supervisorApprovalStatus'],
       supervisorFeedBackComment: map['supervisorFeedBackComment'],
-      attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(), // Deserialize attachments
-
+      attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      appAnalysis: map['appAnalysis'], // Deserialize appAnalysis
     );
   }
 
@@ -143,10 +156,12 @@ class ReportEntry {
         'supervisorApprovalStatus': supervisorApprovalStatus,
       if (supervisorFeedBackComment != null)
         'supervisorFeedBackComment': supervisorFeedBackComment,
-      if (attachments != null) 'attachments': attachments, // Serialize attachments
+      if (attachments != null) 'attachments': attachments,
+      if (appAnalysis != null) 'appAnalysis': appAnalysis, // Serialize appAnalysis
     };
   }
 }
+
 
 class Report {
   String? id;
@@ -1131,7 +1146,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
-  // New Widget to build the report data table
+// Widget to build the report data table (Modified to include "App Analysis" row)
   Widget _buildReportDataTable(String reportTypeKey, List<String> indicators) {
     Report? loadedReport = _loadedReports[reportTypeKey];
     if (loadedReport == null || loadedReport.reportEntries == null || loadedReport.reportEntries!.isEmpty) {
@@ -1144,7 +1159,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     List<String> usernames = loadedReport.reportEntries!.keys.toList();
     List<TableRow> tableRows = [];
 
-    // Header row
+    // Header row (same as before)
     List<Widget> headerCells = [
       const Padding(
         padding: EdgeInsets.all(8.0),
@@ -1161,7 +1176,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     ];
     tableRows.add(TableRow(children: headerCells));
 
-    // Data rows
+    // Data rows for indicators (same as before)
     for (String indicator in indicators) {
       List<Widget> dataCells = [
         Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator)),
@@ -1176,6 +1191,27 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       tableRows.add(TableRow(children: dataCells));
     }
 
+    // "App Analysis" row
+    List<Widget> analysisCells = [
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("App Analysis", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), // Style for emphasis
+      ),
+      ...usernames.map((username) {
+        String analysisText = loadedReport.reportEntries![username]![indicators.first]?.first.appAnalysis ?? "No image Uploaded for Analysis"; // Assuming analysis is stored in first indicator's entry, adjust if needed. Showing message if no image.
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(analysisText, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey)), // Style for analysis text
+        );
+      }),
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("", style: TextStyle(fontWeight: FontWeight.bold)), // Empty total cell for analysis row
+      ),
+    ];
+    tableRows.add(TableRow(children: analysisCells));
+
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Table(
@@ -1188,6 +1224,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
     );
   }
+
+
 
   String? mimeTypeFromUrl(String url) {
     final Uri uri = Uri.parse(url);
@@ -1285,9 +1323,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           children: [
             GestureDetector(
               onTap: () {
-                if (isVideo) {
+                if (isVideo && downloadUrl != null) {
                   // For web, video preview might need different approach
                   // For now, just show a message or handle as needed
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenVideo(videoPath: downloadUrl), // Pass download URL
+                    ),
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video preview not fully implemented in web yet.')));
                 } else if (isImage && downloadUrl != null) { // Use downloadUrl for image preview
                   Navigator.push(
@@ -1304,12 +1348,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                     ),
                   );
                 }
-                else if (isDocument) {
+                else if (isDocument && downloadUrl != null) {
                   // For web, document open might need different approach
                   // For now, just show a message or handle as needed
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document open not fully implemented in web yet.')));
-                  //_openDocument(attachmentPath); // Open document on tap - Original implementation for file path
+                  //ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document open not fully implemented in web yet.')));
+                  _openDocument(downloadUrl); // Open document on tap - Original implementation for file path
                 }
+
               },
               child: thumbnailWidget,
             ),
@@ -1359,6 +1404,50 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
 
+// Function to download file and then open it
+  Future<void> _downloadAndOpenFile(String downloadUrl, String fileName) async {
+    try {
+      print("Attempting to download file from URL: $downloadUrl");
+      final directory = await getTemporaryDirectory();
+      final filePath = '${directory.path}/$fileName';
+      final file = File(filePath);
+
+      if (await file.exists()) {
+        await file.delete(); // Delete any existing file
+      }
+
+      final response = await http.get(Uri.parse(downloadUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+        print("File downloaded to: ${file.path}");
+        _openDocument(file.path); // Open the downloaded file
+      } else {
+        print("Download failed with status code: ${response.statusCode}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download failed. Could not open document.')),
+        );
+      }
+    } catch (e) {
+      print("Error downloading or opening file: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error opening document.')),
+      );
+    }
+  }
+
+
+  // Function to open document (PDF or other types) using OpenFilex - Modified to handle local paths
+  Future<void> _openDocument(String localPath) async { // Expecting localPath now
+    try {
+      OpenFilex.open(localPath);
+      print("Attempting to open document at local path: $localPath");
+    } catch (e) {
+      print("Error opening document: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open document. Please ensure you have a suitable application installed.')),
+      );
+    }
+  }
 
 
   void _handleChangeAttachment(int index, {String? reportType, Task? task}) async {
@@ -2192,7 +2281,120 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-  // Saves the report data to Firestore database. (Modified for dynamic indicators and Firebase Storage)
+  // NEW FUNCTIONS: Convert Image to Base64 and Send to Gemini API
+  Future<String?> convertImageToBase64(XFile imageFile) async {
+    try {
+      Uint8List imageBytes = await imageFile.readAsBytes();
+      String base64String = base64Encode(imageBytes);
+      return base64String;
+    } catch (e) {
+      print("Error converting image to base64: $e");
+      return null;
+    }
+  }
+
+  Future<String?> sendImageToGeminiForValidation(String base64Image, List<String> indicators) async { // Modified to accept List<String> indicators
+    try {
+      final geminiApiKey = 'AIzaSyC7xwM7GQfcSvZeJqeUK5oib6VCPHCyecs'; // Replace with your actual API key
+      final modelName = 'gemini-2.0-flash';
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$geminiApiKey');
+
+      String indicatorsPrompt = indicators.join(", "); // Join all indicators for the prompt
+      final requestBody = {
+        "contents": [
+          {
+            "parts": [
+              {"text": "Analyze this image in the context of the following indicators: $indicatorsPrompt. Describe the image and identify any relevant information for each indicator if possible."}, // Modified prompt to include all indicators
+              {
+                "inline_data": { // Corrected key to inline_data
+                  "mime_type": "image/jpeg", // Adjust mime type if necessary
+                  "data": base64Image
+                }
+              }
+            ]
+          }
+        ]
+      };
+
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        return jsonResponse["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ?? "No response text from Gemini.";
+      } else {
+        print("Gemini API Error: ${response.body}");
+        return "Gemini API Error: ${response.body}";
+      }
+    } catch (e) {
+      print("Error sending image to Gemini API: $e");
+      return "Error communicating with Gemini API.";
+    }
+  }
+
+  Future<String?> analyzeWithGemini(String imageUrl, String designationPrompt) async {
+    try {
+      final geminiApiKey = 'AIzaSyDzXGoMQJzSYNjBmhnQepuvp4S5vrckb2k'; // Replace with actual API key
+      final modelName = 'gemini-pro-vision';
+      final modelName1 = 'gemini-2.0-flash-exp-image-generation';
+      final modelName2 = 'gemini-2.0-flash-lite';
+      final modelName3 = 'gemini-2.0-pro-exp-02-05';
+      final modelName4 = 'gemini-2.0-flash-thinking-exp-01-21';
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$geminiApiKey');
+
+      // Step 1: Download Image as Bytes
+      final imageResponse = await http.get(Uri.parse(imageUrl));
+      if (imageResponse.statusCode != 200) {
+        return "Failed to fetch image from Firebase URL.";
+      }
+
+      // Step 2: Convert Image to Base64
+      Uint8List imageBytes = imageResponse.bodyBytes;
+      String base64Image = base64Encode(imageBytes);
+
+      // Step 3: Construct Request Payload
+      final requestBody = {
+        "contents": [
+          {
+            "parts": [
+              {"text": "Analyze this image based on indicators for the designation: $designationPrompt. Describe the image and identify any relevant information."},
+              {
+                "inlineData": {
+                  "mimeType": "image/png",  // Ensure correct MIME type
+                  "data": base64Image
+                }
+              }
+            ]
+          }
+        ]
+      };
+
+      // Step 4: Make HTTP Request to Gemini API
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      // Step 5: Handle API Response
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        return jsonResponse["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ?? "No response text available.";
+      } else {
+        return "API Error: ${response.body}";
+      }
+    } catch (e) {
+      print('Error analyzing with Gemini API: $e');
+      return 'Error analyzing image/document with Gemini API.';
+    }
+  }
+
+
+
+// Saves the report data to Firestore database. (Modified for dynamic indicators and Firebase Storage)
   Future<void> _saveReportToFirestore(
       String reportType,
       Map<String, TextEditingController> controllers,
@@ -2217,31 +2419,70 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       return;
     }
 
-    // Restructure reportEntries as per requirement
     Map<String, Map<String, List<ReportEntry>>> structuredReportEntries = {};
-    String currentUsername = _currentUsername; // Get current username
+    String currentUsername = _currentUsername;
 
-    Map<String, List<ReportEntry>> indicatorMap = {}; // Map for indicators
+    Map<String, List<ReportEntry>> indicatorMap = {};
     Report? existingReport = _loadedReports[reportType];
     Map<String, String?> currentEnteredBy = {};
     Map<String, String?> currentEditedBy = {};
 
-    List<String> reportAttachmentUrls = []; // List to hold report-level attachment URLs
-    List<AttachmentData> reportAttachmentsToUpload = _reportAttachmentsData[reportType] ?? [];
 
-    // Upload attachments and collect URLs
+    List<String> reportAttachmentUrls = [];
+    List<AttachmentData> reportAttachmentsToUpload = _reportAttachmentsData[reportType] ?? [];
+    List<String> geminiAnalysisResults = []; // List to store analysis results for multiple images
+
+
+    if (reportAttachmentsToUpload.isNotEmpty) { // Analyze only if images are attached.
+      for (AttachmentData attachmentData in reportAttachmentsToUpload) { // Loop through all attachments
+        if (attachmentData.file != null) {
+          String fileExtension = attachmentData.fileName.split('.').last.toLowerCase();
+          if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
+            String? base64Image = await convertImageToBase64(attachmentData.file!);
+            if (base64Image != null) {
+              String? analysisResult = await sendImageToGeminiForValidation(base64Image, indicators); // Send each image for analysis
+              if (analysisResult != null) {
+                geminiAnalysisResults.add("Analysis for ${attachmentData.fileName}:\n$analysisResult"); // Store analysis with filename
+              } else {
+                geminiAnalysisResults.add("Analysis failed for ${attachmentData.fileName}.");
+              }
+            } else {
+              geminiAnalysisResults.add("Error converting image ${attachmentData.fileName} for analysis.");
+            }
+          } else {
+            geminiAnalysisResults.add("Analysis for ${attachmentData.fileName} only supported for image files."); // Or handle differently for other file types.
+          }
+        }
+      }
+    }
+
+    String aggregatedAnalysisResult = "";
+    if (geminiAnalysisResults.isNotEmpty) {
+      aggregatedAnalysisResult = geminiAnalysisResults.join("\n\n"); // Join all analysis results with new lines
+    } else {
+      aggregatedAnalysisResult = "No images Uploaded for Analysis"; // Message when no images are uploaded
+    }
+
+
+
     for (var attachmentData in reportAttachmentsToUpload) {
       if (attachmentData.file != null && attachmentData.downloadUrl == null) {
         String fileExtension = attachmentData.fileName.split('.').last.toLowerCase();
         String fileName = (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension))
             ? 'image_${currentUsername}_$reportType.$fileExtension'
             : 'document_${currentUsername}_$reportType.$fileExtension';
+        //
+        // String? geminiResponse;
+        // if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
+        //   String? base64Image = await convertImageToBase64(attachmentData.file!);
+        //   print("base64Image: $base64Image"); // Log Gemini response
+        //   if (base64Image != null) {
+        //     String indicatorNameForPrompt = indicators.isNotEmpty ? indicators.first : "Value"; // Using first indicator for prompt, adjust as needed.
+        //     geminiResponse = await sendImageToGeminiForValidation(base64Image, "Validate the data in this image for indicator: $indicatorNameForPrompt");
+        //     print("Gemini Response: $geminiResponse"); // Log Gemini response
+        //   }
+        // }
 
-        // String? url = await uploadFileToStorage(
-        //   kIsWeb ? attachmentData.file!.path : attachmentData.file!.path,
-        //   fileName,
-        // );
-        // Ensure Web uploads handle XFile properly
         String? url = await uploadFileToStorage(
           attachmentData.file!.path,
           fileName,
@@ -2251,7 +2492,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         if (url != null) {
           reportAttachmentUrls.add(url);
           attachmentData.downloadUrl = url;
-          _processImageWithMachineLearning(attachmentData.file!.path);
           print("File uploaded successfully: $fileName");
         } else {
           print("Upload failed for ${attachmentData.fileName}");
@@ -2262,7 +2502,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
 
     for (String indicator in indicators) {
-      // ... (Data processing logic for each indicator - same as before) ...
       String? existingValue = existingReport?.reportEntries
           ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
           ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.value : null
@@ -2298,23 +2537,23 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         }
       }
 
-      List<ReportEntry> entryList = []; // List for ReportEntry
-      entryList.add(ReportEntry( // Add ReportEntry to the list
+      List<ReportEntry> entryList = [];
+      entryList.add(ReportEntry(
         key: indicator,
         value: currentValue,
         enteredBy: finalEnteredBy,
         editedBy: finalEditedBy,
         reviewedBy: _selectedReviewer?.name,
         reviewStatus: "Pending",
-        attachments: indicator == indicators.last ? reportAttachmentUrls : null, // Attach report-level attachments only to the last indicator's entry to avoid duplication - adjust if needed.
+        attachments: indicator == indicators.last ? reportAttachmentUrls : null,
+        appAnalysis: indicator == indicators.first ? aggregatedAnalysisResult : null, // Store aggregated analysis in the first indicator's entry
       ));
-      indicatorMap[indicator] = entryList; // Assign list to indicator key
+      indicatorMap[indicator] = entryList;
       currentEnteredBy[indicator] = finalEnteredBy;
       currentEditedBy[indicator] = finalEditedBy;
     }
-    structuredReportEntries[currentUsername] = indicatorMap; // Assign indicator map to username
+    structuredReportEntries[currentUsername] = indicatorMap;
 
-    // Show a loading dialog
     Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
 
@@ -2326,34 +2565,35 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         date: _selectedReportingDate,
         reportingWeek: _selectedReportPeriod!,
         reportingMonth: _selectedMonthForWeekly!,
-        reportEntries: structuredReportEntries, // Use structured report entries
+        reportEntries: structuredReportEntries,
         isSynced: false,
         reportStatus: "Pending",
-        attachments: null, // Attachments are now inside ReportEntry
+        attachments: null,
       );
 
 
-      String department = reportType.split('_')[0]; // Extract department from reportType
-      String designation = reportType.split('_')[1]; // Extract designation from reportType
+      String department = reportType.split('_')[0];
+      String designation = reportType.split('_')[1];
       await saveReport(report, bioData, reportType);
-      Get.back(); // Dismiss loading dialog
+      Get.back();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               '${titleCase(reportType.replaceAll('_', ' '))} Report saved successfully!')));
       setState(() {
-        reportUsernames[reportType] = currentEnteredBy; // Update usernames dynamically
+        reportUsernames[reportType] = currentEnteredBy;
         reportEditedUsernames[reportType] = currentEditedBy;
         _isEditingReportSection[reportType] = true;
         _loadReportsForSelectedDate();
       });
     } catch (e) {
-      Get.back(); // Dismiss loading dialog in case of error
+      Get.back();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Error saving ${titleCase(reportType.replaceAll('_', ' '))} Report.')));
       print("Error saving report to Firestore: $e");
     }
   }
+
 
   // _addTaskToIsar (Modified for Firestore and editing logic and Firebase Storage)
   _addTaskToIsar({bool isEditing = false}) async {
