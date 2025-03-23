@@ -272,7 +272,7 @@ Widget drawer(
               color: Colors.blue,
             ),
             title: Text(
-              'Task Management',
+              'Task Manager',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),

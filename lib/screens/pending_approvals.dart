@@ -1,14 +1,19 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../widgets/drawer2.dart';
+import 'activity_monitoring/activity_monitoring_page.dart';
 
-// Bio Model (Assuming this is your BioModel class definition)
+
+
+// Bio Model (Assuming this is your BioModel class definition) - Keep your existing BioModel
 class BioModel {
   String? firstName;
   String? lastName;
@@ -79,8 +84,10 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   List<Map<String, dynamic>> pendingTimesheetsCaritasSupervisor = [];
   bool isLoading = true;
   final TextEditingController _rejectReasonController = TextEditingController();
+  int _tabIndex = 0; // To manage tab index
+  final FirestoreService _firestoreService = FirestoreService(); // Instantiate FirestoreService
 
-  // Define wine color and gradients
+  // Define wine color and gradients - Keep your existing styles
   static const Color wineColor = Color(0xFF722F37); // Deep wine color
   static const LinearGradient appBarGradient = LinearGradient(
     colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
@@ -575,35 +582,311 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     );
   }
 
+  // --- START OF INTEGRATED REVIEW LIST TAB FUNCTIONS AND WIDGET ---
+
+  // Function to fetch reports needing review - adapted for PendingApprovalsPage context
+  Future<List<Report>> _fetchReportsForReview() async {
+    List<Report> reportsForReview = [];
+    String? currentUserId = selectedFirebaseId; // Use selectedFirebaseId from bioData load
+
+    if (currentUserId == null) {
+      print("Current user ID is null, cannot fetch reports for review.");
+      return [];
+    }
+
+    try {
+      String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now()); // Format date
+
+      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+          .collection('Reports')
+          .doc(selectedBioState) // Use loaded selectedBioState
+          .collection(selectedBioState!) // Use loaded selectedBioState
+          .doc(selectedBioLocation) // Use loaded selectedBioLocation
+          .collection(currentDate) // Use current date for now, adjust if needed
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          Report report = Report.fromFirestore(doc, null);
+          if (report.reportStatus == 'Pending' && report.reportEntries != null) {
+            for (var username in report.reportEntries!.keys) {
+              var indicatorMap = report.reportEntries![username];
+              for (var indicator in indicatorMap!.keys) {
+                for (var entry in indicatorMap[indicator]!) {
+                  if (entry.reviewerId == currentUserId) {
+                    reportsForReview.add(report);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        print("No reports found for user ID: $currentUserId");
+      }
+    } catch (e) {
+      print("Error fetching reports for review: $e");
+    }
+    return reportsForReview;
+  }
+
+  // Widget for Review List Tab - Integrated from DailyActivityMonitoringPage
+  Widget _buildReviewListTab() {
+    return FutureBuilder<List<Report>>(
+      future: _fetchReportsForReview(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text("Error loading review list: ${snapshot.error}"));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text("No reports pending your review."));
+        } else {
+          List<Report> reviewReports = snapshot.data!;
+
+          // Create a set to store unique report identifiers (reportType + date)
+          Set<String> uniqueReportIdentifiers = {};
+          List<Report> uniqueReviewReports = [];
+
+          for (Report report in reviewReports) {
+            String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
+            if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
+              uniqueReportIdentifiers.add(reportIdentifier);
+              uniqueReviewReports.add(report);
+            }
+          }
+
+          return ListView.builder(
+            itemCount: uniqueReviewReports.length,
+            itemBuilder: (context, index) {
+              Report report = uniqueReviewReports[index];
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${report.reportType}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const SizedBox(height: 8),
+                      Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
+                      const SizedBox(height: 16),
+                      if (report.reportEntries != null && report.reportEntries!.isNotEmpty)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: report.reportEntries!.entries.map((usernameEntry) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: usernameEntry.value.entries.map((indicatorEntry) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: indicatorEntry.value.map((entry) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start, // Align row content to start
+                                            children: [
+                                              Text("${entry.key}: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                              Expanded(child: Text(entry.value)), // Use Expanded to wrap Text for long values
+                                            ],
+                                          ),
+                                          if (entry.enteredBy != null)
+                                            Text("Entered By: ${entry.enteredBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                          if (entry.editedBy != null)
+                                            Text("Edited By: ${entry.editedBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                          if (entry.reviewedBy != null) // ADDED: Show reviewedBy field
+                                            Text("Reviewed By: ${entry.reviewedBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                          if (entry.reviewedBy != null) // ADDED: Show reviewedBy field
+                                            Text("Review Status: ${entry.reviewStatus}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                          if (entry.attachments != null && entry.attachments!.isNotEmpty) // ADDED: Show image thumbnail
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 8.0),
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  String? imageUrl = entry.attachments!.firstWhere(
+                                                          (attachment) => attachment.toLowerCase().endsWith(('.png')) || attachment.toLowerCase().endsWith(('.jpg')) || attachment.toLowerCase().endsWith(('.jpeg')),
+                                                      orElse: () => '' // Return empty string if no image found
+                                                  );
+                                                  if (imageUrl.isNotEmpty) {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) => FullScreenImage(imagePath: imageUrl), // Use aliased class
+                                                      ),
+                                                    );
+                                                  } else {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('No image attachment found.')),
+                                                    );
+                                                  }
+                                                },
+                                                child: SizedBox(
+                                                  width: 50,
+                                                  height: 50,
+                                                  child: Image.network(
+                                                    entry.attachments!.firstWhere(
+                                                            (attachment) => attachment.toLowerCase().endsWith(('.png')) || attachment.toLowerCase().endsWith(('.jpg')) || attachment.toLowerCase().endsWith(('.jpeg')),
+                                                        orElse: () => '' // Return empty string if no image found
+                                                    ),
+                                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.error_outline, color: Colors.red),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                );
+                              }).toList(),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              _approveReport(report);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                            child: const Text("Approve", style: TextStyle(color: Colors.white)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              _returnReport(report);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text("Return", style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _approveReport(Report report) async {
+    Report updatedReport = report;
+    updatedReport.reportStatus = 'Approved';
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+  Future<void> _returnReport(Report report) async {
+    String? feedback = await _showFeedbackDialog(context); // Show dialog to get feedback
+    if (feedback != null) {
+      Report updatedReport = report;
+      updatedReport.reportStatus = 'Rejected'; // or 'Returned' as per your model
+      await _updateReportReviewStatus(updatedReport, feedback: feedback); // Pass feedback to update function
+    }
+  }
+
+  Future<void> _updateReportReviewStatus(Report report, {String? feedback}) async {
+    if (selectedBioState == null || selectedBioLocation == null) {
+      print("BioModel data is incomplete, cannot update report status.");
+      return;
+    }
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(report.date!);
+      final DocumentReference reportDocRef = FirebaseFirestore.instance
+          .collection('Reports')
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(report.reportType); // Assuming reportType is used as document ID
+
+      Map<String, dynamic> reportData = report.toFirestore();
+      if (feedback != null) {
+        reportData['reportFeedbackComment'] = feedback; // Store feedback comment
+      }
+      await reportDocRef.set(reportData, SetOptions(merge: true));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Report status updated to ${report.reportStatus}!')));
+      setState(() {}); // Refresh UI
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error updating report status.')));
+      print("Error updating report status in Firestore: $e");
+    }
+  }
+
+  Future<String?> _showFeedbackDialog(BuildContext context) async {
+    TextEditingController feedbackController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Provide Feedback for Return"),
+          content: TextField(
+            controller: feedbackController,
+            decoration: const InputDecoration(hintText: "Enter feedback here"),
+            maxLines: 3,
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.of(context).pop(null),
+            ),
+            TextButton(
+              child: const Text("Return Report"),
+              onPressed: () => Navigator.of(context).pop(feedbackController.text),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // --- END OF INTEGRATED REVIEW LIST TAB FUNCTIONS AND WIDGET ---
+
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3, // Update tab length to 3
       child: Scaffold(
-        drawer: drawer2(context), // No IsarService needed now
+        drawer: drawer2(context),
         appBar: AppBar(
           title: const Text('Pending Approvals', style: TextStyle(color: Colors.white)),
-          iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
+          iconTheme: const IconThemeData(color: Colors.white),
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
             indicatorColor: Colors.white,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
-            tabs: [
+            tabs: const [
               Tab(text: "Leaves"),
               Tab(text: "Timesheet"),
+              Tab(text: "Reviews"), // New Tab for Reviews
             ],
+            onTap: (index) {
+              setState(() {
+                _tabIndex = index;
+              });
+            },
           ),
         ),
         body: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
             return Container(
-              decoration: const BoxDecoration( // Optional background gradient for the body
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFF8EEDD), Color(0xFFFAF0E6)], // Very light background
+                  colors: [Color(0xFFF8EEDD), Color(0xFFFAF0E6)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -611,8 +894,9 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
               child: isLoading
                   ? const Center(child: CircularProgressIndicator(color: wineColor))
                   : TabBarView(
+                physics: const NeverScrollableScrollPhysics(), // Disable swipe between tabs if needed
                 children: [
-                  // Leaves Tab
+                  // Leaves Tab - Existing Leave Tab Content
                   RefreshIndicator(
                     color: wineColor,
                     onRefresh: _fetchPendingApprovals,
@@ -628,7 +912,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                       child: Text("No pending leave approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
                     ),
                   ),
-                  // Timesheet Tab
+                  // Timesheet Tab - Existing Timesheet Tab Content
                   RefreshIndicator(
                     color: wineColor,
                     onRefresh: _fetchPendingApprovals,
@@ -650,10 +934,57 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                       child: Text("No pending timesheet approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
                     ),
                   ),
+                  // Reviews Tab - New Review List Tab Content
+                  _tabIndex == 2 ? _buildReviewListTab() : const Center(child: Text("Review Tab Content Loading...")), // Conditionally load Review Tab
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+
+class FullScreenImage extends StatelessWidget {
+  final String imagePath;
+
+  const FullScreenImage({required this.imagePath, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GestureDetector(
+        onTap: () {
+          Navigator.pop(context);
+        },
+        child: Center(
+          child: kIsWeb // Conditional Image widget for FullScreenImage
+              ? Image.network(imagePath,
+              fit: BoxFit.cover) // Use Image.network for web
+              : Image.file(File(imagePath),
+              fit: BoxFit.cover), // Use Image.file for non-web
+        ),
+      ),
+    );
+  }
+}
+
+class FullScreenImageFromMemory extends StatelessWidget {
+  final AspectRatio imageData; // Receive AspectRatio with Image.memory
+
+  const FullScreenImageFromMemory({required this.imageData, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GestureDetector(
+        onTap: () {
+          Navigator.pop(context);
+        },
+        child: Center(
+          child: imageData, // Display the Image.memory widget
         ),
       ),
     );

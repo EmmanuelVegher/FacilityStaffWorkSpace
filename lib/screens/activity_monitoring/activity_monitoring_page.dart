@@ -108,7 +108,8 @@ class ReportEntry {
   String? supervisorApprovalStatus;
   String? supervisorFeedBackComment;
   List<String>? attachments;
-  String? appAnalysis; // ADDED: appAnalysis field
+  String? appAnalysis;
+  String? reviewerId; // ADDED: reviewerId field
 
   ReportEntry({
     this.key = "",
@@ -122,7 +123,8 @@ class ReportEntry {
     this.supervisorApprovalStatus,
     this.supervisorFeedBackComment,
     this.attachments,
-    this.appAnalysis, // Initialize appAnalysis
+    this.appAnalysis,
+    this.reviewerId, // Initialize reviewerId
   });
 
   factory ReportEntry.fromMap(Map<String, dynamic> map) {
@@ -138,7 +140,8 @@ class ReportEntry {
       supervisorApprovalStatus: map['supervisorApprovalStatus'],
       supervisorFeedBackComment: map['supervisorFeedBackComment'],
       attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
-      appAnalysis: map['appAnalysis'], // Deserialize appAnalysis
+      appAnalysis: map['appAnalysis'],
+      reviewerId: map['reviewerId'], // Deserialize reviewerId
     );
   }
 
@@ -157,7 +160,8 @@ class ReportEntry {
       if (supervisorFeedBackComment != null)
         'supervisorFeedBackComment': supervisorFeedBackComment,
       if (attachments != null) 'attachments': attachments,
-      if (appAnalysis != null) 'appAnalysis': appAnalysis, // Serialize appAnalysis
+      if (appAnalysis != null) 'appAnalysis': appAnalysis,
+      if (reviewerId != null) 'reviewerId': reviewerId, // Serialize reviewerId
     };
   }
 }
@@ -270,6 +274,7 @@ class Task {
     this.attachments,
     this.reviewedBy, // ADDED: Include in constructor
   });
+
 
   factory Task.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> snapshot,
@@ -997,6 +1002,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   String? selectedFirebaseId;
   String? selectedSupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
+  int _selectedIndex = 0; // To track bottom navigation tab index
 
   // Add ImagePicker instance
   final ImagePicker _picker = ImagePicker();
@@ -1033,6 +1039,16 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       });
     });
   }
+
+
+  String? getUserId() {
+    print("Current UUID === ${FirebaseAuth.instance.currentUser?.uid}");
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
+
+
+
+
 // NEW: Function to load thematic report definitions from Firestore
   Future<void> _loadThematicReportDefinitions() async {
     _thematicReportDefinitions.clear();
@@ -1082,6 +1098,474 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       print("Error loading thematic report definitions: $e");
     }
   }
+
+
+  Future<List<Report>> _fetchReportsForReview() async {
+    List<Report> reportsForReview = [];
+    String? currentUserId = selectedFirebaseId; // Use selectedFirebaseId from bioData load
+
+    if (currentUserId == null) {
+      print("Current user ID is null, cannot fetch reports for review.");
+      return [];
+    }
+
+    try {
+      String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now()); // Format date
+
+      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+          .collection('Reports')
+          .doc(selectedBioState) // Use loaded selectedBioState
+          .collection(selectedBioState!) // Use loaded selectedBioState
+          .doc(selectedBioLocation) // Use loaded selectedBioLocation
+          .collection(currentDate) // Use current date for now, adjust if needed
+          .get();
+
+      print("snapshot ===$snapshot");
+
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          print("snapshot doc ===$doc");
+          Report report = Report.fromFirestore(doc, null);
+          print("snapshot report ===$report");
+          print("snapshot report.reportStatus ===${report.reportStatus}");
+          print("snapshot report.reportEntries ===${report.reportEntries}");
+          if (report.reportStatus == 'Pending' && report.reportEntries != null) {
+            print("snapshot report.reportStatus ===${report.reportStatus}");
+            for (var username in report.reportEntries!.keys) {
+              print("snapshot username ===${username}");
+              var indicatorMap = report.reportEntries![username];
+              print("snapshot indicatorMap ===${indicatorMap}");
+              for (var indicator in indicatorMap!.keys) {
+                print("snapshot indicator ===${indicator}");
+                for (var entry in indicatorMap[indicator]!) {
+                  print("snapshot entry.reviewerId ===${entry.reviewerId}");
+                  if (entry.reviewerId == selectedFirebaseId) {
+                    reportsForReview.add(report);
+                    print("snapshot entry.reportsForReview ===${reportsForReview}");
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        print("No reports found for user ID: $currentUserId");
+      }
+    } catch (e) {
+      print("Error fetching reports for review: $e");
+    }
+    print("reportsForReview ===${reportsForReview}");
+    return reportsForReview;
+  }
+
+
+
+  Widget _buildReviewListTab() {
+    return StreamBuilder<List<Report>>( // Changed to StreamBuilder
+      stream: _fetchReportsForReviewStream(), // Changed to _fetchReportsForReviewStream
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text("Error loading review list: ${snapshot.error}"));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text("No reports pending your review."));
+        } else {
+          List<Report> reviewReports = snapshot.data!;
+          print("snapshot.data buildReviewListTab ===${snapshot.data}");
+
+          // Filter reports to only include those where reviewerId matches _selectedFirebaseId
+          List<Report> filteredReviewReports = [];
+          for (Report report in reviewReports) {
+            bool reportNeedsReviewByCurrentUser = false;
+            if (report.reportEntries != null) {
+              for (var usernameEntry in report.reportEntries!.entries) {
+                for (var indicatorEntry in usernameEntry.value.entries) {
+                  for (ReportEntry entry in indicatorEntry.value) {
+                    if (entry.reviewerId == selectedFirebaseId) { // Check reviewerId against _selectedFirebaseId
+                      reportNeedsReviewByCurrentUser = true;
+                      break;
+                    }
+                  }
+                  if (reportNeedsReviewByCurrentUser) break;
+                }
+                if (reportNeedsReviewByCurrentUser) break;
+              }
+            }
+            if (reportNeedsReviewByCurrentUser) {
+              filteredReviewReports.add(report);
+            }
+          }
+
+          // Create a set to store unique report identifiers (reportType + date) for filtered reports
+          Set<String> uniqueReportIdentifiers = {};
+          List<Report> uniqueReviewReports = []; // Use this list for display
+
+          for (Report report in filteredReviewReports) { // Iterate over filtered reports
+            print("report buildReviewListTab ===${report}");
+            String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
+            print("reportIdentifier buildReviewListTab ===${reportIdentifier}");
+            if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
+              uniqueReportIdentifiers.add(reportIdentifier);
+              uniqueReviewReports.add(report);
+              print("uniqueReportIdentifiers buildReviewListTab ===${uniqueReportIdentifiers}");
+              print("uniqueReviewReports buildReviewListTab ===${uniqueReviewReports}");
+            }
+          }
+
+          // Filter out reports that are completely reviewed by current user
+          List<Report> finalReviewReports = uniqueReviewReports.where((report) => !_isReportCompletelyReviewedByCurrentUser(report)).toList();
+          print("finalReviewReports.length  ===${finalReviewReports.length}");
+
+
+          return ListView.builder(
+            itemCount: finalReviewReports.length, // Use finalReviewReports here
+            itemBuilder: (context, index) {
+              Report report = finalReviewReports[index]; // Use finalReviewReports here
+              print("ListView.builder report ===${report.reportEntries}");
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${report.reportType}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const SizedBox(height: 8),
+                      Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
+                      const SizedBox(height: 16),
+                      if (report.reportEntries != null && report.reportEntries!.isNotEmpty)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: report.reportEntries!.entries.map((usernameEntry) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: usernameEntry.value.entries.map((indicatorEntry) {
+                                // Separate Comments entry
+                                ReportEntry? commentsEntry;
+                                List<ReportEntry> otherEntries = [];
+                                for (var entry in indicatorEntry.value) {
+                                  if (entry.key == 'Comments') {
+                                    commentsEntry = entry;
+                                  } else {
+                                    // Filter ReportEntry list to only include entries for the current reviewer
+                                    if (entry.reviewerId == selectedFirebaseId) {
+                                      otherEntries.add(entry);
+                                    }
+                                  }
+                                }
+
+                                // Sort otherEntries alphabetically by enteredBy
+                                otherEntries.sort((a, b) => (a.enteredBy ?? "").compareTo(b.enteredBy ?? ""));
+
+                                List<Widget> indicatorWidgets = [];
+
+                                // Build widgets for other entries first
+                                indicatorWidgets.addAll(otherEntries.map((entry) => _buildIndicatorRowForReview(report, entry, context)).toList());
+
+                                // Build widget for Comments entry last, if it exists and for current reviewer
+                                if (commentsEntry != null && commentsEntry.reviewerId == selectedFirebaseId) {
+                                  indicatorWidgets.add(_buildIndicatorRowForReview(report, commentsEntry, context));
+                                }
+
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: indicatorWidgets,
+                                );
+                              }).toList(),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              _approveReport(report);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                            child: const Text("Approve Report", style: TextStyle(color: Colors.white)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              _returnReport(report);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text("Return Report", style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+      },
+    );
+  }
+
+  bool _isReportCompletelyReviewedByCurrentUser(Report report) {
+    if (report.reportEntries == null) return true; // Consider completely reviewed if no entries
+
+    bool allReviewed = true;
+    report.reportEntries!.forEach((username, indicatorMap) {
+      indicatorMap.forEach((indicatorKey, entryList) {
+        for (ReportEntry entry in entryList) {
+          if (entry.reviewerId == selectedFirebaseId && entry.reviewStatus != 'Approved') {
+            allReviewed = false; // If any entry for current reviewer is not approved, report is not completely reviewed
+            break;
+          }
+        }
+        if (!allReviewed) return; // Exit inner loop early if not allReviewed
+      });
+      if (!allReviewed) return; // Exit outer loop early if not allReviewed
+    });
+    return allReviewed;
+  }
+
+  Widget _buildIndicatorRowForReview(Report report, ReportEntry entry, BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${entry.key}: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+              Expanded(child: Text(entry.value)),
+            ],
+          ),
+          Visibility( // Conditionally show buttons based on reviewStatus
+            visible: entry.reviewStatus != 'Approved',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    _updateIndicatorReviewStatus(report, entry, 'Approved');
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text("Approve", style: TextStyle(color: Colors.white)),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    _updateIndicatorReviewStatus(report, entry, 'Returned');
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text("Return", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+          if (entry.enteredBy != null)
+            Text("Entered By: ${entry.enteredBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          if (entry.editedBy != null)
+            Text("Edited By: ${entry.editedBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          if (entry.reviewedBy != null)
+            Text("Reviewed By: ${entry.reviewedBy}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          if (entry.reviewedBy != null)
+            Text("Review Status: ${entry.reviewStatus}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          if (entry.attachments != null && entry.attachments!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: GestureDetector(
+                onTap: () {
+                  String? imageUrl = entry.attachments!.firstWhere(
+                          (attachment) => attachment.toLowerCase().endsWith(('.png')) || attachment.toLowerCase().endsWith(('.jpg')) || attachment.toLowerCase().endsWith(('.jpeg')),
+                      orElse: () => '');
+                  if (imageUrl.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FullScreenImage(imagePath: imageUrl),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No image attachment found.')),
+                    );
+                  }
+                },
+                child: SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: Image.network(
+                    entry.attachments!.firstWhere(
+                            (attachment) => attachment.toLowerCase().endsWith(('.png')) || attachment.toLowerCase().endsWith(('.jpg')) || attachment.toLowerCase().endsWith(('.jpeg')),
+                        orElse: () => ''),
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.error_outline, color: Colors.red),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+
+
+  // Modified _fetchReportsForReview to return Stream
+  Stream<List<Report>> _fetchReportsForReviewStream() {
+    String? currentUserId = selectedFirebaseId;
+
+    if (currentUserId == null) {
+      print("Current user ID is null, cannot fetch reports for review.");
+      return Stream.value([]); // Return empty stream if no user ID
+    }
+
+    print("_fetchReportsForReview: Current User ID: $currentUserId");
+
+    String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+
+    return FirebaseFirestore.instance
+        .collection('Reports')
+        .doc(selectedBioState)
+        .collection(selectedBioState!)
+        .doc(selectedBioLocation)
+        .collection(currentDate)
+        .snapshots()
+        .map((snapshot) {
+      List<Report> reportsForReview = [];
+      if (snapshot.docs.isNotEmpty) {
+        for (var doc in snapshot.docs) {
+          Report report = Report.fromFirestore(doc, null);
+          print("_fetchReportsForReviewStream: Report Type: ${report.reportType}, Status: ${report.reportStatus}");
+
+          if (report.reportStatus == 'Pending' && report.reportEntries != null) {
+            for (var username in report.reportEntries!.keys) {
+              var indicatorMap = report.reportEntries![username];
+              for (var indicator in indicatorMap!.keys) {
+                for (var entry in indicatorMap[indicator]!) {
+                  print("_fetchReportsForReviewStream:   Indicator: ${entry.key}, Reviewer ID: ${entry.reviewerId}");
+                  if (entry.reviewerId == currentUserId) {
+                    reportsForReview.add(report);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        print("No reports found for user ID: $currentUserId");
+      }
+      return reportsForReview;
+    });
+  }
+
+  Future<void> _approveReport(Report report) async {
+    Report updatedReport = report;
+   // updatedReport.reportStatus = 'Approved'; // Keep overall report status update
+
+    // Iterate through report entries to approve individual indicators for the current reviewer
+    updatedReport.reportEntries?.forEach((username, indicatorMap) {
+      indicatorMap.forEach((indicatorKey, entryList) {
+        for (int i = 0; i < entryList.length; i++) {
+          if (entryList[i].reviewerId == selectedFirebaseId) { // Check reviewerId
+            updatedReport.reportEntries![username]![indicatorKey]![i] = entryList[i]..reviewStatus = 'Approved';
+          }
+        }
+      });
+    });
+
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+  Future<void> _returnReport(Report report) async {
+    Report updatedReport = report;
+    //updatedReport.reportStatus = 'Rejected'; // or 'Returned' as per your model, Keep overall report status update
+
+    // Iterate through report entries to return individual indicators for the current reviewer
+    updatedReport.reportEntries?.forEach((username, indicatorMap) {
+      indicatorMap.forEach((indicatorKey, entryList) {
+        for (int i = 0; i < entryList.length; i++) {
+          if (entryList[i].reviewerId == selectedFirebaseId) { // Check reviewerId
+            updatedReport.reportEntries![username]![indicatorKey]![i] = entryList[i]..reviewStatus = 'Returned'; // Or 'Rejected'
+          }
+        }
+      });
+    });
+
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+
+  Future<void> _updateReportReviewStatus(Report report) async {
+    if (selectedBioState == null || selectedBioLocation == null) {
+      print("BioModel data is incomplete, cannot update report status.");
+      return;
+    }
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(report.date!);
+      final DocumentReference reportDocRef = FirebaseFirestore.instance
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(report.reportType); // Assuming reportType is used as document ID
+
+      await reportDocRef.set(report.toFirestore(), SetOptions(merge: true));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Report status updated to ${report.reportStatus}!')));
+      setState(() {}); // Refresh UI
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error updating report status.')));
+      print("Error updating report status in Firestore: $e");
+    }
+  }
+
+  Future<void> _updateIndicatorReviewStatus(Report report, ReportEntry entry, String status) async {
+    if (selectedBioState == null || selectedBioLocation == null) {
+      print("BioModel data is incomplete, cannot update indicator review status.");
+      return;
+    }
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(report.date!);
+      final DocumentReference reportDocRef = FirebaseFirestore.instance
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(report.reportType);
+
+      Report updatedReport = report;
+      // Assuming reportEntries structure is Map<Username, Map<IndicatorKey, List<ReportEntry>>>
+      updatedReport.reportEntries?.forEach((username, indicatorMap) {
+        indicatorMap.forEach((indicatorKey, entryList) {
+          for (int i = 0; i < entryList.length; i++) {
+            // ADDED CONDITION: Check if the entry's key and reviewerId match
+            if (entryList[i].key == entry.key && entryList[i].reviewerId == selectedFirebaseId) {
+              updatedReport.reportEntries![username]![indicatorKey]![i] = entryList[i]..reviewStatus = status;
+              break; // Stop once found and updated for the current reviewer
+            }
+          }
+        });
+      });
+
+      await reportDocRef.set(updatedReport.toFirestore(), SetOptions(merge: true));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Indicator status updated to $status!')));
+      setState(() {}); // Refresh UI
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error updating indicator status.')));
+      print("Error updating indicator status in Firestore: $e");
+    }
+  }
+
 
   @override
   void dispose() {
@@ -2299,15 +2783,20 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       final modelName = 'gemini-2.0-flash';
       final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$geminiApiKey');
 
+
       String indicatorsPrompt = indicators.join(", "); // Join all indicators for the prompt
       final requestBody = {
         "contents": [
           {
             "parts": [
-              {"text": "Analyze this image in the context of the following indicators: $indicatorsPrompt. Describe the image and identify any relevant information for each indicator if possible."}, // Modified prompt to include all indicators
               {
-                "inline_data": { // Corrected key to inline_data
-                  "mime_type": "image/jpeg", // Adjust mime type if necessary
+                "text": """
+          Dear Gemini, Kindly Analyze this image in the context of the following indicators: $indicatorsPrompt.
+     """
+              },
+              {
+                "inline_data": {
+                  "mime_type": "image/jpeg",
                   "data": base64Image
                 }
               }
@@ -2315,6 +2804,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           }
         ]
       };
+
 
       final response = await http.post(
         url,
@@ -2547,6 +3037,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         reviewStatus: "Pending",
         attachments: indicator == indicators.last ? reportAttachmentUrls : null,
         appAnalysis: indicator == indicators.first ? aggregatedAnalysisResult : null, // Store aggregated analysis in the first indicator's entry
+        reviewerId: _selectedReviewer?.userId, // ADDED: Store reviewer's userId
       ));
       indicatorMap[indicator] = entryList;
       currentEnteredBy[indicator] = finalEnteredBy;
@@ -3279,7 +3770,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             width: double.infinity,
             child: DropdownButton<String?>(
               isExpanded: true,
-              value: selectedSupervisor,
+              value: _selectedSupervisor,
               items: supervisorNames.map((supervisorName) {
                 return DropdownMenuItem<String?>(
                   value: supervisorName,
@@ -3291,7 +3782,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               }).toList(),
               onChanged: (String? newValue) async {
                 setState(() {
-                  selectedSupervisor = newValue;
+                  _selectedSupervisor = newValue;
                 });
                 print("Selected Caritas Supervisor: $newValue");
 
@@ -3812,7 +4303,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   @override
   Widget build(BuildContext context) {
-    // Group thematic report definitions by department
+    // Group thematic report definitions by department (same as before)
     Map<String, List<Map<String, dynamic>>> departmentGroupedReports = {};
     for (var definition in _thematicReportDefinitions) {
       String departmentName = definition['department'];
@@ -3828,77 +4319,78 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
       appBar: _appBar(),
       backgroundColor: Colors.white,
-      body: Stack(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : IndexedStack( // Use IndexedStack to manage different tabs
+        index: _selectedIndex,
         children: [
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _addTaskBar(),
-                  const SizedBox(height: 10),
-                  _addDateBar(),
-                  const SizedBox(height: 30),
-                  const Divider(),
-                  const Divider(),
-                  Text(
-                    "Thematic Reports for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const Divider(),
-                  const Divider(),
-                  const SizedBox(height: 10),
+          SingleChildScrollView( // Daily Activity Monitoring Tab Content
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _addTaskBar(),
+                const SizedBox(height: 10),
+                _addDateBar(),
+                const SizedBox(height: 30),
+                const Divider(),
+                const Divider(),
+                Text(
+                  "Thematic Reports for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const Divider(),
+                const Divider(),
+                const SizedBox(height: 10),
 
-                  const SizedBox(height: 20),
-                  // Dynamically build department expandable widgets
-                  ...departmentGroupedReports.entries.map((entry) {
-                    String departmentName = entry.key;
-                    List<Map<String, dynamic>> designationReports = entry.value;
-                    return _buildDepartmentExpandable(departmentName, designationReports);
-                  }).toList(),
+                const SizedBox(height: 20),
+                // Dynamically build department expandable widgets (same as before)
+                ...departmentGroupedReports.entries.map((entry) {
+                  String departmentName = entry.key;
+                  List<Map<String, dynamic>> designationReports = entry.value;
+                  return _buildDepartmentExpandable(departmentName, designationReports);
+                }).toList(),
 
-                  const Divider(),
-                  const Divider(),
-                  Text(
-                    "Other Activities / Tasks for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                const Divider(),
+                const Divider(),
+                Text(
+                  "Other Activities / Tasks for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const Divider(),
+                const Divider(),
+                const SizedBox(height: 10),
+                if (_tasksForDate.isEmpty)
+                  const Text("No tasks added for this date.",
+                      style: TextStyle(fontWeight: FontWeight.bold))
+                else
+                  Column(
+                    children:
+                    _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
                   ),
-                  const Divider(),
-                  const Divider(),
-                  const SizedBox(height: 10),
-                  if (_tasksForDate.isEmpty)
-                    const Text("No tasks added for this date.",
-                        style: TextStyle(fontWeight: FontWeight.bold))
-                  else
-                    Column(
-                      children:
-                      _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
+                const Divider(),
+                const Divider(),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: buildSupervisorDropdown(),
                     ),
-                  const Divider(),
-                  const Divider(),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: buildSupervisorDropdown(),
-                      ),
-                      const SizedBox(width: 20),
-                      ElevatedButton(
-                        onPressed: _submitActivityToSupervisor,
-                        child: const Text("Submit Activity Report to Supervisor"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 100),
-                ],
-              ),
+                    const SizedBox(width: 20),
+                    ElevatedButton(
+                      onPressed: _submitActivityToSupervisor,
+                      child: const Text("Submit Activity Report to Supervisor"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 100),
+              ],
             ),
+          ),
+          _buildReviewListTab(), // Review List Tab Content
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended( // Show FAB only on Daily Activity Tab
         onPressed: () {
           _showAddTaskBottomSheet(context);
         },
@@ -3908,6 +4400,25 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         ),
         icon: const Icon(Icons.add, color: Colors.white),
         backgroundColor: Colors.red,
+      ) : null, // No FAB on Review List Tab
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today),
+            label: 'Daily Activity',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Review List',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.red,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
   }
