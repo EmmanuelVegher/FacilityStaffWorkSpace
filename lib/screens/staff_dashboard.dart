@@ -42,6 +42,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   final AttendanceAPI _attendanceAPI = AttendanceAPI();
   List<AttendanceRecord> _attendanceData = [];
   List<LocationRecord> _locationData = [];
+  List clockInSet = [];
+  List clockOutSet = [];
 
   String? _errorMessage;
   bool _isLoading = false;
@@ -53,6 +55,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   int _selectedYear = 2024;
 
   int _totalWorkHours = 0;
+  int _totalClockIn = 0;
+  int _totalClockOut = 0;
   int _minHoursWorked = 0;
   final String _minClockInTime = "N/A";
   int _maxHoursWorked = 0;
@@ -237,6 +241,53 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       padding: EdgeInsets.all(16.0 * cardPaddingFactor),
                       child: Column(
                         children: [
+                          Container(
+                            width: MediaQuery.of(context).size.width * 1,
+                            margin: const EdgeInsets.all(12.0),
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.red,
+                                    Colors.black,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(24),
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12.0, horizontal: 8.0),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    "Attendance Summary",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 15 * fontSizeFactor,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: 12.0,
+                                  ),
+
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        cardClockIn('$_totalClockIn',12 * fontSizeFactor,12 * fontSizeFactor,15 * iconSizeFactor),
+                                        cardClockOut('$_totalClockOut',12 * fontSizeFactor,12 * fontSizeFactor,15 * iconSizeFactor),
+                                      ],
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
                           _buildSummaryGrid(
                               context,
                               cardPaddingFactor,
@@ -303,6 +354,78 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget cardClockIn(String value,double fontsizeFactor,double fontsizeFactor2,iconSizeFactor) {
+    return Row(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          padding: const EdgeInsets.all(6.0),
+          margin: const EdgeInsets.only(right: 8.0),
+          child: Icon(
+            Icons.arrow_downward,
+            size: iconSizeFactor,
+            color: Colors.green[700],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Clock-In Total",
+              style: TextStyle(fontSize: fontsizeFactor, color: Colors.white),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                  fontSize: fontsizeFactor2,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white),
+            )
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget cardClockOut(String value,double fontSizeFactor,double fontSizeFactor2,double iconSizeFactor) {
+    return Row(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          padding: const EdgeInsets.all(6.0),
+          margin: const EdgeInsets.only(right: 8.0),
+          child: Icon(
+            Icons.arrow_upward,
+            size: iconSizeFactor,
+            color: Colors.red[700],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Clock-Out Total",
+              style: TextStyle(fontSize: fontSizeFactor, color: Colors.white),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                  fontSize: fontSizeFactor2,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white),
+            )
+          ],
+        )
+      ],
     );
   }
 
@@ -1200,6 +1323,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   void _calculateSummaryValues(List<AttendanceRecord> filteredData) {
     if (filteredData.isEmpty) {
       _totalWorkHours = 0;
+      _totalClockIn = 0;
+      _totalClockOut = 0;
       _minHoursWorked = 0;
       _maxHoursWorked = 0;
       _averageHoursWorked = 0;
@@ -1209,11 +1334,35 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     }
 
     _totalWorkHours = _calculateTotalWorkHours(filteredData);
+    _totalClockIn = _calculateTotalClockIn(filteredData);
+    _totalClockOut = _calculateTotalClockOut(filteredData);
     _minHoursWorked = _calculateMinHoursWorked(filteredData);
     _maxHoursWorked = _calculateMaxHoursWorked(filteredData);
     _averageHoursWorked = _calculateAverageHoursWorked(filteredData);
     _noOfHolidaysFilled = _calculateNoOfHolidaysFilled(filteredData);
     _noOfAnnualLeaveTaken = _calculateNoOfAnnualLeaveTaken(filteredData);
+  }
+
+  int  _calculateTotalClockIn(List<AttendanceRecord> filteredData) {
+    clockInSet = [];
+
+    for (var clockLength in filteredData) {
+      if (clockLength.clockInTime != "--/--") {
+        clockInSet.add(clockLength.clockInTime);
+      }
+    }
+    return clockInSet.isEmpty ? 0 : clockInSet.length;
+  }
+
+  int  _calculateTotalClockOut(List<AttendanceRecord> filteredData) {
+    clockOutSet = [];
+
+    for (var clockLength in filteredData) {
+      if (clockLength.clockOutTime != "--/--") {
+        clockOutSet.add(clockLength.clockOutTime);
+      }
+    }
+    return clockOutSet.isEmpty ? 0 : clockOutSet.length;
   }
 
   int _calculateTotalWorkHours(List<AttendanceRecord> filteredData) {

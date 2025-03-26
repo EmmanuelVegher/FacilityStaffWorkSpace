@@ -583,7 +583,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     <td style="$tdStyle">${_remainingLeaves.value?.annualLeaveBalance ?? 0}</td>
   </tr>
 
-  ${_bioInfo.value?.maritalStatus == 'Married' && _bioInfo.value?.gender == 'Female' ? """
+  ${_bioInfo.value?.gender == 'Female' ? """
     <tr>
       <td style="$tdStyle">Maternity Leave</td>
       <td style="$tdStyle">$_totalMaternityLeaves</td>
@@ -1776,7 +1776,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         _buildLeaveSummaryItem("Annual", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalAnnualLeaves.value, fontSizeFactor, paddingFactor));
 
 
-    if (selectedMaritalStatus == 'Married') {
+    //if (selectedMaritalStatus == 'Married') {
       // if (_bioInfo.value?.gender == 'Male') {
       //   leaveSummaryItems.add(
       //     _buildLeaveSummaryItem("Paternity", _totalPaternityLeaves.value - (_remainingLeaves.value?.paternityLeaveBalance ?? 0), _totalPaternityLeaves.value, fontSizeFactor, paddingFactor),
@@ -1788,7 +1788,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):_totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
         );
       }
-    }
+   // }
     leaveSummaryItems.add(_buildLeaveSummaryItem1("Holiday", _totalHolidayLeaves.value + (_remainingLeaves.value?.holidayLeaveBalance ?? 0), _totalHolidayLeaves.value, fontSizeFactor, paddingFactor));
 
 
@@ -2491,18 +2491,24 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return StatefulBuilder(builder: (context, setState) {
             List<Widget> leaveTypeButtons = [];
 
-            if (_bioInfo.value?.maritalStatus == 'Married') {
-              if (_bioInfo.value?.gender == 'Male') {
-                leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide  / 600))),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-                ]);
-              } else {
-                leaveTypeButtons.addAll([
-                  _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-                  _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-                ]);
-              }
+            if (_bioInfo.value?.gender == 'Female') {
+              // if (_bioInfo.value?.gender == 'Male') {
+              //   leaveTypeButtons.addAll([
+              //     _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide  / 600))),
+              //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+              //   ]);
+              // } else {
+              //   leaveTypeButtons.addAll([
+              //     _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+              //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+              //   ]);
+              // }
+
+              leaveTypeButtons.addAll([
+                _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+                _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
+              ]);
+
             } else {
               leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))));
             }
@@ -2874,13 +2880,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return;
         }
         break;
-      case 'Paternity':
-        final paternityBalance = _remainingLeaves.value!.paternityLeaveBalance;
-        if (paternityBalance != null && leaveDuration > paternityBalance) {
-          _showLeaveExceedsBalanceError(context, 'Paternity', paternityBalance, fontSizeFactor, paddingFactor);
-          return;
-        }
-        break;
+      // case 'Paternity':
+      //   final paternityBalance = _remainingLeaves.value!.paternityLeaveBalance;
+      //   if (paternityBalance != null && leaveDuration > paternityBalance) {
+      //     _showLeaveExceedsBalanceError(context, 'Paternity', paternityBalance, fontSizeFactor, paddingFactor);
+      //     return;
+      //   }
+      //   break;
       case 'Maternity':
         final maternityBalance = _remainingLeaves.value!.maternityLeaveBalance;
         if (maternityBalance != null && leaveDuration > maternityBalance) {
@@ -3158,9 +3164,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           case 'Annual':
             currentAnnualLeaveBalance = (currentAnnualLeaveBalance - daysToDeduct).clamp(0, _totalAnnualLeaves.value);
             break;
-          case 'Paternity':
-            currentPaternityLeaveBalance = (currentPaternityLeaveBalance - daysToDeduct).clamp(0, _totalPaternityLeaves.value);
-            break;
+          // case 'Paternity':
+          //   currentPaternityLeaveBalance = (currentPaternityLeaveBalance - daysToDeduct).clamp(0, _totalPaternityLeaves.value);
+          //   break;
           case 'Maternity':
             currentMaternityLeaveBalance = (currentMaternityLeaveBalance - daysToDeduct).clamp(0, _totalMaternityLeaves.value);
             break;
@@ -3393,9 +3399,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               case 'Annual':
                 currentAnnualLeaveBalance = (currentAnnualLeaveBalance - leaveDuration).clamp(0, _totalAnnualLeaves.value);
                 break;
-              case 'Paternity':
-                currentPaternityLeaveBalance = (currentPaternityLeaveBalance - leaveDuration).clamp(0, _totalPaternityLeaves.value);
-                break;
+              // case 'Paternity':
+              //   currentPaternityLeaveBalance = (currentPaternityLeaveBalance - leaveDuration).clamp(0, _totalPaternityLeaves.value);
+              //   break;
               case 'Maternity':
                 currentMaternityLeaveBalance = (currentMaternityLeaveBalance - leaveDuration).clamp(0, _totalMaternityLeaves.value);
                 break;

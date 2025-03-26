@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -677,6 +678,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   final String bioCollection = 'BioData';
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService(); // Initialize FirestoreService
+  int _totalClockIn = 0;
+  int _totalClockOut = 0;
 
   // Report Operations
   Future<List<Report>> getReportsByDate(DateTime date, BioModel? bioModel) async {
@@ -4303,6 +4306,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    double fontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
+    double paddingFactor = max(0.8, min(1.2, screenWidth / 800));
+    double marginFactor = max(0.8, min(1.2, screenWidth / 800));
+    double iconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
     // Group thematic report definitions by department (same as before)
     Map<String, List<Map<String, dynamic>>> departmentGroupedReports = {};
     for (var definition in _thematicReportDefinitions) {
