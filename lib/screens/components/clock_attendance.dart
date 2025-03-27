@@ -791,28 +791,28 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
     return GestureDetector(
       onTap: () async {
         // Check if it's last thursday of the month and survey is needed
-        if (isLastThursdayOfMonth(DateTime.now())) {
-          final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
-          if (!hasSurvey) {
-            Fluttertoast.showToast(
-              msg: "Kindly Fill the Survey Before Clocking In",
-              toastLength: Toast.LENGTH_LONG,
-              backgroundColor: Colors.black54,
-              gravity: ToastGravity.BOTTOM,
-              timeInSecForIosWeb: 1,
-              textColor: Colors.white,
-              fontSize: 16.0,
-            );
-            // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PsychologicalMetricsPage(),
-              ),
-            );
-            return; // Stop clock-in process for now
-          }
-        }
+        // if (isLastThursdayOfMonth(DateTime.now())) {
+        //   final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
+        //   if (!hasSurvey) {
+        //     Fluttertoast.showToast(
+        //       msg: "Kindly Fill the Survey Before Clocking In",
+        //       toastLength: Toast.LENGTH_LONG,
+        //       backgroundColor: Colors.black54,
+        //       gravity: ToastGravity.BOTTOM,
+        //       timeInSecForIosWeb: 1,
+        //       textColor: Colors.white,
+        //       fontSize: 16.0,
+        //     );
+        //     // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
+        //     Navigator.pushReplacement(
+        //       context,
+        //       MaterialPageRoute(
+        //         builder: (context) => const PsychologicalMetricsPage(),
+        //       ),
+        //     );
+        //     return; // Stop clock-in process for now
+        //   }
+        // }
         await controller.clockInUpdated(
             context, controller.lati.value, controller.longi.value, controller.location.value); // Pass context here
       },
