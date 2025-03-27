@@ -75,6 +75,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   String? _currentUserState;
   String? _currentUserLocation;
   String? _currentUserStaffCategory;
+  String? _currentFirstName;
+  String? _currentLastName;
+  String? _currentDesignation;
+  String? _currentProfileImage;
   final Map<String, Map<String, dynamic>> _bestPlayerCache = {};
   int _totalSurveysCountedForBestPlayer = 0; // Added survey count variable
 
@@ -127,9 +131,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             _currentUserState = bioData['state'] as String?;
             _currentUserLocation = bioData['location'] as String?;
             _currentUserStaffCategory = bioData['staffCategory'] as String?;
+            _currentFirstName = bioData['firstName'] as String?;
+            _currentLastName = bioData['lastName'] as String?;
+            _currentDesignation = bioData['designation'] as String?;
+            _currentProfileImage = bioData['photoUrl'] as String?;
           });
           print(
-              "Current User State: $_currentUserState, Location: $_currentUserLocation");
+              "Current User State: $_currentUserState, Location: $_currentUserLocation, Profile Image: $_currentProfileImage");
         } else {
           print("Bio data is null for UUID: $userUUID");
         }
@@ -241,6 +249,35 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       padding: EdgeInsets.all(16.0 * cardPaddingFactor),
                       child: Column(
                         children: [
+                          // Profile Image Container
+                          Container(
+                            width: 60 * iconSizeFactor,
+                            height: 60 * iconSizeFactor,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Builder( // Use a Builder to get context for print statement
+                              builder: (BuildContext context) {
+                                print("Profile Image URL: $_currentProfileImage"); // Debug print
+
+                                if (_currentProfileImage != null && _currentProfileImage!.isNotEmpty) {
+                                  return Image.network(
+                                    _currentProfileImage!,
+                                    fit: BoxFit.cover,
+                                    key: ValueKey(_currentProfileImage), // Add ValueKey for potential cache refresh
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print("Image Load Error: $error, Stacktrace: $stackTrace"); // Detailed error logging
+                                      return const Icon(Icons.person, color: Colors.white, size: 40); // Fallback icon on error
+                                    },
+                                  );
+                                } else {
+                                  return const Icon(Icons.person, color: Colors.white, size: 40); // Default person icon
+                                }
+                              },
+                            ),
+                          ),
                           Container(
                             width: MediaQuery.of(context).size.width * 1,
                             margin: const EdgeInsets.all(12.0),
@@ -260,6 +297,61 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                   vertical: 12.0, horizontal: 8.0),
                               child: Column(
                                 children: [
+                                  // Profile Section Added Here
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      children: [
+                                        // Profile Image Container
+                                        Container(
+                                          width: 60 * iconSizeFactor,
+                                          height: 60 * iconSizeFactor,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 2),
+                                          ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: _currentProfileImage != null && _currentProfileImage!.isNotEmpty
+                                              ? Image.network(
+                                            _currentProfileImage!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: Colors.white, size: 40), // Fallback icon on error
+                                          )
+                                              : const Icon(Icons.person, color: Colors.white, size: 40), // Default person icon
+                                        ),
+                                        SizedBox(width: 12 * cardMarginFactor),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '$_currentFirstName $_currentLastName', // Display Full Name
+                                                style: TextStyle(
+                                                  fontSize: 16 * fontSizeFactor,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              Text(
+                                                _currentDesignation ?? 'Designation N/A', // Display Designation
+                                                style: TextStyle(
+                                                  fontSize: 12 * fontSizeFactor,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                              Text(
+                                                _currentUserLocation ?? 'Location N/A', // Display Location
+                                                style: TextStyle(
+                                                  fontSize: 12 * fontSizeFactor,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                   Text(
                                     "Attendance Summary",
                                     textAlign: TextAlign.center,
@@ -272,7 +364,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                   const SizedBox(
                                     height: 12.0,
                                   ),
-
                                   Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Row(
