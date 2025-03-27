@@ -249,35 +249,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       padding: EdgeInsets.all(16.0 * cardPaddingFactor),
                       child: Column(
                         children: [
-                          // Profile Image Container
-                          Container(
-                            width: 60 * iconSizeFactor,
-                            height: 60 * iconSizeFactor,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Builder( // Use a Builder to get context for print statement
-                              builder: (BuildContext context) {
-                                print("Profile Image URL: $_currentProfileImage"); // Debug print
 
-                                if (_currentProfileImage != null && _currentProfileImage!.isNotEmpty) {
-                                  return Image.network(
-                                    _currentProfileImage!,
-                                    fit: BoxFit.cover,
-                                    key: ValueKey(_currentProfileImage), // Add ValueKey for potential cache refresh
-                                    errorBuilder: (context, error, stackTrace) {
-                                      print("Image Load Error: $error, Stacktrace: $stackTrace"); // Detailed error logging
-                                      return const Icon(Icons.person, color: Colors.white, size: 40); // Fallback icon on error
-                                    },
-                                  );
-                                } else {
-                                  return const Icon(Icons.person, color: Colors.white, size: 40); // Default person icon
-                                }
-                              },
-                            ),
-                          ),
                           Container(
                             width: MediaQuery.of(context).size.width * 1,
                             margin: const EdgeInsets.all(12.0),
