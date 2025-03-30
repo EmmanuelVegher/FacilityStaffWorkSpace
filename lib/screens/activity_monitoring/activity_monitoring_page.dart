@@ -13,6 +13,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Storage
 //import 'package:firebase_ml_vision/firebase_ml_vision.dart'; // Import Firebase ML Vision
@@ -254,7 +255,6 @@ class Report {
   }
 }
 
-// task.dart
 class Task {
   int? id; // Not used in Firestore, Firestore generates document IDs
   DateTime? date;
@@ -264,6 +264,7 @@ class Task {
   String? taskStatus;
   List<String>? attachments;
   String? reviewedBy; // ADDED: Field to store the reviewer's name
+  String? appAnalysis; // ADDED: Field to store Gemini analysis for tasks
 
   Task({
     this.id,
@@ -274,6 +275,7 @@ class Task {
     this.taskStatus,
     this.attachments,
     this.reviewedBy, // ADDED: Include in constructor
+    this.appAnalysis, // ADDED: Include in constructor
   });
 
 
@@ -291,6 +293,7 @@ class Task {
       attachments:
       (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       reviewedBy: data?['reviewedBy'], // ADDED: Retrieve from Firestore data
+      appAnalysis: data?['appAnalysis'], // ADDED: Retrieve appAnalysis from Firestore
     );
   }
 
@@ -303,9 +306,11 @@ class Task {
       if (taskStatus != null) 'taskStatus': taskStatus,
       if (attachments != null) 'attachments': attachments,
       if (reviewedBy != null) 'reviewedBy': reviewedBy, // ADDED: Include in Firestore data
+      if (appAnalysis != null) 'appAnalysis': appAnalysis, // ADDED: Include appAnalysis in Firestore data
     };
   }
 }
+
 
 class FacilityStaffModel {
   String? id;
@@ -375,6 +380,8 @@ class FirestoreService {
     print("Current UUID === ${_auth.currentUser?.uid}");
     return _auth.currentUser?.uid;
   }
+
+
 
   // BioData Operations (same as before)
   Future<BioModel?> getBioData() async {
@@ -787,7 +794,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
   // Task Operations
-  Future<List<Task>> getTasksByDate(DateTime date) async {
+  Future<List<Task>> getTasksByDate2(DateTime date) async {
     try {
       // Get the start of the day (12:00 AM) for the given date
       DateTime startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
@@ -812,7 +819,118 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
+  // Task Operations (Updated for new path)
+  Future<List<Task>> getTasksByDate(DateTime date) async {
+    try {
+      if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
+        print("BioModel or user ID data is incomplete, cannot fetch tasks.");
+        return [];
+      }
+      return await getTasksByDate1(date, bioData, selectedFirebaseId!);
+    } catch (e) {
+      print("Error fetching tasks by date in Page: $e");
+      return [];
+    }
+  }
+
+
+  // Task Operations (Updated for new path)
+  Future<List<Task>> getTasksByDate1(DateTime date, BioModel? bioModel, String selectedFirebaseId) async {
+    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
+      print("BioModel or user ID data is incomplete, cannot fetch tasks.");
+      return [];
+    }
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(date);
+      final CollectionReference<Map<String, dynamic>> taskCollectionRef = _firestore
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection("Task") // Sub-collection named "Task"
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(selectedFirebaseId)
+          .collection(selectedFirebaseId); // User ID as sub-collection
+
+
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await taskCollectionRef.get();
+      return snapshot.docs.map((doc) => Task.fromFirestore(doc, null)).toList();
+    } catch (e) {
+      print("Error fetching tasks by date from new path: $e");
+      print("Error details: $e");
+      return [];
+    }
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    try {
+      if (bioData == null || selectedFirebaseId == null || taskId == null) {
+        print("BioModel or task ID data is incomplete, cannot delete task.");
+        return;
+      }
+      await deleteTask1(taskId, bioData, selectedFirebaseId!, _selectedReportingDate);
+    } catch (e) {
+      print("Error deleting task in Page: $e");
+      print("Error details: $e");
+    }
+  }
+
+
+  Future<void> deleteTask1(String taskId, BioModel? bioModel, String selectedFirebaseId, DateTime date) async {
+    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null || taskId == null) {
+      print("BioModel or user ID data is incomplete, cannot delete task.");
+      return;
+    }
+    try {
+      print("taskId ==$taskId");
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(date);
+      final DocumentReference taskDocRef = _firestore
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection("Task") // Sub-collection named "Task"
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(selectedFirebaseId)
+          .collection(selectedFirebaseId)
+          .doc(taskId); // Task ID as document
+      print("taskId ==$taskDocRef");
+      await taskDocRef.delete();
+    } catch (e) {
+      print("Error deleting task from new path: $e");
+      print("Error details: $e");
+    }
+  }
+
+
+
   Future<void> saveTask(Task task) async {
+    String taskId = Uuid().v4();
+    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
+      print("BioModel or user ID data is incomplete, cannot save task.");
+      return;
+    }
+
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(task.date!);
+      final DocumentReference taskDocRef = _firestore
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection("Task") // Sub-collection named "Task"
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(selectedFirebaseId)
+          .collection(selectedFirebaseId!)
+          .doc(taskId); // Task ID as document
+
+
+      await taskDocRef.set(task.toFirestore(), SetOptions(merge: true));
+    } catch (e) {
+      print("Error saving task to new path: $e");
+      print("Error details: $e");
+    }
+  }
+
+
+  Future<void> saveTask1(Task task) async {
     try {
       await _firestore.collection(tasksCollection).add(task.toFirestore());
     } catch (e) {
@@ -840,15 +958,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
-  Future<void> pushTaskToFirebase(Task task) async {
-    try {
-      await saveTask(task); // Save task to Firestore
-      await updateTaskSyncStatus(task.id.toString(), true);
-    } catch (e) {
-      print("Error pushing task to Firebase: $e");
-      print("Error details: $e"); // More detailed error log
-    }
-  }
+  // Future<void> pushTaskToFirebase(Task task) async {
+  //   try {
+  //     await saveTask(task); // Save task to Firestore
+  //     await updateTaskSyncStatus(task.id.toString(), true);
+  //   } catch (e) {
+  //     print("Error pushing task to Firebase: $e");
+  //     print("Error details: $e"); // More detailed error log
+  //   }
+  // }
 
   Future<void> updateTaskSyncStatus(String taskId, bool isSynced) async {
     try {
@@ -869,7 +987,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return [];
   }
 
-  Future<void> deleteTask(String taskId) async {
+  Future<void> deleteTask2(String taskId) async {
     try {
       await _firestore.collection(tasksCollection).doc(taskId).delete();
     } catch (e) {
@@ -961,8 +1079,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   List<String> _monthlyOptions = []; // Options for month dropdown.
   final Map<String, bool> _isEditingReportSection =
   {}; // Tracks if a report section is in editing mode.
-  final Map<String, Report?> _loadedReports =
-  {}; // Stores loaded reports for the selected date.
+  final Map<String, Map<String, bool>> _isIndicatorEditable = {}; // Tracks if an indicator is in editing mode within a report section.
+  final Map<String, Report?> _loadedReports = {}; // Keep this
   List<Task> _tasksForDate = []; // Stores tasks for the selected date.
   Map<String, List<Report>> _allReportsForDate = {}; // Stores all reports for the selected date, grouped by department
 
@@ -977,6 +1095,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   bool _isLoading = true; // Loading indicator flag.
   Color _datePickerSelectionColor = Colors.red;
   Color _datePickerSelectedTextColor = Colors.white;
+  // Add a boolean variable to track saving state
+  bool _isSavingReport = false;
+  // NEW: State for validation progress
+  bool _isValidating = false;
+  // NEW: State for Gemini analysis progress
+  bool _isAnalyzingImage = false;
 
   final GlobalKey<FormState> _genericFormKey =
   GlobalKey<FormState>(); // Single generic form key
@@ -2310,27 +2434,75 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     });
     print("_loadTasksForSelectedDate: Fetched tasks count: ${_tasksForDate.length}");
   }
-
-  // Updates the TextEditingController values from the loaded reports. (Modified to be dynamic)
   void _updateControllerValuesFromLoadedReports() {
     _thematicReportDefinitions.forEach((definition) {
       String reportTypeKey = "${definition['department']}_${definition['designation']}"
           .toLowerCase()
           .replaceAll(' ', '_');
       List<String> indicators =
-      List<String>.from(definition['indicators'] ?? []); // Ensure indicators are loaded
+      List<String>.from(definition['indicators'] ?? []);
 
       if (!_isControllerMapInitialized(reportTypeKey)) {
         _initializeControllerMap(reportTypeKey, indicators);
+        _initializeEditableMap(reportTypeKey, indicators);
       }
       _updateControllersFromReport(
           _loadedReports[reportTypeKey],
           reportControllers[reportTypeKey]!,
           indicators,
           reportUsernames[reportTypeKey]!,
-          reportEditedUsernames[reportTypeKey]!);
+          reportEditedUsernames[reportTypeKey]!,
+          reportTypeKey);
     });
   }
+
+
+
+// Helper function to initialize _isIndicatorEditable map
+void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
+  _isIndicatorEditable[reportTypeKey] = {};
+  for (String indicator in indicators) {
+    _isIndicatorEditable[reportTypeKey]![indicator] = false; // Default to not editable
+  }
+}
+
+  void _updateControllersFromReport(
+      Report? report,
+      Map<String, TextEditingController> controllers,
+      List<String> indicators,
+      Map<String, String?> usernames,
+      Map<String, String?> editedUsernames,
+      String reportTypeKey
+      ) {
+    String reportType = report?.reportType ?? 'unknown';
+    if (report != null && report.reportEntries != null) {
+      final username = _currentUsername;
+      if (report.reportEntries![username] != null) {
+        for (var indicatorEntry in report.reportEntries![username]!.entries) {
+          final indicatorName = indicatorEntry.key;
+          final entryList = indicatorEntry.value;
+          if (entryList.isNotEmpty) {
+            final entry = entryList.first;
+            if (controllers.containsKey(indicatorName)) {
+              // Load text only if status is Pending or Returned OR if indicator is in edit mode.
+              if (entry.reviewStatus == 'Pending' || entry.reviewStatus == 'Returned' || (_isIndicatorEditable[reportTypeKey]?[indicatorName] ?? false)) {
+                controllers[indicatorName]!.text = entry.value;
+              }
+              // **MODIFIED: Do NOT clear for Approved status. Retain the value.**
+              // else {
+              //   controllers[indicatorName]!.text = ""; // Clear for Approved status in edit mode
+              // }
+              usernames[indicatorName] = entry.enteredBy;
+              editedUsernames[indicatorName] = entry.editedBy;
+            }
+          }
+        }
+      }
+    } else {
+      _resetControllers(controllers, indicators, usernames, editedUsernames);
+    }
+  }
+
 
   bool _isControllerMapInitialized(String reportTypeKey) {
     return reportControllers.containsKey(reportTypeKey);
@@ -2338,7 +2510,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
   // Helper function to update controllers for a specific report type from a loaded report. (Modified to be dynamic)
-  void _updateControllersFromReport(
+  void _updateControllersFromReport1(
       Report? report,
       Map<String, TextEditingController> controllers,
       List<String> indicators,
@@ -2399,25 +2571,38 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return months;
   }
 
-// Builds a single indicator text field, either as read-only text or editable TextFormField.
+// Builds a single indicator text field, either as read-only text or editable TextFormField. (Modified to handle indicator editability and display for "Approved")
   Widget _buildIndicatorTextField({
     required Map<String, TextEditingController> controllers,
     required String indicator,
     required Map<String, String?> usernames,
-    required Map<String, String?> editedUsernames, // Map to hold edited by usernames
+    required Map<String, String?> editedUsernames,
     required bool isReadOnly,
     required VoidCallback onEditPressed,
-    required String reportType, // Add reportType here
+    required String reportType,
   }) {
     TextInputType keyboardType = indicator == "Comments"
         ? TextInputType.multiline
-        : TextInputType.number; // Set keyboard type based on indicator.
+        : TextInputType.number;
+
+    Report? loadedReport = _loadedReports[reportType];
+    String reviewStatus = '';
+    String indicatorValue = '';
+    if (loadedReport?.reportEntries?[_currentUsername]?[indicator]?.isNotEmpty == true) {
+      reviewStatus = loadedReport!.reportEntries![_currentUsername]![indicator]!.first.reviewStatus ?? '';
+      indicatorValue = loadedReport.reportEntries![_currentUsername]![indicator]!.first.value;
+    }
+
+    bool currentIndicatorReadOnly = isReadOnly || reviewStatus == 'Approved';
+    bool isIndicatorCurrentlyEditable = _isIndicatorEditable[reportType]?[indicator] ?? false;
+
+    bool finalReadOnlyState = currentIndicatorReadOnly && !isIndicatorCurrentlyEditable;
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: isReadOnly
+      child: finalReadOnlyState
           ? Column(
-        // Display as Text widgets when read-only
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           RichText(
@@ -2426,14 +2611,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               children: <TextSpan>[
                 TextSpan(text: "$indicator: "),
                 TextSpan(
-                  text: controllers[indicator]!.text.isNotEmpty
-                      ? controllers[indicator]!.text
-                      : 'Not Entered', // Display value or "Not Entered"
+                  text: indicatorValue.isNotEmpty // Use indicatorValue here
+                      ? indicatorValue // Display actual value
+                      : 'Not Entered',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: controllers[indicator]!.text.isNotEmpty
-                        ? Colors.black
-                        : Colors.red, // Conditional color
+                    color: reviewStatus == 'Approved' && indicatorValue.isNotEmpty ? Colors.green : (indicatorValue.isNotEmpty ? Colors.black : Colors.red), // Green for Approved and has value, black for other value, red for Not Entered
                   ),
                 ),
               ],
@@ -2441,7 +2624,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           ),
           if (usernames[indicator] != null &&
               usernames[indicator]!.isNotEmpty)
-          // Display "Entered by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -2451,7 +2633,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             ),
           if (editedUsernames[indicator] != null &&
               editedUsernames[indicator]!.isNotEmpty)
-          // Display "Edited by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -2459,16 +2640,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 style: const TextStyle(color: Colors.blue, fontSize: 12.0),
               ),
             ),
-          // Display review fields when in ReadOnly mode
-          if (isReadOnly)
+          if (finalReadOnlyState)
             _buildReviewFieldsReadOnly(
-                indicator: indicator,
-                reportType:
-                reportType), // Call helper function to build review fields
+                indicator: indicator, reportType: reportType),
         ],
       )
           : Column(
-        // Display as TextFormField when editable
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -2484,37 +2661,36 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                   controller: controllers[indicator],
                   keyboardType: keyboardType,
                   maxLines: indicator == "Comments" ? 3 : 1,
-                  readOnly: isReadOnly, // Set readOnly based on isReadOnly flag.
+                  readOnly: finalReadOnlyState,
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 8),
-                    suffixIcon: isReadOnly
+                    suffixIcon: isReadOnly && reviewStatus != 'Approved'
                         ? IconButton(
-                      // Show edit icon only in read-only mode.
                       icon: const Icon(Icons.edit),
-                      onPressed: onEditPressed, // Callback to switch to edit mode.
+                      onPressed: () {
+                        setState(() {
+                          _isIndicatorEditable[reportType]![indicator] = true;
+                        });
+                      },
                     )
                         : null,
                   ),
                   onChanged: (value) {
-                    // Set onChanged to track entered/edited by usernames
                     setState(() {
                       if (value.isNotEmpty &&
                           (usernames[indicator] == null ||
                               usernames[indicator]!.isEmpty)) {
-                        usernames[indicator] = _currentUsername; // Update Entered By username on first change if empty
-                        editedUsernames[indicator] =
-                        null; // Reset edited by if newly entered
+                        usernames[indicator] = _currentUsername;
+                        editedUsernames[indicator] = null;
                       } else if (value.isNotEmpty &&
                           value != controllers[indicator]!.text) {
-                        editedUsernames[indicator] = _currentUsername; // Update Edited By username on subsequent change
+                        editedUsernames[indicator] = _currentUsername;
                       } else if (value.isEmpty) {
-                        usernames[indicator] =
-                        null; // Clear usernames when field is cleared
-                        editedUsernames[indicator] =
-                        null; // Clear edited usernames when field is cleared
+                        usernames[indicator] = null;
+                        editedUsernames[indicator] = null;
                       }
                     });
                   },
@@ -2524,7 +2700,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           ),
           if (usernames[indicator] != null &&
               usernames[indicator]!.isNotEmpty)
-          // Display "Entered by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -2534,7 +2709,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             ),
           if (editedUsernames[indicator] != null &&
               editedUsernames[indicator]!.isNotEmpty)
-          // Display "Edited by" username if available.
             Padding(
               padding: const EdgeInsets.only(top: 2.0, left: 10.0),
               child: Text(
@@ -2547,6 +2721,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
     );
   }
+
+
 
   // Helper function to build review fields in ReadOnly mode
   Widget _buildReviewFieldsReadOnly({required String indicator, required String reportType}) {
@@ -2792,11 +2968,62 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         "contents": [
           {
             "parts": [
+              // {
+              //   "text": '''
+              // Analyze the uploaded image and check if the title reads 'HIV TESTING SERVICES REGISTER'.
+              // If the title matches, extract relevant data and generate a table with the following structure:
+              //
+              // Table Columns:
+              // - Indicator (Describes the missing data type)
+              // - Count (Number of occurrences where the specified data is missing)
+              //
+              // Indicators and Their Counting Criteria:
+              // 1. 'Number of Records with the "Date (DD/MM/YY)" column with filled data': Count cells with data in the "Date (DD/MM/YY)" column for S/N 1 to 15.
+              // 2. 'Number of Records with the "Clients Code" column with filled data': Count cells with data in the "Clients Code" column for S/N 1 to 15 under the same row conditions.
+              // 3. 'Number of Records with the "Pre-Test Information session" column with filled data': Count cells with data in the "Pre-Test Information session" column for S/N 1 to 15 under the same row conditions.
+              // 4. 'Number of Records with the "Result" column with filled data': Count cells with data in the "Result" column for S/N 1 to 15 under the same row conditions.
+              //
+              // Return only the table with calculated values.Do not add your summary analysis.
+              // '''
+              // },
+
               {
-                "text": """
-          Dear Gemini, Kindly Analyze this image in the context of the following indicators: $indicatorsPrompt.
-     """
+                "text": '''
+              Analyze the uploaded image and check for the Following:
+              A) Check if the title reads 'HIV TESTING SERVICES REGISTER'.
+              If the title matches,scan the image and only make your analysis on rows that have data in any of the cell for that row and extract relevant data and generate a table with the following structure:
+
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with "Date (DD/MM/YY)" not filled': Count missing cells in the "Date (DD/MM/YY)" column. Only count if the cell in the  "Date (DD/MM/YY)" column is empty but has data in any other cell in the same Row.
+              2. 'Number of Records with "Clients Code" not filled': Count missing cells in the "Clients Code" column under the same row conditions.Only count if the cell in the "Clients Code" column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "Pre-Test Information session" not filled': Count missing cells in the "Pre-Test Information session" column under the same row conditions.Only count if the cell in the "Pre-Test Information session" column is empty but has data in any other cell in the same Row.
+              4. 'Number of Records without a ticked HIV Result': The different age range columns from 1-4 down to 50+ are separated into two sections:**Tested and Received HIV Negative Test Result** and **Tested and Received HIV positive Test Result**.A record in a row with Date filled and Client code has to be ticked in one of the age range cells in either the Postive Test Result section or Negative Test Result Section.Check through each age bracket cell for both section and if there is no "X" indicated in any cell for that Row in any section, count it.
+
+              Return only the table with calculated values.Do not add your summary analysis.
+              
+              B) If it does not  match 'HIV TESTING SERVICES REGISTER' ,then Check if the title reads 'Index Testing Register'.
+              If the title matches,scan the image and only make your analysis on rows that have data in any of the cell for that row and extract relevant data and generate a table with the following structure:
+
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with "INDEX CLIENT'S NAME IN FULL" not filled': Count missing cells in the "INDEX CLIENT'S NAME IN FULL" column. Only count if the cell in the  "NDEX CLIENT'S NAME IN FULL" column is empty but has data in any other cell in the same Row.Also note that the Cells in the "INDEX CLIENT'S NAME IN FULL" Column is sub-divide into two cells 
+              2. 'Number of Records with "Client Code/Unique ID" not filled': Count missing cells in the "Client Code/Unique ID" column. Only count if the cell in the  "Client Code/Unique ID" column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "Age" not filled': The "Age" Column is divided into two sections:**<1 year** and **>=1 year**.Check bothe columns and if both cells are missing, it means that no age was recorded,and so count it.Only count if the cell in the "Age" column is empty but has data in any other cell in the same Row.
+              4. 'Number of Records with "Sex" not filled': Count missing cells in the "Sex" column under the same row conditions.Only count if the cell in the "Sex" column is empty but has data in any other cell in the same Row.
+              5. 'Number of Records with "Marital Status" not filled': Count missing cells in the "Marital Status" column under the same row conditions.Only count if the cell in the "Marital Status" column is empty but has data in any other cell in the same Row.
+              6. 'Index Contacts Elicitation section': check the "Index Contact's Name in full" column which has a group of four cells numbered from 0ne to Four.Check if any of the cell numbered as "1" does not have data then count it.
+
+              Return only the table with calculated values.Do not add your summary analysis.
+              '''
               },
+
               {
                 "inline_data": {
                   "mime_type": "image/jpeg",
@@ -2853,7 +3080,22 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         "contents": [
           {
             "parts": [
-              {"text": "Analyze this image based on indicators for the designation: $designationPrompt. Describe the image and identify any relevant information."},
+              {"text": '''
+              Analyze the uploaded image and check if the title reads 'HIV TESTING SERVICES REGISTER'.
+              If the title matches, extract relevant data and generate a table with the following structure:
+              
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+              
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with the "Date (DD/MM/YY)" column not filled': Count missing cells in the "Date (DD/MM/YY)" column for S/N 1 to 15. Only count a row if at least one other field in the same row is filled.
+              2. 'Number of Records with the "Clients Code" column not filled': Count missing cells in the "Clients Code" column for S/N 1 to 15 under the same row conditions.
+              3. 'Number of Records with the "Pre-Test Information session" missing': Count missing cells in the "Pre-Test Information session" column for S/N 1 to 15 under the same row conditions.
+              4. 'Number of Records with the "Result" column missing': Count missing cells in the "Result" column for S/N 1 to 15 under the same row conditions.
+              
+              Return the table with calculated values.
+              '''},
               {
                 "inlineData": {
                   "mimeType": "image/png",  // Ensure correct MIME type
@@ -2886,8 +3128,509 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
+  // NEW Method: Indicator Validation Logic
+  Future<bool> _validateIndicators2(String reportTypeKey, Map<String, TextEditingController> controllers) async {
+    if (reportTypeKey == "strategic_information_si_assistant") {
+      final txNewEntriesController = controllers["number_of_tx_new_entries_entered_on_the_nmrs_emr"]; //SI Assistant Indicator
+      final hivPositiveClientsController = reportControllers["prevention_hts_assistant"]?["number_of_clients_diagnosed_hiv_positive"]; // HTS Assistant Indicator
 
-// Saves the report data to Firestore database. (Modified for dynamic indicators and Firebase Storage)
+      if (txNewEntriesController != null && hivPositiveClientsController != null) {
+        int txNewEntries = int.tryParse(txNewEntriesController.text) ?? 0;
+        int hivPositiveClients = int.tryParse(hivPositiveClientsController.text) ?? 0;
+
+        if (txNewEntries != hivPositiveClients) {
+          bool? continueSave = await showDialog<bool>(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text("Data Validation Issue"),
+                content: Text(
+                    "Validation failed:\nNumber of TX_New Entries ($txNewEntries) does not match Number of clients diagnosed HIV Positive ($hivPositiveClients).\n\nDo you want to continue saving?"),
+                actions: <Widget>[
+                  TextButton(
+                    child: const Text("No, Cancel"),
+                    onPressed: () {
+                      Navigator.of(context).pop(false); // Do not continue saving
+                    },
+                  ),
+                  TextButton(
+                    child: const Text("Yes, Continue"),
+                    onPressed: () {
+                      Navigator.of(context).pop(true); // Continue saving
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+          return continueSave ?? false; // Return user's choice (or false if dialog dismissed)
+        }
+      }
+    }
+    return true; // Validation passed or not applicable
+  }
+  // Helper Method to Fetch Report from Firestore (Already defined - keep it)
+  Future<Report?> _fetchReportFromFirestore(String reportTypeKey) async {
+    // ... (your existing _fetchReportFromFirestore method - no changes needed)
+    if (selectedBioState == null || selectedBioLocation == null) {
+      print("_fetchReportFromFirestore: BioModel data is incomplete, cannot fetch report.");
+      return null;
+    }
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(_selectedReportingDate);
+      final DocumentSnapshot<Map<String, dynamic>> reportDocSnapshot = await FirebaseFirestore.instance
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(reportTypeKey)
+          .get();
+
+      if (reportDocSnapshot.exists) {
+        return Report.fromFirestore(reportDocSnapshot, null);
+      } else {
+        print("_fetchReportFromFirestore: No report found for type: $reportTypeKey, date: $_selectedReportingDate");
+        return null; // Report does not exist yet
+      }
+    } catch (e) {
+      print("Error fetching report from Firestore for type $reportTypeKey: $e");
+      return null;
+    }
+  }
+
+
+  // NEW Method: Indicator Validation Logic - Modified and Corrected
+  Future<bool> _validateIndicators(String reportTypeKey, Map<String, TextEditingController> controllers) async {
+    String siAssistantReportKey = "strategic_information_si_assistant";
+    String htsAssistantReportKey = "preventions_hts_assistant";
+    String pharmTechReportKey = "pharmacy_and_logistics_pharmacy_technician";
+    String labVLChampionReportKey = "laboratory_viral_load_champion";
+    String trackingAssistantReportKey = "preventions_tracking_assistant";
+
+
+    String txNewIndicatorKey = "Number of Tx_New Clients Entries Entered on NMRS (EMR) For the Day";
+    String hivPositiveLinkedToArtIndicatorKey = "Number of newly diagnosed HIV positive linked to ART For the Day";
+    String diagnosedHIVPositiveIndicatorKey = "Number of Clients Diagnosed HIV Positive For the Day";
+    String vlResultHandedOverIndicatorKey = "Number of Result Handed over to SIAs /MEAL For the Day";
+    String vlResultEnteredNMRSIndicatorKey = "Number of Viral Load Results Entered on NMRS (EMR) For the Day";
+    String eligibleClientsTestedHTSRegisterIndicatorKey = "Number of Eligible Clients Tested and documented in the HTS Register For the Day";
+    String htsDataEnteredNMRSIndicatorKey = "Number of HTS Data Entered on NMRS (EMR) For the Day";
+    String existingClientsEntriesNMRSIndicatorKey = "Number of Existing Clients Entries Entered on NMRS (EMR) For the Day";
+    String refillClientsIndicatorKey = "Number of Refill Clients For the day";
+    String newARTClientsIndicatorKey = "Number of New ART Clients For the day";
+    String arvPickUpClientsIndicatorKey = "Total Number of Clients that Visited the Facility for ARV Pick Up For the Day";
+    String eligibleForTestingIndicatorKey = "Number Eligible for Testing For the Day";
+    String eligibleClientsTestedReceivedResultIndicatorKey = "Number of Eligible Clients Tested for HIV and Received Result For the Day";
+
+
+    TextEditingController? currentTxNewEntriesController;
+    TextEditingController? currentHIVPositiveLinkedToArtController;
+    TextEditingController? currentDiagnosedHIVPositiveController;
+    TextEditingController? currentVLResultHandedOverController;
+    TextEditingController? currentVLResultEnteredNMRSController;
+    TextEditingController? currentEligibleClientsTestedHTSRegisterController;
+    TextEditingController? currentHTSDataEnteredNMRSController;
+    TextEditingController? currentExistingClientsEntriesNMRSController;
+    TextEditingController? currentRefillClientsController;
+    TextEditingController? currentNewARTClientsController;
+    TextEditingController? currentARVPickUpClientsController;
+    TextEditingController? currentEligibleForTestingController;
+    TextEditingController? currentEligibleClientsTestedReceivedResultController;
+
+    String currentUsername = _currentUsername;
+
+    int totalVLResultHandedOver = 0;
+    int totalVLResultEnteredNMRS = 0;
+    int totalEligibleClientsTestedHTSRegister = 0;
+    int totalHTSDataEnteredNMRS = 0;
+    int totalExistingClientsEntriesNMRS = 0;
+    int totalRefillClients = 0;
+    int totalNewARTClients = 0;
+    int totalTxNewEntries = 0;
+    int totalHIVPositiveLinkedToArt = 0;
+    int totalARVPickUpClients = 0;
+    int totalDiagnosedHIVPositive = 0;
+    int totalEligibleForTesting = 0;
+    int totalEligibleClientsTestedReceivedResult = 0;
+
+    bool validationFailed = false;
+    String validationErrorMessage = "";
+
+
+    // Determine which report type is being saved and set controllers accordingly
+    if (reportTypeKey == siAssistantReportKey) {
+      currentVLResultEnteredNMRSController = controllers[vlResultEnteredNMRSIndicatorKey];
+      currentHTSDataEnteredNMRSController = controllers[htsDataEnteredNMRSIndicatorKey];
+      currentExistingClientsEntriesNMRSController = controllers[existingClientsEntriesNMRSIndicatorKey];
+      currentTxNewEntriesController = controllers[txNewIndicatorKey];
+    } else if (reportTypeKey == htsAssistantReportKey) {
+      currentEligibleClientsTestedHTSRegisterController = controllers[eligibleClientsTestedHTSRegisterIndicatorKey];
+      currentHIVPositiveLinkedToArtController = controllers[hivPositiveLinkedToArtIndicatorKey];
+      currentDiagnosedHIVPositiveController = controllers[diagnosedHIVPositiveIndicatorKey];
+      currentEligibleForTestingController = controllers[eligibleForTestingIndicatorKey];
+      currentEligibleClientsTestedReceivedResultController = controllers[eligibleClientsTestedReceivedResultIndicatorKey];
+
+    }else if (reportTypeKey == labVLChampionReportKey) {
+      currentVLResultHandedOverController = controllers[vlResultHandedOverIndicatorKey];
+    }else if (reportTypeKey == pharmTechReportKey) {
+      currentRefillClientsController = controllers[refillClientsIndicatorKey];
+      currentNewARTClientsController = controllers[newARTClientsIndicatorKey];
+    }else if (reportTypeKey == trackingAssistantReportKey) {
+      currentARVPickUpClientsController = controllers[arvPickUpClientsIndicatorKey];
+    }
+    else {
+      return true; // Validation not applicable for other report types
+    }
+
+
+    // Fetch Reports from Firestore
+    final siAssistantReport = await _fetchReportFromFirestore(siAssistantReportKey);
+    final htsAssistantReport = await _fetchReportFromFirestore(htsAssistantReportKey);
+    final labVLChampionReport = await _fetchReportFromFirestore(labVLChampionReportKey);
+    final pharmTechReport = await _fetchReportFromFirestore(pharmTechReportKey);
+    final trackingAssistantReport = await _fetchReportFromFirestore(trackingAssistantReportKey);
+
+
+    // Sum VL Results Handed Over from Lab VL Champion Report
+    if (labVLChampionReport?.reportEntries != null) {
+      labVLChampionReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == labVLChampionReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving Lab VL Champion report
+        }
+        else if (indicatorMap[vlResultHandedOverIndicatorKey] != null &&
+            indicatorMap[vlResultHandedOverIndicatorKey]!.isNotEmpty) {
+          totalVLResultHandedOver += int.tryParse(
+              indicatorMap[vlResultHandedOverIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum VL Results Entered NMRS from SI Assistant Report
+    if (siAssistantReport?.reportEntries != null) {
+      siAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == siAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving SI Assistant report
+        }
+        else if (indicatorMap[vlResultEnteredNMRSIndicatorKey] != null &&
+            indicatorMap[vlResultEnteredNMRSIndicatorKey]!.isNotEmpty) {
+          totalVLResultEnteredNMRS += int.tryParse(
+              indicatorMap[vlResultEnteredNMRSIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum Eligible Clients Tested HTS Register from HTS Assistant Report
+    if (htsAssistantReport?.reportEntries != null) {
+      htsAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == htsAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving HTS Assistant report
+        }
+        else if (indicatorMap[eligibleClientsTestedHTSRegisterIndicatorKey] != null &&
+            indicatorMap[eligibleClientsTestedHTSRegisterIndicatorKey]!.isNotEmpty) {
+          totalEligibleClientsTestedHTSRegister += int.tryParse(
+              indicatorMap[eligibleClientsTestedHTSRegisterIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum HTS Data Entered NMRS from SI Assistant Report
+    if (siAssistantReport?.reportEntries != null) {
+      siAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == siAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving SI Assistant report
+        }
+        else if (indicatorMap[htsDataEnteredNMRSIndicatorKey] != null &&
+            indicatorMap[htsDataEnteredNMRSIndicatorKey]!.isNotEmpty) {
+          totalHTSDataEnteredNMRS += int.tryParse(
+              indicatorMap[htsDataEnteredNMRSIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum Existing Clients Entries NMRS from SI Assistant Report
+    if (siAssistantReport?.reportEntries != null) {
+      siAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == siAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving SI Assistant report
+        }
+        else if (indicatorMap[existingClientsEntriesNMRSIndicatorKey] != null &&
+            indicatorMap[existingClientsEntriesNMRSIndicatorKey]!.isNotEmpty) {
+          totalExistingClientsEntriesNMRS += int.tryParse(
+              indicatorMap[existingClientsEntriesNMRSIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum Refill Clients from Pharmacy Tech Report
+    if (pharmTechReport?.reportEntries != null) {
+      pharmTechReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == pharmTechReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving Pharmacy Tech report
+        }
+        else if (indicatorMap[refillClientsIndicatorKey] != null &&
+            indicatorMap[refillClientsIndicatorKey]!.isNotEmpty) {
+          totalRefillClients += int.tryParse(
+              indicatorMap[refillClientsIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum New ART Clients from Pharmacy Tech Report
+    if (pharmTechReport?.reportEntries != null) {
+      pharmTechReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == pharmTechReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving Pharmacy Tech report
+        }
+        else if (indicatorMap[newARTClientsIndicatorKey] != null &&
+            indicatorMap[newARTClientsIndicatorKey]!.isNotEmpty) {
+          totalNewARTClients += int.tryParse(
+              indicatorMap[newARTClientsIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+    // Sum TX_New Entries from SI Assistant Report
+    if (siAssistantReport?.reportEntries != null) {
+      siAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == siAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving SI Assistant report
+        }
+        else if (indicatorMap[txNewIndicatorKey] != null &&
+            indicatorMap[txNewIndicatorKey]!.isNotEmpty) {
+          totalTxNewEntries += int.tryParse(
+              indicatorMap[txNewIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+
+    // Sum Newly Diagnosed HIV Positive Linked to ART from HTS Assistant Report
+    if (htsAssistantReport?.reportEntries != null) {
+      htsAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == htsAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving HTS Assistant report
+        }
+        else if (indicatorMap[hivPositiveLinkedToArtIndicatorKey] != null &&
+            indicatorMap[hivPositiveLinkedToArtIndicatorKey]!.isNotEmpty) {
+          totalHIVPositiveLinkedToArt += int.tryParse(
+              indicatorMap[hivPositiveLinkedToArtIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+
+      });
+    }
+    // Sum Total Number of Clients that Visited Facility for ARV Pick Up from Tracking Assistant Report
+    if (trackingAssistantReport?.reportEntries != null) {
+      trackingAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+        if (reportTypeKey == trackingAssistantReportKey && username == currentUsername) {
+          // Exclude current user's OLD entry when saving Tracking Assistant report
+        }
+        else if (indicatorMap[arvPickUpClientsIndicatorKey] != null &&
+            indicatorMap[arvPickUpClientsIndicatorKey]!.isNotEmpty) {
+          totalARVPickUpClients += int.tryParse(
+              indicatorMap[arvPickUpClientsIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+      });
+    }
+    // Sum Number of clients diagnosed HIV Positive from HTS Assistant Report
+    if (htsAssistantReport?.reportEntries != null) {
+      htsAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+
+        if (indicatorMap[diagnosedHIVPositiveIndicatorKey] != null &&
+            indicatorMap[diagnosedHIVPositiveIndicatorKey]!.isNotEmpty) {
+          totalDiagnosedHIVPositive += int.tryParse(
+              indicatorMap[diagnosedHIVPositiveIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+
+      });
+    }
+    // Sum Number Eligible for Testing from HTS Assistant Report
+    if (htsAssistantReport?.reportEntries != null) {
+      htsAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+
+        if (indicatorMap[eligibleForTestingIndicatorKey] != null &&
+            indicatorMap[eligibleForTestingIndicatorKey]!.isNotEmpty) {
+          totalEligibleForTesting += int.tryParse(
+              indicatorMap[eligibleForTestingIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+
+      });
+    }
+    // Sum Number of Eligible Clients Tested for HIV and Received Result from HTS Assistant Report
+    if (htsAssistantReport?.reportEntries != null) {
+      htsAssistantReport!.reportEntries!.forEach((username, indicatorMap) {
+
+        if (indicatorMap[eligibleClientsTestedReceivedResultIndicatorKey] != null &&
+            indicatorMap[eligibleClientsTestedReceivedResultIndicatorKey]!.isNotEmpty) {
+          totalEligibleClientsTestedReceivedResult += int.tryParse(
+              indicatorMap[eligibleClientsTestedReceivedResultIndicatorKey]!.first.value
+          ) ?? 0;
+        }
+
+      });
+    }
+
+
+    // Get current value based on which report is being saved
+    int currentVLResultHandedOver = 0;
+    int currentVLResultEnteredNMRS = 0;
+    int currentEligibleClientsTestedHTSRegister = 0;
+    int currentHTSDataEnteredNMRS = 0;
+    int currentExistingClientsEntriesNMRS = 0;
+    int currentRefillClients = 0;
+    int currentNewARTClients = 0;
+    int currentTxNewEntries = 0;
+    int currentHIVPositiveLinkedToArt = 0;
+    int currentARVPickUpClients = 0;
+    int currentDiagnosedHIVPositive = 0;
+    int currentEligibleForTesting = 0;
+    int currentEligibleClientsTestedReceivedResult = 0;
+
+
+    if (currentVLResultHandedOverController != null) {
+      currentVLResultHandedOver = int.tryParse(currentVLResultHandedOverController.text) ?? 0;
+    }
+    if (currentVLResultEnteredNMRSController != null) {
+      currentVLResultEnteredNMRS = int.tryParse(currentVLResultEnteredNMRSController.text) ?? 0;
+    }
+    if (currentEligibleClientsTestedHTSRegisterController != null) {
+      currentEligibleClientsTestedHTSRegister = int.tryParse(currentEligibleClientsTestedHTSRegisterController.text) ?? 0;
+    }
+    if (currentHTSDataEnteredNMRSController != null) {
+      currentHTSDataEnteredNMRS = int.tryParse(currentHTSDataEnteredNMRSController.text) ?? 0;
+    }
+    if (currentExistingClientsEntriesNMRSController != null) {
+      currentExistingClientsEntriesNMRS = int.tryParse(currentExistingClientsEntriesNMRSController.text) ?? 0;
+    }
+    if (currentRefillClientsController != null) {
+      currentRefillClients = int.tryParse(currentRefillClientsController.text) ?? 0;
+    }
+    if (currentNewARTClientsController != null) {
+      currentNewARTClients = int.tryParse(currentNewARTClientsController.text) ?? 0;
+    }
+    if (currentTxNewEntriesController != null) {
+      currentTxNewEntries = int.tryParse(currentTxNewEntriesController.text) ?? 0;
+    }
+    if (currentHIVPositiveLinkedToArtController != null) {
+      currentHIVPositiveLinkedToArt = int.tryParse(currentHIVPositiveLinkedToArtController.text) ?? 0;
+    }
+    if (currentARVPickUpClientsController != null) {
+      currentARVPickUpClients = int.tryParse(currentARVPickUpClientsController.text) ?? 0;
+    }
+    if (currentDiagnosedHIVPositiveController != null) {
+      currentDiagnosedHIVPositive = int.tryParse(currentDiagnosedHIVPositiveController.text) ?? 0;
+    }
+    if (currentEligibleForTestingController != null) {
+      currentEligibleForTesting = int.tryParse(currentEligibleForTestingController.text) ?? 0;
+    }
+    if (currentEligibleClientsTestedReceivedResultController != null) {
+      currentEligibleClientsTestedReceivedResult = int.tryParse(currentEligibleClientsTestedReceivedResultController.text) ?? 0;
+    }
+
+
+    // Add current user's NEWLY EDITED entry to the respective total for validation
+    if (reportTypeKey == labVLChampionReportKey) {
+      totalVLResultHandedOver += currentVLResultHandedOver;
+    } else if (reportTypeKey == siAssistantReportKey) {
+      totalVLResultEnteredNMRS += currentVLResultEnteredNMRS;
+      totalHTSDataEnteredNMRS += currentHTSDataEnteredNMRS;
+      totalExistingClientsEntriesNMRS += currentExistingClientsEntriesNMRS;
+      totalTxNewEntries += currentTxNewEntries;
+
+    } else if (reportTypeKey == htsAssistantReportKey) {
+      totalEligibleClientsTestedHTSRegister += currentEligibleClientsTestedHTSRegister;
+      totalHIVPositiveLinkedToArt += currentHIVPositiveLinkedToArt;
+      totalDiagnosedHIVPositive += currentDiagnosedHIVPositive;
+      totalEligibleForTesting += currentEligibleForTesting;
+      totalEligibleClientsTestedReceivedResult += currentEligibleClientsTestedReceivedResult;
+    }else if (reportTypeKey == pharmTechReportKey) {
+      totalRefillClients += currentRefillClients;
+      totalNewARTClients += currentNewARTClients;
+    }else if (reportTypeKey == trackingAssistantReportKey) {
+      totalARVPickUpClients += currentARVPickUpClients;
+    }
+
+
+    if (totalVLResultHandedOver != totalVLResultEnteredNMRS) {
+      validationFailed = true;
+      validationErrorMessage += "VL Validation failed:\nTotal Number of Result Handed over to SIAs /MEAL (By $labVLChampionReportKey) ($totalVLResultHandedOver) does not match Number of Viral Load Results Entered on NMRS (EMR) (By $siAssistantReportKey) ($totalVLResultEnteredNMRS).\n\n";
+    }
+    if (totalEligibleClientsTestedHTSRegister != totalHTSDataEnteredNMRS) {
+      validationFailed = true;
+      validationErrorMessage += "HTS_HTSRegister_HTSEntry Validation failed:\nTotal Number of Eligible Clients Tested and documented in the HTS Register (By $htsAssistantReportKey) ($totalEligibleClientsTestedHTSRegister) does not match Number of HTS Data Entered on NMRS (EMR) (By $siAssistantReportKey) ($totalHTSDataEnteredNMRS).\n\n";
+    }
+    if (totalExistingClientsEntriesNMRS != totalRefillClients) {
+      validationFailed = true;
+      validationErrorMessage += "ExistingClients_RefillClients Validation failed:\nTotal Number of Existing Clients Entries Entered on NMRS (EMR) (By $siAssistantReportKey) ($totalExistingClientsEntriesNMRS) does not match Number of Refill Clients (By $pharmTechReportKey) ($totalRefillClients).\n\n";
+    }
+    if (totalNewARTClients != totalTxNewEntries || totalNewARTClients != totalHIVPositiveLinkedToArt) {
+      validationFailed = true;
+      validationErrorMessage += "NewARTClients_TxNew_HIVPositiveLinkedART Validation failed:\nTotal Number of New ART Clients (By $pharmTechReportKey) ($totalNewARTClients) does not match Number of Tx_New Clients Entries Entered on NMRS (EMR) (By $siAssistantReportKey) ($totalTxNewEntries) or Number of Newly Diagnosed HIV Positive Linked to ART (By $htsAssistantReportKey) ($totalHIVPositiveLinkedToArt).\n\n";
+    }
+    if (totalARVPickUpClients != totalExistingClientsEntriesNMRS || totalARVPickUpClients != totalRefillClients) {
+      validationFailed = true;
+      validationErrorMessage += "ARVPickUpClients_ExistingClients_RefillClients Validation failed:\nTotal Number of Clients that Visited the Facility for ARV Pick Up (By $trackingAssistantReportKey) ($totalARVPickUpClients) does not match Number of Existing Clients Entries Entered on NMRS (EMR) (By $siAssistantReportKey) ($totalExistingClientsEntriesNMRS) or Number of Refill Clients (By $pharmTechReportKey) ($totalRefillClients).\n\n";
+    }
+    if (totalDiagnosedHIVPositive > totalEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "DiagnosedHIVPositive_EligibleForTesting Validation failed:\nNumber of Clients Diagnosed HIV Positive (By $htsAssistantReportKey) ($totalDiagnosedHIVPositive) cannot be greater than Number Eligible for Testing (By $htsAssistantReportKey) ($totalEligibleForTesting).\n\n";
+    }
+    if (totalEligibleClientsTestedHTSRegister > totalEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "EligibleClientsTestedHTSRegister_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested and documented in the HTS Register (By $htsAssistantReportKey) ($totalEligibleClientsTestedHTSRegister) cannot be greater than Number Eligible for Testing (By $htsAssistantReportKey) ($totalEligibleForTesting).\n\n";
+    }
+    if (totalEligibleClientsTestedReceivedResult > totalEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "EligibleClientsTestedReceivedResult_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested for HIV and Received Result (By $htsAssistantReportKey) ($totalEligibleClientsTestedReceivedResult) cannot be greater than Number Eligible for Testing (By $htsAssistantReportKey) ($totalEligibleForTesting).\n\n";
+    }
+    if (totalHIVPositiveLinkedToArt > totalEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "HIVPositiveLinkedToArt_EligibleForTesting Validation failed:\nNumber of Newly Diagnosed HIV Positive Linked to ART (By $htsAssistantReportKey) ($totalHIVPositiveLinkedToArt) cannot be greater than Number Eligible for Testing (By $htsAssistantReportKey) ($totalEligibleForTesting).\n\n";
+    }
+
+
+    if (validationFailed) {
+      bool? continueSave = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text("Data Validation Issue"),
+            content: Text(
+                "$validationErrorMessage Do you want to continue saving?"),
+            actions: <Widget>[
+              TextButton(
+                child: const Text("No, Cancel"),
+                onPressed: () {
+                  Navigator.of(context).pop(false); // Do not continue saving
+                },
+              ),
+              TextButton(
+                child: const Text("Yes, Continue"),
+                onPressed: () {
+                  Navigator.of(context).pop(true); // Continue saving
+                },
+              ),
+            ],
+          );
+        },
+      );
+      return continueSave ?? false; // Return user's choice (or false if dialog dismissed)
+    }
+
+    return true; // Validation passed or not applicable
+  }
+
+// Modified _saveReportToFirestore to include progress indicator state management
   Future<void> _saveReportToFirestore(
       String reportType,
       Map<String, TextEditingController> controllers,
@@ -2911,6 +3654,21 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           content: Text('BioData is incomplete, cannot save report.')));
       return;
     }
+    setState(() {
+      _isSavingReport = true; // Set saving state to true
+    });
+
+
+    // **NEW: Perform Validation Check BEFORE saving**
+    bool isValid = await _validateIndicators(reportType, controllers);
+    if (!isValid) {
+      setState(() {
+        _isSavingReport = false; // Set saving state to true
+      });
+
+      return; // Stop saving if validation fails and user cancels
+    }
+
 
     Map<String, Map<String, List<ReportEntry>>> structuredReportEntries = {};
     String currentUsername = _currentUsername;
@@ -2923,19 +3681,23 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
     List<String> reportAttachmentUrls = [];
     List<AttachmentData> reportAttachmentsToUpload = _reportAttachmentsData[reportType] ?? [];
-    List<String> geminiAnalysisResults = []; // List to store analysis results for multiple images
+    List<String> geminiAnalysisResults = [];
 
 
-    if (reportAttachmentsToUpload.isNotEmpty) { // Analyze only if images are attached.
-      for (AttachmentData attachmentData in reportAttachmentsToUpload) { // Loop through all attachments
+    if (reportAttachmentsToUpload.isNotEmpty) {
+      setState(() {
+        _isSavingReport = true; // Set saving state to true
+      });
+
+      for (AttachmentData attachmentData in reportAttachmentsToUpload) {
         if (attachmentData.file != null) {
           String fileExtension = attachmentData.fileName.split('.').last.toLowerCase();
           if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
             String? base64Image = await convertImageToBase64(attachmentData.file!);
             if (base64Image != null) {
-              String? analysisResult = await sendImageToGeminiForValidation(base64Image, indicators); // Send each image for analysis
+              String? analysisResult = await sendImageToGeminiForValidation(base64Image, indicators);
               if (analysisResult != null) {
-                geminiAnalysisResults.add("Analysis for ${attachmentData.fileName}:\n$analysisResult"); // Store analysis with filename
+                geminiAnalysisResults.add("Analysis for ${attachmentData.fileName}:\n$analysisResult");
               } else {
                 geminiAnalysisResults.add("Analysis failed for ${attachmentData.fileName}.");
               }
@@ -2943,7 +3705,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
               geminiAnalysisResults.add("Error converting image ${attachmentData.fileName} for analysis.");
             }
           } else {
-            geminiAnalysisResults.add("Analysis for ${attachmentData.fileName} only supported for image files."); // Or handle differently for other file types.
+            geminiAnalysisResults.add("Analysis for ${attachmentData.fileName} only supported for image files.");
           }
         }
       }
@@ -2951,9 +3713,9 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
     String aggregatedAnalysisResult = "";
     if (geminiAnalysisResults.isNotEmpty) {
-      aggregatedAnalysisResult = geminiAnalysisResults.join("\n\n"); // Join all analysis results with new lines
+      aggregatedAnalysisResult = geminiAnalysisResults.join("\n\n");
     } else {
-      aggregatedAnalysisResult = "No images Uploaded for Analysis"; // Message when no images are uploaded
+      aggregatedAnalysisResult = "No images Uploaded for Analysis";
     }
 
 
@@ -2964,17 +3726,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         String fileName = (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension))
             ? 'image_${currentUsername}_$reportType.$fileExtension'
             : 'document_${currentUsername}_$reportType.$fileExtension';
-        //
-        // String? geminiResponse;
-        // if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
-        //   String? base64Image = await convertImageToBase64(attachmentData.file!);
-        //   print("base64Image: $base64Image"); // Log Gemini response
-        //   if (base64Image != null) {
-        //     String indicatorNameForPrompt = indicators.isNotEmpty ? indicators.first : "Value"; // Using first indicator for prompt, adjust as needed.
-        //     geminiResponse = await sendImageToGeminiForValidation(base64Image, "Validate the data in this image for indicator: $indicatorNameForPrompt");
-        //     print("Gemini Response: $geminiResponse"); // Log Gemini response
-        //   }
-        // }
 
         String? url = await uploadFileToStorage(
           attachmentData.file!.path,
@@ -2995,34 +3746,44 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
 
     for (String indicator in indicators) {
+      String currentValue = controllers[indicator]!.text.trim();
+
       String? existingValue = existingReport?.reportEntries
           ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
           ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.value : null
           : null;
 
+      String? existingReviewStatus = existingReport?.reportEntries
+          ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
+          ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.reviewStatus : null
+          : null;
 
-      String currentValue = controllers[indicator]!.text.trim();
-      String? enteredByUser = existingReport?.reportEntries
+      String finalValueToSave;
+
+      if (existingReviewStatus == 'Approved') {
+        finalValueToSave = existingValue ?? ""; // Preserve existing "Approved" value
+      } else {
+        finalValueToSave = currentValue; // Use current controller value for others
+      }
+
+
+      String? finalEnteredBy = existingReport?.reportEntries
           ?.containsKey(currentUsername) == true && existingReport?.reportEntries![currentUsername]!.containsKey(indicator) == true
           ? existingReport!.reportEntries![currentUsername]![indicator]!.isNotEmpty ? existingReport.reportEntries![currentUsername]![indicator]!.first.enteredBy : null
           : null;
-
-
-      String? finalEnteredBy = enteredByUser;
       String? finalEditedBy = editedUsernames[indicator];
+      String finalReviewStatus = 'Pending';
+
 
       if (currentValue.isNotEmpty && (existingValue == null || existingValue.isEmpty)) {
         finalEnteredBy = _currentUsername;
         finalEditedBy = null;
       } else if (currentValue.isNotEmpty && currentValue != existingValue) {
         finalEditedBy = _currentUsername;
-        finalEnteredBy = enteredByUser;
-        if (finalEnteredBy == null || finalEnteredBy.isEmpty) {
-          finalEnteredBy = _currentUsername;
-        }
+        finalEnteredBy = finalEnteredBy ?? _currentUsername; // Preserve existing EnteredBy if available
       } else {
         if (existingValue != null && existingValue.isNotEmpty) {
-          finalEnteredBy = enteredByUser;
+          finalEnteredBy = finalEnteredBy; // Keep existing EnteredBy
           finalEditedBy = editedUsernames[indicator];
         } else {
           finalEnteredBy = null;
@@ -3030,23 +3791,29 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         }
       }
 
+
       List<ReportEntry> entryList = [];
       entryList.add(ReportEntry(
         key: indicator,
-        value: currentValue,
+        value: finalValueToSave, // Use finalValueToSave to preserve "Approved" values
         enteredBy: finalEnteredBy,
         editedBy: finalEditedBy,
         reviewedBy: _selectedReviewer?.name,
-        reviewStatus: "Pending",
+        reviewStatus: finalReviewStatus,
         attachments: indicator == indicators.last ? reportAttachmentUrls : null,
-        appAnalysis: indicator == indicators.first ? aggregatedAnalysisResult : null, // Store aggregated analysis in the first indicator's entry
-        reviewerId: _selectedReviewer?.userId, // ADDED: Store reviewer's userId
+        appAnalysis: indicator == indicators.first ? aggregatedAnalysisResult : null,
+        reviewerId: _selectedReviewer?.userId,
       ));
       indicatorMap[indicator] = entryList;
       currentEnteredBy[indicator] = finalEnteredBy;
       currentEditedBy[indicator] = finalEditedBy;
     }
     structuredReportEntries[currentUsername] = indicatorMap;
+
+    setState(() {
+      _isSavingReport = true; // Set saving state to true
+    });
+
 
     Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
@@ -3078,6 +3845,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         reportEditedUsernames[reportType] = currentEditedBy;
         _isEditingReportSection[reportType] = true;
         _loadReportsForSelectedDate();
+        _isSavingReport = false; // Set saving state to false after successful save
       });
     } catch (e) {
       Get.back();
@@ -3085,11 +3853,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           content: Text(
               'Error saving ${titleCase(reportType.replaceAll('_', ' '))} Report.')));
       print("Error saving report to Firestore: $e");
+      setState(() {
+        _isSavingReport = false; // Set saving state to false even if save fails
+      });
     }
   }
 
 
-  // _addTaskToIsar (Modified for Firestore and editing logic and Firebase Storage)
+
+// _addTaskToIsar (Modified for edit to UPDATE instead of INSERT)
   _addTaskToIsar({bool isEditing = false}) async {
     String title = _taskTitleController.text;
     String description = _taskDescriptionController.text;
@@ -3100,27 +3872,43 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       // Show a loading dialog
       Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
-
       List<String> attachmentUrls = [];
-      List<AttachmentData> attachmentsToUpload = _taskBottomSheetAttachmentsData;
+      List<AttachmentData> attachmentsToUpload = _taskBottomSheetAttachmentsData; // _taskBottomSheetAttachmentsData is now used for main page task input
+      List<String> geminiAnalysisResults = [];
 
       try {
-
         for (var attachmentData in attachmentsToUpload) {
           if (attachmentData.file != null && attachmentData.downloadUrl == null) {
+            String fileExtension = attachmentData.fileName.split('.').last.toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
+              String? base64Image = await convertImageToBase64(attachmentData.file!);
+              if (base64Image != null) {
+                String? analysisResult = await sendImageToGeminiForValidation(base64Image, []); // Indicators not relevant for task analysis here
+                if (analysisResult != null) {
+                  geminiAnalysisResults.add("Analysis for ${attachmentData.fileName}:\n$analysisResult");
+                } else {
+                  geminiAnalysisResults.add("Analysis failed for ${attachmentData.fileName}.");
+                }
+              } else {
+                geminiAnalysisResults.add("Error converting image ${attachmentData.fileName} for analysis.");
+              }
+            }
+
             String fileName = 'task_attachment_${DateTime.now().millisecondsSinceEpoch}_${attachmentData.fileName}';
-            String? url = await _firestoreService.uploadFileToStorage(
+            print("_addTaskToIsar: attachmentData.file before uploadFileToStorage: ${attachmentData.file}"); // ADD THIS LINE
+            if (attachmentData.file == null) { // ADD THIS CHECK
+              print("_addTaskToIsar: attachmentData.file is NULL, skipping upload for ${attachmentData.fileName}");
+              continue; // Skip to the next attachment if file is null
+            }
+            String? url = await uploadFileToStorage(
               kIsWeb ? attachmentData.file!.path : attachmentData.file!.path,
               fileName,
+              xFile: kIsWeb ? attachmentData.file : null,
             );
             if (url != null) {
               attachmentUrls.add(url);
               attachmentData.downloadUrl = url;
-              if (attachmentData.file!.mimeType != null && attachmentData.file!.mimeType!.startsWith('image/')) {
-                // Simulate Machine Learning processing for images
-                String? imageDescription = await _processImageWithMachineLearning(attachmentData.file!.path); // Pass local file path for ML
-                print("Image Description (Task): $imageDescription");
-              }
+
             } else {
               // Handle upload error for a specific file
               print("Upload failed for ${attachmentData.fileName}");
@@ -3131,38 +3919,45 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           }
         }
 
+        String aggregatedAnalysisResult = "";
+        if (geminiAnalysisResults.isNotEmpty) {
+          aggregatedAnalysisResult = geminiAnalysisResults.join("\n\n");
+        } else {
+          aggregatedAnalysisResult = "No images Uploaded for Analysis";
+        }
+
 
         if (isEditing && _taskBeingEdited != null) {
-          task = _taskBeingEdited!
-            ..taskDescription = description
-            ..taskStatus = _taskBeingEdited!.taskStatus ?? "Pending"
-            ..attachments = _taskCardAttachmentsData[_taskBeingEdited!.id ?? -1]?.where((ad) => ad.downloadUrl != null).map((ad) => ad.downloadUrl!).toList() ?? [];
+          task = Task( // Use constructor here
+            id: _taskBeingEdited!.id,
+            date: _taskBeingEdited!.date,
+            taskTitle: title,
+            taskDescription: description,
+            isSynced: _taskBeingEdited!.isSynced,
+            taskStatus: _taskBeingEdited!.taskStatus ?? "Pending",
+            attachments: attachmentUrls, // Use uploaded URLs
+            reviewedBy: _taskBeingEdited!.reviewedBy,
+            appAnalysis: aggregatedAnalysisResult,
+          );
 
-          if (_taskBeingEdited!.id != null) {
-            await deleteTask(_taskBeingEdited!.id.toString()); // Delete old task for update
-          }
-          Task newTask = Task() // Create new task with updated info
-            ..date = _selectedReportingDate
-            ..taskTitle = title
-            ..taskDescription = description
-            ..isSynced = false
-            ..taskStatus = "Pending"
-            ..attachments = _taskCardAttachmentsData[_taskBeingEdited!.id ?? -1]?.where((ad) => ad.downloadUrl != null).map((ad) => ad.downloadUrl!).toList() ?? []
-            ..reviewedBy = reviewer.name; // Add reviewer info
-          await saveTask(newTask);
+
+          // Pass taskId for update
+          await saveTask(task);
           Get.back(); // Dismiss loading dialog
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Task updated successfully!')));
         } else {
 
-          Task newTask = Task()
-            ..date = _selectedReportingDate
-            ..taskTitle = title
-            ..taskDescription = description
-            ..isSynced = false
-            ..taskStatus = "Pending"
-            ..attachments = attachmentUrls // Use uploaded URLs
-            ..reviewedBy = reviewer.name; // Add reviewer info
+          Task newTask = Task( // Create new task with updated info using constructor
+            date: _selectedReportingDate,
+            taskTitle: title,
+            taskDescription: description,
+            isSynced: false,
+            taskStatus: "Pending",
+            attachments: attachmentUrls, // Use uploaded URLs
+            reviewedBy: reviewer.name,
+            appAnalysis: aggregatedAnalysisResult,
+          );
 
           await saveTask(newTask);
           Get.back(); // Dismiss loading dialog
@@ -3174,7 +3969,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         Task? savedTask = await getTaskByTitleAndDate(title, _selectedReportingDate);
         if (savedTask != null) {
           _taskCardAttachmentsData[savedTask.id ?? -1] =
-              List.from(_taskBottomSheetAttachmentsData);
+              List.from(_taskBottomSheetAttachmentsData); // _taskBottomSheetAttachmentsData is now used for main page task input
           _taskBottomSheetAttachmentsData.clear();
         }
 
@@ -3199,6 +3994,105 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     }
   }
 
+  Widget _buildTaskCard(Task task) {
+    return Card(
+      elevation: 4.0,
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task.taskTitle ?? "No Title",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              task.taskDescription ?? "No Description",
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 10),
+            if (task.attachments != null && task.attachments!.isNotEmpty)
+              _buildAttachmentGrid(task.attachments!.map((url) => AttachmentData.fromUrl(url)).toList(), task: task),
+            if (task.appAnalysis != null && task.appAnalysis!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  "Analysis: ${task.appAnalysis!}",
+                  style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontStyle: FontStyle.italic),
+                ),
+              ),
+            const SizedBox(height: 16.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SizedBox.shrink(),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text("Supervisor's Approval Status: ",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        task.taskStatus ?? "Pending",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4.0),
+                      _getTaskStatusIcon(task.taskStatus ?? "Pending"),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    _editTaskOnMainPage(task);
+                  },
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text("Edit", style: TextStyle(fontSize: 14)),
+                ),
+                const SizedBox(width: 8.0),
+                TextButton.icon(
+                  onPressed: () {
+                    _deleteTask(task);
+                  },
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  label: const Text("Delete",
+                      style: TextStyle(fontSize: 14, color: Colors.red)),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  // Function to edit task directly on the main page  (NEWLY ADDED METHOD)
+  void _editTaskOnMainPage(Task taskToEdit) {
+    _taskTitleController.text = taskToEdit.taskTitle ?? '';
+    _taskDescriptionController.text = taskToEdit.taskDescription ?? '';
+    _taskBottomSheetAttachmentsData = _taskCardAttachmentsData[taskToEdit.id ?? -1] ?? []; // _taskBottomSheetAttachmentsData is now used for main page task input
+    _taskBeingEdited = taskToEdit;
+    // Set reviewer if available
+    if (taskToEdit.reviewedBy != null) {
+      for (var staff in _staffList) {
+        if (staff.name == taskToEdit.reviewedBy) {
+          _selectedReviewer = staff;
+          break;
+        }
+      }
+    }
+    setState(() {}); // Rebuild the UI to reflect changes in controllers and attachments
+  }
 
 
   //  _processImageWithMachineLearning using google_mlkit_image_labeling
@@ -3264,12 +4158,11 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return loadedReport.reportEntries!.containsKey(_currentUsername);
   }
 
-// Builds expandable widget for each designation (Modified to conditionally show "Send to Reviewer" button)
   Widget _buildDesignationExpandable(
       String designationName, List<String> indicators, String reportTypeKey) {
     bool isReadOnlySection = _loadedReports[reportTypeKey] != null &&
         (_isEditingReportSection[reportTypeKey] ?? true);
-    bool hasEntries = _hasCurrentUserEntries(_loadedReports[reportTypeKey]); // Check if current user has entries
+    bool hasEntries = _hasCurrentUserEntries(_loadedReports[reportTypeKey]);
 
     Report? loadedReport = _loadedReports[reportTypeKey];
     List<AttachmentData> allReportEntryAttachments = [];
@@ -3294,15 +4187,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Form(
-            key: _genericFormKey, // Using a generic form key here
+            key: _genericFormKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ... (rest of your existing form elements - Reporting Date, Report Type, Dropdowns, Reviewer, Supervisor) ...
+                // ... (rest of your form elements - Reporting Date, Report Type, Dropdowns, Reviewer, Supervisor) ...
                 Row(
                   children: [
                     const Text("Reporting Date: ",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontWeight: FontWeight.bold,fontSize: 18)),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat('yyyy-MM-dd').format(_selectedReportingDate),
@@ -3477,8 +4370,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                       // Conditionally render the "Update" button based on edit mode
                       if (!isReadOnlySection)
                         ElevatedButton(
-                          onPressed: () {
-                            if (_genericFormKey.currentState!.validate()) { // Validate generic form
+                          onPressed: _isSavingReport ? null : () { // Disable button when saving
+                            if (_genericFormKey.currentState!.validate()) {
                               _saveDynamicReport(reportTypeKey, indicators);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -3487,18 +4380,36 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                                           'Please fill all required fields marked with *')));
                             }
                           },
-                          child: Text(_loadedReports[reportTypeKey] != null
-                              ? 'Update ${designationName} Report'
-                              : 'Save ${designationName} Report'),
+                          child: Row( // Use Row to place indicator and text side by side
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_loadedReports[reportTypeKey] != null
+                                  ? 'Update ${designationName} Report'
+                                  : 'Save ${designationName} Report'),
+                              if (_isSavingReport) // Show progress indicator if saving
+                                Container(
+                                  margin: const EdgeInsets.only(left: 10),
+                                  width: 20,
+                                  height: 20,
+                                  child: const CircularProgressIndicator(
+                                    color: Colors.white, // Adjust color as needed
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       if (isReadOnlySection)
                         Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               ElevatedButton(
-                                onPressed: () => setState(() {
-                                  _isEditingReportSection[reportTypeKey] = false;
-                                }),
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditingReportSection[reportTypeKey] = false;
+                                    _resetIndicatorEditableState(reportTypeKey, indicators); // Reset indicator edit state when Edit is clicked
+                                    _updateControllerValuesFromLoadedReports(); // Reload values based on new edit state.
+                                  });
+                                },
                                 child: const Text("Edit"),
                               ),
                               const SizedBox(width: 10),
@@ -3509,7 +4420,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                                       _sendReportToReviewer(reportTypeKey),
                                   child: const Text("Send To Reviewer"),
                                 ),
-                            ].whereType<Widget>().toList() // Remove null if condition is false to avoid error
+                            ].whereType<Widget>().toList()
                         ),
                       const SizedBox(height: 8),
                       if (_loadedReports[reportTypeKey]?.reportStatus != null)
@@ -3608,6 +4519,14 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
+  // Helper function to reset indicator editable state when "Edit" button is clicked
+  void _resetIndicatorEditableState(String reportTypeKey, List<String> indicators) {
+    if (_isIndicatorEditable.containsKey(reportTypeKey)) {
+      indicators.forEach((indicator) {
+        _isIndicatorEditable[reportTypeKey]![indicator] = false;
+      });
+    }
+  }
 
   // Builds expandable widget for each department
   Widget _buildDepartmentExpandable(
@@ -3857,7 +4776,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return AppBar(
       backgroundColor: Colors.white,
       title: Text(
-        "Task Management",
+        "Task Manager",
         style: TextStyle(
             color: Get.isDarkMode ? Colors.white : Colors.grey[600],
             fontFamily: "NexaBold"),
@@ -4020,12 +4939,144 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
   }
 
-  _addTaskBar() {
+  _addTaskBar1() {
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 20, top: 20),
       child: const SizedBox.shrink(),
     );
   }
+  _addTaskBar() {
+    return Container(
+      margin: const EdgeInsets.only(left: 20, right: 20, top: 20),
+      child:  Column( // Task input section moved to main page
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "Add Other Tasks",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontFamily: "NexaBold",
+              color: Get.isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _taskTitleController,
+            style: TextStyle(color: Get.isDarkMode ? Colors.white : Colors.black),
+            decoration: const InputDecoration(
+              hintText: "Task Title",
+              hintStyle: TextStyle(color: Colors.grey),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.red, width: 2),
+              ),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.grey, width: 1),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _taskDescriptionController,
+            maxLines: 3,
+            style: TextStyle(color: Get.isDarkMode ? Colors.white : Colors.black),
+            decoration: const InputDecoration(
+              hintText: "Report of Other Tasks",
+              hintStyle: TextStyle(color: Colors.grey),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.red, width: 2),
+              ),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.grey, width: 1),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text("Other Tasks To Be Reviewed By: ",
+                  style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 10),
+              _isLoadingStaffList
+                  ? const CircularProgressIndicator()
+                  : DropdownButton<FacilityStaffModel>(
+                value: _selectedReviewer,
+                hint: const Text("Select Reviewer"),
+                onChanged: (FacilityStaffModel? newValue) {
+                  setState(() {
+                    _selectedReviewer = newValue;
+                  });
+                },
+                items: _staffList
+                    .map<DropdownMenuItem<FacilityStaffModel>>(
+                        (FacilityStaffModel staff) {
+                      return DropdownMenuItem<FacilityStaffModel>(
+                        value: staff,
+                        child: Text(staff.name ?? 'Unnamed Staff'),
+                      );
+                    }).toList(),
+              ),
+            ],
+          ),
+          Center(
+            child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Click to Add Attachment -->',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.attach_file),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (context) => Wrap(
+                          children: <Widget>[
+                            ListTile(
+                              leading: const Icon(Icons.photo_library),
+                              title: const Text('Choose from Gallery'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleMedia(ImageSource.gallery);
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.camera_alt),
+                              title: const Text('Take a Photo'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleMedia(ImageSource.camera);
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.attach_file),
+                              title: const Text('Choose Document'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleMedia(null); // null imgSource for document selection
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ]),
+          ),
+          if (_taskBottomSheetAttachmentsData.isNotEmpty) // _taskBottomSheetAttachmentsData is now used for main page task input
+            _buildAttachmentGrid(_taskBottomSheetAttachmentsData),
+          const SizedBox(height: 20),
+          MyButton(
+            label: "Add Other Tasks",
+            onTap: () {
+              _addTaskToIsar(isEditing: false); // Always add new task from main page
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   _showAddTaskBottomSheet(BuildContext context, {Task? taskToEdit}) {
     bool isEditing = taskToEdit != null;
@@ -4184,7 +5235,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard1(Task task) {
     return Card(
       elevation: 4.0,
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -4269,6 +5320,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return const Icon(Icons.help_outline);
   }
 
+
   _deleteTask(Task task) async {
     bool? confirmDelete = await showDialog<bool>(
       context: context,
@@ -4291,8 +5343,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     );
 
     if (confirmDelete == true) {
-      await deleteTask(task.id.toString());
-      _loadTasksForSelectedDate();
+      await deleteTask1(task.id.toString(), bioData, selectedFirebaseId!, _selectedReportingDate); // Call deleteTask1 with correct parameters
+      _loadTasksForSelectedDate(); // Refresh task list
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Task deleted successfully!')));
     }
@@ -4329,109 +5381,130 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
       appBar: _appBar(),
       backgroundColor: Colors.white,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : IndexedStack( // Use IndexedStack to manage different tabs
-        index: _selectedIndex,
+      body: Stack( // Wrap body in Stack
         children: [
-          SingleChildScrollView( // Daily Activity Monitoring Tab Content
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _addTaskBar(),
-                const SizedBox(height: 10),
-                _addDateBar(),
-                const SizedBox(height: 30),
-                const Divider(),
-                const Divider(),
-                Text(
-                  "Thematic Reports for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Divider(),
-                const Divider(),
-                const SizedBox(height: 10),
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : IndexedStack( // Use IndexedStack to manage different tabs
+            index: _selectedIndex,
+            children: [
+              SingleChildScrollView( // Daily Activity Monitoring Tab Content
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
 
-                const SizedBox(height: 20),
-                // Dynamically build department expandable widgets (same as before)
-                ...departmentGroupedReports.entries.map((entry) {
-                  String departmentName = entry.key;
-                  List<Map<String, dynamic>> designationReports = entry.value;
-                  return _buildDepartmentExpandable(departmentName, designationReports);
-                }).toList(),
+                    _addDateBar(),
+                    const SizedBox(height: 30),
+                    const Divider(),
+                    const Divider(),
+                    Text(
+                      "Routine Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(),
+                    const Divider(),
+                    const SizedBox(height: 10),
 
-                const Divider(),
-                const Divider(),
-                Text(
-                  "Other Activities / Tasks for ${_selectedReportingDate.toLocal().toString().split(' ')[0]}",
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Divider(),
-                const Divider(),
-                const SizedBox(height: 10),
-                if (_tasksForDate.isEmpty)
-                  const Text("No tasks added for this date.",
-                      style: TextStyle(fontWeight: FontWeight.bold))
-                else
-                  Column(
-                    children:
-                    _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
-                  ),
-                const Divider(),
-                const Divider(),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: buildSupervisorDropdown(),
+                    const SizedBox(height: 20),
+                    // Dynamically build department expandable widgets (same as before)
+                    ...departmentGroupedReports.entries.map((entry) {
+                      String departmentName = entry.key;
+                      List<Map<String, dynamic>> designationReports = entry.value;
+                      return _buildDepartmentExpandable(departmentName, designationReports);
+                    }).toList(),
+
+                    const Divider(),
+                    const Divider(),
+                    Text(
+                      "Other Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 20),
-                    ElevatedButton(
-                      onPressed: _submitActivityToSupervisor,
-                      child: const Text("Submit Activity Report to Supervisor"),
+                    const Divider(),
+                    const Divider(),
+
+                    const SizedBox(height: 10),
+                    _addTaskBar(),
+                    const SizedBox(height: 10),
+                    if (_tasksForDate.isEmpty)
+                      const Text("No tasks added for this date.",
+                          style: TextStyle(fontWeight: FontWeight.bold))
+                    else
+                      Column(
+                        children:
+                        _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
+                      ),
+                    const Divider(),
+                    const Divider(),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: buildSupervisorDropdown(),
+                        ),
+                        const SizedBox(width: 20),
+                        ElevatedButton(
+                          onPressed: _submitActivityToSupervisor,
+                          child: const Text("Submit Activity Report to Supervisor"),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 100),
                   ],
                 ),
-                const SizedBox(height: 100),
-              ],
+              ),
+              _buildReviewListTab(), // Review List Tab Content
+            ],
+          ),
+          if (_isValidating) // Validation progress bar overlay
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
             ),
-          ),
-          _buildReviewListTab(), // Review List Tab Content
+          if (_isAnalyzingImage) // Gemini analysis progress bar overlay
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended( // Show FAB only on Daily Activity Tab
-        onPressed: () {
-          _showAddTaskBottomSheet(context);
-        },
-        label: const Text(
-          "Click to Add Extra Task",
-          style: TextStyle(color: Colors.white, fontSize: 14.0),
-        ),
-        icon: const Icon(Icons.add, color: Colors.white),
-        backgroundColor: Colors.red,
-      ) : null, // No FAB on Review List Tab
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Daily Activity',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
-            label: 'Review List',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.red,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-      ),
+      // floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended( // Show FAB only on Daily Activity Tab
+      //   onPressed: () {
+      //     _showAddTaskBottomSheet(context);
+      //   },
+      //   label: const Text(
+      //     "Click to Add Extra Task",
+      //     style: TextStyle(color: Colors.white, fontSize: 14.0),
+      //   ),
+      //   icon: const Icon(Icons.add, color: Colors.white),
+      //   backgroundColor: Colors.red,
+      // ) : null, // No FAB on Review List Tab
+      // bottomNavigationBar: BottomNavigationBar(
+      //   items: const <BottomNavigationBarItem>[
+      //     BottomNavigationBarItem(
+      //       icon: Icon(Icons.calendar_today),
+      //       label: 'Daily Activity',
+      //     ),
+      //     BottomNavigationBarItem(
+      //       icon: Icon(Icons.list_alt),
+      //       label: 'Review List',
+      //     ),
+      //   ],
+      //   currentIndex: _selectedIndex,
+      //   selectedItemColor: Colors.red,
+      //   onTap: (index) {
+      //     setState(() {
+      //       _selectedIndex = index;
+      //     });
+      //   },
+      // ),
     );
   }
+
 
 
   Future<void> _submitActivityToSupervisor() async {
