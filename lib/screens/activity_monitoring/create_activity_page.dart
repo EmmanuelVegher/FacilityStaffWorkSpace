@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../widgets/button.dart';
 import '../../widgets/drawer2.dart';
@@ -213,19 +212,17 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
       _designations = [];
       _selectedThematicDesignation = null;
     });
-    if (department1 != null) {
-      try {
-        final QuerySnapshot<Map<String, dynamic>> snapshot =
-        await FirebaseFirestore.instance.collection('Designation').doc(department1).collection(department1).get();
-        List<String> designations = snapshot.docs.map((doc) => doc.id).toList();
-        setState(() {
-          _designations = designations;
-        });
-      } catch (e) {
-        print("Error loading designations: $e");
-      }
+    try {
+      final QuerySnapshot<Map<String, dynamic>> snapshot =
+      await FirebaseFirestore.instance.collection('Designation').doc(department1).collection(department1).get();
+      List<String> designations = snapshot.docs.map((doc) => doc.id).toList();
+      setState(() {
+        _designations = designations;
+      });
+    } catch (e) {
+      print("Error loading designations: $e");
     }
-  }
+    }
 
   Future<void> _fetchStaffForDepartmentAndFacility(String department, String? facilityName) async {
     setState(() {

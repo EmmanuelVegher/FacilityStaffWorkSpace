@@ -2254,11 +2254,11 @@ $selectedBioFirstName $selectedBioLastName
                     mainAxisSize: MainAxisSize.min, // Or MainAxisSize.max depending on layout needs
                     children:[
                       IconButton(
-                        icon: Icon(Icons.arrow_back_ios),
+                        icon: const Icon(Icons.arrow_back_ios),
                         onPressed: () {
                           _horizontalScrollController.animateTo(
                             _horizontalScrollController.offset - 200, // Adjust scroll amount
-                            duration: Duration(milliseconds: 300),
+                            duration: const Duration(milliseconds: 300),
                             curve: Curves.easeInOut,
                           );
                         },
@@ -2338,7 +2338,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                            ), 
                                             const Divider(),
                                             Row(
                                               children: [
@@ -2711,7 +2711,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .width * (MediaQuery
                                                 .of(context)
                                                 .size
-                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                                .shortestSide < 600 ? 0.001 : 0.009)),
                                             // Signature of Staff
                                             Container(
                                               width: MediaQuery
@@ -2720,7 +2720,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                                  .shortestSide < 600 ? 0.2 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //  color: Colors.grey.shade200,
@@ -3466,12 +3466,13 @@ $selectedBioFirstName $selectedBioLastName
                                                 children: [
                                                   // Email of Project Cordinator
                                                   Text(
-                                                    'Name of Facility Supervisor',
+                                                    'Name of Project Cordinator / ART Nurse',
                                                     style: TextStyle(
                                                       fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
                                                   ),
                                                   SizedBox(height: 5 * marginFactor),
                                                   //
+                                                  
                                                   StreamBuilder<DocumentSnapshot>(
                                                     // Stream the supervisor signature
                                                     stream: FirebaseFirestore.instance
@@ -3535,7 +3536,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                                  .shortestSide < 600 ? 0.2 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //color: Colors.grey.shade200,
@@ -3918,6 +3919,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .size
                                                 .shortestSide < 600 ? 0.01 : 0.009)),
                                             //Signature of CARITAS Supervisor
+
                                             Container(
                                               width: MediaQuery
                                                   .of(context)
@@ -3925,7 +3927,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.35 : 0.35),
+                                                  .shortestSide < 600 ? 0.2 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //color: Colors.grey.shade200,
@@ -4487,11 +4489,11 @@ $selectedBioFirstName $selectedBioLastName
                         )
                       ),
                            IconButton(
-                        icon: Icon(Icons.arrow_forward_ios),
+                        icon: const Icon(Icons.arrow_forward_ios),
                         onPressed: () {
                           _horizontalScrollController.animateTo(
                             _horizontalScrollController.offset + 200, // Adjust scroll amount
-                            duration: Duration(milliseconds: 300),
+                            duration: const Duration(milliseconds: 300),
                             curve: Curves.easeInOut,
                           );
                         },

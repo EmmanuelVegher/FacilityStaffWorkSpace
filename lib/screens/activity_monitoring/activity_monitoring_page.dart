@@ -31,6 +31,12 @@ String? mimeTypeFromUrl(String url) {
   return mime(path);
 }
 
+class ValidationResult {
+  final bool isValid;
+  final String messages;
+
+  ValidationResult({required this.isValid, required this.messages});
+}
 
 // Models
 // bio_model.dart
@@ -177,6 +183,10 @@ class Report {
   String? reportingMonth;
   String? reportStatus;
   String? reportFeedbackComment;
+  String? supervisorName;
+  String? supervisorEmail;
+  String? supervisorApprovalStatus;
+  String? supervisorFeedBackComment;
   List<String>? attachments;
   bool? isSynced;
   // Modified reportEntries to be a Map as per requirement
@@ -191,6 +201,10 @@ class Report {
     this.reportStatus,
     this.attachments,
     this.reportFeedbackComment,
+    this.supervisorName,
+    this.supervisorEmail,
+    this.supervisorApprovalStatus,
+    this.supervisorFeedBackComment,
     this.isSynced,
     this.reportEntries,
   });
@@ -207,6 +221,10 @@ class Report {
       reportingMonth: data?['reportingMonth'],
       reportStatus: data?['reportStatus'],
       reportFeedbackComment: data?['reportFeedbackComment'],
+      supervisorName: data?['supervisorName'],
+      supervisorEmail: data?['supervisorEmail'],
+      supervisorApprovalStatus: data?['supervisorApprovalStatus'],
+      supervisorFeedBackComment: data?['supervisorFeedBackComment'],
       attachments:
       (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       isSynced: data?['isSynced'],
@@ -236,6 +254,12 @@ class Report {
       if (reportingMonth != null) 'reportingMonth': reportingMonth,
       if (reportStatus != null) 'reportStatus': reportStatus,
       if (reportFeedbackComment != null) 'reportFeedbackComment': reportFeedbackComment,
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
       if (attachments != null) 'attachments': attachments,
       if (isSynced != null) 'isSynced': isSynced,
       // Serialize reportEntries correctly
@@ -265,17 +289,26 @@ class Task {
   List<String>? attachments;
   String? reviewedBy; // ADDED: Field to store the reviewer's name
   String? appAnalysis; // ADDED: Field to store Gemini analysis for tasks
-
+  String? supervisorName;
+  String? supervisorEmail;
+  String? supervisorApprovalStatus;
+  String? supervisorFeedBackComment;
+  String? firestoreId;
   Task({
     this.id,
     this.date,
     this.taskTitle,
+    this.firestoreId, // ADDED
     this.taskDescription,
     this.isSynced,
     this.taskStatus,
     this.attachments,
     this.reviewedBy, // ADDED: Include in constructor
     this.appAnalysis, // ADDED: Include in constructor
+    this.supervisorName,
+    this.supervisorEmail,
+    this.supervisorApprovalStatus,
+    this.supervisorFeedBackComment,
   });
 
 
@@ -289,11 +322,16 @@ class Task {
       taskTitle: data?['taskTitle'],
       taskDescription: data?['taskDescription'],
       isSynced: data?['isSynced'],
+      firestoreId: snapshot.id,
       taskStatus: data?['taskStatus'],
       attachments:
       (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       reviewedBy: data?['reviewedBy'], // ADDED: Retrieve from Firestore data
       appAnalysis: data?['appAnalysis'], // ADDED: Retrieve appAnalysis from Firestore
+      supervisorName: data?['supervisorName'],
+      supervisorEmail: data?['supervisorEmail'],
+      supervisorApprovalStatus: data?['supervisorApprovalStatus'],
+      supervisorFeedBackComment: data?['supervisorFeedBackComment'],
     );
   }
 
@@ -303,10 +341,17 @@ class Task {
       if (taskTitle != null) 'taskTitle': taskTitle,
       if (taskDescription != null) 'taskDescription': taskDescription,
       if (isSynced != null) 'isSynced': isSynced,
+      if (firestoreId != null) 'firestoreId': firestoreId,
       if (taskStatus != null) 'taskStatus': taskStatus,
       if (attachments != null) 'attachments': attachments,
       if (reviewedBy != null) 'reviewedBy': reviewedBy, // ADDED: Include in Firestore data
       if (appAnalysis != null) 'appAnalysis': appAnalysis, // ADDED: Include appAnalysis in Firestore data
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
     };
   }
 }
@@ -685,8 +730,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   final String bioCollection = 'BioData';
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirestoreService _firestoreService = FirestoreService(); // Initialize FirestoreService
-  int _totalClockIn = 0;
-  int _totalClockOut = 0;
+  final int _totalClockIn = 0;
+  final int _totalClockOut = 0;
 
   // Report Operations
   Future<List<Report>> getReportsByDate(DateTime date, BioModel? bioModel) async {
@@ -836,7 +881,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   // Task Operations (Updated for new path)
   Future<List<Task>> getTasksByDate1(DateTime date, BioModel? bioModel, String selectedFirebaseId) async {
-    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
+    if (selectedBioState == null || selectedBioLocation == null) {
       print("BioModel or user ID data is incomplete, cannot fetch tasks.");
       return [];
     }
@@ -863,7 +908,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
   Future<void> deleteTask(String taskId) async {
     try {
-      if (bioData == null || selectedFirebaseId == null || taskId == null) {
+      if (bioData == null || selectedFirebaseId == null) {
         print("BioModel or task ID data is incomplete, cannot delete task.");
         return;
       }
@@ -876,7 +921,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
   Future<void> deleteTask1(String taskId, BioModel? bioModel, String selectedFirebaseId, DateTime date) async {
-    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null || taskId == null) {
+    if (selectedBioState == null || selectedBioLocation == null) {
       print("BioModel or user ID data is incomplete, cannot delete task.");
       return;
     }
@@ -903,7 +948,34 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
   Future<void> saveTask(Task task) async {
-    String taskId = Uuid().v4();
+    String taskId = const Uuid().v4();
+    if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
+      print("BioModel or user ID data is incomplete, cannot save task.");
+      return;
+    }
+
+    try {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(task.date!);
+      final DocumentReference taskDocRef = _firestore
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection("Task") // Sub-collection named "Task"
+          .doc(selectedBioLocation)
+          .collection(formattedDate)
+          .doc(selectedFirebaseId)
+          .collection(selectedFirebaseId!)
+          .doc(taskId); // Task ID as document
+
+
+      await taskDocRef.set(task.toFirestore(), SetOptions(merge: true));
+    } catch (e) {
+      print("Error saving task to new path: $e");
+      print("Error details: $e");
+    }
+  }
+
+  Future<void> updateTask(Task task,String taskId) async {
+
     if (selectedBioState == null || selectedBioLocation == null || selectedFirebaseId == null) {
       print("BioModel or user ID data is incomplete, cannot save task.");
       return;
@@ -1071,6 +1143,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   Map<String, String?> siReportEditedUsernames = {};
 
   String _currentUsername = ""; // Stores the current logged-in user's name.
+  bool _isEditingTask = false; // Track if editing task in the "Other Tasks" section
 
   String _selectedReportType = "Daily"; // Default report type.
   String? _selectedReportPeriod; // Selected reporting week (Week 1, Week 2, etc.)
@@ -1082,7 +1155,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   final Map<String, Map<String, bool>> _isIndicatorEditable = {}; // Tracks if an indicator is in editing mode within a report section.
   final Map<String, Report?> _loadedReports = {}; // Keep this
   List<Task> _tasksForDate = []; // Stores tasks for the selected date.
-  Map<String, List<Report>> _allReportsForDate = {}; // Stores all reports for the selected date, grouped by department
+  final Map<String, List<Report>> _allReportsForDate = {}; // Stores all reports for the selected date, grouped by department
 
   Task? _taskBeingEdited; // Track the task being edited
 
@@ -1100,7 +1173,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   // NEW: State for validation progress
   bool _isValidating = false;
   // NEW: State for Gemini analysis progress
-  bool _isAnalyzingImage = false;
+  final bool _isAnalyzingImage = false;
 
   final GlobalKey<FormState> _genericFormKey =
   GlobalKey<FormState>(); // Single generic form key
@@ -1130,6 +1203,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   String? selectedSupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
   int _selectedIndex = 0; // To track bottom navigation tab index
+  Future<Map<String, Map<String, int>>>? _summaryDataCache;
 
   // Add ImagePicker instance
   final ImagePicker _picker = ImagePicker();
@@ -1259,16 +1333,16 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           if (report.reportStatus == 'Pending' && report.reportEntries != null) {
             print("snapshot report.reportStatus ===${report.reportStatus}");
             for (var username in report.reportEntries!.keys) {
-              print("snapshot username ===${username}");
+              print("snapshot username ===$username");
               var indicatorMap = report.reportEntries![username];
-              print("snapshot indicatorMap ===${indicatorMap}");
+              print("snapshot indicatorMap ===$indicatorMap");
               for (var indicator in indicatorMap!.keys) {
-                print("snapshot indicator ===${indicator}");
+                print("snapshot indicator ===$indicator");
                 for (var entry in indicatorMap[indicator]!) {
                   print("snapshot entry.reviewerId ===${entry.reviewerId}");
                   if (entry.reviewerId == selectedFirebaseId) {
                     reportsForReview.add(report);
-                    print("snapshot entry.reportsForReview ===${reportsForReview}");
+                    print("snapshot entry.reportsForReview ===$reportsForReview");
                     break;
                   }
                 }
@@ -1282,11 +1356,422 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     } catch (e) {
       print("Error fetching reports for review: $e");
     }
-    print("reportsForReview ===${reportsForReview}");
+    print("reportsForReview ===$reportsForReview");
     return reportsForReview;
   }
 
+  Widget _buildTaskSummaryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            mainAxisAlignment:MainAxisAlignment.spaceEvenly,
+            children:[
+              Text(
+                "Task Summary for ${DateFormat('MMMM yyyy').format(_selectedReportingDate)}",
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton(
+                onPressed: () { // Disable button when saving
+                  _performDataValidation(); // Call the data validation function
+                },
+                child: const Text('Data Validation Check'),
+              ),
+            ]
+          ),
 
+          const SizedBox(height: 20),
+          // Tables for each unit will be added here dynamically
+          ..._buildSummaryTables(), // Call a helper function to build tables
+        ],
+      ),
+    );
+  }
+
+
+  Future<ValidationResult> _validateMonthlySummaryData(Map<String, Map<String, int>> weeklySummary) async {
+    bool validationFailed = false;
+    String validationErrorMessage = "";
+    Map<String, int> monthlyTotals = {}; // To store monthly totals for each indicator
+
+    String vlResultHandedOverIndicatorKey = "Number of Result Handed over to SIAs /MEAL For the Day";
+    String vlResultEnteredNMRSIndicatorKey = "Number of Viral Load Results Entered on NMRS (EMR) For the Day";
+    String eligibleClientsTestedHTSRegisterIndicatorKey = "Number of Eligible Clients Tested and documented in the HTS Register For the Day";
+    String htsDataEnteredNMRSIndicatorKey = "Number of HTS Data Entered on NMRS (EMR) For the Day";
+    String existingClientsEntriesNMRSIndicatorKey = "Number of Existing Clients Entries Entered on NMRS (EMR) For the Day";
+    String refillClientsIndicatorKey = "Number of Refill Clients For the day";
+    String newARTClientsIndicatorKey = "Number of New ART Clients For the day";
+    String txNewIndicatorKey = "Number of Tx_New Clients Entries Entered on NMRS (EMR) For the Day";
+    String hivPositiveLinkedToArtIndicatorKey = "Number of newly diagnosed HIV positive linked to ART For the Day";
+    String arvPickUpClientsIndicatorKey = "Total Number of Clients that Visited the Facility for ARV Pick Up For the Day";
+    String diagnosedHIVPositiveIndicatorKey = "Number of Clients Diagnosed HIV Positive For the Day";
+    String eligibleForTestingIndicatorKey = "Number Eligible for Testing For the Day";
+    String eligibleClientsTestedReceivedResultIndicatorKey = "Number of Eligible Clients Tested for HIV and Received Result For the Day";
+
+
+    // Aggregate weekly totals to monthly totals
+    for (String week in weeklySummary.keys) {
+      weeklySummary[week]?.forEach((indicator, weeklyValue) {
+        monthlyTotals[indicator] = (monthlyTotals[indicator] ?? 0) + weeklyValue;
+      });
+    }
+
+    // Perform monthly validation checks
+    int monthlyVLResultHandedOver = monthlyTotals[vlResultHandedOverIndicatorKey] ?? 0;
+    int monthlyVLResultEnteredNMRS = monthlyTotals[vlResultEnteredNMRSIndicatorKey] ?? 0;
+    int monthlyEligibleClientsTestedHTSRegister = monthlyTotals[eligibleClientsTestedHTSRegisterIndicatorKey] ?? 0;
+    int monthlyHTSDataEnteredNMRS = monthlyTotals[htsDataEnteredNMRSIndicatorKey] ?? 0;
+    int monthlyExistingClientsEntriesNMRS = monthlyTotals[existingClientsEntriesNMRSIndicatorKey] ?? 0;
+    int monthlyRefillClients = monthlyTotals[refillClientsIndicatorKey] ?? 0;
+    int monthlyNewARTClients = monthlyTotals[newARTClientsIndicatorKey] ?? 0;
+    int monthlyTxNewEntries = monthlyTotals[txNewIndicatorKey] ?? 0;
+    int monthlyHIVPositiveLinkedToArt = monthlyTotals[hivPositiveLinkedToArtIndicatorKey] ?? 0;
+    int monthlyARVPickUpClients = monthlyTotals[arvPickUpClientsIndicatorKey] ?? 0;
+    int monthlyDiagnosedHIVPositive = monthlyTotals[diagnosedHIVPositiveIndicatorKey] ?? 0;
+    int monthlyEligibleForTesting = monthlyTotals[eligibleForTestingIndicatorKey] ?? 0;
+    int monthlyEligibleClientsTestedReceivedResult = monthlyTotals[eligibleClientsTestedReceivedResultIndicatorKey] ?? 0;
+
+
+    if (monthlyVLResultHandedOver != monthlyVLResultEnteredNMRS) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly VL Validation failed:\nTotal Number of Result Handed over to SIAs /MEAL  ($monthlyVLResultHandedOver) does not match Number of Viral Load Results Entered on NMRS (EMR) ($monthlyVLResultEnteredNMRS).\n\n";
+    }
+    if (monthlyEligibleClientsTestedHTSRegister != monthlyHTSDataEnteredNMRS) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly HTS_HTSRegister_HTSEntry Validation failed:\nTotal Number of Eligible Clients Tested and documented in the HTS Register ($monthlyEligibleClientsTestedHTSRegister) does not match Number of HTS Data Entered on NMRS (EMR) ($monthlyHTSDataEnteredNMRS).\n\n";
+    }
+    if (monthlyExistingClientsEntriesNMRS != monthlyRefillClients) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly ExistingClients_RefillClients Validation failed:\nTotal Number of Existing Clients Entries Entered on NMRS (EMR) ($monthlyExistingClientsEntriesNMRS) does not match Number of Refill Clients ($monthlyRefillClients).\n\n";
+    }
+    if (monthlyNewARTClients != monthlyTxNewEntries || monthlyNewARTClients != monthlyHIVPositiveLinkedToArt) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly NewARTClients_TxNew_HIVPositiveLinkedART Validation failed:\nTotal Number of New ART Clients ($monthlyNewARTClients) does not match Number of Tx_New Clients Entries Entered on NMRS (EMR) ($monthlyTxNewEntries) or Number of Newly Diagnosed HIV Positive Linked to ART ($monthlyHIVPositiveLinkedToArt).\n\n";
+    }
+    if (monthlyARVPickUpClients != monthlyExistingClientsEntriesNMRS || monthlyARVPickUpClients != monthlyRefillClients) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly ARVPickUpClients_ExistingClients_RefillClients Validation failed:\nTotal Number of Clients that Visited the Facility for ARV Pick Up ($monthlyARVPickUpClients) does not match Number of Existing Clients Entries Entered on NMRS (EMR) ($monthlyExistingClientsEntriesNMRS) or Number of Refill Clients ($monthlyRefillClients).\n\n";
+    }
+    if (monthlyDiagnosedHIVPositive > monthlyEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly DiagnosedHIVPositive_EligibleForTesting Validation failed:\nNumber of Clients Diagnosed HIV Positive ($monthlyDiagnosedHIVPositive) cannot be greater than Number Eligible for Testing ($monthlyEligibleForTesting).\n\n";
+    }
+    if (monthlyEligibleClientsTestedHTSRegister > monthlyEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly EligibleClientsTestedHTSRegister_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested and documented in the HTS Register ($monthlyEligibleClientsTestedHTSRegister) cannot be greater than Number Eligible for Testing ($monthlyEligibleForTesting).\n\n";
+    }
+    if (monthlyEligibleClientsTestedReceivedResult > monthlyEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly EligibleClientsTestedReceivedResult_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested for HIV and Received Result ($monthlyEligibleClientsTestedReceivedResult) cannot be greater than Number Eligible for Testing ($monthlyEligibleForTesting).\n\n";
+    }
+    if (monthlyHIVPositiveLinkedToArt > monthlyEligibleForTesting) {
+      validationFailed = true;
+      validationErrorMessage += "Monthly HIVPositiveLinkedToArt_EligibleForTesting Validation failed:\nNumber of Newly Diagnosed HIV Positive Linked to ART ($monthlyHIVPositiveLinkedToArt) cannot be greater than Number Eligible for Testing ($monthlyEligibleForTesting).\n\n";
+    }
+
+
+    return ValidationResult(isValid: !validationFailed, messages: validationErrorMessage);
+  }
+
+  Future<void> _performDataValidation() async {
+    bool allValid = true;
+    String validationMessages = "";
+
+    setState(() {
+      _isValidating = true; // Start validation progress indicator
+    });
+
+    Map<String, Map<String, int>> weeklySummaryData = await _fetchWeeklySummaryData(); // Fetch weekly summary data
+
+    ValidationResult weeklyValidationResult = await _validateWeeklySummaryData(weeklySummaryData); // Call weekly validation
+    if (!weeklyValidationResult.isValid) {
+      allValid = false;
+      validationMessages += weeklyValidationResult.messages;
+    }
+
+    ValidationResult monthlyValidationResult = await _validateMonthlySummaryData(weeklySummaryData); // Call monthly validation
+    if (!monthlyValidationResult.isValid) {
+      allValid = false;
+      validationMessages += monthlyValidationResult.messages;
+    }
+
+
+    setState(() {
+      _isValidating = false; // Stop validation progress indicator
+    });
+
+    if (allValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data validation passed for weekly and monthly summaries!')),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text("Data Validation Issues"),
+            content: Text(validationMessages.isNotEmpty ? validationMessages : "Data validation failed."),
+            actions: <Widget>[
+              TextButton(
+                child: const Text("OK"),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  Future<ValidationResult> _validateWeeklySummaryData(Map<String, Map<String, int>> weeklySummary) async {
+    bool validationFailed = false;
+    String validationErrorMessage = "";
+
+    String vlResultHandedOverIndicatorKey = "Number of Result Handed over to SIAs /MEAL For the Day";
+    String vlResultEnteredNMRSIndicatorKey = "Number of Viral Load Results Entered on NMRS (EMR) For the Day";
+    String eligibleClientsTestedHTSRegisterIndicatorKey = "Number of Eligible Clients Tested and documented in the HTS Register For the Day";
+    String htsDataEnteredNMRSIndicatorKey = "Number of HTS Data Entered on NMRS (EMR) For the Day";
+    String existingClientsEntriesNMRSIndicatorKey = "Number of Existing Clients Entries Entered on NMRS (EMR) For the Day";
+    String refillClientsIndicatorKey = "Number of Refill Clients For the day";
+    String newARTClientsIndicatorKey = "Number of New ART Clients For the day";
+    String txNewIndicatorKey = "Number of Tx_New Clients Entries Entered on NMRS (EMR) For the Day";
+    String hivPositiveLinkedToArtIndicatorKey = "Number of newly diagnosed HIV positive linked to ART For the Day";
+    String arvPickUpClientsIndicatorKey = "Total Number of Clients that Visited the Facility for ARV Pick Up For the Day";
+    String diagnosedHIVPositiveIndicatorKey = "Number of Clients Diagnosed HIV Positive For the Day";
+    String eligibleForTestingIndicatorKey = "Number Eligible for Testing For the Day";
+    String eligibleClientsTestedReceivedResultIndicatorKey = "Number of Eligible Clients Tested for HIV and Received Result For the Day";
+
+
+    // Perform weekly validation checks - Example validations (adjust as needed)
+    for (String week in weeklySummary.keys) {
+      int weeklyVLResultHandedOver = weeklySummary[week]![vlResultHandedOverIndicatorKey] ?? 0;
+      int weeklyVLResultEnteredNMRS = weeklySummary[week]![vlResultEnteredNMRSIndicatorKey] ?? 0;
+      int weeklyEligibleClientsTestedHTSRegister = weeklySummary[week]![eligibleClientsTestedHTSRegisterIndicatorKey] ?? 0;
+      int weeklyHTSDataEnteredNMRS = weeklySummary[week]![htsDataEnteredNMRSIndicatorKey] ?? 0;
+      int weeklyExistingClientsEntriesNMRS = weeklySummary[week]![existingClientsEntriesNMRSIndicatorKey] ?? 0;
+      int weeklyRefillClients = weeklySummary[week]![refillClientsIndicatorKey] ?? 0;
+      int weeklyNewARTClients = weeklySummary[week]![newARTClientsIndicatorKey] ?? 0;
+      int weeklyTxNewEntries = weeklySummary[week]![txNewIndicatorKey] ?? 0;
+      int weeklyHIVPositiveLinkedToArt = weeklySummary[week]![hivPositiveLinkedToArtIndicatorKey] ?? 0;
+      int weeklyARVPickUpClients = weeklySummary[week]![arvPickUpClientsIndicatorKey] ?? 0;
+      int weeklyDiagnosedHIVPositive = weeklySummary[week]![diagnosedHIVPositiveIndicatorKey] ?? 0;
+      int weeklyEligibleForTesting = weeklySummary[week]![eligibleForTestingIndicatorKey] ?? 0;
+      int weeklyEligibleClientsTestedReceivedResult = weeklySummary[week]![eligibleClientsTestedReceivedResultIndicatorKey] ?? 0;
+
+
+      if (weeklyVLResultHandedOver != weeklyVLResultEnteredNMRS) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week VL Validation failed:\nTotal Number of Result Handed over to SIAs /MEAL  ($weeklyVLResultHandedOver) does not match Number of Viral Load Results Entered on NMRS (EMR) ($weeklyVLResultEnteredNMRS).\n\n";
+      }
+      if (weeklyEligibleClientsTestedHTSRegister != weeklyHTSDataEnteredNMRS) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week HTS_HTSRegister_HTSEntry Validation failed:\nTotal Number of Eligible Clients Tested and documented in the HTS Register ($weeklyEligibleClientsTestedHTSRegister) does not match Number of HTS Data Entered on NMRS (EMR) ($weeklyHTSDataEnteredNMRS).\n\n";
+      }
+      if (weeklyExistingClientsEntriesNMRS != weeklyRefillClients) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week ExistingClients_RefillClients Validation failed:\nTotal Number of Existing Clients Entries Entered on NMRS (EMR) ($weeklyExistingClientsEntriesNMRS) does not match Number of Refill Clients ($weeklyRefillClients).\n\n";
+      }
+      if (weeklyNewARTClients != weeklyTxNewEntries || weeklyNewARTClients != weeklyHIVPositiveLinkedToArt) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week NewARTClients_TxNew_HIVPositiveLinkedART Validation failed:\nTotal Number of New ART Clients ($weeklyNewARTClients) does not match Number of Tx_New Clients Entries Entered on NMRS (EMR) ($weeklyTxNewEntries) or Number of Newly Diagnosed HIV Positive Linked to ART ($weeklyHIVPositiveLinkedToArt).\n\n";
+      }
+      if (weeklyARVPickUpClients != weeklyExistingClientsEntriesNMRS || weeklyARVPickUpClients != weeklyRefillClients) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week ARVPickUpClients_ExistingClients_RefillClients Validation failed:\nTotal Number of Clients that Visited the Facility for ARV Pick Up ($weeklyARVPickUpClients) does not match Number of Existing Clients Entries Entered on NMRS (EMR) ($weeklyExistingClientsEntriesNMRS) or Number of Refill Clients ($weeklyRefillClients).\n\n";
+      }
+      if (weeklyDiagnosedHIVPositive > weeklyEligibleForTesting) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week DiagnosedHIVPositive_EligibleForTesting Validation failed:\nNumber of Clients Diagnosed HIV Positive ($weeklyDiagnosedHIVPositive) cannot be greater than Number Eligible for Testing ($weeklyEligibleForTesting).\n\n";
+      }
+      if (weeklyEligibleClientsTestedHTSRegister > weeklyEligibleForTesting) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week EligibleClientsTestedHTSRegister_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested and documented in the HTS Register ($weeklyEligibleClientsTestedHTSRegister) cannot be greater than Number Eligible for Testing ($weeklyEligibleForTesting).\n\n";
+      }
+      if (weeklyEligibleClientsTestedReceivedResult > weeklyEligibleForTesting) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week EligibleClientsTestedReceivedResult_EligibleForTesting Validation failed:\nNumber of Eligible Clients Tested for HIV and Received Result ($weeklyEligibleClientsTestedReceivedResult) cannot be greater than Number Eligible for Testing ($weeklyEligibleForTesting).\n\n";
+      }
+      if (weeklyHIVPositiveLinkedToArt > weeklyEligibleForTesting) {
+        validationFailed = true;
+        validationErrorMessage += "Week $week HIVPositiveLinkedToArt_EligibleForTesting Validation failed:\nNumber of Newly Diagnosed HIV Positive Linked to ART ($weeklyHIVPositiveLinkedToArt) cannot be greater than Number Eligible for Testing ($weeklyEligibleForTesting).\n\n";
+      }
+
+
+    }
+
+
+    return ValidationResult(isValid: !validationFailed, messages: validationErrorMessage);
+  }
+
+  List<Widget> _buildSummaryTables() {
+    List<Widget> summaryWidgets = [];
+
+    for (var definition in _thematicReportDefinitions) {
+      String departmentName = definition['department'];
+      String designationName = definition['designation'];
+      String reportTypeKey = "${departmentName}_$designationName"
+          .toLowerCase()
+          .replaceAll(' ', '_');
+      List<String> indicators =
+      List<String>.from(definition['indicators'] ?? []);
+
+      summaryWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20.0),
+          child: Text(
+            "$departmentName - $designationName",
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      summaryWidgets.add(_buildSummaryDataTable(reportTypeKey, indicators));
+    }
+    return summaryWidgets;
+  }
+
+  Widget _buildSummaryDataTable(String reportTypeKey, List<String> indicators) {
+    // Check if data is cached, if not, fetch and cache
+    _summaryDataCache ??= _fetchWeeklySummaryData();
+
+    return FutureBuilder<Map<String, Map<String, int>>>(
+      future: _summaryDataCache, // Use the cached Future
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
+        } else if (snapshot.hasError) {
+          return Text("Error loading summary data: ${snapshot.error}");
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Text("No summary data available for this unit for the current month.");
+        } else {
+          Map<String, Map<String, int>> summaryData = snapshot.data!;
+          return _buildDataTable(indicators, summaryData); // Helper to build the table UI
+        }
+      },
+    );
+  }
+
+  Future<Map<String, Map<String, int>>> _fetchWeeklySummaryData() async {
+    Map<String, Map<String, int>> weeklySummary = {};
+    DateTime startDateOfMonth = DateTime(_selectedReportingDate.year, _selectedReportingDate.month, 1);
+    DateTime endDateOfMonth = DateTime(_selectedReportingDate.year, _selectedReportingDate.month + 1, 0);
+
+    print("DEBUG: _fetchWeeklySummaryData - Start fetching for ALL reportTypes, Month: ${DateFormat('MMMM yyyy').format(_selectedReportingDate)}");
+
+    for (DateTime date = startDateOfMonth; date.isBefore(endDateOfMonth.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+      final String formattedDate = DateFormat('dd-MMM-yyyy').format(date);
+      final CollectionReference<Map<String, dynamic>> reportCollectionRef = _firestore
+          .collection(reportsCollection)
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDate);
+
+      print("DEBUG: _fetchWeeklySummaryData - Fetching reports for date: $formattedDate");
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await reportCollectionRef.get();
+      print("DEBUG: _fetchWeeklySummaryData - Snapshot size for $formattedDate: ${snapshot.docs.length}");
+
+      for (var doc in snapshot.docs) {
+        Report report = Report.fromFirestore(doc, null);
+
+        if (report.reportEntries != null && report.reportingWeek != null) { // Check for reportingWeek
+          String weekIdentifier = report.reportingWeek!; // Use reportingWeek from report
+          print("DEBUG: _fetchWeeklySummaryData - Processing report for date: $formattedDate, week: $weekIdentifier, reportType: ${report.reportType}");
+
+          if (!weeklySummary.containsKey(weekIdentifier)) {
+            weeklySummary[weekIdentifier] = {};
+            print("DEBUG: _fetchWeeklySummaryData - Initializing week: $weekIdentifier in weeklySummary");
+          }
+
+          if (report.reportEntries == null) {
+            print("DEBUG: _fetchWeeklySummaryData - report.reportEntries is NULL for reportType: ${report.reportType}, date: $formattedDate");
+            continue; // Skip to next report if reportEntries is null
+          }
+
+          for (var username in report.reportEntries!.keys) {
+            if (report.reportEntries![username] != null) {
+              for (var indicatorEntry in report.reportEntries![username]!.entries) {
+                String indicatorName = indicatorEntry.key;
+
+                if (indicatorEntry.value.isEmpty) {
+                  print("DEBUG: _fetchWeeklySummaryData - indicatorEntry.value is NULL or EMPTY for indicator: $indicatorName, week: $weekIdentifier");
+                  continue; // Skip if indicatorEntry.value is null or empty
+                }
+                String valueString = indicatorEntry.value.first.value;
+                int value = int.tryParse(valueString) ?? 0;
+                print("DEBUG: _fetchWeeklySummaryData - Extracted value: '$valueString', parsed value: $value, indicator: $indicatorName, week: $weekIdentifier, reportType: ${report.reportType}");
+                weeklySummary[weekIdentifier]![indicatorName] = (weeklySummary[weekIdentifier]![indicatorName] ?? 0) + value;
+                print("DEBUG: _fetchWeeklySummaryData - Accumulated value: ${weeklySummary[weekIdentifier]![indicatorName]}, indicator: $indicatorName, week: $weekIdentifier, reportType: ${report.reportType}");
+
+              }
+            }
+          }
+        } else {
+          print("DEBUG: _fetchWeeklySummaryData - Skipping report due to NULL reportEntries or reportingWeek, reportType: ${report.reportType}, date: $formattedDate");
+        }
+      }
+    }
+    print("DEBUG: _fetchWeeklySummaryData - Final weeklySummary data: $weeklySummary");
+    return weeklySummary;
+  }
+
+
+  // Helper function to get week number (you can use a library for more robust week numbering if needed)
+  int getWeekNumber(DateTime date) {
+    int dayOfYear = int.parse(DateFormat("D").format(date));
+    return ((dayOfYear - date.weekday + 10) / 7).floor();
+  }
+
+  Widget _buildDataTable(List<String> indicators, Map<String, Map<String, int>> summaryData) {
+    List<TableRow> tableRows = [];
+
+    // Header Row
+    List<Widget> headerCells = [
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      ..._reportPeriodOptions.map((week) => Padding( // Use _reportPeriodOptions for week headers
+          padding: const EdgeInsets.all(8.0),
+          child: Text(week, style: const TextStyle(fontWeight: FontWeight.bold))
+      )),
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: Text("Monthly Total", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    ];
+    tableRows.add(TableRow(children: headerCells));
+
+    // Data Rows
+    for (String indicator in indicators) {
+      List<Widget> dataCells = [
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator)),
+      ];
+      int monthlyTotal = 0;
+      for (String week in _reportPeriodOptions) { // Use _reportPeriodOptions to iterate through weeks
+        int weeklyValue = summaryData[week]?[indicator] ?? 0;
+        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(weeklyValue.toString())));
+        monthlyTotal += weeklyValue;
+      }
+      dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(monthlyTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold))));
+      tableRows.add(TableRow(children: dataCells));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Table(
+        border: TableBorder.all(),
+        columnWidths: const <int, TableColumnWidth>{
+          0: FixedColumnWidth(250), // Indicator column width
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: tableRows,
+      ),
+    );
+  }
 
   Widget _buildReviewListTab() {
     return StreamBuilder<List<Report>>( // Changed to StreamBuilder
@@ -1299,6 +1784,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text("No reports pending your review."));
         } else {
+
+
           List<Report> reviewReports = snapshot.data!;
           print("snapshot.data buildReviewListTab ===${snapshot.data}");
 
@@ -1330,20 +1817,26 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           List<Report> uniqueReviewReports = []; // Use this list for display
 
           for (Report report in filteredReviewReports) { // Iterate over filtered reports
-            print("report buildReviewListTab ===${report}");
+            print("report buildReviewListTab ===$report");
             String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
-            print("reportIdentifier buildReviewListTab ===${reportIdentifier}");
+            print("reportIdentifier buildReviewListTab ===$reportIdentifier");
             if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
               uniqueReportIdentifiers.add(reportIdentifier);
               uniqueReviewReports.add(report);
-              print("uniqueReportIdentifiers buildReviewListTab ===${uniqueReportIdentifiers}");
-              print("uniqueReviewReports buildReviewListTab ===${uniqueReviewReports}");
+              print("uniqueReportIdentifiers buildReviewListTab ===$uniqueReportIdentifiers");
+              print("uniqueReviewReports buildReviewListTab ===$uniqueReviewReports");
             }
           }
 
           // Filter out reports that are completely reviewed by current user
-          List<Report> finalReviewReports = uniqueReviewReports.where((report) => !_isReportCompletelyReviewedByCurrentUser(report)).toList();
+          List<Report> finalReviewReports = uniqueReviewReports.where((report) => !_isReportFullyActionedByCurrentUser(report)).toList();
           print("finalReviewReports.length  ===${finalReviewReports.length}");
+
+
+          if (finalReviewReports.isEmpty) { // ADDED CONDITION - If no reports left after filtering
+            return const Center(child: Text("No reports pending your review.")); // Show "No reports" message again if list is empty
+          }
+
 
 
           return ListView.builder(
@@ -1415,7 +1908,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                               _approveReport(report);
                             },
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                            child: const Text("Approve Report", style: TextStyle(color: Colors.white)),
+                            child: const Text("Approve All", style: TextStyle(color: Colors.white)),
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton(
@@ -1423,7 +1916,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                               _returnReport(report);
                             },
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                            child: const Text("Return Report", style: TextStyle(color: Colors.white)),
+                            child: const Text("Return All", style: TextStyle(color: Colors.white)),
                           ),
                         ],
                       ),
@@ -1436,6 +1929,25 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         }
       },
     );
+  }
+
+  bool _isReportFullyActionedByCurrentUser(Report report) {
+    if (report.reportEntries == null) return true; // Consider completely actioned if no entries
+
+    bool allActioned = true; // Assume all actioned initially
+    report.reportEntries!.forEach((username, indicatorMap) {
+      indicatorMap.forEach((indicatorKey, entryList) {
+        for (ReportEntry entry in entryList) {
+          if (entry.reviewerId == selectedFirebaseId && entry.reviewStatus == 'Pending') {
+            allActioned = false; // If any entry for current reviewer is Pending, report is NOT fully actioned
+            break;
+          }
+        }
+        if (!allActioned) return; // Exit inner loop early if not allActioned
+      });
+      if (!allActioned) return; // Exit outer loop early if not allActioned
+    });
+    return allActioned; // Returns true if NO indicator is Pending for current reviewer
   }
 
   bool _isReportCompletelyReviewedByCurrentUser(Report report) {
@@ -1471,7 +1983,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             ],
           ),
           Visibility( // Conditionally show buttons based on reviewStatus
-            visible: entry.reviewStatus != 'Approved',
+            visible: entry.reviewStatus != 'Approved' && entry.reviewStatus != 'Returned',
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -1727,8 +2239,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
   void _addAttachment(XFile pickedFile, {String? reportType, Task? task}) {
-    if (pickedFile == null) return;
-
     String fileName = pickedFile.name;
 
     AttachmentData attachment = AttachmentData(
@@ -2435,7 +2945,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     print("_loadTasksForSelectedDate: Fetched tasks count: ${_tasksForDate.length}");
   }
   void _updateControllerValuesFromLoadedReports() {
-    _thematicReportDefinitions.forEach((definition) {
+    for (var definition in _thematicReportDefinitions) {
       String reportTypeKey = "${definition['department']}_${definition['designation']}"
           .toLowerCase()
           .replaceAll(' ', '_');
@@ -2453,7 +2963,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           reportUsernames[reportTypeKey]!,
           reportEditedUsernames[reportTypeKey]!,
           reportTypeKey);
-    });
+    }
   }
 
 
@@ -2551,12 +3061,22 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   }
 
   // Updates the report period options based on the selected report type (currently only "Daily").
-  void _updateReportPeriodOptions(String reportType) {
+  void _updateReportPeriodOptions23(String reportType) {
     setState(() {
       _selectedReportPeriod = null;
       _selectedMonthForWeekly = null;
       _reportPeriodOptions =
       reportType == "Daily" ? ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"] : [];
+    });
+  }
+
+
+  void _updateReportPeriodOptions(String reportType) {
+    setState(() {
+      _selectedReportPeriod = null;
+      _selectedMonthForWeekly = null;
+      _reportPeriodOptions = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"]; // Initialize for Daily reports too
+
     });
   }
 
@@ -2736,33 +3256,31 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
           orElse: () => ReportEntry(key: indicator, value: ''),
         );
 
-        if (reportEntry != null) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 10.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (reportEntry.reviewedBy != null && reportEntry.reviewedBy!.isNotEmpty)
-                  _buildReadOnlyField("To Be Reviewed by", reportEntry.reviewedBy!),
-                if (reportEntry.reviewStatus != null && reportEntry.reviewStatus!.isNotEmpty)
-                  _buildReadOnlyField("Review Status", reportEntry.reviewStatus!),
-                if (reportEntry.supervisorName != null && reportEntry.supervisorName!.isNotEmpty)
-                  _buildReadOnlyField("Supervisor Name", reportEntry.supervisorName!),
-                if (reportEntry.supervisorEmail != null && reportEntry.supervisorEmail!.isNotEmpty)
-                  _buildReadOnlyField("Supervisor Email", reportEntry.supervisorEmail!),
-                if (reportEntry.supervisorApprovalStatus != null &&
-                    reportEntry.supervisorApprovalStatus!.isNotEmpty)
-                  _buildReadOnlyField(
-                      "Supervisor Approval Status", reportEntry.supervisorApprovalStatus!),
-                if (reportEntry.supervisorFeedBackComment != null &&
-                    reportEntry.supervisorFeedBackComment!.isNotEmpty)
-                  _buildReadOnlyField("Supervisor Feedback Comment",
-                      reportEntry.supervisorFeedBackComment!),
-              ],
-            ),
-          );
-        }
-      }
+        return Padding(
+          padding: const EdgeInsets.only(top: 8.0, left: 10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (reportEntry.reviewedBy != null && reportEntry.reviewedBy!.isNotEmpty)
+                _buildReadOnlyField("To Be Reviewed by", reportEntry.reviewedBy!),
+              if (reportEntry.reviewStatus != null && reportEntry.reviewStatus!.isNotEmpty)
+                _buildReadOnlyField("Review Status", reportEntry.reviewStatus!),
+              if (reportEntry.supervisorName != null && reportEntry.supervisorName!.isNotEmpty)
+                _buildReadOnlyField("Supervisor Name", reportEntry.supervisorName!),
+              if (reportEntry.supervisorEmail != null && reportEntry.supervisorEmail!.isNotEmpty)
+                _buildReadOnlyField("Supervisor Email", reportEntry.supervisorEmail!),
+              if (reportEntry.supervisorApprovalStatus != null &&
+                  reportEntry.supervisorApprovalStatus!.isNotEmpty)
+                _buildReadOnlyField(
+                    "Supervisor Approval Status", reportEntry.supervisorApprovalStatus!),
+              if (reportEntry.supervisorFeedBackComment != null &&
+                  reportEntry.supervisorFeedBackComment!.isNotEmpty)
+                _buildReadOnlyField("Supervisor Feedback Comment",
+                    reportEntry.supervisorFeedBackComment!),
+            ],
+          ),
+        );
+            }
     }
     return const SizedBox.shrink();
   }
@@ -2958,8 +3476,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
 
   Future<String?> sendImageToGeminiForValidation(String base64Image, List<String> indicators) async { // Modified to accept List<String> indicators
     try {
-      final geminiApiKey = 'AIzaSyC7xwM7GQfcSvZeJqeUK5oib6VCPHCyecs'; // Replace with your actual API key
-      final modelName = 'gemini-2.0-flash';
+      const geminiApiKey = 'AIzaSyC7xwM7GQfcSvZeJqeUK5oib6VCPHCyecs'; // Replace with your actual API key
+      const modelName = 'gemini-2.0-flash';
       final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$geminiApiKey');
 
 
@@ -3057,12 +3575,12 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
 
   Future<String?> analyzeWithGemini(String imageUrl, String designationPrompt) async {
     try {
-      final geminiApiKey = 'AIzaSyDzXGoMQJzSYNjBmhnQepuvp4S5vrckb2k'; // Replace with actual API key
-      final modelName = 'gemini-pro-vision';
-      final modelName1 = 'gemini-2.0-flash-exp-image-generation';
-      final modelName2 = 'gemini-2.0-flash-lite';
-      final modelName3 = 'gemini-2.0-pro-exp-02-05';
-      final modelName4 = 'gemini-2.0-flash-thinking-exp-01-21';
+      const geminiApiKey = 'AIzaSyDzXGoMQJzSYNjBmhnQepuvp4S5vrckb2k'; // Replace with actual API key
+      const modelName = 'gemini-pro-vision';
+      const modelName1 = 'gemini-2.0-flash-exp-image-generation';
+      const modelName2 = 'gemini-2.0-flash-lite';
+      const modelName3 = 'gemini-2.0-pro-exp-02-05';
+      const modelName4 = 'gemini-2.0-flash-thinking-exp-01-21';
       final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$geminiApiKey');
 
       // Step 1: Download Image as Bytes
@@ -3143,7 +3661,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: const Text("Data Validation Issue"),
+                title: const Text("Task Validation Issue"),
                 content: Text(
                     "Validation failed:\nNumber of TX_New Entries ($txNewEntries) does not match Number of clients diagnosed HIV Positive ($hivPositiveClients).\n\nDo you want to continue saving?"),
                 actions: <Widget>[
@@ -3830,6 +4348,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
         isSynced: false,
         reportStatus: "Pending",
         attachments: null,
+        supervisorName: _selectedSupervisor, // ADD THIS LINE
+        supervisorEmail: _selectedSupervisorEmail, // ADD THIS LINE
       );
 
 
@@ -3938,11 +4458,14 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
             attachments: attachmentUrls, // Use uploaded URLs
             reviewedBy: _taskBeingEdited!.reviewedBy,
             appAnalysis: aggregatedAnalysisResult,
+            firestoreId: _taskBeingEdited!.firestoreId, // ADD THIS LINE FOR UPDATE
+            supervisorName: _selectedSupervisor, // ADD THIS LINE
+            supervisorEmail: _selectedSupervisorEmail, // ADD THIS LINE
           );
 
 
           // Pass taskId for update
-          await saveTask(task);
+          await updateTask(task,_taskBeingEdited!.firestoreId!);
           Get.back(); // Dismiss loading dialog
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Task updated successfully!')));
@@ -3957,6 +4480,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
             attachments: attachmentUrls, // Use uploaded URLs
             reviewedBy: reviewer.name,
             appAnalysis: aggregatedAnalysisResult,
+            supervisorName: _selectedSupervisor, // ADD THIS LINE
+            supervisorEmail: _selectedSupervisorEmail, // ADD THIS LINE
           );
 
           await saveTask(newTask);
@@ -3978,6 +4503,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
         _taskBeingEdited = null;
         _loadTasksForSelectedDate();
         _selectedReviewer = null; // Reset Reviewer after save/update
+        _isEditingTask = false; // Reset edit mode after save
       } catch (e) {
         Get.back(); // Dismiss loading dialog in case of error
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -3993,6 +4519,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
               'Please fill in all task details and select a Reviewer')));
     }
   }
+
+
 
   Widget _buildTaskCard(Task task) {
     return Card(
@@ -4076,12 +4604,13 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   }
 
 
-  // Function to edit task directly on the main page  (NEWLY ADDED METHOD)
+// Function to edit task directly on the main page
   void _editTaskOnMainPage(Task taskToEdit) {
     _taskTitleController.text = taskToEdit.taskTitle ?? '';
     _taskDescriptionController.text = taskToEdit.taskDescription ?? '';
     _taskBottomSheetAttachmentsData = _taskCardAttachmentsData[taskToEdit.id ?? -1] ?? []; // _taskBottomSheetAttachmentsData is now used for main page task input
     _taskBeingEdited = taskToEdit;
+    _isEditingTask = true; // Set edit mode to true
     // Set reviewer if available
     if (taskToEdit.reviewedBy != null) {
       for (var staff in _staffList) {
@@ -4093,6 +4622,17 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
     }
     setState(() {}); // Rebuild the UI to reflect changes in controllers and attachments
   }
+
+  // After editing is done or cancelled, reset _isEditingTask
+  void _resetTaskEditState() {
+    _isEditingTask = false;
+    _taskBeingEdited = null;
+    _taskTitleController.clear();
+    _taskDescriptionController.clear();
+    _taskBottomSheetAttachmentsData.clear();
+    setState(() {});
+  }
+
 
 
   //  _processImageWithMachineLearning using google_mlkit_image_labeling
@@ -4302,50 +4842,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                       : null,
                 ),
                 const SizedBox(height: 10),
-                if ( _loadedReports[reportTypeKey]?.reportStatus == "Approved")
-                  StreamBuilder<List<String?>>(
-                    stream: selectedBioDepartment != null && selectedBioState != null
-                        ? getSupervisorStream(selectedBioDepartment!, selectedBioState!)
-                        : Stream.value([]),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      } else if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      } else {
-                        List<String?> supervisorNames = snapshot.data ?? [];
-                        return DropdownButtonFormField<String?>(
-                          decoration:
-                          const InputDecoration(labelText: 'Select Supervisor'),
-                          value: _selectedSupervisor,
-                          items: supervisorNames.map((supervisorName) {
-                            return DropdownMenuItem<String?>(
-                                value: supervisorName,
-                                child: Text(supervisorName ?? 'No Supervisor'));
-                          }).toList(),
-                          onChanged: isReadOnlySection
-                              ? null
-                              : (String? newValue) async {
-                            setState(() {
-                              _selectedSupervisor = newValue;
-                            });
-                            if (newValue != null && bioData?.department != null) {
-                              List<String?> supervisorsemail =
-                              await getSupervisorEmailFromFirestore2(
-                                  selectedBioDepartment!, newValue);
-                              setState(() {
-                                _selectedSupervisorEmail = supervisorsemail[0];
-                              });
-                            }
-                          },
-                          hint: const Text('Select Supervisor'),
-                          disabledHint: _selectedSupervisor != null
-                              ? Text(_selectedSupervisor!)
-                              : null,
-                        );
-                      }
-                    },
-                  ),
+                buildSupervisorDropdown(), // ADD BUILD SUPERVISOR DROPDOWN HERE
                 const SizedBox(height: 20),
                 ...indicators.map((indicator) {
                   return _buildIndicatorTextField(
@@ -4361,7 +4858,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     },
                     reportType: reportTypeKey,
                   );
-                }).toList(),
+                }),
                 const SizedBox(height: 20),
                 Center(
                   child: Column(
@@ -4384,8 +4881,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(_loadedReports[reportTypeKey] != null
-                                  ? 'Update ${designationName} Report'
-                                  : 'Save ${designationName} Report'),
+                                  ? 'Update $designationName Report'
+                                  : 'Save $designationName Report'),
                               if (_isSavingReport) // Show progress indicator if saving
                                 Container(
                                   margin: const EdgeInsets.only(left: 10),
@@ -4522,9 +5019,9 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   // Helper function to reset indicator editable state when "Edit" button is clicked
   void _resetIndicatorEditableState(String reportTypeKey, List<String> indicators) {
     if (_isIndicatorEditable.containsKey(reportTypeKey)) {
-      indicators.forEach((indicator) {
+      for (var indicator in indicators) {
         _isIndicatorEditable[reportTypeKey]![indicator] = false;
-      });
+      }
     }
   }
 
@@ -4784,6 +5281,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       elevation: 0.5,
       iconTheme: IconThemeData(color: Get.isDarkMode ? Colors.white : Colors.black87),
       actions: [
+
         Container(
           margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
           child: Image.asset("assets/image/ccfn_logo.png"),
@@ -4884,6 +5382,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                         return;
                       }
                       setState(() {
+                        _summaryDataCache = null;
                         _selectedReportingDate = pickedDate;
                         _datePickerSelectionColor = Colors.red;
                         _datePickerSelectedTextColor = Colors.white;
@@ -4952,7 +5451,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            "Add Other Tasks",
+            "Other Tasks",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 20,
@@ -4994,12 +5493,15 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Text("Other Tasks To Be Reviewed By: ",
+              const Text("To Be Reviewed By: ",
                   style: TextStyle(fontSize: 16)),
               const SizedBox(width: 10),
               _isLoadingStaffList
                   ? const CircularProgressIndicator()
-                  : DropdownButton<FacilityStaffModel>(
+                  :
+              // Expanded(
+              //   child:
+                DropdownButton<FacilityStaffModel>(
                 value: _selectedReviewer,
                 hint: const Text("Select Reviewer"),
                 onChanged: (FacilityStaffModel? newValue) {
@@ -5016,8 +5518,22 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                       );
                     }).toList(),
               ),
+              //),
             ],
           ),
+          Row(
+            children: [
+
+              const Text("Select Supervisor's Name: ",
+                  style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 20),
+              Expanded(
+                child: buildSupervisorDropdown(),
+              ),
+
+            ],
+          ),
+          // ADD BUILD SUPERVISOR DROPDOWN HERE
           Center(
             child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -5066,15 +5582,20 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
             _buildAttachmentGrid(_taskBottomSheetAttachmentsData),
           const SizedBox(height: 20),
           MyButton(
-            label: "Add Other Tasks",
+            label: _isEditingTask ? "Edit Other Task" : "Add Other Task", // Conditional button label
             onTap: () {
-              _addTaskToIsar(isEditing: false); // Always add new task from main page
+              _addTaskToIsar(isEditing: _isEditingTask); // Pass isEditing state
+              _resetTaskEditState(); // Reset state after add/edit
             },
           ),
         ],
       ),
     );
   }
+
+
+
+
 
 
 
@@ -5343,7 +5864,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
     );
 
     if (confirmDelete == true) {
-      await deleteTask1(task.id.toString(), bioData, selectedFirebaseId!, _selectedReportingDate); // Call deleteTask1 with correct parameters
+      await deleteTask1(task.firestoreId!, bioData, selectedFirebaseId!, _selectedReportingDate); // Call deleteTask1 with correct parameters
       _loadTasksForSelectedDate(); // Refresh task list
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Task deleted successfully!')));
@@ -5412,7 +5933,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                       String departmentName = entry.key;
                       List<Map<String, dynamic>> designationReports = entry.value;
                       return _buildDepartmentExpandable(departmentName, designationReports);
-                    }).toList(),
+                    }),
 
                     const Divider(),
                     const Divider(),
@@ -5437,23 +5958,13 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     const Divider(),
                     const Divider(),
                     const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: buildSupervisorDropdown(),
-                        ),
-                        const SizedBox(width: 20),
-                        ElevatedButton(
-                          onPressed: _submitActivityToSupervisor,
-                          child: const Text("Submit Activity Report to Supervisor"),
-                        ),
-                      ],
-                    ),
+
                     const SizedBox(height: 100),
                   ],
                 ),
               ),
               _buildReviewListTab(), // Review List Tab Content
+              _buildTaskSummaryTab(),
             ],
           ),
           if (_isValidating) // Validation progress bar overlay
@@ -5483,25 +5994,29 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       //   icon: const Icon(Icons.add, color: Colors.white),
       //   backgroundColor: Colors.red,
       // ) : null, // No FAB on Review List Tab
-      // bottomNavigationBar: BottomNavigationBar(
-      //   items: const <BottomNavigationBarItem>[
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.calendar_today),
-      //       label: 'Daily Activity',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.list_alt),
-      //       label: 'Review List',
-      //     ),
-      //   ],
-      //   currentIndex: _selectedIndex,
-      //   selectedItemColor: Colors.red,
-      //   onTap: (index) {
-      //     setState(() {
-      //       _selectedIndex = index;
-      //     });
-      //   },
-      // ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today),
+            label: 'Daily Activity',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Review List',
+          ),
+          BottomNavigationBarItem( // ADDED: Task Summary Tab
+            icon: Icon(Icons.summarize),
+            label: 'Task Summary',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.red,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+      ),
     );
   }
 

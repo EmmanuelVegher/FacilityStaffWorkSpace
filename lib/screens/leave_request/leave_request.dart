@@ -1680,7 +1680,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       print("Leave request deleted from Firebase: ${leaveRequest.leaveRequestId}");
     } catch (e) {
       print("Error deleting leave request from Firebase: $e");
-      throw e; // Re-throw the exception to be caught in the dialog
+      rethrow; // Re-throw the exception to be caught in the dialog
     }
   }
 
@@ -3045,12 +3045,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   }
   Future<void> _checkAndUpdateLeaveStatus() async {
     try {
-
       for (final leaveRequest in _leaveRequests) {
         print("leaveRequest === ${leaveRequest.leaveRequestId}");
-
         try {
-
           final doc = await FirebaseFirestore.instance
               .collection('Staff')
               .doc(_bioInfo.value?.firebaseAuthId)
@@ -3063,16 +3060,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             final firestoreReason = doc.data()?['reason'] as String?;
             final firestoreReasonsForRejectedLeave = doc.data()?['reasonsForRejectedLeave'] as String?;
 
-
             if (firestoreStatus != null && firestoreStatus != leaveRequest.status) {
-
               setState(() {
                 leaveRequest.status = firestoreStatus;
               });
 
-
               if (firestoreStatus == 'Approved') {
-
                 await _addLeaveToAttendance1(
                   _bioInfo.value?.firebaseAuthId,
                   leaveRequest.startDate,
@@ -3086,25 +3079,24 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                 Fluttertoast.showToast(msg: "Out of Office Request Approved");
               } else if (firestoreStatus == 'Rejected') {
                 leaveRequest.reasonsForRejectedLeave = firestoreReasonsForRejectedLeave;
-
                 Fluttertoast.showToast(msg: "Out of Office Request Rejected");
               }
             }
           }
         } catch (innerError) {
           print('Error processing individual leave request: $innerError');
-          Fluttertoast.showToast(
-              msg: "Error processing individual Out of Office Request: $innerError");
+          Fluttertoast.showToast(msg: "Error processing individual Out of Office Request: $innerError");
         }
       }
 
-
-      Get.off(() => const LeaveRequestsPage1());
+      // Reload the current page
+      setState(() {});
     } catch (e) {
       print('Error checking Out of Office Request status: $e');
       Fluttertoast.showToast(msg: "Error syncing Out of Office Request status");
     }
   }
+
 
 
 
