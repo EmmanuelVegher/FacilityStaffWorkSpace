@@ -2774,15 +2774,15 @@ class ClockAttendanceWebController extends GetxController {
 
       _checkGeofence(offices, position.latitude, position.longitude,location1);
     } catch (e) {
-      print("Error getting location: \$e");
-      Fluttertoast.showToast(
-        msg: "Error getting location: \$e",
-        toastLength: Toast.LENGTH_LONG,
-        backgroundColor: Colors.black54,
-        gravity: ToastGravity.BOTTOM,
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+      print("Error getting location: $e");
+      // Fluttertoast.showToast(
+      //   msg: "Error getting location: $e",
+      //   toastLength: Toast.LENGTH_LONG,
+      //   backgroundColor: Colors.black54,
+      //   gravity: ToastGravity.BOTTOM,
+      //   textColor: Colors.white,
+      //   fontSize: 16.0,
+      // );
     }
   }
 
