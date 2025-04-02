@@ -814,7 +814,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
   }
 
-  Future<void> _getUserLocation() async {
+  Future<void> _getUserLocation22() async {
     print("Fetching user location...");
 
     try {
@@ -835,7 +835,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       isMock.value = position.isMocked;
 
       // Reverse geocoding using Google Maps API
-      String apiKey = "AIzaSyDrEiP6HeIv5C2_Fo5szYDkpkYGdoOvcPg"; // Replace with your API key
+      String apiKey = ""; // Replace with your API key
       String url =
           "https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$apiKey";
       final response = await http.get(Uri.parse(url));
@@ -875,6 +875,77 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         fontSize: 16.0,
       );
     }
+  }
+
+  Future<void> _getUserLocation() async {
+    print("Fetching user location using Nominatim...");
+
+    try {
+      // Get user's current position (using geolocator, which is still fine for location, just avoid geocoding)
+      Position position = await geolocator.Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.high,
+      );
+
+      print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
+      lati.value = position.latitude;
+      longi.value = position.longitude;
+      accuracy.value = position.accuracy;
+      altitude.value = position.altitude;
+      speed.value = position.speed;
+      speedAccuracy.value = position.speedAccuracy;
+      heading.value = position.heading;
+      time.value = position.timestamp.millisecondsSinceEpoch.toDouble();
+      isMock.value = position.isMocked;
+
+      // --- Nominatim API Call for Reverse Geocoding ---
+      final nominatimUrl = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.latitude}&lon=${position.longitude}');
+      final response = await http.get(nominatimUrl);
+
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        if (decodedResponse != null && decodedResponse['display_name'] != null) {
+          location.value = decodedResponse['display_name'];
+          administrativeArea.value = _extractStateFromNominatim(decodedResponse); // Extract state if needed
+        } else {
+          location.value = "Location not found"; // Or handle no location found from Nominatim
+          administrativeArea.value = "";
+        }
+      } else {
+        print('Nominatim API error: ${response.statusCode}, ${response.body}');
+        location.value = "Geocoding failed"; // Handle API error
+        administrativeArea.value = "";
+      }
+
+      String geofenceLocationName =
+      await _determineGeofenceLocation(lati.value, longi.value);
+      if (geofenceLocationName.isNotEmpty) {
+        location.value = geofenceLocationName;
+        isInsideAnyGeofence.value = true;
+      } else {
+        isInsideAnyGeofence.value = false;
+        currentStateDisplay.value = administrativeArea.value.isNotEmpty
+            ? administrativeArea.value
+            : "State Unknown";
+      }
+      isCircularProgressBarOn.value = false;
+
+
+    } catch (e) {
+      print("Error getting location: $e");
+      location.value = "Location Error"; // Generic error message for UI
+      administrativeArea.value = "";
+      isCircularProgressBarOn.value = false;
+
+    }
+  }
+
+  // Helper function to extract state from Nominatim response (adjust as needed)
+  String _extractStateFromNominatim(Map<String, dynamic> nominatimResponse) {
+    if (nominatimResponse['address'] != null) {
+      final address = nominatimResponse['address'];
+      return address['state'] ?? address['region'] ?? ''; // Try 'state' first, then 'region'
+    }
+    return '';
   }
 
   String _extractState(Map<String, dynamic> data) {

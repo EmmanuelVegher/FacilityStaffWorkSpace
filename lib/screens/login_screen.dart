@@ -26,8 +26,9 @@ class _LoginPageState extends State<LoginPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+
   int _currentCharIndex = 0;
-  final String _title = "Facility Staff WorkSpace";
+  final String _title = "Work Manager";
   String _animatedText = "";
 
   @override
