@@ -1724,15 +1724,15 @@ class ClockAttendanceWebController extends GetxController {
         });
       } else {
         dev.log('Error getting location: $e');
-        Fluttertoast.showToast(
-          msg: "Error getting location: $e",
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
+        // Fluttertoast.showToast(
+        //   msg: "Error getting location: $e",
+        //   toastLength: Toast.LENGTH_LONG,
+        //   backgroundColor: Colors.black54,
+        //   gravity: ToastGravity.BOTTOM,
+        //   timeInSecForIosWeb: 1,
+        //   textColor: Colors.white,
+        //   fontSize: 16.0,
+        // );
       }
     }
   }
