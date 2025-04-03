@@ -139,6 +139,7 @@ dependencies:
   js:
   universal_html:
   syncfusion_flutter_gauges:
+  rename: ^3.0.2
 
 
 

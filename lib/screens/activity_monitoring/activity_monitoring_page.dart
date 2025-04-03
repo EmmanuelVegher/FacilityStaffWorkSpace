@@ -2316,7 +2316,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     List<Widget> analysisCells = [
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("App Analysis", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), // Style for emphasis
+        child: Text("Data Quality Check", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), // Style for emphasis
       ),
       ...usernames.map((username) {
         String analysisText = loadedReport.reportEntries![username]![indicators.first]?.first.appAnalysis ?? "No image Uploaded for Analysis"; // Assuming analysis is stored in first indicator's entry, adjust if needed. Showing message if no image.
