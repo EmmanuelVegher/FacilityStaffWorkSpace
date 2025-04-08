@@ -685,7 +685,7 @@ $selectedBioFirstName $selectedBioLastName
     );
   }
 
-  pw.Widget _buildTimesheetTable(pw.Context context) {
+  pw.Widget _buildTimesheetTable1(pw.Context context) {
     final tableHeaders = [
       'Project Name',
       ...daysInRange.map((date) => DateFormat('dd').format(date)),
@@ -811,7 +811,7 @@ $selectedBioFirstName $selectedBioLastName
                 padding: const pw.EdgeInsets.all(1.0),
                 alignment: pw.Alignment.center,
                 child: pw.Text(data,
-                    style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+                    style: pw.TextStyle(fontSize: 10 * pdfTableFontSizeFactor)), // Reduced table text size
               );
             }).toList(),
           );
@@ -831,6 +831,198 @@ $selectedBioFirstName $selectedBioLastName
       ],
     );
   }
+
+  pw.Widget _buildTimesheetTable(pw.Context context) {
+    // Data for the table
+    final tableHeaders = [
+      'Project Name',
+      ...daysInRange.map((date) => DateFormat('dd').format(date)).toList(),
+      'Total Hours',
+      '%'
+    ];
+
+    List<List<String>> allRows = []; // List to hold all rows
+
+
+
+    // Project Data Row
+    final projectData = [
+      selectedProjectName ?? '',
+      ...daysInRange.map((date) {
+        return isWeekend(date) ? '0' : _getDurationForDate3(
+            date, selectedProjectName, selectedProjectName!)
+            .round()
+            .toString(); // No rounding here
+      }).toList(),
+      // calculateTotalHours1(selectedProjectName).toStringAsFixed(2),  // Calculate total for project, 2 decimal places
+      // '${calculatePercentageWorked1(selectedProjectName).toStringAsFixed(2)}%'
+      //  calculateTotalHours1(selectedProjectName).round().toString(), // Round total hours
+      // '${calculatePercentageWorked1(selectedProjectName).round()}%' // Round percentage
+      // Total hours and percentage will be calculated later based on rounded values
+      '0',
+      // Placeholder for Total Hours
+      '0%'
+      // Placeholder for Percentage
+
+
+    ];
+    allRows.add(projectData); // Add project data to allRows
+
+    // Out-of-office Rows
+    final outOfOfficeCategories = [
+      'Annual leave',
+      'Holiday',
+      // 'Paternity',
+      'Maternity'
+    ];
+    final outOfOfficeData = outOfOfficeCategories.map((category) {
+      final rowData = [
+        category,
+        ...daysInRange.map((date) {
+          return isWeekend(date) ? '0' : _getDurationForDate3(date, selectedProjectName, category)
+              .round()
+              .toString(); // No rounding here
+        }).toList(),
+        // calculateCategoryHours(category).toStringAsFixed(2), // Calculate total for category, 2 decimal places
+        // '${calculateCategoryPercentage(category).toStringAsFixed(1)}%'
+        // calculateCategoryHours(category).round().toString(),  // Round category hours
+        // '${calculateCategoryPercentage(category).round()}%' // Round percentage
+        '0',
+        // Placeholder for Total Hours
+        '0%'
+        // Placeholder for Percentage
+      ];
+      allRows.add(rowData); // Add each category row to allRows
+      return rowData;
+    }).toList();
+
+    // Now calculate totals AFTER rounding for ALL rows (including project data)
+    for (List<String> row in allRows) {
+      double rowTotal = 0;
+      for (int i = 1; i <=
+          daysInRange.length; i++) { // Sum the rounded daily hours
+        rowTotal += double.tryParse(row[i]) ?? 0;
+      }
+
+      row[daysInRange.length + 1] =
+          rowTotal.round().toString(); // Rounded total hours
+
+      int workingDays = daysInRange
+          .where((date) => !isWeekend(date))
+          .length;
+      double percentage = (workingDays * 8) != 0 ? (rowTotal /
+          (workingDays * 8)) * 100 : 0;
+      row[daysInRange.length + 2] =
+      '${percentage.round()}%'; // Rounded percentage
+    }
+
+
+    // Total Row Calculation (rounding to whole numbers)
+    List<String> totalRow = [
+      'Total',
+      ...List.generate(daysInRange.length, (index) => '0'),
+      '0',
+      '0%'
+    ];
+    for (int i = 1; i <= daysInRange.length; i++) { // Iterate over day columns
+      double dayTotal = 0; // Use double to accumulate, round later
+      for (List<String> row in allRows) {
+        if (!isWeekend(daysInRange[i-1])) { // <---- ADDED WEEKEND CHECK HERE
+          dayTotal += double.tryParse(row[i]) ?? 0.0;
+        }
+      }
+      totalRow[i] =
+          dayTotal.round().toString(); // Round day total before storing
+    }
+
+    // Calculate grand total and percentage (using rounded day totals)
+    int grandTotalHours = 0;
+    for (int i = 1; i <= daysInRange.length; i++) {
+      grandTotalHours += int.parse(totalRow[i]);
+    }
+    totalRow[daysInRange.length + 1] =
+        grandTotalHours.toString(); // Grand total
+
+    int workingDays = daysInRange
+        .where((date) => !isWeekend(date))
+        .length;
+    double grandPercentage = (workingDays * 8) > 0 ? (grandTotalHours /
+        (workingDays * 8)) * 100 : 0;
+    totalRow[daysInRange.length + 2] =
+    '${grandPercentage.round()}%'; // Round percentage
+
+
+    // Build the table
+    return pw.Table(
+      border: pw.TableBorder.all(),
+      columnWidths: {
+        0: const pw.FixedColumnWidth(250),
+        for (int i = 1; i <= daysInRange.length; i++) i: const pw
+            .FixedColumnWidth(80),
+        // Fixed width for date columns
+        daysInRange.length + 1: const pw.FixedColumnWidth(200),
+        // Fixed width for "Total Hours"
+        daysInRange.length + 2: const pw.FixedColumnWidth(200),
+        // Fixed width for "Percentage"
+      },
+      children: [
+        // Header row
+
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: tableHeaders
+              .map((header) => pw.Center(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(
+                header,
+                style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 11 * pdfHeaderFontSizeFactor), // Reduced header size
+              ),
+            ),
+          ))
+              .toList(),
+        ),
+
+
+        // Combined loop for project and out-of-office rows, including Total row:
+        ...allRows.map((rowData) {
+          return pw.TableRow(
+            children: rowData
+                .asMap()
+                .entries
+                .map((entry) { // Use asMap().entries to get index
+              final i = entry.key;
+              final data = entry.value;
+              final isWeekendColumn = i > 0 && i <= daysInRange.length &&
+                  isWeekend(daysInRange[i - 1]);
+
+              return pw.Container(
+                color: isWeekendColumn ? PdfColors.grey900 : null,
+                padding: const pw.EdgeInsets.all(1.0),
+                alignment: pw.Alignment.center,
+                child: pw.Text(data,
+                    style: pw.TextStyle(fontSize: 12 * pdfTableFontSizeFactor)), // Reduced table text size
+              );
+            }).toList(),
+          );
+        }).toList(),
+
+
+        // Total Row (updated to use rounded values)
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: totalRow.map((data) => pw.Center(child: pw.Padding(
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(data,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold,fontSize: 12 * pdfHeaderFontSizeFactor)))))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
 
 
   Future<Uint8List?> networkImageToByte(String imageUrl) async {

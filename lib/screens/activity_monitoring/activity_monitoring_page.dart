@@ -1762,15 +1762,19 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Table(
-        border: TableBorder.all(),
-        columnWidths: const <int, TableColumnWidth>{
-          0: FixedColumnWidth(250), // Indicator column width
-        },
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: tableRows,
+      child: SizedBox(
+        width: double.infinity, // Ensures full width
+        child: Table(
+          border: TableBorder.all(),
+          columnWidths: const <int, TableColumnWidth>{
+            0: FlexColumnWidth(1), // Adjusts dynamically
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: tableRows,
+        ),
       ),
     );
+
   }
 
   Widget _buildReviewListTab() {
@@ -2335,15 +2339,19 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Table(
-        border: TableBorder.all(),
-        columnWidths: const <int, TableColumnWidth>{
-          0: FixedColumnWidth(250), // Indicator column width
-        },
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: tableRows,
+      child: SizedBox(
+        width: double.infinity, // Ensures full width
+        child: Table(
+          border: TableBorder.all(),
+          columnWidths: const <int, TableColumnWidth>{
+            0: FlexColumnWidth(1), // Adjusts dynamically
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: tableRows,
+        ),
       ),
     );
+
   }
 
 
