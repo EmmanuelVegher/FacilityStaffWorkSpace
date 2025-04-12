@@ -1,3 +1,5 @@
+import 'package:attendanceappmailtool/screens/delete_account/delete_account.dart';
+import 'package:attendanceappmailtool/screens/delete_account/delete_data.dart';
 import 'package:attendanceappmailtool/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -36,8 +38,8 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(), // Use SplashScreen as home
       getPages: [
         GetPage(name: '/login', page: () => const LoginPage()),
-        // GetPage(name: '/home', page: () => const HomeScreen()),
-        // GetPage(name: '/dashboard', page: () => const UserDashboardApp()),
+        GetPage(name: '/delete-data', page: () => DeleteDataPage()),
+        GetPage(name: '/delete-account', page: () => DeleteAccountPage()),
       ],
     );
   }
