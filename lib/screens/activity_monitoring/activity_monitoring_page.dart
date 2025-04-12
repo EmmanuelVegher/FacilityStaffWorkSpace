@@ -1377,7 +1377,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 onPressed: () { // Disable button when saving
                   _performDataValidation(); // Call the data validation function
                 },
-                child: const Text('Data Validation Check'),
+                child: const Text('Task Validation'),
               ),
             ]
           ),
@@ -1504,15 +1504,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
     if (allValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data validation passed for weekly and monthly summaries!')),
+        const SnackBar(content: Text('Task validation passed for weekly and monthly summaries!')),
       );
     } else {
       showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text("Data Validation Issues"),
-            content: Text(validationMessages.isNotEmpty ? validationMessages : "Data validation failed."),
+            title: const Text("Task Validation"),
+            content: Text(validationMessages.isNotEmpty ? validationMessages : "Task validation failed."),
             actions: <Widget>[
               TextButton(
                 child: const Text("OK"),
@@ -4130,7 +4130,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text("Data Validation Issue"),
+            title: const Text("Task Validation"),
             content: Text(
                 "$validationErrorMessage Do you want to continue saving?"),
             actions: <Widget>[
