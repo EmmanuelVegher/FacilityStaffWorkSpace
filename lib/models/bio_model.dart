@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class BioModel {
   String? firstName;
   String? lastName;
@@ -14,7 +16,7 @@ class BioModel {
   String? role;
   String? department;
   String? project;
-  bool? isSynced ;
+  bool? isSynced;
   String? supervisor;
   String? supervisorEmail;
   String? version;
@@ -22,6 +24,7 @@ class BioModel {
   bool? isRemoteUpdate;
   DateTime? lastUpdateDate;
   String? signatureLink;
+
 
   BioModel({
     this.firstName,
@@ -44,8 +47,7 @@ class BioModel {
     this.isRemoteDelete,
     this.isRemoteUpdate,
     this.lastUpdateDate,
-    this.signatureLink
-    // ... other fields
+    this.signatureLink,
   });
 
   factory BioModel.fromJson(Map<String, dynamic> json) {
@@ -58,19 +60,21 @@ class BioModel {
       staffCategory: json['staffCategory'],
       location: json['location'],
       state: json['state'],
-        designation: json['designation'],
-        password: json['password'],
-        role: json['role'],
-        department: json['department'],
-        project: json['project'],
-        isSynced:json['isSynced'],
-        supervisor:json['supervisor'],
-        supervisorEmail:json['supervisorEmail'],
-        version:json['version'],
-        isRemoteDelete:json['isRemoteDelete'],
-        isRemoteUpdate:json['isRemoteUpdate'],
-        lastUpdateDate:json['lastUpdateDate'],
-        signatureLink:json['signatureLink']
+      designation: json['designation'],
+      password: json['password'],
+      role: json['role'],
+      department: json['department'],
+      project: json['project'],
+      isSynced: json['isSynced'],
+      supervisor: json['supervisor'],
+      supervisorEmail: json['supervisorEmail'],
+      version: json['version'],
+      isRemoteDelete: json['isRemoteDelete'],
+      isRemoteUpdate: json['isRemoteUpdate'],
+      lastUpdateDate: json['lastUpdateDate'] != null
+          ? (json['lastUpdateDate'] as Timestamp).toDate()
+          : null,
+      signatureLink: json['signatureLink'],
     );
   }
 
@@ -89,15 +93,14 @@ class BioModel {
       'department': department,
       'mobile': mobile,
       'project': project,
-      'isSynced':isSynced,
-      'supervisor':supervisor,
-      'supervisorEmail':supervisorEmail,
-      'version':version,
-      'isRemoteDelete':isRemoteDelete,
-      'isRemoteUpdate':isRemoteUpdate,
-      'lastUpdateDate':lastUpdateDate,
+      'isSynced': isSynced,
+      'supervisor': supervisor,
+      'supervisorEmail': supervisorEmail,
+      'version': version,
+      'isRemoteDelete': isRemoteDelete,
+      'isRemoteUpdate': isRemoteUpdate,
+      'lastUpdateDate': lastUpdateDate,
+      'signatureLink': signatureLink,
     };
   }
-
-  map(Map<String, dynamic> Function(dynamic e) param0) {}
 }

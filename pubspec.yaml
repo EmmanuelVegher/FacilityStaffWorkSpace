@@ -140,6 +140,9 @@ dependencies:
   universal_html:
   syncfusion_flutter_gauges:
   rename: ^3.0.2
+  share_plus:
+ # web:
+  html:
 
 
 

@@ -1,19 +1,30 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:rxdart/rxdart.dart'; // Import rxdart for combining streams
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
-
+import 'dart:typed_data';
 import '../api/attendance_api.dart';
 import '../models/attendance_record.dart';
 import '../utils/date_helper.dart';
 import '../widgets/drawer.dart';
 import 'login_screen.dart';
 import '../models/facility_staff_model.dart';
+import 'dart:html' as html;
+
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 class UserDashboardApp extends StatelessWidget {
   const UserDashboardApp({super.key});
@@ -44,7 +55,14 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   List<LocationRecord> _locationData = [];
   List clockInSet = [];
   List clockOutSet = [];
-
+  bool _isPDFLoading = false;
+  // Add GlobalKeys for each chart widget you want to capture
+  final GlobalKey _clockInOutChartKey = GlobalKey();
+  final GlobalKey _durationChartKey = GlobalKey();
+  final GlobalKey _locationChartKey = GlobalKey();
+  final GlobalKey _earlyLateChartKey = GlobalKey();
+  final GlobalKey _bestPlayerChartKey = GlobalKey();
+  final GlobalKey _summaryCardKey = GlobalKey(); // If you want to capture the summary card
   String? _errorMessage;
   bool _isLoading = false;
   bool _isLoadingBestPlayer = false;
@@ -103,6 +121,206 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     super.initState();
     _initialDataLoadingFuture = _initializeData();
     _startLogoutTimer();
+  }
+
+  Future<Uint8List> _captureWidgetAsImage(GlobalKey key) async {
+    RenderRepaintBoundary boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final ui.Image image = await boundary.toImage(pixelRatio: 3.0); // Adjust pixelRatio for quality
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final Uint8List pngBytes = byteData!.buffer.asUint8List();
+    return pngBytes;
+  }
+
+
+
+  Future<void> _generateDashboardPdf1(BuildContext context) async {
+    setState(() {
+      _isPDFLoading = true;
+    });
+
+    final pdf = pw.Document();
+
+    // --- Capture Widgets as Images ---
+    Uint8List clockInOutChartImage = await _captureWidgetAsImage(_clockInOutChartKey);
+    Uint8List durationChartImage = await _captureWidgetAsImage(_durationChartKey);
+    Uint8List locationChartImage = await _captureWidgetAsImage(_locationChartKey);
+    Uint8List earlyLateChartImage = await _captureWidgetAsImage(_earlyLateChartKey);
+    Uint8List bestPlayerChartImage = await _captureWidgetAsImage(_bestPlayerChartKey);
+    Uint8List summaryCardImage = await _captureWidgetAsImage(_summaryCardKey);
+
+    // --- Add Content to PDF ---
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (pw.Context context) {
+        List<pw.Widget> content = [];
+
+        content.add(pw.Header(level: 1, text: 'Dashboard Summary Report'));
+        content.add(pw.Paragraph(text: 'Report generated on: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}'));
+        content.add(pw.SizedBox(height: 20));
+
+        content.add(pw.Header(level: 2, text: 'Attendance Summary'));
+        content.add(pw.Paragraph(text: 'Total Hours Worked: $_totalWorkHours hours'));
+        content.add(pw.Paragraph(text: 'Total Clock-Ins: $_totalClockIn'));
+        content.add(pw.Paragraph(text: 'Total Clock-Outs: $_totalClockOut'));
+        content.add(pw.Paragraph(text: 'Min Hours Worked: $_minHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Max Hours Worked: $_maxHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Average Hours Worked: $_averageHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Holidays Filled: $_noOfHolidaysFilled'));
+        content.add(pw.Paragraph(text: 'Annual Leave Taken: $_noOfAnnualLeaveTaken'));
+        content.add(pw.SizedBox(height: 20));
+
+        content.add(pw.Header(level: 2, text: 'Charts'));
+
+        content.add(pw.Header(level: 3, text: 'Clock-In and Clock-Out Trends'));
+        content.add(pw.Image(pw.MemoryImage(clockInOutChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Distribution of Hours Worked'));
+        content.add(pw.Image(pw.MemoryImage(durationChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Attendance by Location'));
+        content.add(pw.Image(pw.MemoryImage(locationChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Early or Late Clock-Ins'));
+        content.add(pw.Image(pw.MemoryImage(earlyLateChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Team Player for the Current Month'));
+        content.add(pw.Image(pw.MemoryImage(bestPlayerChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        return content;
+      },
+    ));
+    //
+    // // Save PDF to bytes
+    // final Uint8List pdfBytes = await pdf.save();
+    //
+    // // Web download logic
+    // final blob = html.Blob([pdfBytes], 'application/pdf');
+    // final url = html.Url.createObjectUrlFromBlob(blob);
+    //
+    // final anchor = html.AnchorElement(href: url)
+    //   ..download = 'Dashboard_Report_${_currentFirstName}_$_currentLastName.pdf'
+    //   ..click();
+    //
+    // html.Url.revokeObjectUrl(url);
+
+    final Uint8List pdfBytes = await pdf.save();
+
+    // Create and trigger download
+    final blob = html.Blob([pdfBytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute("download", "Dashboard_Report_${_currentFirstName}_$_currentLastName.pdf")
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    setState(() {
+      _isPDFLoading = false;
+    });
+  }
+
+  Future<void> _generateDashboardPdf(BuildContext context) async {
+    setState(() {
+      _isPDFLoading = true;
+    });
+
+    try{
+
+    final pdf = pw.Document();
+
+    // --- Capture Widgets as Images ---
+    Uint8List clockInOutChartImage = await _captureWidgetAsImage(_clockInOutChartKey);
+    Uint8List durationChartImage = await _captureWidgetAsImage(_durationChartKey);
+    Uint8List locationChartImage = await _captureWidgetAsImage(_locationChartKey);
+    Uint8List earlyLateChartImage = await _captureWidgetAsImage(_earlyLateChartKey);
+    Uint8List bestPlayerChartImage = await _captureWidgetAsImage(_bestPlayerChartKey);
+    Uint8List summaryCardImage = await _captureWidgetAsImage(_summaryCardKey);
+
+    // --- Add Content to PDF ---
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (pw.Context context) {
+        List<pw.Widget> content = [];
+
+        content.add(pw.Header(level: 1, text: 'Dashboard Summary Report'));
+        content.add(pw.Paragraph(text: 'Report generated on: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}'));
+        content.add(pw.SizedBox(height: 20));
+
+        content.add(pw.Header(level: 2, text: 'Attendance Summary'));
+        content.add(pw.Paragraph(text: 'Total Hours Worked: $_totalWorkHours hours'));
+        content.add(pw.Paragraph(text: 'Total Clock-Ins: $_totalClockIn'));
+        content.add(pw.Paragraph(text: 'Total Clock-Outs: $_totalClockOut'));
+        content.add(pw.Paragraph(text: 'Min Hours Worked: $_minHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Max Hours Worked: $_maxHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Average Hours Worked: $_averageHoursWorked hours'));
+        content.add(pw.Paragraph(text: 'Holidays Filled: $_noOfHolidaysFilled'));
+        content.add(pw.Paragraph(text: 'Annual Leave Taken: $_noOfAnnualLeaveTaken'));
+        content.add(pw.SizedBox(height: 20));
+
+        content.add(pw.Header(level: 2, text: 'Charts'));
+
+        content.add(pw.Header(level: 3, text: 'Clock-In and Clock-Out Trends'));
+        content.add(pw.Image(pw.MemoryImage(clockInOutChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Distribution of Hours Worked'));
+        content.add(pw.Image(pw.MemoryImage(durationChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Attendance by Location'));
+        content.add(pw.Image(pw.MemoryImage(locationChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Early or Late Clock-Ins'));
+        content.add(pw.Image(pw.MemoryImage(earlyLateChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        content.add(pw.Header(level: 3, text: 'Team Player for the Current Month'));
+        content.add(pw.Image(pw.MemoryImage(bestPlayerChartImage)));
+        content.add(pw.SizedBox(height: 10));
+
+        return content;
+      },
+    ));
+
+      // Convert PDF to bytes and trigger download in the browser
+      final pdfBytes = await pdf.save();
+      final blob = html.Blob([Uint8List.fromList(pdfBytes)]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..target = 'blank'
+        ..download = 'Dashboard_Report_${_currentFirstName}_$_currentLastName.pdf';
+      anchor.click();
+      html.Url.revokeObjectUrl(url);
+
+      setState(() {
+        _isPDFLoading = false;
+      });
+    } catch (e) {
+      print("Error generating Task Summary PDF: $e");
+      Fluttertoast.showToast(
+        msg: "Error generating Task Summary PDF: $e",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      setState(() {
+        _isPDFLoading = false;
+      });
+    }finally {
+      setState(() {
+        _isPDFLoading = false;
+      });
+    }
   }
 
   Future<void> _initializeData() async {
@@ -209,7 +427,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               Padding(
                 padding: EdgeInsets.only(left: 10 * cardMarginFactor),
                 child: Text(
-                  'Facility Staff WorkSpace',
+                  'Work Manager',
                    style: TextStyle(
                     color: Colors.white,
                     fontSize: 20 * titleFontSizeFactor,
@@ -233,6 +451,35 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   generateAnalyticsButtonPaddingFactor),
             ),
           ),
+          actions: [
+            _isPDFLoading
+                ? CircularProgressIndicator()
+                : Row(
+                children:[
+                  IconButton(
+                    icon: const Icon(Icons.download),
+                    tooltip: 'Download PDF',
+                    onPressed: () async {
+                      await _generateDashboardPdf(context); // Call the PDF generation method
+                      // Optionally add a success message after PDF generation
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('PDF Report generated and shared!')),
+                      );
+                    },
+                  ),
+                  //
+                  // IconButton(
+                  //   icon: const Icon(Icons.share),
+                  //   tooltip: 'Share PDF',
+                  //   onPressed: () async {
+                  //     await _generateAndShareDashboardPdf(context); // Call the PDF generation method
+                  //     // Sharing is already handled within _generateDashboardPdf, so no need to repeat here.
+                  //   },
+                  // ),
+                ]
+            ),
+
+          ],
         ),
         body: Stack(
           children: [
@@ -351,7 +598,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                               ),
                             ),
                           ),
-                          _buildSummaryGrid(
+                          RepaintBoundary(
+                            key: _summaryCardKey,
+                            child:_buildSummaryGrid(
                               context,
                               cardPaddingFactor,
                               cardMarginFactor,
@@ -362,7 +611,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                               summaryGridCrossAxisCount,
                               summaryGridChildAspectRatio,
                               summaryCardHeightFactor // Pass summaryCardHeightFactor
-                          ),
+                          ),),
                           // SizedBox(height: 20 * gridSpacingFactor),
                           // _buildRecognitionCardForDashboardInDashboard(
                           //     context, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
@@ -689,7 +938,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             chartCardVerticalPaddingFactor,
             screenWidth// Pass screenWidth
         ),
-        _buildBestTeamPlayerCardWrapper(
+        RepaintBoundary(
+          key: _bestPlayerChartKey,
+          child:_buildBestTeamPlayerCardWrapper(
             context,
             cardPaddingFactor,
             cardMarginFactor,
@@ -700,7 +951,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             chartCardVerticalPaddingFactor,
             screenWidth, // Pass screenWidth
             _totalSurveysCountedForBestPlayer // Pass survey count here
-        ),
+        ),),
 
       ],
     );
@@ -920,8 +1171,12 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
             vertical:
             16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildClockInOutTrendsChartContent(
-            fontSizeFactor, cardMarginFactor, screenWidth), // Pass screenWidth
+        child: RepaintBoundary(
+        key: _clockInOutChartKey,
+        child:
+    _buildClockInOutTrendsChartContent(
+            fontSizeFactor, cardMarginFactor, screenWidth),),
+        // Pass screenWidth
       ),
     );
   }
@@ -1051,8 +1306,12 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
             vertical:
             16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child:  RepaintBoundary(
+        key: _durationChartKey,
         child: _buildDurationWorkedDistributionChartContent(
-            fontSizeFactor, cardMarginFactor, screenWidth), // Pass screenWidth
+            fontSizeFactor, cardMarginFactor, screenWidth), ),
+
+        // Pass screenWidth
       ),
     );
   }
@@ -1130,8 +1389,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
             vertical:
             16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
+        child: RepaintBoundary(
+        key: _locationChartKey,
         child: _buildAttendanceByLocationChartContent(
-            fontSizeFactor, cardMarginFactor, locationData1, screenWidth), // Pass screenWidth
+            fontSizeFactor, cardMarginFactor, locationData1, screenWidth), ),// Pass screenWidth
       ),
     );
   }
@@ -1204,8 +1465,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
             vertical:
             16.0 * cardPaddingFactor * otherCardHeightFactor * chartCardVerticalPaddingFactor),
-        child: _buildEarlyLateClockInsChartContent( // Using the rewritten chart content function
-            fontSizeFactor, cardMarginFactor, chartData, screenWidth), // Pass screenWidth
+        child: RepaintBoundary(
+          key: _earlyLateChartKey,
+          child:_buildEarlyLateClockInsChartContent( // Using the rewritten chart content function
+            fontSizeFactor, cardMarginFactor, chartData, screenWidth),), // Pass screenWidth
       ),
     );
   }

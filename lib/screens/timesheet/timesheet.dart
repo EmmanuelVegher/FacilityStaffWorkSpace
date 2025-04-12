@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
+import 'dart:math' as dev;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-
+import 'package:web/web.dart' as web;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart';
@@ -24,6 +25,292 @@ import 'package:dio/dio.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' hide Column, Row, Alignment,Border; // Import and hide conflicting classes
 import 'package:flutter_email_sender/flutter_email_sender.dart';
 
+// report_model.dart
+class ReportEntry {
+  String key;
+  String value;
+  String? enteredBy;
+  String? editedBy;
+  String? reviewedBy;
+  String? reviewStatus;
+  String? supervisorName;
+  String? supervisorEmail;
+  String? supervisorApprovalStatus;
+  String? supervisorFeedBackComment;
+  List<String>? attachments;
+  String? appAnalysis;
+  String? reviewerId;
+
+  ReportEntry({
+    this.key = "",
+    this.value = "",
+    this.enteredBy,
+    this.editedBy,
+    this.reviewedBy,
+    this.reviewStatus,
+    this.supervisorName,
+    this.supervisorEmail,
+    this.supervisorApprovalStatus,
+    this.supervisorFeedBackComment,
+    this.attachments,
+    this.appAnalysis,
+    this.reviewerId,
+  });
+
+  factory ReportEntry.fromMap(Map<String, dynamic> map) {
+    return ReportEntry(
+      key: map['key'] ?? '',
+      value: map['value'] ?? '',
+      enteredBy: map['enteredBy'],
+      editedBy: map['editedBy'],
+      reviewedBy: map['reviewedBy'],
+      reviewStatus: map['reviewStatus'],
+      supervisorName: map['supervisorName'],
+      supervisorEmail: map['supervisorEmail'],
+      supervisorApprovalStatus: map['supervisorApprovalStatus'],
+      supervisorFeedBackComment: map['supervisorFeedBackComment'],
+      attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      appAnalysis: map['appAnalysis'],
+      reviewerId: map['reviewerId'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'key': key,
+      'value': value,
+      if (enteredBy != null) 'enteredBy': enteredBy,
+      if (editedBy != null) 'editedBy': editedBy,
+      if (reviewedBy != null) 'reviewedBy': reviewedBy,
+      if (reviewStatus != null) 'reviewStatus': reviewStatus,
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
+      if (attachments != null) 'attachments': attachments,
+      if (appAnalysis != null) 'appAnalysis': appAnalysis,
+      if (reviewerId != null) 'reviewerId': reviewerId,
+    };
+  }
+
+  /// **Add the copyWith method**
+  ReportEntry copyWith({
+    String? key,
+    String? value,
+    String? enteredBy,
+    String? editedBy,
+    String? reviewedBy,
+    String? reviewStatus,
+    String? supervisorName,
+    String? supervisorEmail,
+    String? supervisorApprovalStatus,
+    String? supervisorFeedBackComment,
+    List<String>? attachments,
+    String? appAnalysis,
+    String? reviewerId,
+  }) {
+    return ReportEntry(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      enteredBy: enteredBy ?? this.enteredBy,
+      editedBy: editedBy ?? this.editedBy,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+      supervisorName: supervisorName ?? this.supervisorName,
+      supervisorEmail: supervisorEmail ?? this.supervisorEmail,
+      supervisorApprovalStatus:
+      supervisorApprovalStatus ?? this.supervisorApprovalStatus,
+      supervisorFeedBackComment:
+      supervisorFeedBackComment ?? this.supervisorFeedBackComment,
+      attachments: attachments ?? this.attachments,
+      appAnalysis: appAnalysis ?? this.appAnalysis,
+      reviewerId: reviewerId ?? this.reviewerId,
+    );
+  }
+}
+
+class Report {
+  String? id;
+  DateTime? date;
+  String? reportType;
+  String? reportingWeek;
+  String? reportingMonth;
+  String? reportStatus;
+  String? reportFeedbackComment;
+  String? supervisorName;
+  String? supervisorEmail;
+  String? supervisorApprovalStatus;
+  String? supervisorFeedBackComment;
+  List<String>? attachments;
+  bool? isSynced;
+  // Modified reportEntries to be a Map as per requirement
+  Map<String, Map<String, List<ReportEntry>>>? reportEntries;
+
+  Report({
+    this.id,
+    this.date,
+    this.reportType,
+    this.reportingWeek,
+    this.reportingMonth,
+    this.reportStatus,
+    this.attachments,
+    this.reportFeedbackComment,
+    this.supervisorName,
+    this.supervisorEmail,
+    this.supervisorApprovalStatus,
+    this.supervisorFeedBackComment,
+    this.isSynced,
+    this.reportEntries,
+  });
+
+  factory Report.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
+    final data = snapshot.data();
+    return Report(
+      id: snapshot.id,
+      reportType: data?['reportType'],
+      date: data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
+      reportingWeek: data?['reportingWeek'],
+      reportingMonth: data?['reportingMonth'],
+      reportStatus: data?['reportStatus'],
+      reportFeedbackComment: data?['reportFeedbackComment'],
+      supervisorName: data?['supervisorName'],
+      supervisorEmail: data?['supervisorEmail'],
+      supervisorApprovalStatus: data?['supervisorApprovalStatus'],
+      supervisorFeedBackComment: data?['supervisorFeedBackComment'],
+      attachments:
+      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      isSynced: data?['isSynced'],
+      // Deserialize reportEntries correctly
+      reportEntries: (data?['reportEntries'] as Map<String, dynamic>?)?.map(
+            (username, indicatorMap) => MapEntry(
+          username,
+          (indicatorMap as Map<String, dynamic>).map(
+                (indicator, entryList) => MapEntry(
+              indicator,
+              (entryList as List<dynamic>)
+                  .map((entryData) =>
+                  ReportEntry.fromMap(entryData as Map<String, dynamic>))
+                  .toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      if (reportType != null) 'reportType': reportType,
+      if (date != null) 'date': date,
+      if (reportingWeek != null) 'reportingWeek': reportingWeek,
+      if (reportingMonth != null) 'reportingMonth': reportingMonth,
+      if (reportStatus != null) 'reportStatus': reportStatus,
+      if (reportFeedbackComment != null) 'reportFeedbackComment': reportFeedbackComment,
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
+      if (attachments != null) 'attachments': attachments,
+      if (isSynced != null) 'isSynced': isSynced,
+      // Serialize reportEntries correctly
+      if (reportEntries != null)
+        'reportEntries': reportEntries!.map(
+              (username, indicatorMap) => MapEntry(
+            username,
+            indicatorMap.map(
+                  (indicator, entryList) => MapEntry(
+                indicator,
+                entryList.map((e) => e.toMap()).toList(),
+              ),
+            ),
+          ),
+        ),
+    };
+  }
+}
+
+class Task {
+  int? id; // Not used in Firestore, Firestore generates document IDs
+  DateTime? date;
+  String? taskTitle;
+  String? taskDescription;
+  bool? isSynced;
+  String? taskStatus;
+  List<String>? attachments;
+  String? reviewedBy; // ADDED: Field to store the reviewer's name
+  String? appAnalysis; // ADDED: Field to store Gemini analysis for tasks
+  String? supervisorName;
+  String? supervisorEmail;
+  String? supervisorApprovalStatus;
+  String? supervisorFeedBackComment;
+  String? firestoreId;
+  Task({
+    this.id,
+    this.date,
+    this.taskTitle,
+    this.firestoreId, // ADDED
+    this.taskDescription,
+    this.isSynced,
+    this.taskStatus,
+    this.attachments,
+    this.reviewedBy, // ADDED: Include in constructor
+    this.appAnalysis, // ADDED: Include in constructor
+    this.supervisorName,
+    this.supervisorEmail,
+    this.supervisorApprovalStatus,
+    this.supervisorFeedBackComment,
+  });
+
+
+  factory Task.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> snapshot,
+      SnapshotOptions? options) {
+    final data = snapshot.data();
+    return Task(
+      id: null, // Firestore doesn't use integer IDs, document ID is used instead
+      date: data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
+      taskTitle: data?['taskTitle'],
+      taskDescription: data?['taskDescription'],
+      isSynced: data?['isSynced'],
+      firestoreId: snapshot.id,
+      taskStatus: data?['taskStatus'],
+      attachments:
+      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      reviewedBy: data?['reviewedBy'], // ADDED: Retrieve from Firestore data
+      appAnalysis: data?['appAnalysis'], // ADDED: Retrieve appAnalysis from Firestore
+      supervisorName: data?['supervisorName'],
+      supervisorEmail: data?['supervisorEmail'],
+      supervisorApprovalStatus: data?['supervisorApprovalStatus'],
+      supervisorFeedBackComment: data?['supervisorFeedBackComment'],
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      if (date != null) 'date': date,
+      if (taskTitle != null) 'taskTitle': taskTitle,
+      if (taskDescription != null) 'taskDescription': taskDescription,
+      if (isSynced != null) 'isSynced': isSynced,
+      if (firestoreId != null) 'firestoreId': firestoreId,
+      if (taskStatus != null) 'taskStatus': taskStatus,
+      if (attachments != null) 'attachments': attachments,
+      if (reviewedBy != null) 'reviewedBy': reviewedBy, // ADDED: Include in Firestore data
+      if (appAnalysis != null) 'appAnalysis': appAnalysis, // ADDED: Include appAnalysis in Firestore data
+      if (supervisorName != null) 'supervisorName': supervisorName,
+      if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
+      if (supervisorApprovalStatus != null)
+        'supervisorApprovalStatus': supervisorApprovalStatus,
+      if (supervisorFeedBackComment != null)
+        'supervisorFeedBackComment': supervisorFeedBackComment,
+    };
+  }
+}
 
 class TimesheetScreen extends StatefulWidget {
   const TimesheetScreen({super.key});
@@ -61,6 +348,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   List<String?> projectNames = []; // Store project names from Isar
   List<String?> supervisorNames = []; // Store project names from Isar
   //late final bioData;
+  String _currentUsername = "";
   String? selectedProjectName;
   String? selectedBioFirstName;
   String? selectedBioLastName;
@@ -87,6 +375,8 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   List<String> attachments = [];
   bool isHTML = false;
   List<Uint8List> checkSignatureImage = []; // Initialize as empty list
+  bool _isPDFLoading = false;
+  bool _includeTaskSummary = false;
 
     // Responsive Scaling Factors for PDF Text Sizes - Adjust these as needed
   final double pdfTitleFontSizeFactor = 1.0; // Reduced from 20 to 16
@@ -103,6 +393,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   late double iconSizeFactor;
   late double tableFontSizeFactor;
   late double dropdownFontSizeFactor;
+
 
   @override
   void initState() {
@@ -295,6 +586,10 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
   }
 
   Future<void> _createAndExportPDF() async {
+
+    setState(() {
+      _isPDFLoading = true;
+    });
     final pdf = pw.Document();
     String monthYear =
     DateFormat('MMMM, yyyy').format(DateTime(selectedYear, selectedMonth + 1));
@@ -304,9 +599,13 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
       await rootBundle.load('assets/image/ccfn_logo.png');
       final Uint8List logoImageData = logoBytes.buffer.asUint8List();
       final pw.MemoryImage logoImage = pw.MemoryImage(logoImageData);
+      final pageFormat = PdfPageFormat.a4.landscape;
 
       final supervisorNames = await _getSupervisorNames();
       final signatureColumns = await _buildSignatureColumns(supervisorNames);
+
+      // **Fetch Task Summary Data BEFORE building PDF**
+      final taskSummaryContent = await _prepareTaskSummaryContent(); // New method to prepare task summary content
 
       pdf.addPage(
         pw.Page(
@@ -342,19 +641,243 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
         ),
       );
 
+      // Add Task Summary Page using MultiPage, now passing pre-fetched content
+      // Conditionally add Task Summary Page
+      if (_includeTaskSummary && taskSummaryContent != null) {
+        pdf.addPage(
+          pw.MultiPage(
+           // pageFormat: pageFormat,
+            header: (pw.Context context) {
+              return pw.Header(
+                level: 0,
+                child: pw.Text('Task Summary Report - $monthYear',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              );
+            },
+            footer: (pw.Context context) {
+              return pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+                  child: pw.Text(
+                      'Page ${context.pageNumber} of ${context.pagesCount}',
+                      style: pw.Theme.of(context)
+                          .defaultTextStyle
+                          .copyWith(color: PdfColors.grey)
+                  ));
+            },
+            build: (pw.Context context) {
+              return [
+                pw.SizedBox(height: 20),
+                pw.Center(
+                  child: pw.Text(
+                    "Task Summary for ${DateFormat('MMMM yyyy').format(DateTime(selectedYear, selectedMonth + 1))}",
+                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+                _buildTaskSummaryPage(logoImage, taskSummaryContent), // Pass pre-fetched content here
+              ];
+            },
+          ),
+        );}
+
+
       final Uint8List pdfBytes = await pdf.save();
 
       final blob = html.Blob([pdfBytes], 'application/pdf');
       final url = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", "timesheet_${monthYear}_$selectedBioLastName.pdf")
+        ..setAttribute("download", "Timesheet_${monthYear}_${selectedBioFirstName}_$selectedBioLastName.pdf")
         ..click();
 
       html.Url.revokeObjectUrl(url);
     } catch (e) {
       print("Error generating PDF: $e");
+    }finally {
+      setState(() {
+        _isPDFLoading = false;
+      });
     }
   }
+
+  // New method to pre-fetch and prepare task summary content
+  Future<List<pw.Widget>> _prepareTaskSummaryContent() async {
+    String monthYear = DateFormat('MMMM, yyyy').format(
+        DateTime(selectedYear, selectedMonth + 1));
+
+    DateTime now = DateTime(selectedYear, selectedMonth + 1);
+    DateTime startDateOfMonth = DateTime(now.year, now.month - 1, 20);
+    DateTime endDateOfMonth = DateTime(now.year, now.month, 19);
+
+    Map<DateTime, Map<String, Map<String, dynamic>>> summaryDataByDate = {};
+    Map<DateTime, List<Task>> otherTasksByDate = {};
+    Map<DateTime, List<Report>> reportsByDate = {};
+
+
+    // Loop through each day of the month, EXCLUDING SATURDAYS AND SUNDAYS
+    for (DateTime date = startDateOfMonth; date.isBefore(endDateOfMonth.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+      if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+        print("_createTaskSummaryPDF: Skipping weekend date: ${DateFormat('dd-MMM-yyyy').format(date)}");
+        continue; // Skip weekends
+      }
+
+      final formattedDateForReportPath = DateFormat('dd-MMM-yyyy').format(date);
+      final formattedDateForTaskPath = DateFormat('yyyy-MM-dd').format(date); // Format for task path
+
+      // Fetch Daily Reports (as before - with logging)
+      print("_createTaskSummaryPDF: Fetching REPORTS for date: $formattedDateForReportPath");
+      // Fetch Daily Reports
+      String reportCollectionPath = 'Reports/${selectedBioState}/${selectedBioState}/${selectedBioLocation}/${formattedDateForReportPath}'; // Construct path dynamically
+      print("_createTaskSummaryPDF: Report Collection Path: $reportCollectionPath"); // ADDED DEBUG LOG
+
+      QuerySnapshot<Map<String, dynamic>> reportSnapshot = await FirebaseFirestore.instance
+          .collection('Reports')
+          .doc(selectedBioState)
+          .collection(selectedBioState!)
+          .doc(selectedBioLocation)
+          .collection(formattedDateForReportPath)
+          .get();
+      print("_createTaskSummaryPDF: Number of REPORTS found for $formattedDateForReportPath: ${reportSnapshot.docs.length}");
+
+
+      List<Report> dailyReports = reportSnapshot.docs
+          .map((doc) => Report.fromFirestore(doc, null))
+          .where((report) {
+        if (report.reportEntries != null) {
+          return report.reportEntries!.keys.any((username) => username == _currentUsername);
+        }
+        return false;
+      }).toList();
+
+      reportsByDate[date] = dailyReports; // Store daily reports
+      print("_createTaskSummaryPDF: Number of USER REPORTS found for $formattedDateForReportPath: ${dailyReports.length}");
+
+// Fetch Other Tasks for the date (with detailed logging)
+      print("_createTaskSummaryPDF: Fetching TASKS for date: $formattedDateForTaskPath"); // ADDED DEBUG LOG
+      String taskCollectionPath = 'Reports/${selectedBioState}/Task/${selectedBioLocation}/${formattedDateForReportPath}/${selectedFirebaseId}/${selectedFirebaseId}'; // Construct path dynamically
+      print("_createTaskSummaryPDF: Task Collection Path: $taskCollectionPath"); // ADDED DEBUG LOG
+
+      // Fetch Other Tasks for the date
+      QuerySnapshot<Map<String, dynamic>> taskSnapshot = await FirebaseFirestore.instance
+          .collection('Reports')
+          .doc(selectedBioState)
+          .collection('Task')
+          .doc(selectedBioLocation)
+          .collection(formattedDateForReportPath)
+          .doc(selectedFirebaseId)
+          .collection(selectedFirebaseId!)
+          .get();
+
+      List<Task> dailyTasks = taskSnapshot.docs
+          .map((doc) => Task.fromFirestore(doc, null))
+          .toList();
+      otherTasksByDate[date] = dailyTasks; // Store daily tasks
+    }
+
+    if (reportsByDate.isEmpty && otherTasksByDate.isEmpty) {
+      return [pw.Center(child: pw.Text("No reports or tasks found for this period."))];
+    }
+
+    reportsByDate.forEach((date, dailyReports) {
+      summaryDataByDate[date] = {};
+
+      for (Report report in dailyReports) {
+        if (report.reportEntries != null) {
+          for (var usernameEntry in report.reportEntries!.entries) {
+            String username = usernameEntry.key;
+            for (var indicatorEntry in usernameEntry.value.entries) {
+              String indicatorName = indicatorEntry.key;
+              String indicatorValue = indicatorEntry.value.first.value;
+              int value = int.tryParse(indicatorValue) ?? 0;
+
+              if (!summaryDataByDate[date]!.containsKey(indicatorName)) {
+                summaryDataByDate[date]![indicatorName] = {'Total': 0};
+              }
+
+              summaryDataByDate[date]![indicatorName]![username] = value;
+              summaryDataByDate[date]![indicatorName]!['Total'] = (summaryDataByDate[date]![indicatorName]!['Total'] as int) + value;
+            }
+          }
+        }
+      }
+    });
+
+    List<pw.Widget> content = [];
+
+    content.add(pw.Center(
+      child: pw.Text(
+        "Task Summary for period: ${DateFormat('dd MMMM yyyy').format(startDateOfMonth)} - ${DateFormat('dd MMMM yyyy').format(endDateOfMonth)}", // Dynamic date range
+        style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+      ),
+    ));
+    content.add(pw.SizedBox(height: 20));
+
+    // 1. Tabular Summary of Reports
+    summaryDataByDate.forEach((date, indicatorData) {
+      List<List<String>> tableData = [];
+      tableData.add(['Indicator', 'What You Entered', 'Total Value']);
+
+      indicatorData.forEach((indicatorName, userData) {
+        String userValue = (userData[_currentUsername]?.toString()) ?? '0'; // Adapt _currentUsername if necessary
+        String totalValue = (userData['Total']?.toString()) ?? '0';
+        tableData.add([indicatorName, userValue, totalValue]);
+      });
+
+      content.add(pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 10, top: 20),
+          child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))));
+      content.add(pw.Table.fromTextArray(
+          context: null, // Context is not needed here as we are building widgets outside the build method
+          border: pw.TableBorder.all(),
+          data: tableData,
+          cellStyle: const pw.TextStyle(fontSize: 10),
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)
+      ));
+    });
+
+    // 2. Summary of Other Tasks
+    if (otherTasksByDate.isNotEmpty) {
+      content.add(pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 30),
+          child: pw.Text("Summary of Other Tasks:", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold))));
+
+      otherTasksByDate.forEach((date, taskList) {
+        if (taskList.isNotEmpty) {
+          content.add(pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 5, top: 10),
+              child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))));
+          for (Task task in taskList) {
+            content.add(pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: taskList.map((task) => pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(right: 5, top: 2),
+                    child: pw.Text('•'),
+                  ),
+                  pw.Expanded(
+                    child: pw.Text("${task.taskTitle}: ${task.taskDescription}"),
+                  ),
+                ],
+              )).toList(),
+            ));
+          }
+        }
+      });
+    }
+    return content;
+  }
+
+
+  // Modified _buildPdfTaskSummaryPage to be synchronous and accept pre-fetched content
+  pw.Widget _buildTaskSummaryPage(pw.MemoryImage logoImage, List<pw.Widget> taskSummaryContent) {
+    return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: taskSummaryContent // Use the pre-built content directly
+    );
+  }
+
 
 
   Future<void> sendEmailToSelf1() async {
@@ -1717,6 +2240,11 @@ $selectedBioFirstName $selectedBioLastName
           staffSignatureLink = data['signatureLink'] ?? '';
           selectedFirebaseId = userId; // Store the Firebase UUID
           bioData = BioModel.fromJson(data); // Assign bioData here
+          if (bioData!.firstName != null && bioData!.lastName != null) {
+            _currentUsername = "${bioData!.firstName!} ${bioData!.lastName!}";
+          } else {
+            _currentUsername = "Unknown User";
+          }
         });
 
 
@@ -2314,21 +2842,41 @@ $selectedBioFirstName $selectedBioLastName
 
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Timesheet', style: TextStyle(fontSize: 12 * titleFontSizeFactor)),
-        toolbarHeight: 50 * appBarHeightFactor,
-        actions: <Widget>[
-          IconButton(
-            icon: Icon(Icons.save_alt, size: 24 * iconSizeFactor),
-            onPressed: _createAndExportPDF,
+      appBar:AppBar(
+        title: Text('Timesheet', style: TextStyle(color: Colors.white, fontSize: 20 * dev.max(0.8, dev.min(1.2, MediaQuery.of(context).size.shortestSide / 600)))),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(
+            colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),),
+        ),
+        actions: [
+
+          _isPDFLoading
+              ? CircularProgressIndicator()
+              : Row(
+              children:[
+
+                IconButton(
+                  icon: const Icon(Icons.save_alt),
+                  tooltip: 'Download PDF',
+                  onPressed: _createAndExportPDF,
+                ),
+                const Icon(Icons.picture_as_pdf),
+
+              ]
           ),
-          Icon(Icons.picture_as_pdf, size: 24 * iconSizeFactor),
-          SizedBox(width: 15 * marginFactor)
-          // IconButton(
-          //   icon: const Icon(Icons.save_alt), // Use a suitable icon for Excel
-          //   onPressed: _createAndExportExcel,
-          // ),
+
+          const SizedBox(width: 15),
+
+          Container(
+            margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
+            child: Image.asset("assets/image/ccfn_logo.png"),
+          )
         ],
+
       ),
       drawer:
       // role == "User"
@@ -2349,6 +2897,24 @@ $selectedBioFirstName $selectedBioLastName
               child: Column(
                 //mainAxisAlignment:MainAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Checkbox(
+                          checkColor: Colors.black,
+                          // hoverColor: Colors.white,
+                          // activeColor: Colors.white,
+                          // focusColor: Colors.white,
+                          //overlayColor:  Colors.white,
+                          value: _includeTaskSummary,
+                          onChanged: (bool? newValue) {
+                            setState(() {
+                              _includeTaskSummary = newValue ?? false;
+                            });
+                          },
+                        ),
+                        const Text('Include Task Summary in Timesheet PDF', style: TextStyle(color: Colors.black, fontSize: 12)),
+                      ],
+                    ),
                     Image(
                       image: const AssetImage("./assets/image/ccfn_logo.png"),
                       width: MediaQuery.of(context).size.width * 0.10 * iconSizeFactor,
@@ -2880,19 +3446,19 @@ $selectedBioFirstName $selectedBioLastName
                                                 children: [
                                                   Text('Name of Staff',
                                                     style: TextStyle(
-                                                      fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
-                                                  SizedBox(height: 5 * marginFactor),
+                                                      fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),),
+                                                  SizedBox(height: 3 * marginFactor),
                                                   Text(
                                                     '${selectedBioFirstName.toString()
                                                         .toUpperCase()} ${selectedBioLastName
                                                         .toString().toUpperCase()}',
                                                     style: TextStyle(
-                                                      fontSize: 16 * fontSizeFactor,
+                                                      fontSize: 14 * fontSizeFactor,
                                                       // fontWeight: FontWeight.bold,
                                                       fontFamily: "NexaLight",
                                                     ),
                                                   ),
-                                                  SizedBox(height: 5 * marginFactor),
+                                                  SizedBox(height: 3 * marginFactor),
                                                   // Adjust path and size accordingly
                                                 ],
                                               ),
@@ -2912,15 +3478,15 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.2 : 0.35),
+                                                  .shortestSide < 600 ? 0.15 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //  color: Colors.grey.shade200,
                                               child: Column(
                                                 children: [
                                                   Text('Signature', style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),),
-                                                  SizedBox(height: 5 * marginFactor),
+                                                    fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),),
+                                                  SizedBox(height: 3 * marginFactor),
 
                                                   StreamBuilder<DocumentSnapshot>(
                                                     // Stream the supervisor signature
@@ -3544,7 +4110,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                                  .shortestSide < 600 ? 0.20 : 0.30),
                                               padding: const EdgeInsets.all(8.0),
                                               child: Column(
                                                 children: [
@@ -3647,7 +4213,7 @@ $selectedBioFirstName $selectedBioLastName
                                                       .of(context)
                                                       .size
                                                       .shortestSide < 600
-                                                      ? 0.30
+                                                      ? 0.40
                                                       : 0.25),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
@@ -3660,9 +4226,9 @@ $selectedBioFirstName $selectedBioLastName
                                                   Text(
                                                     'Name of Project Cordinator / ART Nurse',
                                                     style: TextStyle(
-                                                      fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                      fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
                                                   ),
-                                                  SizedBox(height: 5 * marginFactor),
+                                                  SizedBox(height: 3 * marginFactor),
                                                   //
                                                   
                                                   StreamBuilder<DocumentSnapshot>(
@@ -3697,7 +4263,7 @@ $selectedBioFirstName $selectedBioLastName
                                                         } else {
                                                           return Text(
                                                             "$facilitySupervisor",style: TextStyle(
-                                                            fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
+                                                            fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor,),);
                                                         }
                                                       } else {
                                                         return buildFacilitySupervisorDropdown();
@@ -3707,7 +4273,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   //
 
 
-                                                  SizedBox(height: 5 * marginFactor),
+                                                  SizedBox(height: 3 * marginFactor),
                                                 ],
                                               ),
                                             ),),

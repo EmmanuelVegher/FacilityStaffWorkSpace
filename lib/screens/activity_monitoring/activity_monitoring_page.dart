@@ -5,12 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:date_picker_timeline/date_picker_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:mime_type/mime_type.dart';
+import 'package:pdf/pdf.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:uuid/uuid.dart';
@@ -24,6 +27,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io' show File, Directory;
 import 'dart:convert';
+
+import 'dart:html' as html;
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
 
 String? mimeTypeFromUrl(String url) {
   final Uri uri = Uri.parse(url);
@@ -117,7 +124,7 @@ class ReportEntry {
   String? supervisorFeedBackComment;
   List<String>? attachments;
   String? appAnalysis;
-  String? reviewerId; // ADDED: reviewerId field
+  String? reviewerId;
 
   ReportEntry({
     this.key = "",
@@ -132,7 +139,7 @@ class ReportEntry {
     this.supervisorFeedBackComment,
     this.attachments,
     this.appAnalysis,
-    this.reviewerId, // Initialize reviewerId
+    this.reviewerId,
   });
 
   factory ReportEntry.fromMap(Map<String, dynamic> map) {
@@ -149,7 +156,7 @@ class ReportEntry {
       supervisorFeedBackComment: map['supervisorFeedBackComment'],
       attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       appAnalysis: map['appAnalysis'],
-      reviewerId: map['reviewerId'], // Deserialize reviewerId
+      reviewerId: map['reviewerId'],
     );
   }
 
@@ -169,8 +176,43 @@ class ReportEntry {
         'supervisorFeedBackComment': supervisorFeedBackComment,
       if (attachments != null) 'attachments': attachments,
       if (appAnalysis != null) 'appAnalysis': appAnalysis,
-      if (reviewerId != null) 'reviewerId': reviewerId, // Serialize reviewerId
+      if (reviewerId != null) 'reviewerId': reviewerId,
     };
+  }
+
+  /// **Add the copyWith method**
+  ReportEntry copyWith({
+    String? key,
+    String? value,
+    String? enteredBy,
+    String? editedBy,
+    String? reviewedBy,
+    String? reviewStatus,
+    String? supervisorName,
+    String? supervisorEmail,
+    String? supervisorApprovalStatus,
+    String? supervisorFeedBackComment,
+    List<String>? attachments,
+    String? appAnalysis,
+    String? reviewerId,
+  }) {
+    return ReportEntry(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      enteredBy: enteredBy ?? this.enteredBy,
+      editedBy: editedBy ?? this.editedBy,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+      supervisorName: supervisorName ?? this.supervisorName,
+      supervisorEmail: supervisorEmail ?? this.supervisorEmail,
+      supervisorApprovalStatus:
+      supervisorApprovalStatus ?? this.supervisorApprovalStatus,
+      supervisorFeedBackComment:
+      supervisorFeedBackComment ?? this.supervisorFeedBackComment,
+      attachments: attachments ?? this.attachments,
+      appAnalysis: appAnalysis ?? this.appAnalysis,
+      reviewerId: reviewerId ?? this.reviewerId,
+    );
   }
 }
 
@@ -1158,7 +1200,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   final Map<String, List<Report>> _allReportsForDate = {}; // Stores all reports for the selected date, grouped by department
 
   Task? _taskBeingEdited; // Track the task being edited
-
+  bool _isPDFLoading = false;
   //final TaskController _taskController = Get.put(TaskController());
   //late NotifyHelper notifyHelper;
   final DateTime _selectedDate =
@@ -1379,15 +1421,323 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                 },
                 child: const Text('Task Validation'),
               ),
+
+
+
             ]
           ),
 
+          const SizedBox(height: 20),
+
+          _isPDFLoading
+              ? CircularProgressIndicator()
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Wrap(
+                  spacing: 8.0,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _createTaskSummaryPDF,
+                      icon: const Icon(Icons.download, size: 18),
+                      label: const Text(
+                        'Download Your Task Summary',
+                        textAlign: TextAlign.center,
+                        softWrap: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           // Tables for each unit will be added here dynamically
           ..._buildSummaryTables(), // Call a helper function to build tables
         ],
       ),
     );
+  }
+
+  Future<void> _createTaskSummaryPDF() async {
+    setState(() {
+      _isPDFLoading = true;
+    });
+    final pdf = pw.Document(pageMode: PdfPageMode.outlines);
+    String monthYear = DateFormat('MMMM, yyyy').format(
+        DateTime(_selectedReportingDate.year, _selectedReportingDate.month));
+    final pageFormat = PdfPageFormat.a4;
+
+    try {
+      // Load the logo as bytes (no changes here)
+      final ByteData? logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
+      if (logoBytes == null) {
+        Fluttertoast.showToast(msg: "Error: Logo asset not found!");
+        setState(() {
+          _isPDFLoading = false;
+        });
+        return;
+      }
+      final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+
+      // Fetch reports and other tasks (with detailed debugging)
+      // final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      // if (currentUserId == null) {
+      //   Fluttertoast.showToast(msg: "User not logged in.");
+      //   setState(() {
+      //     _isPDFLoading = false;
+      //   });
+      //   return;
+      // }
+
+      final now = _selectedReportingDate;
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      Map<DateTime, List<Report>> reportsByDate = {};
+      Map<DateTime, List<Task>> otherTasksByDate = {};
+
+      // Loop through each day of the month, EXCLUDING SATURDAYS AND SUNDAYS
+      for (DateTime date = startOfMonth; date.isBefore(endOfMonth.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+        if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+          print("_createTaskSummaryPDF: Skipping weekend date: ${DateFormat('dd-MMM-yyyy').format(date)}");
+          continue; // Skip weekends
+        }
+
+        final formattedDateForReportPath = DateFormat('dd-MMM-yyyy').format(date);
+        final formattedDateForTaskPath = DateFormat('yyyy-MM-dd').format(date); // Format for task path
+
+        // Fetch Daily Reports (as before - with logging)
+        print("_createTaskSummaryPDF: Fetching REPORTS for date: $formattedDateForReportPath");
+        QuerySnapshot<Map<String, dynamic>> reportSnapshot = await FirebaseFirestore.instance
+            .collection('Reports')
+            .doc(selectedBioState)
+            .collection(selectedBioState!)
+            .doc(selectedBioLocation)
+            .collection(formattedDateForReportPath)
+            .get();
+        print("_createTaskSummaryPDF: Number of REPORTS found for $formattedDateForReportPath: ${reportSnapshot.docs.length}");
+
+
+        List<Report> dailyReports = reportSnapshot.docs
+            .map((doc) => Report.fromFirestore(doc, null))
+            .where((report) {
+          if (report.reportEntries != null) {
+            return report.reportEntries!.keys.any((username) => username == _currentUsername);
+          }
+          return false;
+        }).toList();
+
+        reportsByDate[date] = dailyReports; // Store daily reports
+        print("_createTaskSummaryPDF: Number of USER REPORTS found for $formattedDateForReportPath: ${dailyReports.length}");
+
+
+
+        // Fetch Other Tasks for the date (with detailed logging)
+        print("_createTaskSummaryPDF: Fetching TASKS for date: $formattedDateForTaskPath"); // ADDED DEBUG LOG
+        String taskCollectionPath = 'Reports/${selectedBioState}/Task/${selectedBioLocation}/${formattedDateForReportPath}/${selectedFirebaseId}/${selectedFirebaseId}'; // Construct path dynamically
+        print("_createTaskSummaryPDF: Task Collection Path: $taskCollectionPath"); // ADDED DEBUG LOG
+
+
+        QuerySnapshot<Map<String, dynamic>> taskSnapshot = await FirebaseFirestore.instance
+            .collection('Reports')
+            .doc(selectedBioState)
+            .collection('Task')
+            .doc(selectedBioLocation)
+            .collection(formattedDateForReportPath)
+            .doc(selectedFirebaseId)
+            .collection(selectedFirebaseId!)
+            .get();
+
+        print("_createTaskSummaryPDF: Number of TASKS found for $formattedDateForTaskPath: ${taskSnapshot.docs.length}"); // ADDED DEBUG LOG
+
+        List<Task> dailyTasks = taskSnapshot.docs
+            .map((doc) => Task.fromFirestore(doc, null))
+            .toList();
+        otherTasksByDate[date] = dailyTasks; // Store daily tasks
+        print("_createTaskSummaryPDF: Number of USER TASKS found for $formattedDateForTaskPath: ${dailyTasks.length}"); // ADDED DEBUG LOG
+      }
+
+
+      if (reportsByDate.isEmpty && otherTasksByDate.isEmpty) {
+        Fluttertoast.showToast(msg: "No reports or other tasks found for the current user in this month (excluding weekends).");
+        setState(() {
+          _isPDFLoading = false;
+        });
+        return;
+      }
+
+
+      // Prepare summary data structure (no changes here)
+      Map<DateTime, Map<String, Map<String, dynamic>>> summaryDataByDate = {};
+
+      reportsByDate.forEach((date, dailyReports) {
+        summaryDataByDate[date] = {};
+
+        for (Report report in dailyReports) {
+          if (report.reportEntries != null) {
+            for (var usernameEntry in report.reportEntries!.entries) {
+              String username = usernameEntry.key;
+              for (var indicatorEntry in usernameEntry.value.entries) {
+                String indicatorName = indicatorEntry.key;
+                String indicatorValue = indicatorEntry.value.first.value;
+                int value = int.tryParse(indicatorValue) ?? 0;
+
+                if (!summaryDataByDate[date]!.containsKey(indicatorName)) {
+                  summaryDataByDate[date]![indicatorName] = {'Total': 0};
+                }
+
+                summaryDataByDate[date]![indicatorName]![username] = value;
+                summaryDataByDate[date]![indicatorName]!['Total'] = (summaryDataByDate[date]![indicatorName]!['Total'] as int) + value;
+              }
+            }
+          }
+        }
+      });
+
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: pageFormat,
+          header: (pw.Context context) {
+            return pw.Header(
+              level: 0,
+              child: pw.Text('Task Summary Report - $monthYear', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            );
+          },
+          footer: (pw.Context context) {
+            return pw.Container(
+                alignment: pw.Alignment.centerRight,
+                margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+                child: pw.Text(
+                    'Page ${context.pageNumber} of ${context.pagesCount}',
+                    style: pw.Theme.of(context)
+                        .defaultTextStyle
+                        .copyWith(color: PdfColors.grey)
+                ));
+          },
+          build: (pw.Context context) {
+            List<pw.Widget> content = [];
+
+            // 1. Tabular Summary of Reports (no changes here)
+            summaryDataByDate.forEach((date, indicatorData) {
+
+              // // Fetch attendance record for the date from Isar
+              // AttendanceModel? attendanceRecord = await IsarService().getAttendanceByDate(DateFormat('dd-MMMM-yyyy').format(date)); // Fetch attendance for the date
+              //
+              // // Get clock-in and clock-out times from attendanceRecord
+              // String clockInTime = "N/A"; // Default if no attendance data
+              // String clockOutTime = "N/A";
+              //
+              // if (attendanceRecord != null) {
+              //   clockInTime = attendanceRecord.clockIn ?? "N/A"; // Access clockInTime from Isar
+              //   clockOutTime = attendanceRecord.clockOut ?? "N/A";   // Access clockOut from Isar
+              // }
+
+              content.add(pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 10, top: 20),
+                  child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))));
+
+              // content.add(pw.Padding(
+              //     padding: const pw.EdgeInsets.only(bottom: 10, top: 20),
+              //     child: pw.Row(
+              //       children:[
+              //         pw.Text(
+              //             clockInTime, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              //
+              //         pw.Text(
+              //             clockOutTime, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))
+              //       ]
+              //     ),
+              //
+              // )
+              // );
+
+              List<List<String>> tableData = [];
+              tableData.add(['Indicator', 'What You Entered', 'Total Value']);
+
+              indicatorData.forEach((indicatorName, userData) {
+                String userValue = (userData[_currentUsername]?.toString()) ?? '0';
+                String totalValue = (userData['Total']?.toString()) ?? '0';
+                tableData.add([indicatorName, userValue, totalValue]);
+              });
+
+              content.add(pw.Table.fromTextArray(
+                  context: context,
+                  border: pw.TableBorder.all(),
+                  data: tableData,
+                  cellStyle: const pw.TextStyle(fontSize: 10),
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)
+              ));
+            });
+
+            // 2. Summary of Other Tasks (no changes here)
+            if (otherTasksByDate.isNotEmpty) {
+              content.add(pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 30),
+                  child: pw.Text("Summary of Other Tasks:", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold))));
+
+              otherTasksByDate.forEach((date, taskList) {
+                if (taskList.isNotEmpty) {
+                  content.add(pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 5, top: 10),
+                      child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))));
+                  for (Task task in taskList) {
+                    content.add(pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: taskList.map((task) => pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(right: 5, top: 2),
+                            child: pw.Text('•'),
+                          ),
+                          pw.Expanded(
+                            child: pw.Text("${task.taskTitle}: ${task.taskDescription}"),
+                          ),
+                        ],
+                      )).toList(),
+                    ));
+                  }
+                }
+              });
+            }
+
+
+            return content;
+          },
+        ),
+      );
+
+      // Convert PDF to bytes and trigger download in the browser
+      final pdfBytes = await pdf.save();
+      final blob = html.Blob([Uint8List.fromList(pdfBytes)]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..target = 'blank'
+        ..download = 'Task_Summary_Report_${_currentUsername}_$monthYear.pdf';
+      anchor.click();
+      html.Url.revokeObjectUrl(url);
+
+      setState(() {
+        _isPDFLoading = false;
+      });
+    } catch (e) {
+      print("Error generating Task Summary PDF: $e");
+      Fluttertoast.showToast(
+        msg: "Error generating Task Summary PDF: $e",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      setState(() {
+        _isPDFLoading = false;
+      });
+    }
   }
 
 
@@ -1732,15 +2082,15 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     List<Widget> headerCells = [
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold)),
+        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold,fontSize:10)),
       ),
       ..._reportPeriodOptions.map((week) => Padding( // Use _reportPeriodOptions for week headers
           padding: const EdgeInsets.all(8.0),
-          child: Text(week, style: const TextStyle(fontWeight: FontWeight.bold))
+          child: Text(week, style: const TextStyle(fontWeight: FontWeight.bold,fontSize:10))
       )),
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("Monthly Total", style: TextStyle(fontWeight: FontWeight.bold)),
+        child: Text("Monthly Total", style: TextStyle(fontWeight: FontWeight.bold,fontSize:10)),
       ),
     ];
     tableRows.add(TableRow(children: headerCells));
@@ -1748,17 +2098,18 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     // Data Rows
     for (String indicator in indicators) {
       List<Widget> dataCells = [
-        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator)),
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: TextStyle(fontWeight: FontWeight.bold,fontSize:10))),
       ];
       int monthlyTotal = 0;
       for (String week in _reportPeriodOptions) { // Use _reportPeriodOptions to iterate through weeks
         int weeklyValue = summaryData[week]?[indicator] ?? 0;
-        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(weeklyValue.toString())));
+        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(weeklyValue.toString(), style: TextStyle(fontWeight: FontWeight.bold,fontSize:10))));
         monthlyTotal += weeklyValue;
       }
-      dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(monthlyTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold))));
+      dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(monthlyTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold,fontSize:10))));
       tableRows.add(TableRow(children: dataCells));
     }
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -1774,166 +2125,165 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
         ),
       ),
     );
-
   }
-
-  Widget _buildReviewListTab() {
-    return StreamBuilder<List<Report>>( // Changed to StreamBuilder
-      stream: _fetchReportsForReviewStream(), // Changed to _fetchReportsForReviewStream
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text("Error loading review list: ${snapshot.error}"));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("No reports pending your review."));
-        } else {
-
-
-          List<Report> reviewReports = snapshot.data!;
-          print("snapshot.data buildReviewListTab ===${snapshot.data}");
-
-          // Filter reports to only include those where reviewerId matches _selectedFirebaseId
-          List<Report> filteredReviewReports = [];
-          for (Report report in reviewReports) {
-            bool reportNeedsReviewByCurrentUser = false;
-            if (report.reportEntries != null) {
-              for (var usernameEntry in report.reportEntries!.entries) {
-                for (var indicatorEntry in usernameEntry.value.entries) {
-                  for (ReportEntry entry in indicatorEntry.value) {
-                    if (entry.reviewerId == selectedFirebaseId) { // Check reviewerId against _selectedFirebaseId
-                      reportNeedsReviewByCurrentUser = true;
-                      break;
-                    }
-                  }
-                  if (reportNeedsReviewByCurrentUser) break;
-                }
-                if (reportNeedsReviewByCurrentUser) break;
-              }
-            }
-            if (reportNeedsReviewByCurrentUser) {
-              filteredReviewReports.add(report);
-            }
-          }
-
-          // Create a set to store unique report identifiers (reportType + date) for filtered reports
-          Set<String> uniqueReportIdentifiers = {};
-          List<Report> uniqueReviewReports = []; // Use this list for display
-
-          for (Report report in filteredReviewReports) { // Iterate over filtered reports
-            print("report buildReviewListTab ===$report");
-            String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
-            print("reportIdentifier buildReviewListTab ===$reportIdentifier");
-            if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
-              uniqueReportIdentifiers.add(reportIdentifier);
-              uniqueReviewReports.add(report);
-              print("uniqueReportIdentifiers buildReviewListTab ===$uniqueReportIdentifiers");
-              print("uniqueReviewReports buildReviewListTab ===$uniqueReviewReports");
-            }
-          }
-
-          // Filter out reports that are completely reviewed by current user
-          List<Report> finalReviewReports = uniqueReviewReports.where((report) => !_isReportFullyActionedByCurrentUser(report)).toList();
-          print("finalReviewReports.length  ===${finalReviewReports.length}");
-
-
-          if (finalReviewReports.isEmpty) { // ADDED CONDITION - If no reports left after filtering
-            return const Center(child: Text("No reports pending your review.")); // Show "No reports" message again if list is empty
-          }
-
-
-
-          return ListView.builder(
-            itemCount: finalReviewReports.length, // Use finalReviewReports here
-            itemBuilder: (context, index) {
-              Report report = finalReviewReports[index]; // Use finalReviewReports here
-              print("ListView.builder report ===${report.reportEntries}");
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("${report.reportType}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                      const SizedBox(height: 8),
-                      Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
-                      const SizedBox(height: 16),
-                      if (report.reportEntries != null && report.reportEntries!.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: report.reportEntries!.entries.map((usernameEntry) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: usernameEntry.value.entries.map((indicatorEntry) {
-                                // Separate Comments entry
-                                ReportEntry? commentsEntry;
-                                List<ReportEntry> otherEntries = [];
-                                for (var entry in indicatorEntry.value) {
-                                  if (entry.key == 'Comments') {
-                                    commentsEntry = entry;
-                                  } else {
-                                    // Filter ReportEntry list to only include entries for the current reviewer
-                                    if (entry.reviewerId == selectedFirebaseId) {
-                                      otherEntries.add(entry);
-                                    }
-                                  }
-                                }
-
-                                // Sort otherEntries alphabetically by enteredBy
-                                otherEntries.sort((a, b) => (a.enteredBy ?? "").compareTo(b.enteredBy ?? ""));
-
-                                List<Widget> indicatorWidgets = [];
-
-                                // Build widgets for other entries first
-                                indicatorWidgets.addAll(otherEntries.map((entry) => _buildIndicatorRowForReview(report, entry, context)).toList());
-
-                                // Build widget for Comments entry last, if it exists and for current reviewer
-                                if (commentsEntry != null && commentsEntry.reviewerId == selectedFirebaseId) {
-                                  indicatorWidgets.add(_buildIndicatorRowForReview(report, commentsEntry, context));
-                                }
-
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: indicatorWidgets,
-                                );
-                              }).toList(),
-                            );
-                          }).toList(),
-                        ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              _approveReport(report);
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                            child: const Text("Approve All", style: TextStyle(color: Colors.white)),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              _returnReport(report);
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                            child: const Text("Return All", style: TextStyle(color: Colors.white)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        }
-      },
-    );
-  }
+// // selectedFirebaseId
+//   Widget _buildReviewListTab1() {
+//     return StreamBuilder<List<Report>>( // Changed to StreamBuilder
+//       stream: _fetchReportsForReviewStream(), // Changed to _fetchReportsForReviewStream
+//       builder: (context, snapshot) {
+//         if (snapshot.connectionState == ConnectionState.waiting) {
+//           return const Center(child: CircularProgressIndicator());
+//         } else if (snapshot.hasError) {
+//           return Center(child: Text("Error loading review list: ${snapshot.error}"));
+//         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+//           return const Center(child: Text("No reports pending your review."));
+//         } else {
+//
+//
+//           List<Report> reviewReports = snapshot.data!;
+//           print("snapshot.data buildReviewListTab ===${snapshot.data}");
+//
+//           // Filter reports to only include those where reviewerId matches _selectedFirebaseId
+//           List<Report> filteredReviewReports = [];
+//           for (Report report in reviewReports) {
+//             bool reportNeedsReviewByCurrentUser = false;
+//             if (report.reportEntries != null) {
+//               for (var usernameEntry in report.reportEntries!.entries) {
+//                 for (var indicatorEntry in usernameEntry.value.entries) {
+//                   for (ReportEntry entry in indicatorEntry.value) {
+//                     if (entry.reviewerId == selectedFirebaseId) { // Check reviewerId against _selectedFirebaseId
+//                       reportNeedsReviewByCurrentUser = true;
+//                       break;
+//                     }
+//                   }
+//                   if (reportNeedsReviewByCurrentUser) break;
+//                 }
+//                 if (reportNeedsReviewByCurrentUser) break;
+//               }
+//             }
+//             if (reportNeedsReviewByCurrentUser) {
+//               filteredReviewReports.add(report);
+//             }
+//           }
+//
+//           // Create a set to store unique report identifiers (reportType + date) for filtered reports
+//           Set<String> uniqueReportIdentifiers = {};
+//           List<Report> uniqueReviewReports = []; // Use this list for display
+//
+//           for (Report report in filteredReviewReports) { // Iterate over filtered reports
+//             print("report buildReviewListTab ===$report");
+//             String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
+//             print("reportIdentifier buildReviewListTab ===$reportIdentifier");
+//             if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
+//               uniqueReportIdentifiers.add(reportIdentifier);
+//               uniqueReviewReports.add(report);
+//               print("uniqueReportIdentifiers buildReviewListTab ===$uniqueReportIdentifiers");
+//               print("uniqueReviewReports buildReviewListTab ===$uniqueReviewReports");
+//             }
+//           }
+//
+//           // Filter out reports that are completely reviewed by current user
+//           List<Report> finalReviewReports = uniqueReviewReports.where((report) => !_isReportFullyActionedByCurrentUser(report)).toList();
+//           print("finalReviewReports.length  ===${finalReviewReports.length}");
+//
+//
+//           if (finalReviewReports.isEmpty) { // ADDED CONDITION - If no reports left after filtering
+//             return const Center(child: Text("No reports pending your review.")); // Show "No reports" message again if list is empty
+//           }
+//
+//
+//
+//           return ListView.builder(
+//             itemCount: finalReviewReports.length, // Use finalReviewReports here
+//             itemBuilder: (context, index) {
+//               Report report = finalReviewReports[index]; // Use finalReviewReports here
+//               print("ListView.builder report ===${report.reportEntries}");
+//               return Card(
+//                 elevation: 2,
+//                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+//                 child: Padding(
+//                   padding: const EdgeInsets.all(16.0),
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Text("${report.reportType}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+//                       const SizedBox(height: 8),
+//                       Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
+//                       const SizedBox(height: 16),
+//                       if (report.reportEntries != null && report.reportEntries!.isNotEmpty)
+//                         Column(
+//                           crossAxisAlignment: CrossAxisAlignment.start,
+//                           children: report.reportEntries!.entries.map((usernameEntry) {
+//                             return Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: usernameEntry.value.entries.map((indicatorEntry) {
+//                                 // Separate Comments entry
+//                                 ReportEntry? commentsEntry;
+//                                 List<ReportEntry> otherEntries = [];
+//                                 for (var entry in indicatorEntry.value) {
+//                                   if (entry.key == 'Comments') {
+//                                     commentsEntry = entry;
+//                                   } else {
+//                                     // Filter ReportEntry list to only include entries for the current reviewer
+//                                     if (entry.reviewerId == selectedFirebaseId) {
+//                                       otherEntries.add(entry);
+//                                     }
+//                                   }
+//                                 }
+//
+//                                 // Sort otherEntries alphabetically by enteredBy
+//                                 otherEntries.sort((a, b) => (a.enteredBy ?? "").compareTo(b.enteredBy ?? ""));
+//
+//                                 List<Widget> indicatorWidgets = [];
+//
+//                                 // Build widgets for other entries first
+//                                 indicatorWidgets.addAll(otherEntries.map((entry) => _buildIndicatorRowForReview(report, entry, context)).toList());
+//
+//                                 // Build widget for Comments entry last, if it exists and for current reviewer
+//                                 if (commentsEntry != null && commentsEntry.reviewerId == selectedFirebaseId) {
+//                                   indicatorWidgets.add(_buildIndicatorRowForReview(report, commentsEntry, context));
+//                                 }
+//
+//
+//                                 return Column(
+//                                   crossAxisAlignment: CrossAxisAlignment.start,
+//                                   children: indicatorWidgets,
+//                                 );
+//                               }).toList(),
+//                             );
+//                           }).toList(),
+//                         ),
+//                       const SizedBox(height: 20),
+//                       Row(
+//                         mainAxisAlignment: MainAxisAlignment.end,
+//                         children: [
+//                           ElevatedButton(
+//                             onPressed: () {
+//                               _approveReport(report);
+//                             },
+//                             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+//                             child: const Text("Approve All", style: TextStyle(color: Colors.white)),
+//                           ),
+//                           const SizedBox(width: 10),
+//                           ElevatedButton(
+//                             onPressed: () {
+//                               _returnReport(report);
+//                             },
+//                             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+//                             child: const Text("Return All", style: TextStyle(color: Colors.white)),
+//                           ),
+//                         ],
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               );
+//             },
+//           );
+//         }
+//       },
+//     );
+//   }
 
   bool _isReportFullyActionedByCurrentUser(Report report) {
     if (report.reportEntries == null) return true; // Consider completely actioned if no entries
@@ -1973,7 +2323,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     return allReviewed;
   }
 
-  Widget _buildIndicatorRowForReview(Report report, ReportEntry entry, BuildContext context) {
+  Widget _buildIndicatorRowForReview1(Report report, ReportEntry entry, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -2054,6 +2404,335 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
       ),
     );
   }
+
+
+  Widget _buildReviewListTab() {
+    return StreamBuilder<List<Report>>(
+      stream: _fetchReportsForReviewStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text("Error loading review list: ${snapshot.error}"));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text("No reports pending your review."));
+        }
+
+        List<Report> reviewReports = snapshot.data!;
+        List<Report> filteredReviewReports = reviewReports.where((report) {
+          if (report.reportEntries != null) {
+            return report.reportEntries!.entries.any((usernameEntry) {
+              return usernameEntry.value.entries.any((indicatorEntry) {
+                return indicatorEntry.value.any((entry) => entry.reviewerId == selectedFirebaseId);
+              });
+            });
+          }
+          return false;
+        }).toList();
+
+
+        Set<String> uniqueReportIdentifiers = {};
+        List<Report> uniqueReviewReports = filteredReviewReports.where((report) {
+          String reportIdentifier = "${report.reportType}_${DateFormat('yyyy-MM-dd').format(report.date!)}";
+          if (!uniqueReportIdentifiers.contains(reportIdentifier)) {
+            uniqueReportIdentifiers.add(reportIdentifier);
+            return true;
+          }
+          return false;
+        }).toList();
+
+        List<Map<String, dynamic>> userReportList = []; // Changed type to dynamic
+
+        for (var report in uniqueReviewReports) {
+          if (report.reportEntries != null) {
+            for (var usernameEntry in report.reportEntries!.entries) {
+              String username = usernameEntry.key;
+              if (!_isReportFullyActionedByCurrentUserForUser(report, username)) { // Only add if not fully actioned for this user
+                userReportList.add({'username': username, 'report': report});
+              }
+            }
+          }
+        }
+
+        if (userReportList.isEmpty) {
+          return const Center(child: Text("No reports pending your review."));
+        }
+
+        return ListView.builder(
+          itemCount: userReportList.length,
+          itemBuilder: (context, index) {
+            final userReportData = userReportList[index];
+            Report report = userReportData['report'] as Report; // Cast to Report
+            String username = userReportData['username'] as String; // Cast to String
+
+            return Card(
+              elevation: 2,
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Text(report.reportType!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text("Entered by: $username", style: const TextStyle(fontWeight: FontWeight.bold)), // Display username in card
+                    const SizedBox(height: 16),
+                    Column(
+                      children: _buildIndicatorRowsForUser(report, username), // Extract indicator row building
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => _approveReportForUser(report, username), // Approve for specific user
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          child: const Text("Approve All", style: TextStyle(color: Colors.white)),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: () => _returnReportForUser(report, username), // Return for specific user
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          child: const Text("Return All", style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+  List<Widget> _buildIndicatorRowsForUser(Report report, String username) {
+    Map<String, List<ReportEntry>>? indicatorMap = report.reportEntries?[username];
+    if (indicatorMap == null) {
+      return [];
+    }
+
+    List<Widget> indicatorRowsForUser = [];
+    indicatorMap.forEach((indicatorKey, entryList) {
+      List<ReportEntry> relevantEntries = entryList.where((entry) => entry.reviewerId == selectedFirebaseId).toList();
+      relevantEntries.sort((a, b) => (a.enteredBy ?? "").compareTo(b.enteredBy ?? ""));
+      indicatorRowsForUser.addAll(relevantEntries.map((entry) => _buildIndicatorRowForReview(report, entry, context, username)).toList());
+    });
+    return indicatorRowsForUser;
+  }
+
+
+  Future<void> _approveReportForUser(Report report, String username) async {
+    Report updatedReport = report;
+
+    updatedReport.reportEntries?.forEach((entryUsername, indicatorMap) {
+      if (entryUsername == username) { // Target specific username
+        indicatorMap.forEach((indicatorKey, entryList) {
+          List<ReportEntry> newEntryList = entryList.map((entry) {
+            if (entry.reviewerId == selectedFirebaseId) {
+              return entry.copyWith(reviewStatus: 'Approved'); // Use copyWith for immutability
+            }
+            return entry;
+          }).toList();
+          updatedReport.reportEntries![entryUsername]![indicatorKey] = newEntryList;
+        });
+      }
+    });
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+
+  Future<void> _returnReportForUser(Report report, String username) async {
+    Report updatedReport = report;
+
+    updatedReport.reportEntries?.forEach((entryUsername, indicatorMap) {
+      if (entryUsername == username) { // Target specific username
+        indicatorMap.forEach((indicatorKey, entryList) {
+          List<ReportEntry> newEntryList = entryList.map((entry) {
+            if (entry.reviewerId == selectedFirebaseId) {
+              return entry.copyWith(reviewStatus: 'Returned'); // Use copyWith for immutability
+            }
+            return entry;
+          }).toList();
+          updatedReport.reportEntries![entryUsername]![indicatorKey] = newEntryList;
+        });
+      }
+    });
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+
+  bool _isReportFullyActionedByCurrentUserForUser(Report report, String username) {
+    if (report.reportEntries == null || report.reportEntries![username] == null) return true;
+
+    bool allActioned = true;
+    report.reportEntries![username]!.forEach((indicatorKey, entryList) {
+      for (ReportEntry entry in entryList) {
+        if (entry.reviewerId == selectedFirebaseId && entry.reviewStatus == 'Pending') {
+          allActioned = false;
+          break;
+        }
+      }
+      if (!allActioned) return; // Optimization: Exit early if not fully actioned
+    });
+    return allActioned;
+  }
+
+  Future<void> _approveReportEntry1(Report report, String username, ReportEntry entry) async {
+    Report updatedReport = report;
+
+    updatedReport.reportEntries?[username]?.forEach((indicatorKey, entryList) {
+      for (int i = 0; i < entryList.length; i++) {
+        if (entryList[i] == entry && entryList[i].reviewerId == selectedFirebaseId) {
+          entryList[i] = entryList[i].copyWith(reviewStatus: 'Approved'); // Use copyWith
+          break;
+        }
+      }
+    });
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+  Future<void> _returnReportEntry1(Report report, String username, ReportEntry entry) async {
+    Report updatedReport = report;
+
+    updatedReport.reportEntries?[username]?.forEach((indicatorKey, entryList) {
+      for (int i = 0; i < entryList.length; i++) {
+        if (entryList[i] == entry && entryList[i].reviewerId == selectedFirebaseId) {
+          entryList[i] = entryList[i].copyWith(reviewStatus: 'Returned'); // Use copyWith
+          break;
+        }
+      }
+    });
+    await _updateReportReviewStatus(updatedReport);
+  }
+
+
+  Widget _buildIndicatorRowForReview(Report report, ReportEntry entry, BuildContext context,String username) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  "${entry.key}:  ",
+                  softWrap: true,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  entry.value,
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+
+          // Conditionally show buttons based on reviewStatus
+          Visibility(
+            visible: entry.reviewStatus != 'Approved' && entry.reviewStatus != 'Returned',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildStatusButton(
+                  context: context,
+                  label: "Approve",
+                  color: Colors.green,
+                  onPressed: () => _approveReportEntry1(report, username,entry),
+                ),
+                const SizedBox(width: 10),
+                _buildStatusButton(
+                  context: context,
+                  label: "Return",
+                  color: Colors.red,
+                  onPressed: () => _returnReportEntry1(report, username,entry),
+                ),
+              ],
+            ),
+          ),
+          // Display metadata
+          _buildMetadata("Entered By", entry.enteredBy),
+          _buildMetadata("Edited By", entry.editedBy),
+          _buildMetadata("Reviewed By", entry.reviewedBy),
+          if (entry.reviewStatus != null)
+            _buildMetadata("Review Status", entry.reviewStatus),
+
+          // Display image attachment
+          if (entry.attachments != null && entry.attachments!.isNotEmpty)
+            _buildAttachmentPreview(entry.attachments!, context),
+
+          const Divider(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusButton({
+    required BuildContext context,
+    required String label,
+    required Color color,
+    required VoidCallback? onPressed,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(backgroundColor: color),
+      child: Text(label, style: const TextStyle(color: Colors.white)),
+    );
+  }
+
+  Widget _buildMetadata(String label, String? value) {
+    if (value == null || value.isEmpty) {
+      return const SizedBox.shrink(); // Hide metadata if value is empty
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentPreview(List<String> attachments, BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Attachments:", style: TextStyle(fontWeight: FontWeight.bold)),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: attachments.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Image.network(attachments[index], width: 100, fit: BoxFit.cover),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+
 
 
 
@@ -2160,7 +2839,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
       await reportDocRef.set(report.toFirestore(), SetOptions(merge: true));
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Report status updated to ${report.reportStatus}!')));
+          SnackBar(content: Text('Report status updated !')));
       setState(() {}); // Refresh UI
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2271,7 +2950,6 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
   }
 
 
-// Widget to build the report data table (Modified to include "App Analysis" row)
   Widget _buildReportDataTable(String reportTypeKey, List<String> indicators) {
     Report? loadedReport = _loadedReports[reportTypeKey];
     if (loadedReport == null || loadedReport.reportEntries == null || loadedReport.reportEntries!.isEmpty) {
@@ -2284,35 +2962,60 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     List<String> usernames = loadedReport.reportEntries!.keys.toList();
     List<TableRow> tableRows = [];
 
-    // Header row (same as before)
+    // Header row
     List<Widget> headerCells = [
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold)),
+        child: Text("Indicator", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       ),
       ...usernames.map((username) => Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Text(username, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Text(username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       )),
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("Total", style: TextStyle(fontWeight: FontWeight.bold)),
+        child: Text("Total", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       ),
     ];
     tableRows.add(TableRow(children: headerCells));
 
-    // Data rows for indicators (same as before)
+    // Data rows for indicators
     for (String indicator in indicators) {
       List<Widget> dataCells = [
-        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator)),
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: TextStyle(fontSize: 12))),
       ];
       int indicatorTotal = 0;
+
       for (String username in usernames) {
-        String value = loadedReport.reportEntries![username]![indicator]?.first.value ?? "0";
-        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(value)));
+        var entry = loadedReport.reportEntries![username]?[indicator]?.first;
+        String value = entry?.value ?? "0";
+        String reviewedBy = entry?.reviewedBy ?? "N/A";
+        String reviewStatus = entry?.reviewStatus ?? "Pending";
+        Color statusColor = reviewStatus.toLowerCase() == "approved"
+            ? Colors.green.shade700
+            : reviewStatus.toLowerCase() == "returned"
+            ? Colors.red
+            : Colors.blueGrey;
+
+        dataCells.add(Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: TextStyle(fontSize: 12)),
+              Text("Reviewed by: $reviewedBy", style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey)),
+              Text("Status: $reviewStatus", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
+            ],
+          ),
+        ));
+
         indicatorTotal += int.tryParse(value) ?? 0;
       }
-      dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(indicatorTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold))));
+
+      dataCells.add(Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(indicatorTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      ));
       tableRows.add(TableRow(children: dataCells));
     }
 
@@ -2320,38 +3023,36 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     List<Widget> analysisCells = [
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("Data Quality Check", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), // Style for emphasis
+        child: Text("Data Quality Check", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
       ),
       ...usernames.map((username) {
-        String analysisText = loadedReport.reportEntries![username]![indicators.first]?.first.appAnalysis ?? "No image Uploaded for Analysis"; // Assuming analysis is stored in first indicator's entry, adjust if needed. Showing message if no image.
+        String analysisText = loadedReport.reportEntries![username]![indicators.first]?.first.appAnalysis ?? "No image Uploaded for Analysis";
         return Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Text(analysisText, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey)), // Style for analysis text
+          child: Text(analysisText, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey)),
         );
       }),
       const Padding(
         padding: EdgeInsets.all(8.0),
-        child: Text("", style: TextStyle(fontWeight: FontWeight.bold)), // Empty total cell for analysis row
+        child: Text("", style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     ];
     tableRows.add(TableRow(children: analysisCells));
 
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: SizedBox(
-        width: double.infinity, // Ensures full width
+        width: double.infinity,
         child: Table(
           border: TableBorder.all(),
           columnWidths: const <int, TableColumnWidth>{
-            0: FlexColumnWidth(1), // Adjusts dynamically
+            0: FlexColumnWidth(1),
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: tableRows,
         ),
       ),
     );
-
   }
 
 
@@ -3539,13 +4240,73 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
               - Count (Number of occurrences where the specified data is missing)
 
               Indicators and Their Counting Criteria:
-              1. 'Number of Records with "INDEX CLIENT'S NAME IN FULL" not filled': Count missing cells in the "INDEX CLIENT'S NAME IN FULL" column. Only count if the cell in the  "NDEX CLIENT'S NAME IN FULL" column is empty but has data in any other cell in the same Row.Also note that the Cells in the "INDEX CLIENT'S NAME IN FULL" Column is sub-divide into two cells 
+              1. 'Number of Records with "INDEX CLIENT'S NAME IN FULL" not filled': Count missing cells in the "INDEX CLIENT'S NAME IN FULL" column. Only count if the cell in the  "INDEX CLIENT'S NAME IN FULL" column is empty but has data in any other cell in the same Row.Also note that the Cells in the "INDEX CLIENT'S NAME IN FULL" Column is sub-divide into two cells 
               2. 'Number of Records with "Client Code/Unique ID" not filled': Count missing cells in the "Client Code/Unique ID" column. Only count if the cell in the  "Client Code/Unique ID" column is empty but has data in any other cell in the same Row.
-              3. 'Number of Records with "Age" not filled': The "Age" Column is divided into two sections:**<1 year** and **>=1 year**.Check bothe columns and if both cells are missing, it means that no age was recorded,and so count it.Only count if the cell in the "Age" column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "Age" not filled': The "Age" Column is divided into two sections:**<1 year** and **>=1 year**.Check both columns and if both cells are missing, it means that no age was recorded,and so count it.Only count if the cell in the "Age" column is empty but has data in any other cell in the same Row.
               4. 'Number of Records with "Sex" not filled': Count missing cells in the "Sex" column under the same row conditions.Only count if the cell in the "Sex" column is empty but has data in any other cell in the same Row.
               5. 'Number of Records with "Marital Status" not filled': Count missing cells in the "Marital Status" column under the same row conditions.Only count if the cell in the "Marital Status" column is empty but has data in any other cell in the same Row.
               6. 'Index Contacts Elicitation section': check the "Index Contact's Name in full" column which has a group of four cells numbered from 0ne to Four.Check if any of the cell numbered as "1" does not have data then count it.
 
+              Return only the table with calculated values.Do not add your summary analysis.
+              
+              C) If it does not  match 'HIV TESTING SERVICES REGISTER' or 'Index Testing Register' ,then Check if the title reads 'ART Register'.
+              If the title matches,scan the image and only make your analysis on rows that have data in any of the cell for that row and extract relevant data and generate a table with the following structure:
+
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with "Hospital No" not filled': Count missing cells in the "Hospital No" column. Only count if the cell in the "Hospital No" column is empty but has data in any other cell in the same Row.
+              2. 'Number of Records with "Unique ID No." not filled': Count missing cells in the "Unique ID No." column. Only count if the cell in the "Unique ID No." column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "ART Start Date (dd/mm/yy)" not filled': Count missing cells in the "ART Start Date (dd/mm/yy)" column. Only count if the cell in the "ART Start Date (dd/mm/yy)" column is empty but has data in any other cell in the same Row.
+              4. 'Number of Records with "Address" not filled': Count missing cells in the "Address" column. Only count if the cell in the "Address" column is empty but has data in any other cell in the same Row.
+              5. 'Number of Records with "Sex" not filled': Count missing cells in the "Sex" column. Only count if the cell in the "Sex" column is empty but has data in any other cell in the same Row.
+              6. 'Number of Records with "D.O.B" not filled': Count missing cells in the "D.O.B" column. Only count if the cell in the "D.O.B" column is empty but has data in any other cell in the same Row.
+              7. 'Number of Records with "Age" not filled': Count missing cells in the "Age" column. Only count if the cell in the "Age" column is empty but has data in any other cell in the same Row.
+              8. 'Number of Records with "WHO Clinical Stage" not filled': Count missing cells in the "WHO Clinical Stage" column. Only count if the cell in the "WHO Clinical Stage" column is empty but has data in any other cell in the same Row.
+              9. 'Number of Records with "Weight (kg)" not filled': Count missing cells in the "Weight (kg)" column. Only count if the cell in the "Weight (kg)" column is empty but has data in any other cell in the same Row.
+              10. 'Number of Records with "Height (m)" not filled': Count missing cells in the "Height (m)" column. Only count if the cell in the "Height (m)" column is empty but has data in any other cell in the same Row.
+              11. 'Number of Records with "BMI/MUAC" not filled': Count missing cells in the "BMI/MUAC" column. Only count if the cell in the  "BMI/MUAC" column is empty but has data in any other cell in the same Row.
+              12. 'Number of Records with "Functional Status" not filled': Count missing cells in the "Functional Status" column. Only count if the cell in the  "Functional Status" column is empty but has data in any other cell in the same Row.
+              13. 'Number of Records with "CD4 Count (c/ml)" not filled': Count missing cells in the "CD4 Count (c/ml)" column. Only count if the cell in the  "CD4 Count (c/ml)" column is empty but has data in any other cell in the same Row.
+              14. 'Number of Records with "Regimen at Start of ART" not filled': Count missing cells in the "Regimen at Start of ART" column. Only count if the cell in the  "Regimen at Start of ART" column is empty but has data in any other cell in the same Row.
+              
+              Return only the table with calculated values.Do not add your summary analysis.
+              
+              D) If it does not  match 'HIV TESTING SERVICES REGISTER' or 'Index Testing Register' OR 'ART Register' ,then Check if the title reads 'LABORATORY VIRAL LOAD REGISTER'.
+              If the title matches,scan the image and only make your analysis on rows that have data in any of the cell for that row and extract relevant data and generate a table with the following structure:
+
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with "Hospital ID" not filled': Count missing cells in the "Hospital ID" column. Only count if the cell in the "Hospital ID" column is empty but has data in any other cell in the same Row.
+              2. 'Number of Records with "LIB ID" not filled': Count missing cells in the "LIB ID" column. Only count if the cell in the "LIB ID" column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "Patient Name" not filled': Count missing cells in the "Patient Name" column. Only count if the cell in the "Patient Name" column is empty but has data in any other cell in the same Row.
+              4. 'Number of Records with "Age (in years)" not filled': Count missing cells in the "Age (in years)" column. Only count if the cell in the "Age (in years)" column is empty but has data in any other cell in the same Row.
+              5. 'Number of Records with "Sex" not filled': Count missing cells in the "Sex" column. Only count if the cell in the "Sex" column is empty but has data in any other cell in the same Row.
+              6. 'Number of Records with "Test Indication *see key below" not filled': Count missing cells in the "Test Indication *see key below" column. Only count if the cell in the "Test Indication *see key below" column is empty but has data in any other cell in the same Row.
+              7. 'Number of Records with "Sample Collection Date (dd-mmm-yyyy)" not filled': Count missing cells in the "Sample Collection Date (dd-mmm-yyyy)" column. Only count if the cell in the "Sample Collection Date (dd-mmm-yyyy)" column is empty but has data in any other cell in the same Row.
+              
+              Return only the table with calculated values.Do not add your summary analysis.
+              
+              E) If it does not  match 'HIV TESTING SERVICES REGISTER' or 'Index Testing Register' OR 'ART Register' or 'LABORATORY VIRAL LOAD REGISTER' ,then Check if the title reads 'PHARMACY DAILY WORKSHEET'.
+              If the title matches,scan the image and only make your analysis on rows that have data in any of the cell for that row and extract relevant data and generate a table with the following structure:
+
+              Table Columns:
+              - Indicator (Describes the missing data type)
+              - Count (Number of occurrences where the specified data is missing)
+
+              Indicators and Their Counting Criteria:
+              1. 'Number of Records with "Pharmacy No" not filled': Count missing cells in the "Pharmacy No" column. Only count if the cell in the "Pharmacy No" column is empty but has data in any other cell in the same Row.
+              2. 'Number of Records with "Unique ID" not filled': Count missing cells in the "Unique ID" column. Only count if the cell in the "Unique ID" column is empty but has data in any other cell in the same Row.
+              3. 'Number of Records with "Patient Name" not filled': Count missing cells in the "Patient Name" column. Only count if the cell in the "Patient Name" column is empty but has data in any other cell in the same Row.
+              4. 'Number of Records with "Sex" not filled': The different Sex range has three columns;"Male","F Non preg","F Preg" .A record in a row with "Unique ID" filled has to be ticked in one of the "Sex" range cells in either the "Male" or "F Non Preg" or "F Preg" Section.Check through each Sex bracket cell and if there is any empty cell for that Row in any section, count it.
+              5. 'Number of Records with "Age" not filled': The different age range columns are seperated from 1-4 down to 50+. Check through each age bracket cell and if there is any empty cell for that Row in any section, count it.
+              6. 'Number of Records with "Regimen Code" not filled': Count missing cells in the "Regimen Code" column. Only count if the cell in the "Regimen Code" column is empty but has data in any other cell in the same Row.
+               
               Return only the table with calculated values.Do not add your summary analysis.
               '''
               },
@@ -4730,7 +5491,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
 
     return ExpansionTile(
       title: Text(designationName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -5038,7 +5799,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       String departmentName, List<Map<String, dynamic>> designationReports) {
     return ExpansionTile(
       title: Text(departmentName,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       children: designationReports.map((designationReport) {
         String designationName = designationReport['designation'] as String;
         List<String> indicators =
@@ -5279,22 +6040,37 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   // AppBar for the page.
   AppBar _appBar() {
     return AppBar(
-      backgroundColor: Colors.white,
-      title: Text(
-        "Task Manager",
-        style: TextStyle(
-            color: Get.isDarkMode ? Colors.white : Colors.grey[600],
-            fontFamily: "NexaBold"),
+      title: Text('Task Manager', style: TextStyle(color: Colors.white, fontSize: 20 * max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600)))),
+      iconTheme: const IconThemeData(color: Colors.white),
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(gradient: LinearGradient(
+          colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),),
       ),
-      elevation: 0.5,
-      iconTheme: IconThemeData(color: Get.isDarkMode ? Colors.white : Colors.black87),
       actions: [
+        _isPDFLoading
+            ? CircularProgressIndicator()
+            : Row(
+            children:[
+              IconButton(
+                icon: const Icon(Icons.save_alt),
+                onPressed: _createTaskSummaryPDF,
+              ),
+              const Icon(Icons.picture_as_pdf),
+
+            ]
+        ),
+
+        const SizedBox(width: 15),
 
         Container(
           margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
           child: Image.asset("assets/image/ccfn_logo.png"),
         )
       ],
+
     );
   }
 
@@ -5343,7 +6119,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                                   fontSize: MediaQuery.of(context).size.width *
                                       (MediaQuery.of(context).size.shortestSide < 600
                                           ? 0.050
-                                          : 0.030),
+                                          : 0.020),
                                   fontFamily: "NexaBold"),
                             ),
                           ],
@@ -5360,7 +6136,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                           fontSize: MediaQuery.of(context).size.width *
                               (MediaQuery.of(context).size.shortestSide < 600
                                   ? 0.050
-                                  : 0.030),
+                                  : 0.020),
                         ),
                       ),
                     ),
