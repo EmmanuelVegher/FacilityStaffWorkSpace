@@ -2600,7 +2600,7 @@ $selectedBioFirstName $selectedBioLastName
                   value: supervisorName,
                   child: Text(
                     supervisorName ?? 'No Supervisor',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                   ),
                 );
               }).toList(),
@@ -2618,7 +2618,7 @@ $selectedBioFirstName $selectedBioLastName
                   print("Caritas Supervisor Email: $_selectedSupervisorEmail");
                 }
               },
-              hint: const Text('Select Supervisor'),
+              hint: const Text('Select Supervisor', style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
             ),
           );
         }
@@ -2650,7 +2650,7 @@ $selectedBioFirstName $selectedBioLastName
                   value: supervisorName,
                   child: Text(
                     supervisorName ?? 'No Supervisor',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                   ),
                 );
               }).toList(),
@@ -2668,7 +2668,7 @@ $selectedBioFirstName $selectedBioLastName
                   print("Facility Supervisor Email: $_selectedFacilitySupervisorEmail");
                 }
               },
-              hint: const Text('Select Supervisor'),
+              hint: const Text('Select Supervisor', style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
             ),
           );
         }
@@ -3546,8 +3546,31 @@ $selectedBioFirstName $selectedBioLastName
                                                                   .circular(20),
                                                               //color: Colors.grey.shade300,
                                                             ),
-                                                            child:
-                                                            Image.network(Uri.decodeFull(staffSignature!)),
+                                                            child:staffSignature != null && staffSignature.toString().isNotEmpty?
+                                                            // Image.network(
+                                                            //   staffSignature.toString(),
+                                                            //  // errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+                                                            // )
+                                                            ClipRRect(
+                                                              borderRadius: BorderRadius.circular(12),
+                                                              child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                staffSignature.toString(),
+                                                                fit: BoxFit.contain,
+                                                                loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                  if (loadingProgress == null) return child;
+                                                                  return Center(
+                                                                    child: CircularProgressIndicator(
+                                                                      value: loadingProgress.expectedTotalBytes != null
+                                                                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                          : null,
+                                                                    ),
+                                                                  );
+                                                                },
+                                                              ),
+                                                            )
+
+
+                                                                :const Text("No signature uploaded"),
 
                                                             // CachedNetworkImage(
                                                             //   imageUrl: staffSignature!,
@@ -3767,8 +3790,23 @@ $selectedBioFirstName $selectedBioLastName
                                                                       .circular(20),
                                                                   //color: Colors.grey.shade300,
                                                                 ),
-                                                                child: Image.network(
-                                                                    staffSignatureLink!),
+                                                                child:  ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(12),
+                                                                  child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                    staffSignature.toString(),
+                                                                    fit: BoxFit.contain,
+                                                                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                      if (loadingProgress == null) return child;
+                                                                      return Center(
+                                                                        child: CircularProgressIndicator(
+                                                                          value: loadingProgress.expectedTotalBytes != null
+                                                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                              : null,
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                )
                                                               ),
 
 
@@ -3815,8 +3853,23 @@ $selectedBioFirstName $selectedBioLastName
                                                                       .circular(20),
                                                                   //color: Colors.grey.shade300,
                                                                 ),
-                                                                child: Image.network(
-                                                                    staffSignatureLink!),
+                                                                child:  ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(12),
+                                                                  child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                    staffSignature.toString(),
+                                                                    fit: BoxFit.contain,
+                                                                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                      if (loadingProgress == null) return child;
+                                                                      return Center(
+                                                                        child: CircularProgressIndicator(
+                                                                          value: loadingProgress.expectedTotalBytes != null
+                                                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                              : null,
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                )
                                                               ),
 
                                                             ],
@@ -3860,8 +3913,23 @@ $selectedBioFirstName $selectedBioLastName
                                                                       .circular(20),
                                                                   //color: Colors.grey.shade300,
                                                                 ),
-                                                                child: Image.network(
-                                                                    staffSignatureLink!),
+                                                                child:  ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(12),
+                                                                  child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                    staffSignature.toString(),
+                                                                    fit: BoxFit.contain,
+                                                                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                      if (loadingProgress == null) return child;
+                                                                      return Center(
+                                                                        child: CircularProgressIndicator(
+                                                                          value: loadingProgress.expectedTotalBytes != null
+                                                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                              : null,
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                )
                                                               ),
 
 
@@ -4351,10 +4419,29 @@ $selectedBioFirstName $selectedBioLastName
                                                               mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
                                                               children: [
                                                                 Flexible(
-                                                                  child: Image.network(
-                                                                    facilitySupervisorSignature!,
-                                                                    fit: BoxFit.contain,
-                                                                  ),
+                                                                  child:
+                                                                  // Image.network(
+                                                                  //   facilitySupervisorSignature!,
+                                                                  //   fit: BoxFit.contain,
+                                                                  // ),
+
+                                                                    ClipRRect(
+                                                                      borderRadius: BorderRadius.circular(12),
+                                                                      child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                        facilitySupervisorSignature.toString(),
+                                                                        fit: BoxFit.contain,
+                                                                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                          if (loadingProgress == null) return child;
+                                                                          return Center(
+                                                                            child: CircularProgressIndicator(
+                                                                              value: loadingProgress.expectedTotalBytes != null
+                                                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                                  : null,
+                                                                            ),
+                                                                          );
+                                                                        },
+                                                                      ),
+                                                                    )
                                                                 ),
                                                                 const SizedBox(height: 8),
                                                                 Row(
@@ -4785,10 +4872,28 @@ $selectedBioFirstName $selectedBioLastName
                                                               mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
                                                               children: [
                                                                 Flexible(
-                                                                  child: Image.network(
-                                                                    caritasSupervisorSignature!,
-                                                                    fit: BoxFit.contain,
-                                                                  ),
+                                                                  child:
+                                                                  // Image.network(
+                                                                  //   caritasSupervisorSignature!,
+                                                                  //   fit: BoxFit.contain,
+                                                                  // ),
+                                                                    ClipRRect(
+                                                                      borderRadius: BorderRadius.circular(12),
+                                                                      child: Image.network( // Use Image.network to display from Firebase Storage
+                                                                        caritasSupervisorSignature.toString(),
+                                                                        fit: BoxFit.contain,
+                                                                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                          if (loadingProgress == null) return child;
+                                                                          return Center(
+                                                                            child: CircularProgressIndicator(
+                                                                              value: loadingProgress.expectedTotalBytes != null
+                                                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                                                  : null,
+                                                                            ),
+                                                                          );
+                                                                        },
+                                                                      ),
+                                                                    )
                                                                 ),
                                                                 const SizedBox(height: 8),
                                                                 Row(

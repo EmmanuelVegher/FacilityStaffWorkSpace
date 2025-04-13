@@ -18,6 +18,7 @@ import 'package:location/location.dart' as locationPkg;
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 import 'package:http/http.dart' as http; // Import http package
 import '../../services/location_services.dart';
+import '../../team_survey/team_survey.dart';
 import '../../widgets/drawer.dart';
 import '../../widgets/geo_utils.dart';
 import '../../widgets/header_widget.dart';
@@ -781,12 +782,29 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
 
   // Helper function to check if a given date is the last Thursday of the month
   bool isLastThursdayOfMonth(DateTime date) {
-    final lastDayOfMonth = DateTime(date.year, date.month + 1, 0);
-    DateTime lastThursday = lastDayOfMonth;
+    int year = date.year;
+    int month = date.month;
+    DateTime lastThursday = DateTime(year, month + 1, 0); // Start from the last day of the month
+
     while (lastThursday.weekday != DateTime.thursday) {
-      lastThursday = lastThursday.subtract(const Duration(days: 1));
+      lastThursday = lastThursday.subtract(Duration(days: 1));
     }
-    return date.day == lastThursday.day && date.month == lastThursday.month && date.year == lastThursday.year;
+
+    // Ensure the last Thursday falls between the 20th and 30th
+    return lastThursday.day >= 20 && lastThursday.day <= 31 && date.day == lastThursday.day;
+  }
+
+  bool _isLastFridayBetween2ndAnd11th(DateTime date) {
+    int year = date.year;
+    int month = date.month;
+    DateTime lastFriday = DateTime(year, month, 11); // Start from the 11th
+
+    while (lastFriday.weekday != DateTime.friday) {
+      lastFriday = lastFriday.subtract(Duration(days: 1));
+    }
+
+    // Ensure the last Friday falls between the 2nd and 11th
+    return lastFriday.day >= 2 && lastFriday.day <= 11 && date.day == lastFriday.day;
   }
 
 
@@ -796,29 +814,31 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
       ResponsiveSizes sizes) {
     return GestureDetector(
       onTap: () async {
-        // Check if it's last thursday of the month and survey is needed
-        // if (isLastThursdayOfMonth(DateTime.now())) {
-        //   final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
-        //   if (!hasSurvey) {
-        //     Fluttertoast.showToast(
-        //       msg: "Kindly Fill the Survey Before Clocking In",
-        //       toastLength: Toast.LENGTH_LONG,
-        //       backgroundColor: Colors.black54,
-        //       gravity: ToastGravity.BOTTOM,
-        //       timeInSecForIosWeb: 1,
-        //       textColor: Colors.white,
-        //       fontSize: 16.0,
-        //     );
-        //     // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
-        //     Navigator.pushReplacement(
-        //       context,
-        //       MaterialPageRoute(
-        //         builder: (context) => const PsychologicalMetricsPage(),
-        //       ),
-        //     );
-        //     return; // Stop clock-in process for now
-        //   }
-        // }
+
+        // Check if today is the last Thursday between the 20th and 30th
+        DateTime now = DateTime.now();
+        if (isLastThursdayOfMonth(DateTime.now())) {
+          final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
+          if (!hasSurvey) {
+            Fluttertoast.showToast(
+              msg: "Kindly Fill the Survey Before Clocking In",
+              toastLength: Toast.LENGTH_LONG,
+              backgroundColor: Colors.black54,
+              gravity: ToastGravity.BOTTOM,
+              timeInSecForIosWeb: 1,
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+            // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PsychologicalMetricsPage(),
+              ),
+            );
+            return;
+          }
+        }
         await controller.clockInUpdated(
             context, controller.lati.value, controller.longi.value, controller.location.value); // Pass context here
       },

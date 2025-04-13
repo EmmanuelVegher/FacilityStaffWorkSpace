@@ -592,52 +592,73 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
   Widget _buildCard(int index, FacilityStaffModel staff) {
     Color cardBackgroundColor = (index % 2 == 0) ? Colors.grey[100]! : Colors.white;
 
-    print("Building Card for: ${staff.name}, userId: ${staff.userId}, index: $index");
-
     return Card(
-      key: ValueKey(staff.userId),
+      key: ValueKey(staff.id),
       elevation: 3,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       color: cardBackgroundColor,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue[200],
-          child: Text(
-            "${index + 1}",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              staff.name ?? 'Unnamed Staff',
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-            ),
-            if (staff.designation != null)
-              Text(
-                staff.designation!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                  fontStyle: FontStyle.italic,
-                ),
+            CircleAvatar(
+              backgroundColor: Colors.blue[200],
+              child: Text(
+                "${index + 1}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-          ],
-        ),
-        trailing: const Column(
-          children: [
-            Icon(Icons.drag_indicator, color: Colors.grey),
-            Text(
-              'Press & Hold & Drag to Rearrange',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    staff.name ?? 'Unnamed Staff',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  if (staff.designation != null)
+                    Text(
+                      staff.designation!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                children: [
+                  const Icon(Icons.drag_indicator, color: Colors.grey),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Press & Hold & Drag up or down to Rearrange',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
 
 
   Widget _buildSection({

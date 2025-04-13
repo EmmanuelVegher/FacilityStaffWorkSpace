@@ -15,6 +15,7 @@ import '../screens/profile_page.dart';
 import '../screens/staff_dashboard.dart';
 import '../screens/timesheet/timesheet.dart';
 import '../screens/timesheet/upload_signature.dart';
+import '../team_survey/team_survey.dart';
 import 'app_button.dart';
 
 
@@ -205,33 +206,33 @@ Widget drawer(
           //   },
           // ),
 
-          // const Divider(
-          //   color: Colors.grey,
-          //   height: 1,
-          // ),
-          //
-          // ListTile(
-          //   leading: Icon(
-          //     Icons.local_post_office,
-          //     size: drawerIconSize,
-          //     color: Colors.blue,
-          //   ),
-          //   title: Text(
-          //     'Team Survey',
-          //     style: TextStyle(
-          //         fontSize: drawerFontSize,
-          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
-          //   ),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //           builder: (context) => const PsychologicalMetricsPage(
-          //
-          //           )),
-          //     );
-          //   },
-          // ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.local_post_office,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Team Survey',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PsychologicalMetricsPage(
+
+                    )),
+              );
+            },
+          ),
           //
           // const Divider(
           //   color: Colors.grey,
