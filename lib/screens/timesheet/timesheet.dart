@@ -3417,13 +3417,13 @@ $selectedBioFirstName $selectedBioLastName
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            // SizedBox(width: MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .width * (MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .shortestSide < 600 ? 0.02 : 0.02),),
 
                                             Expanded( // Wrap Container with Expanded
                                               child:Container(
@@ -3433,7 +3433,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.25 : 0.25),
+                                                  .shortestSide < 600 ? 0.40 : 0.25),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //color: Colors.white,
@@ -3478,7 +3478,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.15 : 0.35),
+                                                  .shortestSide < 600 ? 0.30 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //  color: Colors.grey.shade200,
@@ -3547,13 +3547,13 @@ $selectedBioFirstName $selectedBioLastName
                                                               //color: Colors.grey.shade300,
                                                             ),
                                                             child:
-                                                            //Image.network(Uri.decodeFull(staffSignature!)),
+                                                            Image.network(Uri.decodeFull(staffSignature!)),
 
-                                                            CachedNetworkImage(
-                                                              imageUrl: staffSignature!,
-                                                              placeholder: (context, url) => const CircularProgressIndicator(),
-                                                              errorWidget: (context, url, error) => const Icon(Icons.error),
-                                                            ),
+                                                            // CachedNetworkImage(
+                                                            //   imageUrl: staffSignature!,
+                                                            //   placeholder: (context, url) => const CircularProgressIndicator(),
+                                                            //   errorWidget: (context, url, error) => const Icon(Icons.error),
+                                                            // ),
 
                                                           );
                                                         }
@@ -4100,7 +4100,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .width * (MediaQuery
                                                 .of(context)
                                                 .size
-                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                                .shortestSide < 600 ? 0.001 : 0.009)),
                                             // Date of Signature of Staff
 
                                             Container(
@@ -4115,7 +4115,7 @@ $selectedBioFirstName $selectedBioLastName
                                               child: Column(
                                                 children: [
                                                   const Text('Date', style: TextStyle(
-                                                      fontWeight: FontWeight.bold, fontSize: 20 ),),
+                                                      fontWeight: FontWeight.bold, fontSize: 18 ),),
                                                   SizedBox(height: 5 * marginFactor),
 
                                                   StreamBuilder<DocumentSnapshot>(
@@ -4149,7 +4149,8 @@ $selectedBioFirstName $selectedBioLastName
                                                             children: [
                                                               //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                               Text(staffSignatureDate
-                                                                  .toString()),
+                                                                  .toString(), style: TextStyle(
+                                                                  fontWeight: FontWeight.bold, fontSize: 14 ),),
                                                             ],
                                                           );
                                                         } else {
@@ -4157,13 +4158,13 @@ $selectedBioFirstName $selectedBioLastName
                                                               formattedDate,
                                                               style: const TextStyle(
                                                                   fontWeight: FontWeight
-                                                                      .bold));
+                                                                      .bold, fontSize: 14));
                                                         }
                                                       } else {
                                                         return Text(formattedDate,
                                                             style: const TextStyle(
                                                                 fontWeight: FontWeight
-                                                                    .bold));
+                                                                    .bold, fontSize: 14 ));
                                                       }
                                                     },
                                                   ),
@@ -4171,13 +4172,13 @@ $selectedBioFirstName $selectedBioLastName
                                                 ],
                                               ),
                                             ),
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            // SizedBox(width: MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .width * (MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .shortestSide < 600 ? 0.02 : 0.02),),
 
 
                                           ],
@@ -4194,13 +4195,13 @@ $selectedBioFirstName $selectedBioLastName
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            // SizedBox(width: MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .width * (MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .shortestSide < 600 ? 0.02 : 0.02),),
                                             //Name of Project Cordinator
                                             Expanded( // Wrap Container with Expanded
                                               child:
@@ -4224,7 +4225,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 children: [
                                                   // Email of Project Cordinator
                                                   Text(
-                                                    'Name of Project Cordinator / ART Nurse',
+                                                    'Name of Project Cordinator',
                                                     style: TextStyle(
                                                       fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
                                                   ),
@@ -4285,7 +4286,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .width * (MediaQuery
                                                 .of(context)
                                                 .size
-                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                                .shortestSide < 600 ? 0.001 : 0.009)),
                                             //Signature of Project Cordinator
                                             Container(
                                               width: MediaQuery
@@ -4294,16 +4295,16 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.2 : 0.35),
+                                                  .shortestSide < 600 ? 0.30 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //color: Colors.grey.shade200,
                                               child: Column(
                                                 children: [
                                                   Text('Signature', style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                    fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
                                                   ),
-                                                  SizedBox(height: 5 * marginFactor),
+                                                  SizedBox(height: 3 * marginFactor),
                                                   StreamBuilder<DocumentSnapshot>(
                                                     // Stream the supervisor signature
                                                     stream: FirebaseFirestore.instance
@@ -4363,7 +4364,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                     const SizedBox(width: 8),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                   ],
                                                                 ),
@@ -4376,16 +4377,16 @@ $selectedBioFirstName $selectedBioLastName
                                                             null && facilitySupervisorSignatureStatus == "Rejected"){
                                                           return Column(
                                                             children: [
-                                                              const Text("Awaiting Facility Supervisor Signature"),
+                                                              const Text("Awaiting Facility Supervisor Signature",style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
                                                               const SizedBox(height: 8),
                                                               if (facilitySupervisorSignatureStatus == "Rejected")
                                                                 Row(
                                                                   children: [
                                                                     const Icon(Icons.cancel, color: Colors.red),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                     const SizedBox(width: 15),
                                                                     GestureDetector(
@@ -4411,7 +4412,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       child: const Icon(
                                                                         Icons.info_outline,
                                                                         color: Colors.blue,
-                                                                        size: 20,
+                                                                        size: 14,
                                                                       ),
                                                                     ),
                                                                   ],
@@ -4420,10 +4421,10 @@ $selectedBioFirstName $selectedBioLastName
                                                                 Row(
                                                                   children: [
                                                                     const Icon(Icons.check_circle, color: Colors.green),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                   ],
                                                                 ),
@@ -4439,10 +4440,10 @@ $selectedBioFirstName $selectedBioLastName
                                                                 Row(
                                                                   children: [
                                                                     const Icon(Icons.access_time, color: Colors.orange),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                   ],
                                                                 )
@@ -4450,10 +4451,10 @@ $selectedBioFirstName $selectedBioLastName
                                                                 Row(
                                                                   children: [
                                                                     const Icon(Icons.cancel, color: Colors.red),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                     const SizedBox(width: 15),
                                                                     GestureDetector(
@@ -4479,7 +4480,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       child: const Icon(
                                                                         Icons.info_outline,
                                                                         color: Colors.blue,
-                                                                        size: 20,
+                                                                        size: 14,
                                                                       ),
                                                                     ),
                                                                   ],
@@ -4488,10 +4489,10 @@ $selectedBioFirstName $selectedBioLastName
                                                                 Row(
                                                                   children: [
                                                                     const Icon(Icons.check_circle, color: Colors.green),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$facilitySupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                   ],
                                                                 ),
@@ -4501,14 +4502,14 @@ $selectedBioFirstName $selectedBioLastName
                                                         }
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature");
+                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature",style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ), // Adjust path and size accordingly
                                                 ],
                                               ),
                                             ),
-                                            SizedBox(height: 5 * marginFactor),
+                                            SizedBox(height: 3 * marginFactor),
                                             //Date of Project Signature Date
 
                                             Container(
@@ -4518,12 +4519,12 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                                  .shortestSide < 600 ? 0.20 : 0.30),
                                               padding: const EdgeInsets.all(8.0),
                                               child: Column(
                                                 children: [
                                                   const Text('Date', style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 20 ,),),
+                                                    fontWeight: FontWeight.bold, fontSize: 18 ,),),
                                                   SizedBox(height: 5 * marginFactor),
                                                   StreamBuilder<DocumentSnapshot>(
                                                     // Stream the supervisor signature
@@ -4557,16 +4558,19 @@ $selectedBioFirstName $selectedBioLastName
                                                               //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                               Text(
                                                                   facilitySupervisorDate
-                                                                      .toString()),
+                                                                      .toString(),style: TextStyle(
+                                                            fontWeight: FontWeight.bold, fontSize: 14 ,),),
                                                             ],
                                                           );
                                                         } else {
                                                           return const Text(
-                                                              "Awaiting Facility Supervisor Date");
+                                                              "Awaiting Facility Supervisor Date",style: TextStyle(
+                                                            fontWeight: FontWeight.bold, fontSize: 12 ,),);
                                                         }
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature Date");
+                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature Date",style: TextStyle(
+                                                          fontWeight: FontWeight.bold, fontSize: 12 ,),);
                                                       }
                                                     },
                                                   ),
@@ -4588,13 +4592,13 @@ $selectedBioFirstName $selectedBioLastName
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.02 : 0.02),),
+                                            // SizedBox(width: MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .width * (MediaQuery
+                                            //     .of(context)
+                                            //     .size
+                                            //     .shortestSide < 600 ? 0.02 : 0.02),),
                                             // Name of CARITAS Supervisor
                                             Expanded(
                                                 child:Container(
@@ -4606,7 +4610,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           .of(context)
                                                           .size
                                                           .shortestSide < 600
-                                                          ? 0.30
+                                                          ? 0.40
                                                           : 0.25),
                                                   alignment: Alignment.center,
                                                   padding: const EdgeInsets.all(8.0),
@@ -4618,10 +4622,10 @@ $selectedBioFirstName $selectedBioLastName
                                                       Text(
                                                         'Name of CARITAS Supervisor',
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                          fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
                                                       ),
 
-                                                      SizedBox(height: 5 * marginFactor),
+                                                      SizedBox(height: 3 * marginFactor),
                                                       StreamBuilder<DocumentSnapshot>(
                                                         // Stream the supervisor signature
                                                         stream: FirebaseFirestore.instance
@@ -4654,7 +4658,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             } else {
                                                               return Text(
                                                                 "$caritasSupervisor",style: TextStyle(
-                                                                fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),);
+                                                                fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor,),);
                                                             }
                                                           } else {
                                                             return buildSupervisorDropdown();
@@ -4675,7 +4679,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .width * (MediaQuery
                                                 .of(context)
                                                 .size
-                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                                .shortestSide < 600 ? 0.001 : 0.009)),
                                             //Signature of CARITAS Supervisor
 
                                             Container(
@@ -4685,14 +4689,14 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.2 : 0.35),
+                                                  .shortestSide < 600 ? 0.30 : 0.35),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.all(8.0),
                                               //color: Colors.grey.shade200,
                                               child: Column(
                                                 children: [
                                                   Text('Signature', style: TextStyle(
-                                                    fontWeight: FontWeight.bold, fontSize: 20 * fontSizeFactor,),
+                                                    fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
                                                   ),
                                                   SizedBox(height: 5 * marginFactor),
                                                   StreamBuilder<DocumentSnapshot>(
@@ -4791,10 +4795,10 @@ $selectedBioFirstName $selectedBioLastName
                                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                                   children: [
                                                                     const Icon(Icons.check_circle, color: Colors.green),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Text(
                                                                       "$caritasSupervisorSignatureStatus",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                     ),
                                                                   ],
                                                                 ),
@@ -4813,6 +4817,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                 // style: TextStyle(fontWeight: FontWeight.bold),
                                                                 softWrap: true,
                                                                 overflow: TextOverflow.visible,
+                                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                               ),
                                                               const SizedBox(height: 8),
                                                               facilitySupervisorSignatureStatus == "Pending"
@@ -4829,7 +4834,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       padding: const EdgeInsets.only(top: 0.0),
                                                                       child: Text(
                                                                         "$facilitySupervisorSignatureStatus (Awaiting Approval from Facility Supervisor)",
-                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         softWrap: true,
                                                                         overflow: TextOverflow.visible,
                                                                       ),
@@ -4845,13 +4850,13 @@ $selectedBioFirstName $selectedBioLastName
                                                                       padding: EdgeInsets.only(top: 0.0),
                                                                       child: Icon(Icons.cancel, color: Colors.red),
                                                                     ),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Expanded(
                                                                       child: Padding(
                                                                         padding: const EdgeInsets.only(bottom: 0.0),
                                                                         child: Text(
                                                                           "$facilitySupervisorSignatureStatus (Approval Rejected by Facility Supervisor)",
-                                                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                          style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                           softWrap: true,
                                                                           overflow: TextOverflow.visible,
                                                                         ),
@@ -4864,7 +4869,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                           context: context,
                                                                           builder: (context) {
                                                                             return AlertDialog(
-                                                                              title: const Text("Reason for Rejection"),
+                                                                              title: const Text("Reason for Rejection",),
                                                                               content: Text(
                                                                                 facilitySupervisorSignatureStatus ?? "No reason provided.",
                                                                                 softWrap: true,
@@ -4885,7 +4890,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       child: const Icon(
                                                                         Icons.info_outline,
                                                                         color: Colors.blue,
-                                                                        size: 20,
+                                                                        size: 14,
                                                                       ),
                                                                     ),]
                                                               )
@@ -4902,7 +4907,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       padding: const EdgeInsets.only(bottom: 0.0),
                                                                       child: Text(
                                                                         "$facilitySupervisorSignatureStatus",
-                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         softWrap: true,
                                                                         overflow: TextOverflow.visible,
                                                                       ),
@@ -4919,6 +4924,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               const Text(
                                                                 "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
                                                                 // style: TextStyle(fontWeight: FontWeight.w100),
+                                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                 softWrap: true,
                                                                 overflow: TextOverflow.visible,
                                                               ),
@@ -4931,13 +4937,13 @@ $selectedBioFirstName $selectedBioLastName
                                                                     padding: EdgeInsets.only(top: 0.0),
                                                                     child: Icon(Icons.cancel, color: Colors.red),
                                                                   ),
-                                                                  SizedBox(width: 8),
+                                                                  SizedBox(width: 4),
                                                                   Expanded(
                                                                     child: Padding(
                                                                       padding: EdgeInsets.only(bottom: 0.0),
                                                                       child: Text(
                                                                         "(Approval Rejected by Facility Supervisor)",
-                                                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                                                        style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         softWrap: true,
                                                                         overflow: TextOverflow.visible,
                                                                       ),
@@ -4954,15 +4960,16 @@ $selectedBioFirstName $selectedBioLastName
                                                                     padding: EdgeInsets.only(top: 0.0),
                                                                     child: Icon(Icons.check_circle, color: Colors.green),
                                                                   ),
-                                                                  const SizedBox(width: 8),
+                                                                  const SizedBox(width: 4),
                                                                   Expanded(
                                                                     child: Padding(
                                                                       padding: const EdgeInsets.only(bottom: 0.0),
                                                                       child: Text(
                                                                         "$facilitySupervisorSignatureStatus",
-                                                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                        style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         softWrap: true,
                                                                         overflow: TextOverflow.visible,
+
                                                                       ),
                                                                     ),
                                                                   ),
@@ -4977,7 +4984,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           return Column(
                                                             children: [
                                                               const Text(
-                                                                  "Awaiting Caritas Supervisor Signature"),
+                                                                  "Awaiting Caritas Supervisor Signature", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
                                                               const SizedBox(height: 8),
                                                               caritasSupervisorSignatureStatus ==
                                                                   "Pending"
@@ -4995,7 +5002,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                           color: Colors
                                                                               .orange),
                                                                     ),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Padding(
                                                                       padding: const EdgeInsets
                                                                           .only(
@@ -5004,7 +5011,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                         "$caritasSupervisorSignatureStatus",
                                                                         style: const TextStyle(
                                                                             fontWeight: FontWeight
-                                                                                .bold),
+                                                                                .bold,fontSize: 12),
                                                                       ),
                                                                     ),
                                                                   ]
@@ -5022,7 +5029,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                           color: Colors
                                                                               .red),
                                                                     ),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Padding(
                                                                       padding: const EdgeInsets
                                                                           .only(
@@ -5031,7 +5038,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                         "$caritasSupervisorSignatureStatus",
                                                                         style: const TextStyle(
                                                                             fontWeight: FontWeight
-                                                                                .bold),
+                                                                                .bold,fontSize: 12),
                                                                       ),
                                                                     ),
                                                                     const SizedBox(width:8),
@@ -5058,7 +5065,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                       child: const Icon(
                                                                         Icons.info_outline,
                                                                         color: Colors.blue,
-                                                                        size: 20,
+                                                                        size: 14,
                                                                       ),
                                                                     ),
                                                                   ]
@@ -5075,7 +5082,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                           color: Colors
                                                                               .green),
                                                                     ),
-                                                                    const SizedBox(width: 8),
+                                                                    const SizedBox(width: 4),
                                                                     Padding(
                                                                       padding: const EdgeInsets
                                                                           .only(
@@ -5084,7 +5091,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                         "$caritasSupervisorSignatureStatus",
                                                                         style: const TextStyle(
                                                                             fontWeight: FontWeight
-                                                                                .bold),
+                                                                                .bold,fontSize: 12),
                                                                       ),
                                                                     ),
                                                                   ]
@@ -5098,7 +5105,7 @@ $selectedBioFirstName $selectedBioLastName
 
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Caritas Supervisor's Signature");
+                                                            "Timesheet Yet to be submitted for Caritas Supervisor's Signature", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ), // Adjust path and size accordingly
@@ -5112,7 +5119,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 .width * (MediaQuery
                                                 .of(context)
                                                 .size
-                                                .shortestSide < 600 ? 0.01 : 0.009)),
+                                                .shortestSide < 600 ? 0.001 : 0.009)),
 
                                             //Date of CARITAS Supervisor
                                             Container(
@@ -5122,12 +5129,12 @@ $selectedBioFirstName $selectedBioLastName
                                                   .width * (MediaQuery
                                                   .of(context)
                                                   .size
-                                                  .shortestSide < 600 ? 0.30 : 0.30),
+                                                  .shortestSide < 600 ? 0.20 : 0.30),
                                               padding: const EdgeInsets.all(8.0),
                                               child: Column(
                                                 children: [
                                                   const Text('Date', style: TextStyle(
-                                                      fontWeight: FontWeight.bold, fontSize: 20),),
+                                                      fontWeight: FontWeight.bold, fontSize: 18),),
                                                   SizedBox(height: 5 * marginFactor),
                                                   StreamBuilder<DocumentSnapshot>(
                                                     // Stream the supervisor signature
@@ -5161,16 +5168,17 @@ $selectedBioFirstName $selectedBioLastName
                                                               //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                               Text(
                                                                   caritasSupervisorDate
-                                                                      .toString()),
+                                                                      .toString(), style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 14),),
+
                                                             ],
                                                           );
                                                         } else {
                                                           return const Text(
-                                                              "Awaiting Caritas Supervisor Date");
+                                                              "Awaiting Caritas Supervisor Date", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                         }
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Caritas Signature Date");
+                                                            "Timesheet Yet to be submitted for Caritas Signature Date", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ),
