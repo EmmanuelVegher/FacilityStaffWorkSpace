@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:attendanceappmailtool/widgets/drawer2.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
@@ -241,7 +242,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer(context,), // You might need to adjust drawer for web if IsarService is removed
+      drawer: drawer2(context,), // You might need to adjust drawer for web if IsarService is removed
       appBar: AppBar(
         title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white

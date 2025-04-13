@@ -1875,6 +1875,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             end: Alignment.bottomRight,
           ),),
         ),
+        actions: [
+
+          Container(
+            margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
+            child: Image.asset("assets/image/ccfn_logo.png"),
+          )
+        ],
 
       ),
       drawer: drawer(context),

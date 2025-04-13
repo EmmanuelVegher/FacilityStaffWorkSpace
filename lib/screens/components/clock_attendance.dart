@@ -319,6 +319,13 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
           ),
+          actions: [
+
+            Container(
+              margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
+              child: Image.asset("assets/image/ccfn_logo.png"),
+            )
+          ],
 
         ),
         body: SafeArea(
