@@ -6,6 +6,8 @@ class StaffModel {
   String? firstName;
   String? lastName;
   String? staffCategory;
+  String? maritalStatus;
+  String? gender;
   String? designation;
   String? state;
   String? emailAddress;
@@ -27,6 +29,8 @@ class StaffModel {
   StaffModel({
     this.id,
     this.firstName,
+    this.maritalStatus,
+    this.gender,
     this.lastName,
     this.staffCategory,
     this.designation,
@@ -55,6 +59,8 @@ class StaffModel {
       firstName: data?['firstName'],
       lastName: data?['lastName'],
       staffCategory: data?['staffCategory'],
+      maritalStatus: data?['maritalStatus'],
+      gender: data?['gender'],
       designation: data?['designation'],
       state: data?['state'],
       emailAddress: data?['emailAddress'],
@@ -80,6 +86,8 @@ class StaffModel {
       'firstName': firstName,
       'lastName': lastName,
       'staffCategory': staffCategory,
+      'maritalStatus':maritalStatus,
+      'gender':gender,
       'designation': designation,
       'state': state,
       'emailAddress': emailAddress,

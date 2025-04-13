@@ -9,7 +9,9 @@ import 'package:image_picker/image_picker.dart';
 import '../models/staff_model.dart';
 import '../widgets/editable_department.dart';
 import '../widgets/editable_designation.dart';
+import '../widgets/editable_gender.dart';
 import '../widgets/editable_location.dart';
+import '../widgets/editable_maritalstatus.dart';
 import '../widgets/editable_project.dart';
 import '../widgets/editable_staffcategory.dart';
 import '../widgets/editable_state.dart';
@@ -40,8 +42,30 @@ class _ProfilePageState extends State<ProfilePage> {
   var updatedDepartment;
   var newState;
   var newCategory;
+  var newMaritalStatus;
+  var newGender;
   bool isSynced = true;
   bool newSynced = true;
+  String _currentUsername = "";
+  String? selectedProjectName;
+  String? selectedBioFirstName;
+  String? selectedBioLastName;
+  String? selectedBioDepartment;
+  String? selectedBioState;
+  String? selectedBioDesignation;
+  String? selectedBioLocation;
+  String? selectedBioStaffCategory;
+  String? selectedBioEmail;
+  String? selectedBioPhone;
+  String? selectedFirebaseId;
+  String? facilitySupervisor;
+  String? caritasSupervisor;
+  DateTime? selectedDate;
+  String? staffSignatureLink;
+
+  String? selectedSupervisor; // State variable to store the selected supervisor
+  String? selectedFacilitySupervisor; // State variable to store the selected supervisor
+  String? _selectedSupervisorEmail;
   // Define wine color and gradients
   static const Color wineColor = Color(0xFF722F37); // Deep wine color
   static const LinearGradient appBarGradient = LinearGradient(
@@ -62,6 +86,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _getUserId().then((_) {
+      _loadBioData();
       _getUserDetail();
       _checkSignature();
       _checkProfilePic();
@@ -407,6 +432,33 @@ class _ProfilePageState extends State<ProfilePage> {
                                   padding: EdgeInsets.all(cardPadding),
                                   child: Column(
                                     children: <Widget>[
+                                      EditableGenderTile(
+                                        icon: Icons.person,
+                                        title: "Gender",
+                                        initialValue: _staffData?.gender ?? '',
+                                        onSave: (newValue) {
+                                          _updateFirestoreField('gender', newValue);
+                                          setState(() {
+                                            newGender = newValue;
+                                            isSynced = false;
+                                          });
+                                        },
+                                        fetchGender: () => _fetchGenderFromFirestore(),
+                                      ),
+                                      EditableMaritalStatusTile(
+                                        icon: Icons.person,
+                                        title: "Marital Status",
+                                        initialValue: _staffData?.maritalStatus ?? '',
+                                        onSave: (newValue) {
+                                          _updateFirestoreField('maritalStatus', newValue);
+                                          setState(() {
+                                            newMaritalStatus = newValue;
+                                            isSynced = false;
+                                          });
+                                        },
+                                        fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
+                                      ),
+
                                       EditableStaffCategoryTile(
                                         icon: Icons.category,
                                         title: "Staff Category",
@@ -554,8 +606,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         fontSizeTitle: fontSizeDetailTitle,
                                         fontSizeSubtitle: fontSizeDetailSubtitle,
                                         onSave: (newValue) async {
-                                          List<String?> supervisorsemail = await _getSupervisorEmailFromFirestore(_staffData?.department ?? '', newValue);
-
+                                          List<String?> supervisorsemail = await _getSupervisorEmailFromFirestore(_staffData?.department ?? '', newValue,_staffData?.state ?? '');
                                           _updateFirestoreField('supervisor', newValue);
                                           _updateFirestoreField('supervisorEmail', supervisorsemail.isNotEmpty ? supervisorsemail[0] : null);
 
@@ -576,99 +627,99 @@ class _ProfilePageState extends State<ProfilePage> {
                                         title: Text("Supervisor's Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                                        child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                            children: [
-                                              Row(children: [
-                                                const Icon(Icons.draw),
-                                                Text("Is Signature saved?", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                                Text(_signatureLink != null ? "Yes" : "No", style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                              ]),
-                                              Row(children: [
-                                                ElevatedButton(
-                                                  onPressed: () {
-                                                    showModalBottomSheet(
-                                                      context: context,
-                                                      builder: (context) => Container(
-                                                        height: MediaQuery.of(context).size.width *
-                                                            (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.60),
-                                                        padding: const EdgeInsets.all(16),
-                                                        child: Column(children: [
-                                                          SizedBox(
-                                                            height: MediaQuery.of(context).size.width *
-                                                                (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.50),
-                                                            child: GestureDetector(
-                                                              onTap: () {
-                                                                _pickSignatureImage();
-                                                              },
-                                                              child: Container(
-                                                                margin: const EdgeInsets.only(
-                                                                  top: 20,
-                                                                  bottom: 24,
-                                                                ),
-                                                                height: MediaQuery.of(context).size.width *
-                                                                    (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                                                width: MediaQuery.of(context).size.width *
-                                                                    (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                                                alignment: Alignment.center,
-                                                                decoration: BoxDecoration(
-                                                                  borderRadius: BorderRadius.circular(20),
-                                                                ),
-                                                                child: _signatureImage != null
-                                                                    ? ClipRRect(
-                                                                    borderRadius: BorderRadius.circular(20),
-                                                                    child: Image.file(
-                                                                      _signatureImage!,
-                                                                      width: MediaQuery.of(context).size.width *
-                                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                                                      height: MediaQuery.of(context).size.width *
-                                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                                                      fit: BoxFit.cover,
-                                                                    )
-                                                                )
-                                                                    : Column(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(
-                                                                      Icons.upload_file,
-                                                                      size: MediaQuery.of(context).size.width *
-                                                                          (MediaQuery.of(context).size.shortestSide < 600 ? 0.075 : 0.05),
-                                                                      color: Colors.grey.shade600,
-                                                                    ),
-                                                                    const SizedBox(height: 8),
-                                                                    const Text(
-                                                                      "Click to Upload Signature Image Here",
-                                                                      style: TextStyle(
-                                                                        fontSize: 14,
-                                                                        color: Colors.grey,
-                                                                        fontWeight: FontWeight.bold,
-                                                                      ),
-                                                                      textAlign: TextAlign.center,
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          ElevatedButton(
-                                                              onPressed: () {
-                                                                _uploadSignatureAndSync().then((_){
-                                                                  Navigator.pop(context);
-                                                                });
-
-                                                              },
-                                                              child: const Text("Save Signature")),
-                                                        ]),
-                                                      ),
-                                                    );
-                                                  },
-                                                  child: _signatureLink == null ? const Text("Add") : const Text("Update"),
-                                                ),
-                                              ]),
-                                            ]),
-                                      ),
+                                      // Padding(
+                                      //   padding: const EdgeInsets.symmetric(vertical: 10.0),
+                                      //   child: Row(
+                                      //       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      //       children: [
+                                      //         Row(children: [
+                                      //           const Icon(Icons.draw),
+                                      //           Text("Is Signature saved?", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                      //           Text(_signatureLink != null ? "Yes" : "No", style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      //         ]),
+                                      //         Row(children: [
+                                      //           ElevatedButton(
+                                      //             onPressed: () {
+                                      //               showModalBottomSheet(
+                                      //                 context: context,
+                                      //                 builder: (context) => Container(
+                                      //                   height: MediaQuery.of(context).size.width *
+                                      //                       (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.60),
+                                      //                   padding: const EdgeInsets.all(16),
+                                      //                   child: Column(children: [
+                                      //                     SizedBox(
+                                      //                       height: MediaQuery.of(context).size.width *
+                                      //                           (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.50),
+                                      //                       child: GestureDetector(
+                                      //                         onTap: () {
+                                      //                           _pickSignatureImage();
+                                      //                         },
+                                      //                         child: Container(
+                                      //                           margin: const EdgeInsets.only(
+                                      //                             top: 20,
+                                      //                             bottom: 24,
+                                      //                           ),
+                                      //                           height: MediaQuery.of(context).size.width *
+                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
+                                      //                           width: MediaQuery.of(context).size.width *
+                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
+                                      //                           alignment: Alignment.center,
+                                      //                           decoration: BoxDecoration(
+                                      //                             borderRadius: BorderRadius.circular(20),
+                                      //                           ),
+                                      //                           child: _signatureImage != null
+                                      //                               ? ClipRRect(
+                                      //                               borderRadius: BorderRadius.circular(20),
+                                      //                               child: Image.file(
+                                      //                                 _signatureImage!,
+                                      //                                 width: MediaQuery.of(context).size.width *
+                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
+                                      //                                 height: MediaQuery.of(context).size.width *
+                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
+                                      //                                 fit: BoxFit.cover,
+                                      //                               )
+                                      //                           )
+                                      //                               : Column(
+                                      //                             mainAxisAlignment: MainAxisAlignment.center,
+                                      //                             children: [
+                                      //                               Icon(
+                                      //                                 Icons.upload_file,
+                                      //                                 size: MediaQuery.of(context).size.width *
+                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.075 : 0.05),
+                                      //                                 color: Colors.grey.shade600,
+                                      //                               ),
+                                      //                               const SizedBox(height: 8),
+                                      //                               const Text(
+                                      //                                 "Click to Upload Signature Image Here",
+                                      //                                 style: TextStyle(
+                                      //                                   fontSize: 14,
+                                      //                                   color: Colors.grey,
+                                      //                                   fontWeight: FontWeight.bold,
+                                      //                                 ),
+                                      //                                 textAlign: TextAlign.center,
+                                      //                               ),
+                                      //                             ],
+                                      //                           ),
+                                      //                         ),
+                                      //                       ),
+                                      //                     ),
+                                      //                     ElevatedButton(
+                                      //                         onPressed: () {
+                                      //                           _uploadSignatureAndSync().then((_){
+                                      //                             Navigator.pop(context);
+                                      //                           });
+                                      //
+                                      //                         },
+                                      //                         child: const Text("Save Signature")),
+                                      //                   ]),
+                                      //                 ),
+                                      //               );
+                                      //             },
+                                      //             child: _signatureLink == null ? const Text("Add") : const Text("Update"),
+                                      //           ),
+                                      //         ]),
+                                      //       ]),
+                                      // ),
                                     ],
                                   ),
                                 ),
@@ -734,6 +785,66 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _loadBioData() async {
+    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
+
+    if (userId == null) {
+      print("User is not authenticated.");
+      return;
+    }
+
+    try {
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(userId)
+          .get();
+
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        Map<String, dynamic> data = docSnapshot.data()!;
+        setState(() {
+          selectedBioFirstName = data['firstName'] ?? '';
+          selectedBioLastName = data['lastName'] ?? '';
+          selectedBioDepartment = data['department'] ?? '';
+          selectedBioState = data['state'] ?? '';
+          selectedBioDesignation = data['designation'] ?? '';
+          selectedBioLocation = data['location'] ?? '';
+          selectedBioStaffCategory = data['staffCategory'] ?? '';
+          selectedBioEmail = data['emailAddress'] ?? '';
+          selectedBioPhone = data['mobile'] ?? '';
+          staffSignatureLink = data['signatureLink'] ?? '';
+          selectedFirebaseId = userId; // Store the Firebase UUID
+
+        });
+
+
+      } else {
+        print("No bio data found for user ID: $userId");
+
+        Fluttertoast.showToast(
+          msg: "No bio data found for user. Please ensure your profile is complete.",
+          toastLength: Toast.LENGTH_SHORT,
+          backgroundColor: Colors.black54,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+    } catch (e) {
+      print("Error loading bio data: $e");
+
+      Fluttertoast.showToast(
+        msg: "Error loading bio data. Please check your internet connection.",
+        toastLength: Toast.LENGTH_SHORT,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
+  }
+
   Future<void> _updateFirestoreField(String field, String? newValue) async {
     if (firebaseAuthId != null) {
       await FirebaseFirestore.instance
@@ -755,6 +866,8 @@ class _ProfilePageState extends State<ProfilePage> {
           case 'supervisor': _staffData!.supervisor = newValue; break;
           case 'supervisorEmail': _staffData!.supervisorEmail = newValue; break;
           case 'signatureLink': _staffData!.signatureLink = newValue; break;
+          case 'gender': _staffData!.gender = newValue; break;
+          case 'maritalStatus': _staffData!.maritalStatus = newValue; break;
           case 'photoUrl': _staffData!.photoUrl = newValue; break;
         }
       }
@@ -817,16 +930,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<List<DropdownMenuItem<String>>> _fetchLocationsFromFirestore(String state, String category) async {
     CollectionReference locationsRef;
-    if (category == "Facility Staff") {
-      locationsRef = FirebaseFirestore.instance.collection('FacilityLocations');
-    } else if (category == "State Office Staff") {
-      locationsRef = FirebaseFirestore.instance.collection('StateOfficeLocations');
-    } else {
-      locationsRef = FirebaseFirestore.instance.collection('HQOfficeLocations');
-    }
 
-    QuerySnapshot snapshot = await locationsRef.where('state', isEqualTo: state).get();
-    List<String> locations = snapshot.docs.map((doc) => doc['locationName'] as String).toList();
+    locationsRef = FirebaseFirestore.instance.collection('Location').doc(state).collection(state);
+
+    QuerySnapshot snapshot = await locationsRef.get();
+    List<String> locations = snapshot.docs.map((doc) => doc['LocationName'] as String).toList();
 
     return locations.map((location) => DropdownMenuItem<String>(
       value: location,
@@ -845,11 +953,31 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Text(department),
     )).toList();
   }
+  Future<List<DropdownMenuItem<String>>> _fetchMaritalStatusFromFirestore() async {
+    CollectionReference staffCategoryRef = FirebaseFirestore.instance.collection('MaritalStatus');
+    QuerySnapshot snapshot = await staffCategoryRef.get();
+    List<String> staffCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
+
+    return staffCategories.map((category) => DropdownMenuItem<String>(
+      value: category,
+      child: Text(category),
+    )).toList();
+  }
+  Future<List<DropdownMenuItem<String>>> _fetchGenderFromFirestore() async {
+    CollectionReference staffCategoryRef = FirebaseFirestore.instance.collection('Gender');
+    QuerySnapshot snapshot = await staffCategoryRef.get();
+    List<String> staffCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
+
+    return staffCategories.map((category) => DropdownMenuItem<String>(
+      value: category,
+      child: Text(category),
+    )).toList();
+  }
 
   Future<List<DropdownMenuItem<String>>> _fetchStaffCategoryFromFirestore() async {
-    CollectionReference staffCategoryRef = FirebaseFirestore.instance.collection('StaffCategories');
+    CollectionReference staffCategoryRef = FirebaseFirestore.instance.collection('StaffCategory');
     QuerySnapshot snapshot = await staffCategoryRef.get();
-    List<String> staffCategories = snapshot.docs.map((doc) => doc['categoryName'] as String).toList();
+    List<String> staffCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
 
     return staffCategories.map((category) => DropdownMenuItem<String>(
       value: category,
@@ -859,9 +987,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   Future<List<DropdownMenuItem<String>>> _fetchDepartmentsForFacilityFromFirestore() async {
-    CollectionReference departmentsRef = FirebaseFirestore.instance.collection('Departments');
+    CollectionReference departmentsRef = FirebaseFirestore.instance.collection('Designation');
     QuerySnapshot snapshot = await departmentsRef.get();
-    List<String> allDepartments = snapshot.docs.map((doc) => doc['departmentName'] as String).toList();
+    List<String> allDepartments = snapshot.docs.map((doc) => doc.id).toList();
     List<String> departmentFilterList = ['Care and Treatment','Laboratory','Pharmacy and Logistics','Preventions','Strategic Information'];
 
     List<String> filteredDepartments = allDepartments.where((department) {
@@ -878,14 +1006,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<List<DropdownMenuItem<String>>> _fetchDesignationsFromFirestore(String department, String category) async {
     CollectionReference designationsRef;
+    QuerySnapshot snapshot;
+    designationsRef = FirebaseFirestore.instance.collection('Designation').doc(department).collection(department);
     if(category == "Facility Staff"){
-      designationsRef = FirebaseFirestore.instance.collection('FacilityDesignations');
+      snapshot = await designationsRef.where('category', isEqualTo: "Facility Staff").get();
     }else{
-      designationsRef = FirebaseFirestore.instance.collection('OfficeDesignations');
+      snapshot = await designationsRef.where('category', isEqualTo: "Office Staff").get();
     }
 
-    QuerySnapshot snapshot = await designationsRef.where('department', isEqualTo: department).get();
-    List<String> designations = snapshot.docs.map((doc) => doc['designationName'] as String).toList();
+
+    List<String> designations = snapshot.docs.map((doc) => doc.id).toList();
 
     return designations.map((designation) => DropdownMenuItem<String>(
       value: designation,
@@ -894,10 +1024,11 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
 
+
   Future<List<DropdownMenuItem<String>>> _fetchStatesFromFirestore(String category) async {
-    CollectionReference statesRef = FirebaseFirestore.instance.collection('States');
+    CollectionReference statesRef = FirebaseFirestore.instance.collection('Location');
     QuerySnapshot snapshot = await statesRef.get();
-    List<String> allStates = snapshot.docs.map((doc) => doc['stateName'] as String).toList();
+    List<String> allStates = snapshot.docs.map((doc) => doc['name'] as String).toList();
 
     List<String> states;
     if (category == 'HQ Staff') {
@@ -913,9 +1044,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchProjectsFromFirestore() async {
-    CollectionReference projectsRef = FirebaseFirestore.instance.collection('Projects');
+    CollectionReference projectsRef = FirebaseFirestore.instance.collection('Project');
     QuerySnapshot snapshot = await projectsRef.get();
-    List<String> projects = snapshot.docs.map((doc) => doc['projectName'] as String).toList();
+    List<String> projects = snapshot.docs.map((doc) => doc['name'] as String).toList();
 
     return projects.map((project) => DropdownMenuItem<String>(
       value: project,
@@ -925,9 +1056,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   Future<List<DropdownMenuItem<String>>> _fetchSupervisorsFromFirestore(String department, String state) async {
-    CollectionReference supervisorsRef = FirebaseFirestore.instance.collection('Supervisors');
-    QuerySnapshot snapshot = await supervisorsRef.where('department', isEqualTo: department).where('state',isEqualTo:state).get();
-    List<String> supervisors = snapshot.docs.map((doc) => doc['supervisorName'] as String).toList();
+    CollectionReference supervisorsRef = FirebaseFirestore.instance.collection('Supervisors').doc(state).collection(state);
+    QuerySnapshot snapshot = await supervisorsRef.where('department', isEqualTo: department).get();
+    List<String> supervisors = snapshot.docs.map((doc) => doc['supervisor'] as String).toList();
 
     return supervisors.map((supervisor) => DropdownMenuItem<String>(
       value: supervisor,
@@ -935,10 +1066,15 @@ class _ProfilePageState extends State<ProfilePage> {
     )).toList();
   }
 
-  Future<List<String?>> _getSupervisorEmailFromFirestore(String department, String supervisorName) async {
-    CollectionReference supervisorsRef = FirebaseFirestore.instance.collection('Supervisors');
-    QuerySnapshot snapshot = await supervisorsRef.where('department', isEqualTo: department).where('supervisorName',isEqualTo:supervisorName).get();
-    List<String?> supervisorEmails = snapshot.docs.map((doc) => doc['supervisorEmail'] as String?).toList();
+
+
+  Future<List<String?>> _getSupervisorEmailFromFirestore(String department, String supervisorName,String state) async {
+    print("Supervisor Email State===$state");
+    print("Supervisor Email supervisorName===$supervisorName");
+    print("Supervisor Email department===$department");
+    CollectionReference supervisorsRef = FirebaseFirestore.instance.collection('Supervisors').doc(state).collection(state);
+    QuerySnapshot snapshot = await supervisorsRef.where('department', isEqualTo: department).where('supervisor',isEqualTo:supervisorName).get();
+    List<String?> supervisorEmails = snapshot.docs.map((doc) => doc['email'] as String?).toList();
 
     return supervisorEmails;
   }
@@ -955,7 +1091,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return ListTile(
       leading: Icon(icon),
-      title: Text(title, style: const TextStyle(fontSize: 20)),
+      title: Text(title, style: const TextStyle(fontSize: 16)),
       subtitle: initialValue != null
           ? Text(initialValue, style: const TextStyle(fontSize: 14))
           : null,

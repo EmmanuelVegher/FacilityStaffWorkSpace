@@ -783,37 +783,66 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
 
   Future<void> _submitResponses() async {
     try {
-      if (listEquals(_staffList, _reorderableItems)) {
-        Fluttertoast.showToast(
-          msg:
-          'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 8,
-        );
-        throw Exception('Best team player question not answered'); // Prevent Firestore save
-      } else {
-        for (var entry in _sections.entries) {
-          final sectionTitle = entry.key;
-          final questions = entry.value;
+      String bestTeamPlayerQuestion = 'For the current week, who is the best team player in your facility';
+      bool isBestTeamPlayerQuestionAnswered = _responses.containsKey(bestTeamPlayerQuestion) && _responses[bestTeamPlayerQuestion] != null;
+      bool isReordered = false;
 
-          for (var questionData in questions) {
-            final question = questionData['question'] ?? '';
-            if (question ==
-                'For the current week, who is the best team player in your facility') {
-              continue;
-            }
-            if (!_responses.containsKey(question) ||
-                _responses[question] == null) {
-              Fluttertoast.showToast(
-                msg:
-                'Please answer all questions in the "${_capitalize(sectionTitle.replaceAll('_', ' '))}" section before submitting.',
-                toastLength: Toast.LENGTH_LONG,
-                gravity: ToastGravity.CENTER,
-                timeInSecForIosWeb: 8,
-              );
-              throw Exception('Incomplete survey answers'); // Prevent Firestore save
-            }
+      // Check if staff list length is greater than 2 before performing reorder check
+      if (_staffList.length > 2) {
+        if (listEquals(_staffList, _reorderableItems)) {
+          Fluttertoast.showToast(
+            msg: 'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
+            toastLength: Toast.LENGTH_LONG, // This parameter can stay or be ignored; duration overrides it.
+            gravity: ToastGravity.CENTER,
+            timeInSecForIosWeb: 8, // Set the duration for the toast.
+          );
+          return;
+        }
+      }
+
+      // if (isBestTeamPlayerQuestionAnswered && _staffList.length >= 2) {
+      //   isReordered = !listEquals(_staffList, _reorderableItems);
+      //   if (!isReordered) {
+      //     Fluttertoast.showToast(
+      //       msg:
+      //       'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
+      //       toastLength: Toast.LENGTH_LONG,
+      //       gravity: ToastGravity.CENTER,
+      //       timeInSecForIosWeb: 8,
+      //     );
+      //     throw Exception('Best team player question not answered'); // Prevent Firestore save
+      //   }
+      // } else if (_staffList.length >= 2 && !isBestTeamPlayerQuestionAnswered) {
+      //   Fluttertoast.showToast(
+      //     msg:
+      //     'Hey!!, You forgot to answer the question "For the current week, who is the best team player in your facility". We value your opinion and would love you to re-arrange who you feel has been the best team player from top to bottom. Kindly read the instructions for the question before answering.',
+      //     toastLength: Toast.LENGTH_LONG,
+      //     gravity: ToastGravity.CENTER,
+      //     timeInSecForIosWeb: 8,
+      //   );
+      //   throw Exception('Best team player question not answered');
+      // }
+
+
+      for (var entry in _sections.entries) {
+        final sectionTitle = entry.key;
+        final questions = entry.value;
+
+        for (var questionData in questions) {
+          final question = questionData['question'] ?? '';
+          if (question == bestTeamPlayerQuestion) {
+            continue;
+          }
+          if (!_responses.containsKey(question) ||
+              _responses[question] == null) {
+            Fluttertoast.showToast(
+              msg:
+              'Please answer all questions in the "${_capitalize(sectionTitle.replaceAll('_', ' '))}" section before submitting.',
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.CENTER,
+              timeInSecForIosWeb: 8,
+            );
+            throw Exception('Incomplete survey answers'); // Prevent Firestore save
           }
         }
       }
