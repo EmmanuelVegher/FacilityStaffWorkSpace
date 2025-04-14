@@ -83,6 +83,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   List<Map<String, dynamic>> pendingTimesheetsFacilitySupervisor = [];
   List<Map<String, dynamic>> pendingTimesheetsCaritasSupervisor = [];
   bool isLoading = true;
+  bool isApproveLoading = false;
   final TextEditingController _rejectReasonController = TextEditingController();
   int _tabIndex = 0; // To manage tab index
   final FirestoreService _firestoreService = FirestoreService(); // Instantiate FirestoreService
@@ -276,7 +277,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Reject Leave Request", style: TextStyle(color: wineColor, fontWeight: FontWeight.bold)),
+          title: const Text("Return Leave Request", style: TextStyle(color: wineColor, fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -438,7 +439,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                 SizedBox(width: paddingValue / 2),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.close, color: Colors.white),
-                  label: const Text("Reject", style: TextStyle(color: Colors.white)),
+                  label: const Text("Return", style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
@@ -473,6 +474,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     final staffCategory = doc['staffCategory'] ?? 'N/A';
     final staffEmail = doc['staffEmail'] ?? 'N/A';
     final staffPhone = doc['staffPhone'] ?? 'N/A';
+    //final staffMonth = doc.id ?? 'N/A';
 
 
     return Container(
@@ -528,7 +530,9 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (selectedBioStaffCategory == "State Office Staff" || selectedBioStaffCategory == "HQ Staff")
+                if (selectedBioStaffCategory == "State Office Staff" ||
+                    selectedBioStaffCategory == "HQ Staff" ||
+                    selectedBioStaffCategory == "Facility Staff")
                   ElevatedButton.icon(
                     label: const Text("Pending", style: TextStyle(color: Colors.white)),
                     icon: const Icon(Icons.access_time, color: Colors.orange),
@@ -540,7 +544,13 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                     onPressed: () {},
                   ),
                 SizedBox(width: paddingValue / 2),
-                ElevatedButton.icon(
+                isLoading
+                    ? const SizedBox(
+                  height: 40,
+                  width: 40,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+                    : ElevatedButton.icon(
                   label: const Text("Approve Timesheet", style: TextStyle(color: Colors.white)),
                   icon: const Icon(Icons.forward, color: Colors.white),
                   style: ElevatedButton.styleFrom(
@@ -548,19 +558,9 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
                     backgroundColor: wineColor,
                   ),
-                  onPressed: () {
-                    log("doc['staffId'] ==${doc['staffId']}");
-                    log("doc['staffId'] ==$doc");
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TimesheetDetailsScreen2(
-                          timesheetData: doc,
-                          staffId: doc['staffId'],
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () =>  isApproveLoading
+                      ? CircularProgressIndicator()
+                      :_onApprovePressed(doc),
                 ),
               ],
             ),
@@ -569,6 +569,28 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       ),
     );
   }
+
+  void _onApprovePressed(Map<String, dynamic> doc) async {
+    setState(() {
+      isApproveLoading = true;
+    });
+
+    // Simulate delay if needed, otherwise go straight to navigation
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TimesheetDetailsScreen2(
+          timesheetData: doc,
+          staffId: doc['staffId'],
+        ),
+      ),
+    );
+
+    setState(() {
+      isApproveLoading = false;
+    });
+  }
+
 
   Widget _buildDetailRow(String label, String? value, double labelFontSize, double valueFontSize, {Color? textColor}) {
     return RichText(
@@ -880,6 +902,13 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
               });
             },
           ),
+          actions: [
+
+            Container(
+              margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
+              child: Image.asset("assets/image/ccfn_logo.png"),
+            )
+          ],
         ),
         body: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {

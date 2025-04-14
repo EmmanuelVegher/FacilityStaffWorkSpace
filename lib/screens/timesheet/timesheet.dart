@@ -2879,8 +2879,6 @@ $selectedBioFirstName $selectedBioLastName
 
       ),
       drawer:
-      // role == "User"
-      //     ?
       drawer(this.context),
 
       body: _pageLoading // Conditional rendering based on loading state
@@ -4811,45 +4809,7 @@ $selectedBioFirstName $selectedBioLastName
                                                         final caritasSupervisorRejectionReason = data['caritasSupervisorRejectionReason'];
                                                         final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus'];
 
-                                                        // if (caritasSupervisorSignature !=
-                                                        //     null) {
-                                                        //   // caritasSupervisorSignature is a URL/path to the image
-                                                        //   return Container(
-                                                        //     margin: const EdgeInsets
-                                                        //         .only(
-                                                        //       top: 20,
-                                                        //       bottom: 24,
-                                                        //     ),
-                                                        //     height: MediaQuery
-                                                        //         .of(context)
-                                                        //         .size
-                                                        //         .width *
-                                                        //         (MediaQuery
-                                                        //             .of(context)
-                                                        //             .size
-                                                        //             .shortestSide < 600
-                                                        //             ? 0.30
-                                                        //             : 0.15),
-                                                        //     width: MediaQuery
-                                                        //         .of(context)
-                                                        //         .size
-                                                        //         .width *
-                                                        //         (MediaQuery
-                                                        //             .of(context)
-                                                        //             .size
-                                                        //             .shortestSide < 600
-                                                        //             ? 0.30
-                                                        //             : 0.30),
-                                                        //     alignment: Alignment.center,
-                                                        //     decoration: BoxDecoration(
-                                                        //       borderRadius: BorderRadius
-                                                        //           .circular(20),
-                                                        //       //color: Colors.grey.shade300,
-                                                        //     ),
-                                                        //     child: Image.network(
-                                                        //         caritasSupervisorSignature!),
-                                                        //   );
-                                                        // }
+
 
                                                         if (caritasSupervisorSignature != null && caritasSupervisorSignatureStatus == "Approved") {
                                                           return Container(
@@ -5576,6 +5536,8 @@ $selectedBioFirstName $selectedBioLastName
         'staffCategory': selectedBioStaffCategory,
         'staffEmail': selectedBioEmail,
         'staffPhone': selectedBioPhone,
+        'month':'${selectedMonth}_${selectedYear}'
+
 
       };
 

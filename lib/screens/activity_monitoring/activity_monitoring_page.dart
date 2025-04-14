@@ -756,6 +756,7 @@ class FirestoreService {
   }
 }
 
+
 class DailyActivityMonitoringPage extends StatefulWidget {
   const DailyActivityMonitoringPage({super.key});
 
