@@ -1136,45 +1136,67 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
             ),
             DataColumn(
               label: Text(
-                'What Was Entered',
+                'What Staff Entered',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
               ),
             ),
             DataColumn(
               label: Text(
-                'Total Value',
+                'Total Value Entered',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                '% of What Staff Entered',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
               ),
             ),
           ],
-          rows: indicators.entries.map((entry) {
-            final indicatorName = entry.key;
-            final entered = entry.value[_currentUsername]?.toString() ?? '0';
-            final total = entry.value['Total']?.toString() ?? '0';
+            rows: indicators.entries.map((entry) {
+              final indicatorName = entry.key;
 
-            return DataRow(
-              cells: [
-                DataCell(
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 200),
-                    child: Text(indicatorName, style: TextStyle(fontSize: 10), softWrap: true),
+              // Safely parse entered and total values to double
+              final enteredStr = entry.value[_currentUsername]?.toString() ?? '0';
+              final totalStr = entry.value['Total']?.toString() ?? '0';
+
+              final entered = double.tryParse(enteredStr) ?? 0.0;
+              final total = double.tryParse(totalStr) ?? 0.0;
+
+              // Calculate percentage, avoid division by zero
+              final percentage = total > 0 ? (entered / total) * 100 : 0.0;
+              final formattedPercentage = "${percentage.toStringAsFixed(1)}%";
+
+              return DataRow(
+                cells: [
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 200),
+                      child: Text(indicatorName, style: TextStyle(fontSize: 10), softWrap: true),
+                    ),
                   ),
-                ),
-                DataCell(
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 100),
-                    child: Text(entered, style: TextStyle(fontSize: 10), softWrap: true),
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 100),
+                      child: Text(enteredStr, style: TextStyle(fontSize: 10), softWrap: true),
+                    ),
                   ),
-                ),
-                DataCell(
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 100),
-                    child: Text(total, style: TextStyle(fontSize: 10), softWrap: true),
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 100),
+                      child: Text(totalStr, style: TextStyle(fontSize: 10), softWrap: true),
+                    ),
                   ),
-                ),
-              ],
-            );
-          }).toList(),
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 100),
+                      child: Text(formattedPercentage, style: TextStyle(fontSize: 10), softWrap: true),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+
         ),
       ));
     });
@@ -2263,6 +2285,7 @@ $selectedBioFirstName $selectedBioLastName
   }
 
   Future<void> _loadBioData() async {
+    print("widget.timesheetData['date'] ==${widget.timesheetData}");
     final bioData = await _fetchBioDataFromFirestore(widget.staffId);
     if (bioData != null) {
       setState(() {
