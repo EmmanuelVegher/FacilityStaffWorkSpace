@@ -537,6 +537,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
             'facilitySupervisorSignature': selectedSignatureLink2,
             'facilitySupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
             'facilitySupervisorSignatureStatus':"Approved",
+            'facilitySupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
           };
         }
 
@@ -545,6 +546,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
             'caritasSupervisorSignature': selectedSignatureLink2,
             'caritasSupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
             'caritasSupervisorSignatureStatus':"Approved",
+            'caritasSupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
           };
         }
 

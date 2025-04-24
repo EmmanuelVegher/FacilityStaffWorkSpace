@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
+import '../screens/call_tracker/report_page.dart';
 import '../screens/delete_account/delete_account.dart';
 import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
@@ -311,32 +312,32 @@ Widget drawer(
             },
           ),
 
-          // const Divider(
-          //   color: Colors.grey,
-          //   height: 1,
-          // ),
-          //
-          // ListTile(
-          //   leading: Icon(
-          //     Icons.task,
-          //     size: drawerIconSize,
-          //     color: Colors.blue,
-          //   ),
-          //   title: Text(
-          //     'Delete Page',
-          //     style: TextStyle(
-          //         fontSize: drawerFontSize,
-          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
-          //   ),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //           builder: (context) => DeleteAccountPage()),
-          //
-          //     );
-          //   },
-          // ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.phone,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Call Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => ReportsPageWeb()),
+
+              );
+            },
+          ),
 
           const Divider(
             color: Colors.grey,

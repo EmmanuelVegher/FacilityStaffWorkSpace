@@ -5420,28 +5420,22 @@ $selectedBioFirstName $selectedBioLastName
   }
 
   Future<void> _saveTimesheetToFirestore() async {
-
     print("Step One");
 
     if (staffSignatureLink == null) {
-      // Handle case where signature is not present (e.g., show a message)
       Fluttertoast.showToast(
-          msg: "Cannot send timesheet without staff signature",
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0);
-
-
-
-
+        msg: "Cannot send timesheet without staff signature",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
     }
-    if (selectedSupervisor == null ||
-        _selectedFacilitySupervisorFullName == null) {
-      // Handle case where signature is not present (e.g., show a message)
 
+    if (selectedSupervisor == null || _selectedFacilitySupervisorFullName == null) {
       Fluttertoast.showToast(
         msg: "Cannot send timesheet without Selecting Project Coordinator Name or CARITAS Supervisor.",
         toastLength: Toast.LENGTH_LONG,
@@ -5454,18 +5448,14 @@ $selectedBioFirstName $selectedBioLastName
       log("Cannot send timesheet without staff signature.");
       return;
     }
+
     log("selectedSupervisor ===$selectedSupervisor");
     log("_selectedFacilitySupervisorFullName ==$_selectedFacilitySupervisorFullName");
 
-    String monthYear = DateFormat('MMMM_yyyy').format(
-        DateTime(selectedYear, selectedMonth + 1));
+    String monthYear = DateFormat('MMMM_yyyy').format(DateTime(selectedYear, selectedMonth + 1));
 
     try {
       log("Start Pushing timesheet");
-      // // Construct the timesheet data to be saved
-      // List<BioModel> getAttendanceForBio =
-      // await IsarService().getBioInfoWithUserBio();
-
 
       QuerySnapshot snap = await FirebaseFirestore.instance
           .collection("Staff")
@@ -5475,36 +5465,29 @@ $selectedBioFirstName $selectedBioLastName
       List<Map<String, dynamic>> timesheetEntries = [];
 
       for (var date in daysInRange) {
-        Map<String,
-            dynamic>? entryForDate; // Store the entry for the current date
+        Map<String, dynamic>? entryForDate;
 
         for (var attendance in attendanceData) {
           try {
-            DateTime attendanceDate = DateFormat('dd-MMMM-yyyy').parse(
-                attendance.date!);
+            DateTime attendanceDate = DateFormat('dd-MMMM-yyyy').parse(attendance.date!);
             if (attendanceDate.year == date.year &&
                 attendanceDate.month == date.month &&
                 attendanceDate.day == date.day) {
               entryForDate = {
-                // Create or update the entry for this date
                 'date': DateFormat('yyyy-MM-dd').format(date),
                 'noOfHours': attendance.noOfHours,
-                // Use noOfHours directly from attendance
                 'projectName': selectedProjectName,
                 'offDay': attendance.offDay,
-                // Use offDay directly
                 'durationWorked': attendance.durationWorked,
-                // Use durationWorked directly
               };
-              break; // Exit inner loop once an entry is found for the date
+              break;
             }
           } catch (e) {
             log("Error parsing date: $e");
           }
         }
 
-        if (entryForDate !=
-            null) { // Add the entry if it exists for this date
+        if (entryForDate != null) {
           timesheetEntries.add(entryForDate);
         }
       }
@@ -5513,8 +5496,6 @@ $selectedBioFirstName $selectedBioLastName
         'projectName': selectedProjectName,
         'staffName': '$selectedBioFirstName $selectedBioLastName',
         'staffSignature': staffSignatureLink,
-        // 'staffSignatureDate': DateFormat('MMMM dd, yyyy').format(
-        //     createCustomDate(selectedMonth + 1, selectedYear)),
         'staffSignatureDate': DateFormat('MMMM dd, yyyy').format(DateTime.now()),
         'facilitySupervisorSignatureDate': null,
         'caritasSupervisorSignatureDate': null,
@@ -5522,8 +5503,9 @@ $selectedBioFirstName $selectedBioLastName
         'state': selectedBioState,
         'facilitySupervisorSignatureStatus': 'Pending',
         'caritasSupervisorSignatureStatus': 'Pending',
+        'facilitySupervisorTimesheetSubmissionTimestamp':null,
+        'caritasSupervisorTimesheetSubmissionTimestamp':null,
         'timesheetEntries': timesheetEntries,
-        //<<< The list of date/hour entries
         'facilitySupervisor': _selectedFacilitySupervisorFullName,
         'facilitySupervisorEmail': _selectedFacilitySupervisorEmail,
         'facilitySupervisorSignature': facilitySupervisorSignature,
@@ -5536,11 +5518,9 @@ $selectedBioFirstName $selectedBioLastName
         'staffCategory': selectedBioStaffCategory,
         'staffEmail': selectedBioEmail,
         'staffPhone': selectedBioPhone,
-        'month':'${selectedMonth}_${selectedYear}'
-
-
+        'month': '${selectedMonth}_${selectedYear}',
+        'timesheetSubmissionTimestamp': DateTime.now().toIso8601String(),
       };
-
 
       await FirebaseFirestore.instance
           .collection("Staff")
@@ -5548,7 +5528,6 @@ $selectedBioFirstName $selectedBioLastName
           .collection("TimeSheets")
           .doc(monthYear)
           .set(timesheetData, SetOptions(merge: true));
-
 
       print('Timesheet saved to Firestore');
       Fluttertoast.showToast(
@@ -5562,9 +5541,9 @@ $selectedBioFirstName $selectedBioLastName
       );
     } catch (e) {
       print('Error saving timesheet: $e');
-      // Handle error (e.g., show a dialog)
     }
   }
+
 
   // Function to load and append coordinator signature
 

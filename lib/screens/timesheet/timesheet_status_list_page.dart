@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -37,7 +38,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
   @override
   void initState() {
     super.initState();
-  //  _loadCurrentUserStateAndFetchTimesheets();
+    //  _loadCurrentUserStateAndFetchTimesheets();
     _initializeTimesheets();
   }
 
@@ -107,6 +108,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
         QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
             .collection('Staff')
             .where('state', isEqualTo: _currentUserState)
+            .where('staffCategory', isEqualTo: "Facility Staff")
             .get();
 
         for (var staffDoc in staffSnapshot.docs) {
@@ -190,91 +192,94 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
       _isPDFLoading = true;
     });
 
-    final pdfDoc = pw.Document(pageMode: PdfPageMode.outlines);
-    final pageFormat = PdfPageFormat.a4.landscape;
-
     try {
-      final ByteData logoBytes =
-      await rootBundle.load('assets/image/ccfn_logo.png');
+      // Create a combined PDF document
+      final pdfDoc = pw.Document(pageMode: PdfPageMode.outlines);
+
+      // Load logo once for all timesheets
+      final ByteData logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
       final Uint8List logoImageData = logoBytes.buffer.asUint8List();
       final pw.MemoryImage logoImage = pw.MemoryImage(logoImageData);
 
-
       for (String timesheetPath in selectedTimesheetPaths) {
+        // Get the timesheet data from Firestore
         DocumentReference timesheetRef = FirebaseFirestore.instance.doc(timesheetPath);
         DocumentSnapshot timesheetSnapshot = await timesheetRef.get();
+
         if (timesheetSnapshot.exists) {
           Map<String, dynamic> timesheetData = timesheetSnapshot.data() as Map<String, dynamic>;
 
-          DateTime? timesheetDate1;
+          // Parse the timesheet date
+          DateTime? timesheetDate;
           try {
             final dateString = timesheetData['date'];
             if (dateString != null && dateString is String) {
-              timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
+              timesheetDate = DateFormat('MMMM dd, yyyy').parse(dateString);
             } else {
-              timesheetDate1 = DateTime.now();
+              timesheetDate = DateTime.now();
               print("Warning: Timesheet date is null or not a string, using current date as default.");
             }
           } catch (e) {
             print("Error parsing date: $e, using current date as default.");
-            timesheetDate1 = DateTime.now();
+            timesheetDate = DateTime.now();
           }
-          timesheetDate1 ??= DateTime.now();
-          final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
+          timesheetDate ??= DateTime.now();
+
+          final monthYear = DateFormat('MMMM_yyyy').format(timesheetDate);
           final staffName = timesheetData['staffName'] ?? 'N/A';
 
-          final supervisorNames = await _getSupervisorNamesForTimesheet(timesheetData); // Assuming you need supervisor names per timesheet
-          final signatureColumns = await _buildSignatureColumnsForTimesheet(supervisorNames); // Assuming signature columns per timesheet
+          // Get supervisor names and signature data
+          final supervisorNames = await _getSupervisorNamesForTimesheet(timesheetData);
+          final signatureColumns = await _buildSignatureColumnsForTimesheet(supervisorNames);
 
+          // Add the timesheet page to the PDF
           pdfDoc.addPage(
             pw.Page(
-              pageFormat: pageFormat,
+              pageFormat: PdfPageFormat.a4.landscape,
               build: (pw.Context context) {
                 return pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
+                    // Header with logo and title
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStaffInfoForPDF(context, timesheetData), // Staff info for each timesheet
+                        _buildStaffInfoForPDF(context, timesheetData),
                         pw.Column(
                             children: [
-                              pw.Text("CARITAS NIGERIA", style: pw.TextStyle(
-                                  fontWeight: pw.FontWeight.bold, fontSize: 20),),
-                              pw.SizedBox(height: 10,),
-                              pw.Text("Monthly Time Report ($monthYear1)")
+                              pw.Text("CARITAS NIGERIA",
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
+                              pw.SizedBox(height: 10),
+                              pw.Text("Monthly Time Report ($monthYear)")
                             ]
                         ),
                         pw.Container(
-                          child: pw.Image(
-                            logoImage,
-                            width: 50,
-                            height: 50,
-                          ),
+                          child: pw.Image(logoImage, width: 50, height: 50),
                         ),
                       ],
                     ),
                     pw.SizedBox(height: 10),
-                    _buildTimesheetTableForPDF(context, timesheetData), // Timesheet table for each timesheet
+                    // Timesheet table
+                    _buildTimesheetTableForPDF(context, timesheetData),
                     pw.SizedBox(height: 10),
-                    _buildSignatureSectionForPDF(context, signatureColumns), // Signature section for each timesheet
+                    // Signature section
+                    _buildSignatureSectionForPDF(context, signatureColumns),
                   ],
                 );
               },
             ),
           );
 
-          // Conditionally add Task Summary Page
+          // Conditionally add task summary page
           if (_includeTaskSummary) {
             final taskSummaryContent = await _prepareTaskSummaryContentForTimesheet(timesheetData);
             if (taskSummaryContent.isNotEmpty) {
               pdfDoc.addPage(
                 pw.MultiPage(
-                  // pageFormat: pageFormat, // You can set page format if needed, or let MultiPage handle it
                   header: (pw.Context context) {
                     return pw.Header(
                       level: 0,
-                      child: pw.Text('Task Summary Report - $monthYear1 - ${timesheetData['staffName'] ?? 'N/A'}', // Include staff name in task summary header
+                      child: pw.Text('Task Summary Report - $monthYear - $staffName',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     );
                   },
@@ -294,23 +299,26 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
                       pw.SizedBox(height: 20),
                       pw.Center(
                         child: pw.Text(
-                          "Task Summary for ${monthYear1} - ${timesheetData['staffName'] ?? 'N/A'}", // Include staff name in task summary title
+                          "Task Summary for $monthYear - $staffName",
                           style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                         ),
                       ),
                       pw.SizedBox(height: 20),
-                      pw.Column(children: taskSummaryContent), // Use the prepared task summary content
+                      pw.Column(children: taskSummaryContent),
                     ];
                   },
                 ),
-              );}
+              );
+            }
           }
         }
       }
 
-      Uint8List pdfBytes = await pdfDoc.save();
+      // Save and download the PDF
+      final Uint8List pdfBytes = await pdfDoc.save();
 
       if (kIsWeb) {
+        // Web download logic
         final blob = html.Blob([pdfBytes], 'application/pdf');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.AnchorElement(href: url)
@@ -318,10 +326,11 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
           ..click();
         html.Url.revokeObjectUrl(url);
       } else {
+        // Mobile/desktop download logic
         final output = await getTemporaryDirectory();
         final file = File("${output.path}/Selected_Timesheets.pdf");
         await file.writeAsBytes(pdfBytes);
-        // Optionally, use Printing.sharePdf here if you want to enable sharing/printing on mobile
+        // Optionally share/print the PDF
         // await Printing.sharePdf(bytes: pdfBytes, filename: 'Selected_Timesheets.pdf');
       }
     } catch (e) {
@@ -336,57 +345,381 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
     }
   }
 
-  // Placeholder methods - You need to implement these based on your _createAndExportPDF and data structure
-  Future<List<String>> _getSupervisorNamesForTimesheet(Map<String, dynamic> timesheetData) async {
-    // Implement logic to get supervisor names based on timesheetData
-    // This might involve fetching from Firestore based on user roles or data in timesheetData
-    return ["Supervisor 1 Name", "Supervisor 2 Name"]; // Example placeholder
+// Helper function to get supervisor names for a timesheet
+  Future<Map<String, String>> _getSupervisorNamesForTimesheet(Map<String, dynamic> timesheetData) async {
+    return {
+      'staffName': timesheetData['staffName'] ?? 'Not Assigned',
+      'projectCoordinatorName': timesheetData['facilitySupervisor'] ?? 'Not Assigned',
+      'caritasSupervisorName': timesheetData['caritasSupervisor'] ?? 'Not Assigned',
+      'projectCoordinatorSignature': timesheetData['facilitySupervisorSignature'] ?? '',
+      'caritasSupervisorSignature': timesheetData['caritasSupervisorSignature'] ?? '',
+      'staffSignature': timesheetData['staffSignature'] ?? '',
+      'staffSignatureDate': timesheetData['staffSignatureDate'] ?? '',
+      'facilitySupervisorSignatureDate': timesheetData['facilitySupervisorSignatureDate'] ?? '',
+      'caritasSupervisorSignatureDate': timesheetData['caritasSupervisorSignatureDate'] ?? '',
+    };
   }
 
-  Future<List<pw.Widget>> _buildSignatureColumnsForTimesheet(List<String> supervisorNames) async {
-    // Implement logic to build signature columns based on supervisorNames
-    // Replicate the structure from your _buildSignatureColumns
+// Helper function to build signature columns
+  Future<List<pw.Widget>> _buildSignatureColumnsForTimesheet(Map<String, String> supervisorData) async {
+    final staffSig = supervisorData['staffSignature']!.isNotEmpty
+        ? await networkImageToByte(supervisorData['staffSignature']!)
+        : null;
+    final coordSig = supervisorData['projectCoordinatorSignature']!.isNotEmpty
+        ? await networkImageToByte(supervisorData['projectCoordinatorSignature']!)
+        : null;
+    final caritasSig = supervisorData['caritasSupervisorSignature']!.isNotEmpty
+        ? await networkImageToByte(supervisorData['caritasSupervisorSignature']!)
+        : null;
+
     return [
-      pw.Column(children: [pw.Text("Supervisor 1 Signature")]),
-      pw.Column(children: [pw.Text("Supervisor 2 Signature")])
-    ]; // Example placeholder
+      _buildSingleSignatureColumn(
+          'Name of Staff',
+          supervisorData['staffName']!.toUpperCase(),
+          staffSig,
+          supervisorData['staffSignatureDate']!
+      ),
+      _buildSingleSignatureColumn(
+          'Name of Project Coordinator',
+          supervisorData['projectCoordinatorName']!.toUpperCase(),
+          coordSig,
+          supervisorData['facilitySupervisorSignatureDate']!
+      ),
+      _buildSingleSignatureColumn(
+          'Name of Caritas Supervisor',
+          supervisorData['caritasSupervisorName']!.toUpperCase(),
+          caritasSig,
+          supervisorData['caritasSupervisorSignatureDate']!
+      ),
+    ];
   }
 
-
-  pw.Widget _buildStaffInfoForPDF(pw.Context context, Map<String, dynamic> timesheetData) {
-    final staffName = timesheetData['staffName'] ?? 'N/A';
-    // Add other staff info from timesheetData as needed
+// Helper function to build a single signature column
+  pw.Widget _buildSingleSignatureColumn(String title, String name, Uint8List? imageBytes, String date) {
     return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text("$staffName", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          // pw.Text("Staff ID: [Staff ID here]"), // Add staff ID if available in timesheetData
-          // pw.Text("Location: [Location here]"), // Add location if available
-        ]
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 10),
+        pw.Text(name),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          height: 100,
+          width: 150,
+          decoration: pw.BoxDecoration(border: pw.Border.all()),
+          child: pw.Center(
+            child: imageBytes != null
+                ? pw.Image(pw.MemoryImage(imageBytes))
+                : pw.Text("Signature"),
+          ),
+        ),
+        pw.SizedBox(height: 10),
+        pw.Text("Date: $date"),
+      ],
     );
   }
 
+// Helper function to build staff info section
+  pw.Widget _buildStaffInfoForPDF(pw.Context context, Map<String, dynamic> timesheetData) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Name: ${timesheetData['staffName'] ?? 'N/A'}'),
+        pw.Text('Department: ${timesheetData['department'] ?? 'N/A'}'),
+        pw.Text('Designation: ${timesheetData['designation'] ?? 'N/A'}'),
+        pw.Text('Location: ${timesheetData['location'] ?? 'N/A'}'),
+        pw.Text('State: ${timesheetData['state'] ?? 'N/A'}'),
+        pw.SizedBox(height: 20),
+      ],
+    );
+  }
+
+// Helper function to build the timesheet table
   pw.Widget _buildTimesheetTableForPDF(pw.Context context, Map<String, dynamic> timesheetData) {
-    // Implement logic to build timesheet table for PDF based on timesheetData
-    // Replicate the structure from your _buildTimesheetTable, adapting to use timesheetData
-    return pw.Text("Timesheet Table Content Here"); // Placeholder - Implement your table building logic
+    DateTime? timesheetDate;
+    try {
+      final dateString = timesheetData['date'];
+      if (dateString != null && dateString is String) {
+        timesheetDate = DateFormat('MMMM dd, yyyy').parse(dateString);
+      } else {
+        timesheetDate = DateTime.now();
+      }
+    } catch (e) {
+      timesheetDate = DateTime.now();
+    }
+    timesheetDate ??= DateTime.now();
+
+    final month = DateFormat('MM').format(timesheetDate);
+    final year = DateFormat('yyyy').format(timesheetDate);
+    final daysInRange = initializeDateRange(int.parse(month), int.parse(year));
+    final projectName = timesheetData['projectName'] ?? 'N/A';
+    final attendanceData = timesheetData['timesheetEntries']?.cast<Map<String, dynamic>>() ?? [];
+
+    // Helper function to get duration for a date
+    String _getDurationForDate(DateTime date, String projectName, String category, List<Map<String, dynamic>> data) {
+      double totalHoursForDate = 0;
+
+      for (var attendance in data) {
+        try {
+          String dateString = attendance['date'] as String;
+          DateTime attendanceDate = DateFormat('yyyy-MM-dd').parse(dateString);
+
+          if (attendanceDate.year == date.year &&
+              attendanceDate.month == date.month &&
+              attendanceDate.day == date.day) {
+            if (category == projectName) {
+              if (!attendance['offDay']) {
+                totalHoursForDate += attendance['noOfHours'] > 8.0 ? 8.0 : attendance['noOfHours'] as double;
+              }
+            } else {
+              if (attendance['offDay'] as bool &&
+                  (attendance['durationWorked'] as String?)?.toLowerCase() == category.toLowerCase()) {
+                totalHoursForDate += attendance['noOfHours'] > 8.0 ? 8.0 : attendance['noOfHours'] as double;
+              }
+            }
+          }
+        } catch (e) {
+          print("Error processing attendance data: $e");
+        }
+      }
+      return totalHoursForDate.toStringAsFixed(2);
+    }
+
+    // Calculate totals and percentages
+    double calculateTotalHours() {
+      double totalHours = 0;
+      for (var date in daysInRange) {
+        if (!isWeekend(date)) {
+          totalHours += double.parse(_getDurationForDate(date, projectName, projectName, attendanceData));
+        }
+      }
+      return totalHours;
+    }
+
+    double calculateCategoryHours(String category) {
+      double totalHours = 0;
+      for (var date in daysInRange) {
+        if (!isWeekend(date)) {
+          totalHours += double.parse(_getDurationForDate(date, projectName, category, attendanceData));
+        }
+      }
+      return totalHours;
+    }
+
+    double calculatePercentage(int workingDays, double hours) {
+      return (workingDays * 8) > 0 ? (hours / (workingDays * 8)) * 100 : 0;
+    }
+
+    int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
+    double projectTotal = calculateTotalHours();
+    double projectPercentage = calculatePercentage(workingDays, projectTotal);
+
+    // Build the table rows
+    List<pw.TableRow> tableRows = [
+      // Header row
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          pw.Container(
+              width: 250,
+              alignment: pw.Alignment.centerLeft,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text('Project Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          ...daysInRange.map((date) => pw.Container(
+              width: 80,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              color: isWeekend(date) ? PdfColors.grey900 : PdfColors.grey300,
+              child: pw.Text(DateFormat('dd').format(date), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text('Total Hours', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text('%', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+        ],
+      ),
+
+      // Project row
+      pw.TableRow(
+        children: [
+          pw.Container(
+              width: 250,
+              alignment: pw.Alignment.centerLeft,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(projectName)),
+          ...daysInRange.map((date) {
+            String hours = _getDurationForDate(date, projectName, projectName, attendanceData);
+            return pw.Container(
+              width: 80,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              color: isWeekend(date) ? PdfColors.grey900 : null,
+              child: pw.Text(hours),
+            );
+          }),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(projectTotal.toStringAsFixed(2))),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text('${projectPercentage.toStringAsFixed(2)}%')),
+        ],
+      ),
+
+      // Out-of-office categories
+      ...['Annual leave', 'Holiday', 'Maternity'].map((category) {
+        double categoryHours = calculateCategoryHours(category);
+        double categoryPercentage = calculatePercentage(workingDays, categoryHours);
+
+        return pw.TableRow(
+          children: [
+            pw.Container(
+                width: 250,
+                alignment: pw.Alignment.centerLeft,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text(category)),
+            ...daysInRange.map((date) {
+              String hours = _getDurationForDate(date, projectName, category, attendanceData);
+              return pw.Container(
+                width: 80,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                color: isWeekend(date) ? PdfColors.grey900 : null,
+                child: pw.Text(hours),
+              );
+            }),
+            pw.Container(
+                width: 200,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text(categoryHours.toStringAsFixed(2))),
+            pw.Container(
+                width: 200,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text('${categoryPercentage.toStringAsFixed(2)}%')),
+          ],
+        );
+      }),
+
+      // Total row
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          pw.Container(
+              width: 250,
+              alignment: pw.Alignment.centerLeft,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          ...List.generate(daysInRange.length, (_) => pw.SizedBox(width: 80)),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(
+                  (projectTotal + ['Annual leave', 'Holiday', 'Maternity']
+                      .fold(0.0, (sum, category) => sum + calculateCategoryHours(category)))
+                      .toStringAsFixed(2),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+          pw.Container(
+              width: 200,
+              alignment: pw.Alignment.center,
+              padding: const pw.EdgeInsets.all(1.0),
+              child: pw.Text(
+                  '${((projectPercentage + ['Annual leave', 'Holiday', 'Maternity']
+                      .fold(0.0, (sum, category) => sum + calculatePercentage(workingDays, calculateCategoryHours(category)))))
+                      .toStringAsFixed(2)}%',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+        ],
+      ),
+    ];
+
+    return pw.Table(
+      border: pw.TableBorder.all(),
+      columnWidths: {
+        0: const pw.FixedColumnWidth(250),
+        for (int i = 1; i <= daysInRange.length; i++) i: const pw.FixedColumnWidth(80),
+        daysInRange.length + 1: const pw.FixedColumnWidth(200),
+        daysInRange.length + 2: const pw.FixedColumnWidth(200),
+      },
+      children: tableRows,
+    );
   }
 
+// Helper function to build signature section
   pw.Widget _buildSignatureSectionForPDF(pw.Context context, List<pw.Widget> signatureColumns) {
-    // Implement logic to build signature section for PDF
-    // Replicate the structure from your _buildSignatureSection, using signatureColumns
-    return pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: signatureColumns
-    ); // Placeholder - Implement your signature section
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Signature & Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.Divider(),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: signatureColumns,
+        ),
+      ],
+    );
   }
 
-
+// Helper function to prepare task summary content
   Future<List<pw.Widget>> _prepareTaskSummaryContentForTimesheet(Map<String, dynamic> timesheetData) async {
-    // Adapt your _prepareTaskSummaryContent or _prepareTaskSummaryContent1 here
-    // to work with timesheetData to fetch task summary for the specific staff/timesheet
-    // You will need to adjust data fetching logic to use staffId or other relevant identifiers
-    return [pw.Center(child: pw.Text("Task Summary Content for ${timesheetData['staffName'] ?? 'N/A'}"))]; // Placeholder
+    // Implement your task summary logic here based on timesheetData
+    // This should return a list of pw.Widgets that make up the task summary
+
+    // Placeholder implementation - replace with your actual logic
+    return [
+      pw.Text("Task summary for ${timesheetData['staffName']}"),
+      pw.SizedBox(height: 20),
+      pw.Text("No task summary data available", style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+    ];
+  }
+
+// Helper function to check if a date is a weekend
+  bool isWeekend(DateTime date) {
+    return date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+  }
+
+// Helper function to initialize date range
+  List<DateTime> initializeDateRange(int month, int year) {
+    DateTime startDate = DateTime(year, month - 1, 20);
+    DateTime endDate = DateTime(year, month, 19);
+
+    List<DateTime> daysInRange = [];
+    DateTime currentDate = startDate;
+    while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
+      daysInRange.add(currentDate);
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+    return daysInRange;
+  }
+
+// Helper function to convert network image to bytes
+  Future<Uint8List?> networkImageToByte(String imageUrl) async {
+    try {
+      final response = await Dio().get(
+        imageUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return Uint8List.fromList(response.data as List<int>);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching image: $e');
+      return null;
+    }
   }
 
 
@@ -427,10 +760,6 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
           final timesheetDocPath = '/Staff/${timesheet['staffId']}/TimeSheets/${_timesheetCollectionName}';
           bool isSelected = selectedTimesheetPaths.contains(timesheetDocPath);
 
-          print("timesheet ===$timesheet");
-          print("timesheets[index] ===${timesheets[index]}");
-          print("timesheetDocPath ===$timesheetDocPath");
-          print("isSelected ===$isSelected");
 
           return Card(
             child: ListTile(
@@ -440,10 +769,8 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
                   setState(() {
                     if (value == true) {
                       selectedTimesheetPaths.add(timesheetDocPath);
-                      print("selectedTimesheetPaths True ===$selectedTimesheetPaths");
                     } else {
                       selectedTimesheetPaths.remove(timesheetDocPath);
-                      print("selectedTimesheetPaths False ===$selectedTimesheetPaths");
                     }
                   });
                 },
@@ -452,23 +779,37 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('State: ${timesheet['state'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('Facility Name: ${timesheet['location'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('Staff Email: ${timesheet['staffEmail'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
                   Text('Status: ${_getApprovalStatusText(timesheet)}'),
-                  Row(
-                    children: [
-                      const Text('Duration: '),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _getDurationColor(timesheet).withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          DateFormat('yyyy-MM-dd').format((timesheet['timesheetSubmissionDate'] as Timestamp?)?.toDate() ?? DateTime.now()),
-                          style: TextStyle(color: _getDurationColor(timesheet)),
-                        ),
-                      ),
-                    ],
+                  SizedBox(height: 8,),
+                  Divider(),
+                  Text('Timesheet Submission Date: ${timesheet['timesheetSubmissionTimestamp'] != null ? _formatTimestamp(timesheet['timesheetSubmissionTimestamp']) : 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('Project Coordinator: ${timesheet['facilitySupervisor'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('Project Coordinator Approval Status: ${timesheet['facilitySupervisorSignatureStatus'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('CARITAS Supervisor: ${timesheet['caritasSupervisor'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  Text('CARITAS Supervisor\'s Approval Status: ${timesheet['caritasSupervisorSignatureStatus'] ?? 'N/A'}'),
+                  SizedBox(height: 4,),
+                  _buildApprovalDurationText(
+                    title: 'Duration of Approval Time for Project Coordinator',
+                    submissionTimestamp: timesheet['timesheetSubmissionTimestamp'],
+                    approvalTimestamp: timesheet['facilitySupervisorTimesheetSubmissionTimestamp'],
                   ),
+                  SizedBox(height: 4,),
+                  _buildApprovalDurationText(
+                    title: 'Duration of Approval Time for CARITAS Supervisor',
+                    submissionTimestamp: timesheet['timesheetSubmissionTimestamp'],
+                    approvalTimestamp: timesheet['caritasSupervisorTimesheetSubmissionTimestamp'],
+                  ),
+
                 ],
               ),
               trailing: IconButton(
@@ -491,5 +832,66 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
         },
       ),
     );
+  }
+
+  String _formatTimestamp(dynamic timestamp) {
+    if (timestamp is Timestamp) {
+      return DateFormat('yyyy-MM-dd HH:mm').format(timestamp.toDate());
+    } else if (timestamp is String) {
+      // Try to parse the string as DateTime, if it fails, return 'N/A' or handle accordingly
+      try {
+        DateTime dateTime = DateTime.parse(timestamp);
+        return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
+      } catch (e) {
+        print("Error parsing timestamp string: $e");
+        return 'N/A (Invalid Date)';
+      }
+    }
+    return 'N/A'; // Default case if it's neither Timestamp nor String
+  }
+
+
+  Widget _buildApprovalDurationText({
+    required String title,
+    required dynamic submissionTimestamp, // Changed to dynamic
+    required dynamic approvalTimestamp,   // Changed to dynamic
+  }) {
+    DateTime? submissionDate;
+    DateTime? approvalDate;
+
+    if (submissionTimestamp == null || approvalTimestamp == null) {
+      return Text('$title: N/A');
+    }
+
+    if (submissionTimestamp is Timestamp) {
+      submissionDate = submissionTimestamp.toDate();
+    } else if (submissionTimestamp is String) {
+      try {
+        submissionDate = DateTime.parse(submissionTimestamp);
+      } catch (e) {
+        submissionDate = null;
+        print("Error parsing submissionTimestamp string: $e");
+      }
+    }
+
+    if (approvalTimestamp is Timestamp) {
+      approvalDate = approvalTimestamp.toDate();
+    } else if (approvalTimestamp is String) {
+      try {
+        approvalDate = DateTime.parse(approvalTimestamp);
+      } catch (e) {
+        approvalDate = null;
+        print("Error parsing approvalTimestamp string: $e");
+      }
+    }
+
+    if (submissionDate == null || approvalDate == null) {
+      return Text('$title: N/A');
+    }
+
+
+    Duration duration = approvalDate.difference(submissionDate);
+
+    return Text('$title: ${duration.inDays} days');
   }
 }

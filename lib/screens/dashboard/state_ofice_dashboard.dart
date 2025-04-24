@@ -45,6 +45,17 @@ class DashboardScreenState extends State<DashboardScreen> {
   int maleLateCount1 = 0;
   bool _isDataLoaded = false; // Add a loading flag
 
+  // New variables for month and year filter in Timesheet Status Card
+  DateTime _selectedTimesheetMonthYear = DateTime.now();
+  List<String> _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  int _selectedMonthIndex = DateTime.now().month - 1;
+  int _selectedYear = DateTime.now().year;
+  List<int> _yearList = List.generate(10, (index) => DateTime.now().year - 5 + index); // Example: last 5 years and next 4 years from current year
+
+
   @override
   void initState() {
     super.initState();
@@ -69,14 +80,13 @@ class DashboardScreenState extends State<DashboardScreen> {
     _isDataLoaded = true; // Set the flag to true when data is loaded
     setState(() {}); // Trigger a rebuild to reflect the data loading completion
   }
-
   Future<void> _loadTimesheetStatusData() async {
     setState(() {
       _isTimesheetStatusDataLoading = true;
     });
     try {
-      final data = await _getTimesheetStatusData();
-      _timesheetStatusData = data; // Store the entire map returned by _getTimesheetStatusData
+      final data = await _getTimesheetStatusData(month: _selectedMonthIndex + 1, year: _selectedYear); // Pass selected month and year
+      _timesheetStatusData = data;
     } catch (e) {
       print("Error loading timesheet status data: $e");
       // Handle error appropriately
@@ -86,6 +96,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       });
     }
   }
+
 
   Future<void> _loadCurrentUserBioDataForClockInCard() async {
     try {
@@ -193,7 +204,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       appBarIconSizeFactor = 0.55;
       chartLegendFontSizeFactor = 0.45;
       summaryCardHeightFactor = 1.6;
-      otherCardHeightFactor = 2.0;
+      otherCardHeightFactor = 2.5;
       generateAnalyticsButtonPaddingFactor = 0.55;
       chartCardVerticalPaddingFactor = 0.55;
       cardHeightFactor = 0.8;
@@ -210,7 +221,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       appBarIconSizeFactor = 0.75;
       chartLegendFontSizeFactor = 0.65;
       summaryCardHeightFactor = 1.4;
-      otherCardHeightFactor = 2.2;
+      otherCardHeightFactor = 2.8;
       generateAnalyticsButtonPaddingFactor = 0.75;
       chartCardVerticalPaddingFactor = 0.75;
       cardHeightFactor = 1.0;
@@ -227,7 +238,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       appBarIconSizeFactor = 0.95;
       chartLegendFontSizeFactor = 0.85;
       summaryCardHeightFactor = 1.2;
-      otherCardHeightFactor = 2.4;
+      otherCardHeightFactor = 3.0;
       generateAnalyticsButtonPaddingFactor = 0.95;
       chartCardVerticalPaddingFactor = 0.95;
       cardHeightFactor = 1.1;
@@ -244,7 +255,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       appBarIconSizeFactor = 1.0;
       chartLegendFontSizeFactor = 0.9;
       summaryCardHeightFactor = 1.1;
-      otherCardHeightFactor = 2.6;
+      otherCardHeightFactor = 3.2;
       generateAnalyticsButtonPaddingFactor = 1.0;
       chartCardVerticalPaddingFactor = 1.0;
       cardHeightFactor = 1.2;
@@ -533,121 +544,122 @@ class DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+  //
+  // Widget _buildTimesheetStatusCard1(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartLegendFontSizeFactor, double iconSizeFactor, double otherCardHeightFactor, double otherGridTextFontSizeFactor) {
+  //   return Card(
+  //     elevation: 4,
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
+  //     child: Padding(
+  //       padding: EdgeInsets.all(20.0 * cardPaddingFactor),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: <Widget>[
+  //           FutureBuilder<Map<String, dynamic>>(
+  //             future: _getTimesheetStatusData(),
+  //             builder: (context, snapshot) {
+  //               if (snapshot.connectionState == ConnectionState.waiting) {
+  //                 return const CircularProgressIndicator();
+  //               }
+  //               if (snapshot.hasError) {
+  //                 return Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold));
+  //               }
+  //               final timesheetStatusData = snapshot.data ?? {};
+  //               final expectedSubmission = timesheetStatusData['expectedSubmission'] ?? 0;
+  //               final pendingSubmission = timesheetStatusData['pendingSubmission'] ?? 0;
+  //               final pendingApproval = timesheetStatusData['pendingApproval'] ?? 0;
+  //               final timesheetMonthTitle = timesheetStatusData['timesheetMonthTitle'] ?? 'Timesheet Status';
+  //               final completionPercentage = timesheetStatusData['completionPercentage'] ?? 0.0;
+  //
+  //               return Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   Text(
+  //                     timesheetMonthTitle,
+  //                     style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
+  //                   ),
+  //                   SizedBox(height: 20 * cardMarginFactor),
+  //                   Row(
+  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                     children: [
+  //                       Text('Expected Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                       Text('${expectedSubmission} Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                     ],
+  //                   ),
+  //                   SizedBox(height: 5 * cardMarginFactor),
+  //                   Row(
+  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                     children: [
+  //                       Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                       Text('${pendingSubmission} Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                     ],
+  //                   ),
+  //                   SizedBox(height: 5 * cardMarginFactor),
+  //                   Row(
+  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                     children: [
+  //                       Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                       Text('${pendingApproval} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                     ],
+  //                   ),
+  //                   SizedBox(height: 10 * cardMarginFactor),
+  //                   Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                   const SizedBox(height: 10),
+  //                   SizedBox(
+  //                     height: 40 * cardMarginFactor * otherCardHeightFactor,
+  //                     child: SfLinearGauge(
+  //                       minimum: 0,
+  //                       maximum: 100,
+  //                       orientation: LinearGaugeOrientation.horizontal,
+  //                       majorTickStyle: LinearTickStyle(length: 12 * cardMarginFactor),
+  //                       minorTickStyle: LinearTickStyle(length: 8 * cardMarginFactor),
+  //                       axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor),
+  //                       barPointers: <LinearBarPointer>[
+  //                         LinearBarPointer(
+  //                           value: completionPercentage,
+  //                           thickness: 20 * cardMarginFactor,
+  //                           color: Colors.green.shade400,
+  //                           edgeStyle: LinearEdgeStyle.bothCurve,
+  //                         ),
+  //                       ],
+  //                       markerPointers: <LinearShapePointer>[
+  //                         LinearShapePointer(
+  //                           value: completionPercentage,
+  //                           offset: 25 * cardMarginFactor,
+  //                           shapeType: LinearShapePointerType.circle,
+  //                           color: Colors.green.shade700,
+  //                         ),
+  //                       ],
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 10),
+  //                   Align(
+  //                     alignment: Alignment.bottomRight,
+  //                     child: TextButton(
+  //                       onPressed: () {
+  //                         Navigator.push(
+  //                           context,
+  //                           MaterialPageRoute(
+  //                             builder: (context) => TimesheetStatusListPage(),
+  //                           ),
+  //                         );
+  //                       },
+  //                       child: Text('View Timesheets', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               );
+  //             },
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Widget _buildTimesheetStatusCard1(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartLegendFontSizeFactor, double iconSizeFactor, double otherCardHeightFactor, double otherGridTextFontSizeFactor) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(20.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            FutureBuilder<Map<String, dynamic>>(
-              future: _getTimesheetStatusData(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
-                if (snapshot.hasError) {
-                  return Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold));
-                }
-                final timesheetStatusData = snapshot.data ?? {};
-                final expectedSubmission = timesheetStatusData['expectedSubmission'] ?? 0;
-                final pendingSubmission = timesheetStatusData['pendingSubmission'] ?? 0;
-                final pendingApproval = timesheetStatusData['pendingApproval'] ?? 0;
-                final timesheetMonthTitle = timesheetStatusData['timesheetMonthTitle'] ?? 'Timesheet Status';
-                final completionPercentage = timesheetStatusData['completionPercentage'] ?? 0.0;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      timesheetMonthTitle,
-                      style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 20 * cardMarginFactor),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Expected Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                        Text('${expectedSubmission} Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                      ],
-                    ),
-                    SizedBox(height: 5 * cardMarginFactor),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                        Text('${pendingSubmission} Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                      ],
-                    ),
-                    SizedBox(height: 5 * cardMarginFactor),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                        Text('${pendingApproval} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                      ],
-                    ),
-                    SizedBox(height: 10 * cardMarginFactor),
-                    Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 40 * cardMarginFactor * otherCardHeightFactor,
-                      child: SfLinearGauge(
-                        minimum: 0,
-                        maximum: 100,
-                        orientation: LinearGaugeOrientation.horizontal,
-                        majorTickStyle: LinearTickStyle(length: 12 * cardMarginFactor),
-                        minorTickStyle: LinearTickStyle(length: 8 * cardMarginFactor),
-                        axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor),
-                        barPointers: <LinearBarPointer>[
-                          LinearBarPointer(
-                            value: completionPercentage,
-                            thickness: 20 * cardMarginFactor,
-                            color: Colors.green.shade400,
-                            edgeStyle: LinearEdgeStyle.bothCurve,
-                          ),
-                        ],
-                        markerPointers: <LinearShapePointer>[
-                          LinearShapePointer(
-                            value: completionPercentage,
-                            offset: 25 * cardMarginFactor,
-                            shapeType: LinearShapePointerType.circle,
-                            color: Colors.green.shade700,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TimesheetStatusListPage(),
-                            ),
-                          );
-                        },
-                        child: Text('View Timesheets', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildTimesheetStatusCard(
-      Map<String, dynamic>? timesheetStatusData, // Data passed as parameter
-      bool isLoading, // Loading state parameter
+      Map<String, dynamic>? timesheetStatusData,
+      bool isLoading,
       double cardPaddingFactor,
       double cardMarginFactor,
       double fontSizeFactor,
@@ -655,43 +667,84 @@ class DashboardScreenState extends State<DashboardScreen> {
       double iconSizeFactor,
       double otherCardHeightFactor,
       double otherGridTextFontSizeFactor) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(20.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // Removed FutureBuilder - Using pre-loaded data
-            if (isLoading) // Show loading indicator if data is loading
-              const CircularProgressIndicator()
-            else if (timesheetStatusData == null) // Handle null data (error case)
-              Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold))
-            else // Display data when loaded
-              _buildTimesheetStatusContent(timesheetStatusData, cardMarginFactor, fontSizeFactor, otherGridTextFontSizeFactor, otherCardHeightFactor, context),
-          ],
-        ),
+    return _buildCardContent(
+      title: timesheetStatusData?['timesheetMonthTitle'] ?? 'Timesheet Status',
+      cardPaddingFactor: cardPaddingFactor,
+      cardMarginFactor: cardMarginFactor,
+      fontSizeFactor: fontSizeFactor,
+      iconSizeFactor: iconSizeFactor,
+      otherCardHeightFactor: otherCardHeightFactor,
+      otherGridTextFontSizeFactor: otherGridTextFontSizeFactor,
+      chartLegendFontSizeFactor: chartLegendFontSizeFactor,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: [
+              DropdownButton<int>(
+                value: _selectedMonthIndex,
+                hint: const Text('Select Month', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+                items: List.generate(_monthNames.length, (index) => DropdownMenuItem<int>(
+                  value: index,
+                  child: Text(_monthNames[index]),
+                )),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedMonthIndex = value!;
+                  });
+                },
+              ),
+              const SizedBox(width: 10),
+              DropdownButton<int>(
+                value: _selectedYear,
+                hint: const Text('Select Year'),
+                items: _yearList.map((year) => DropdownMenuItem<int>(
+                  value: year,
+                  child: Text(year.toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+                )).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedYear = value!;
+                  });
+                },
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _loadTimesheetStatusData,
+                child: const Text('Load', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          ),
+          SizedBox(height: 10 * cardMarginFactor),
+          if (isLoading)
+            const CircularProgressIndicator()
+          else if (timesheetStatusData == null)
+            Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold))
+          else
+            _buildTimesheetStatusContent(timesheetStatusData, cardMarginFactor, fontSizeFactor, otherGridTextFontSizeFactor, otherCardHeightFactor, context),
+        ],
       ),
     );
   }
 
-// Extracted content of Timesheet Status Card into a separate widget
+
   Widget _buildTimesheetStatusContent(Map<String, dynamic> timesheetStatusData, double cardMarginFactor, double fontSizeFactor, double otherGridTextFontSizeFactor, double otherCardHeightFactor, BuildContext context) {
     final expectedSubmission = timesheetStatusData['expectedSubmission'] ?? 0;
     final pendingSubmission = timesheetStatusData['pendingSubmission'] ?? 0;
     final pendingApproval = timesheetStatusData['pendingApproval'] ?? 0;
     final timesheetMonthTitle = timesheetStatusData['timesheetMonthTitle'] ?? 'Timesheet Status';
     final completionPercentage = timesheetStatusData['completionPercentage'] ?? 0.0;
-    final List<Map<String, dynamic>> fetchedTimesheetDocuments = (timesheetStatusData['timesheetDocuments'] as List<Map<String, dynamic>>?) ?? []; // Get timesheet documents
+    final List<Map<String, dynamic>> fetchedTimesheetDocuments = (timesheetStatusData['timesheetDocuments'] as List<Map<String, dynamic>>?) ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          timesheetMonthTitle,
-          style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
-        ),
-        SizedBox(height: 20 * cardMarginFactor),
+        // Text(
+        //   timesheetMonthTitle,
+        //   style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
+        // ),
+        // // SizedBox(height: 15 * cardMarginFactor),
+        // Divider(),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -699,7 +752,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             Text('${expectedSubmission} Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
-        SizedBox(height: 5 * cardMarginFactor),
+        SizedBox(height: 3 * cardMarginFactor),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -707,7 +760,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             Text('${pendingSubmission} Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
-        SizedBox(height: 5 * cardMarginFactor),
+        SizedBox(height: 3 * cardMarginFactor),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -715,11 +768,12 @@ class DashboardScreenState extends State<DashboardScreen> {
             Text('${pendingApproval} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
-        SizedBox(height: 10 * cardMarginFactor),
+    SizedBox(height: 10 * cardMarginFactor),
+        // Divider(),
         Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-        const SizedBox(height: 10),
+        //const SizedBox(height: 10),
         SizedBox(
-          height: 40 * cardMarginFactor * otherCardHeightFactor,
+          height: 25 * cardMarginFactor * otherCardHeightFactor,
           child: SfLinearGauge(
             minimum: 0,
             maximum: 100,
@@ -745,7 +799,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+       // const SizedBox(height: 10),
         Align(
           alignment: Alignment.bottomRight,
           child: TextButton(
@@ -754,7 +808,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => TimesheetStatusListPage(
-                    timesheetDataList: fetchedTimesheetDocuments, // Pass the fetched timesheet documents here
+                    timesheetDataList: fetchedTimesheetDocuments,
                   ),
                 ),
               );
@@ -766,30 +820,13 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<Map<String, dynamic>> _getTimesheetStatusData() async {
+  Future<Map<String, dynamic>> _getTimesheetStatusData({required int month, required int year}) async {
     print("_getTimesheetStatusData started");
-    final now = DateTime.now();
 
-    DateTime startDateTimesheetRange;
-    DateTime endDateTimesheetRange;
-    String timesheetCollectionName;
-    String timesheetMonthTitle;
+    DateTime selectedMonthYear = DateTime(year, month);
+    String timesheetCollectionName = DateFormat('MMMM_yyyy').format(selectedMonthYear);
+    String timesheetMonthTitle = 'Timesheet Status - ${DateFormat('MMMM yyyy').format(selectedMonthYear)}';
 
-    if (now.day >= 20) {
-      // Use current month for start, next month for end, and collection name is next month
-      startDateTimesheetRange = DateTime(now.year, now.month, 20);
-      DateTime nextMonth = DateTime(now.year, now.month + 1);
-      endDateTimesheetRange = DateTime(nextMonth.year, nextMonth.month, 19);
-      timesheetCollectionName = DateFormat('MMMM_yyyy').format(nextMonth);
-      timesheetMonthTitle = 'Timesheet Status - ${DateFormat('MMMM').format(nextMonth)}';
-    } else {
-      // Use previous month for start, current month for end, and collection name is current month
-      DateTime previousMonth = DateTime(now.year, now.month - 1);
-      startDateTimesheetRange = DateTime(previousMonth.year, previousMonth.month, 20);
-      endDateTimesheetRange = DateTime(now.year, now.month, 19);
-      timesheetCollectionName = DateFormat('MMMM_yyyy').format(now);
-      timesheetMonthTitle = 'Timesheet Status - ${DateFormat('MMMM').format(now)}';
-    }
 
     print("Timesheet Collection Name: $timesheetCollectionName");
     print("Current User State: $_currentUserState");
@@ -803,6 +840,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
           .collection('Staff')
           .where('state', isEqualTo: _currentUserState)
+          .where('staffCategory', isEqualTo: "Facility Staff")
           .get();
       expectedSubmissionCount = staffSnapshot.docs.length;
       print("Staff Snapshot Docs Length: ${staffSnapshot.docs.length}");
@@ -823,7 +861,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           final timesheetData = timesheetDoc.data() as Map<String, dynamic>?;
           if (timesheetData != null) {
             timesheetDocuments.add({...timesheetData, 'staffId': staffId});
-            if (timesheetData['caritasSupervisorSignatureStatus'] == 'Pending') {
+            if (timesheetData['caritasSupervisorSignatureStatus'] != 'Approved' ) {
               pendingApprovalCount++;
             }
           }
@@ -850,6 +888,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       'timesheetDocuments': timesheetDocuments,
     };
   }
+
 
 
 
@@ -927,6 +966,39 @@ class DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+  Widget _buildCardContent({
+    required String title,
+    required Widget content,
+    required double cardPaddingFactor,
+    required double cardMarginFactor,
+    required double fontSizeFactor,
+    required double chartLegendFontSizeFactor,
+    required double iconSizeFactor,
+    bool isLargeScreen = false,
+    required double otherCardHeightFactor,
+    required double otherGridTextFontSizeFactor,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
+      child: Padding(
+        padding: EdgeInsets.all(16.0 * cardPaddingFactor),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10 * cardMarginFactor),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+
 
 
 
