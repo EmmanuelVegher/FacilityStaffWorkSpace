@@ -14,19 +14,19 @@ class Contact {
   String? callStatus; // Will likely be null or manually set on web
   int? callDuration; // Will likely be null on web
   String? appointmentStatus;
-  // bool? isUpdated; // Maybe relevant if syncing with mobile app?
-  // bool? isSyncedToNMRS; // Keep if NMRS sync logic remains (ideally via backend)
+  bool? isUpdated; // Maybe relevant if syncing with mobile app?
+  bool? isSyncedToNMRS; // Keep if NMRS sync logic remains (ideally via backend)
   int? patientId; // Keep if relevant from NMRS/CSV
 
-  // bool? isLastVisitDateUpdated; // Keep if relevant
-  // bool? isNextVisitDateUpdated; // Keep if relevant
-  // bool? isPhoneNumberUpdated; // Keep if relevant
-  // bool? isAddressUpdated; // Keep if relevant
-  // bool? isAddressSyncedToNMRS; // Keep if NMRS sync logic remains
+  bool? isLastVisitDateUpdated; // Keep if relevant
+  bool? isNextVisitDateUpdated; // Keep if relevant
+  bool? isPhoneNumberUpdated; // Keep if relevant
+  bool? isAddressUpdated; // Keep if relevant
+  bool? isAddressSyncedToNMRS; // Keep if NMRS sync logic remains
 
-  // DateTime? dateNextVisitChanged; // Keep if relevant
-  // DateTime? datePhoneNumberUpdated; // Keep if relevant
-  // DateTime? dateAddressChanged; // Keep if relevant
+  DateTime? dateNextVisitChanged; // Keep if relevant
+  DateTime? datePhoneNumberUpdated; // Keep if relevant
+  DateTime? dateAddressChanged; // Keep if relevant
 
   // New Fields
   String? state;
@@ -47,22 +47,22 @@ class Contact {
     this.nextVisitDate,
     this.callStatus,
     this.callDuration,
-    //this.isAddressUpdated,
-    //this.isAddressSyncedToNMRS,
-    //this.dateNextVisitChanged,
-    //this.datePhoneNumberUpdated,
-    //this.dateAddressChanged,
+    this.isAddressUpdated,
+    this.isAddressSyncedToNMRS,
+    this.dateNextVisitChanged,
+    this.datePhoneNumberUpdated,
+    this.dateAddressChanged,
     this.state,
     this.facilityName,
     this.uniqueID,
     this.datimCode,
     this.appointmentStatus,
-    //this.isUpdated,
-    //this.isSyncedToNMRS,
+    this.isUpdated,
+    this.isSyncedToNMRS,
     this.patientId,
-    // this.isLastVisitDateUpdated,
-    // this.isNextVisitDateUpdated,
-    // this.isPhoneNumberUpdated,
+    this.isLastVisitDateUpdated,
+    this.isNextVisitDateUpdated,
+    this.isPhoneNumberUpdated,
     this.artStatus,
     this.dateOfTermination,
     this.sampleCollectionDate,
@@ -89,16 +89,16 @@ class Contact {
       callStatus: data['callStatus'] as String?, // Likely null from Firestore unless set manually
       callDuration: data['callDuration'] as int?, // Likely null
       appointmentStatus: data['appointmentStatus'] as String?,
-      // isSyncedToNMRS: data['isSyncedToNMRS'] as bool?,
+      isSyncedToNMRS: data['isSyncedToNMRS'] as bool?,
       patientId: data['patientId'] as int?,
-      // isLastVisitDateUpdated: data['isLastVisitDateUpdated'] as bool?,
-      // isNextVisitDateUpdated: data['isNextVisitDateUpdated'] as bool?,
-      // isPhoneNumberUpdated: data['isPhoneNumberUpdated'] as bool?,
-      // isAddressUpdated: data['isAddressUpdated'] as bool?,
-      // isAddressSyncedToNMRS: data['isAddressSyncedToNMRS'] as bool?,
-      // dateNextVisitChanged: _toDateTime(data['dateNextVisitChanged']),
-      // datePhoneNumberUpdated: _toDateTime(data['datePhoneNumberUpdated']),
-      // dateAddressChanged: _toDateTime(data['dateAddressChanged']),
+      isLastVisitDateUpdated: data['isLastVisitDateUpdated'] as bool?,
+      isNextVisitDateUpdated: data['isNextVisitDateUpdated'] as bool?,
+      isPhoneNumberUpdated: data['isPhoneNumberUpdated'] as bool?,
+      isAddressUpdated: data['isAddressUpdated'] as bool?,
+      isAddressSyncedToNMRS: data['isAddressSyncedToNMRS'] as bool?,
+      dateNextVisitChanged: _toDateTime(data['dateNextVisitChanged']),
+      datePhoneNumberUpdated: _toDateTime(data['datePhoneNumberUpdated']),
+      dateAddressChanged: _toDateTime(data['dateAddressChanged']),
       state: data['state'] as String?,
       facilityName: data['facilityName'] as String?,
       uniqueID: data['uniqueID'] as String?,
@@ -122,16 +122,16 @@ class Contact {
       'callStatus': callStatus,
       'callDuration': callDuration,
       'appointmentStatus': appointmentStatus,
-      // 'isSyncedToNMRS': isSyncedToNMRS,
+      'isSyncedToNMRS': isSyncedToNMRS,
       'patientId': patientId,
-      // 'isLastVisitDateUpdated': isLastVisitDateUpdated,
-      // 'isNextVisitDateUpdated': isNextVisitDateUpdated,
-      // 'isPhoneNumberUpdated': isPhoneNumberUpdated,
-      // 'isAddressUpdated': isAddressUpdated,
-      // 'isAddressSyncedToNMRS': isAddressSyncedToNMRS,
-      // 'dateNextVisitChanged': dateNextVisitChanged != null ? Timestamp.fromDate(dateNextVisitChanged!) : null,
-      // 'datePhoneNumberUpdated': datePhoneNumberUpdated != null ? Timestamp.fromDate(datePhoneNumberUpdated!) : null,
-      // 'dateAddressChanged': dateAddressChanged != null ? Timestamp.fromDate(dateAddressChanged!) : null,
+      'isLastVisitDateUpdated': isLastVisitDateUpdated,
+      'isNextVisitDateUpdated': isNextVisitDateUpdated,
+      'isPhoneNumberUpdated': isPhoneNumberUpdated,
+      'isAddressUpdated': isAddressUpdated,
+      'isAddressSyncedToNMRS': isAddressSyncedToNMRS,
+      'dateNextVisitChanged': dateNextVisitChanged != null ? Timestamp.fromDate(dateNextVisitChanged!) : null,
+      'datePhoneNumberUpdated': datePhoneNumberUpdated != null ? Timestamp.fromDate(datePhoneNumberUpdated!) : null,
+      'dateAddressChanged': dateAddressChanged != null ? Timestamp.fromDate(dateAddressChanged!) : null,
       'state': state,
       'facilityName': facilityName,
       'uniqueID': uniqueID,
