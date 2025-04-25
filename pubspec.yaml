@@ -143,6 +143,12 @@ dependencies:
   share_plus:
  # web:
   html:
+  csv:
+  url_launcher:
+  flutter_phone_direct_caller:
+  call_log:
+  phone_state:
+  mysql1:
 
 
 

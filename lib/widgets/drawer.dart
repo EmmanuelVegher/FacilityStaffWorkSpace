@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
+import '../screens/call_tracker/call_tracker_page.dart';
 import '../screens/call_tracker/report_page.dart';
 import '../screens/delete_account/delete_account.dart';
 import '../screens/facial_recognition/Facial_recognition_page.dart';
@@ -333,7 +334,7 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => ReportsPageWeb()),
+                    builder: (context) => CallTrackerPageWeb()),
 
               );
             },
