@@ -1,14 +1,14 @@
 // pages/call_tracker/today_call_page_web.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For Clipboard
+// For Clipboard
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/contact.dart';
 import '../../services/firestore_service.dart'; // FirestoreService
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 class TodayCallsPageWeb extends StatefulWidget {
+  const TodayCallsPageWeb({super.key});
+
   @override
   _TodayCallsPageWebState createState() => _TodayCallsPageWebState();
 }
@@ -23,10 +23,10 @@ class _TodayCallsPageWebState extends State<TodayCallsPageWeb> {
   Set<String> duplicatePhones = {};
 
   // NMRS User Selection state (keep if needed)
-  bool _isEditingUser = false;
-  String _displayedFullName = '';
+  final bool _isEditingUser = false;
+  final String _displayedFullName = '';
   String? _selectedFullName;
-  List<Map<String, dynamic>> _users = []; // Fetch from Firestore 'Staff' if needed
+  final List<Map<String, dynamic>> _users = []; // Fetch from Firestore 'Staff' if needed
 
   @override
   void initState() {
@@ -90,7 +90,7 @@ class _TodayCallsPageWebState extends State<TodayCallsPageWeb> {
   // --- Build Contact Card (Same as contact_list_web) ---
   Widget _buildContactCard(Contact contact) {
     // ... Use the same _buildContactCard implementation from contact_list_web.dart ...
-    return Card(/* ... */);
+    return const Card(/* ... */);
   }
 
   @override

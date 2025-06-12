@@ -11,6 +11,8 @@ import 'missedAndIITPage.dart';
 
 
 class CallTrackerPageWeb extends StatefulWidget {
+  const CallTrackerPageWeb({super.key});
+
   @override
   _CallTrackerPageWebState createState() => _CallTrackerPageWebState();
 }
@@ -20,12 +22,12 @@ class _CallTrackerPageWebState extends State<CallTrackerPageWeb> {
 
   // List of WEB screens
   final List<Widget> _screens = [
-    TodayCallsPageWeb(),
-    MissedAndIITPageWeb(),
-    UpcomingAppointmentsPageWeb(),
-    ContactListPageWeb(),
-    ImportContactsPageWeb(),
-    ReportsPageWeb(), // Use the web reports page
+    const TodayCallsPageWeb(),
+    const MissedAndIITPageWeb(),
+    const UpcomingAppointmentsPageWeb(),
+    const ContactListPageWeb(),
+    const ImportContactsPageWeb(),
+    const ReportsPageWeb(), // Use the web reports page
   ];
 
   @override

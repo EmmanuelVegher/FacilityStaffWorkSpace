@@ -20,7 +20,7 @@ class LocationModel {
     this.locationName,
     this.datimCode,
     this.locationType,
-  }) : uuid = existingUuid ?? Uuid().v4();
+  }) : uuid = existingUuid ?? const Uuid().v4();
 
   // Factory constructor from Firestore
   factory LocationModel.fromFirestore(Map<String, dynamic> data, String documentId) {
@@ -129,7 +129,7 @@ class FirestoreService {
         .orderBy('name') // Example ordering
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) =>
-        Contact.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)
+        Contact.fromFirestore(doc.data(), doc.id)
     ).toList());
   }
 
@@ -142,7 +142,7 @@ class FirestoreService {
           .set(contact.toJson(), SetOptions(merge: true)); // Use merge to update existing
     } catch (e) {
       print("Error saving contact ${contact.uuid}: $e");
-      throw e; // Re-throw to handle in UI
+      rethrow; // Re-throw to handle in UI
     }
   }
 
@@ -176,7 +176,7 @@ class FirestoreService {
       await _db.collection(_contactsCollectionPath).doc(uuid).delete();
     } catch (e) {
       print("Error deleting contact $uuid: $e");
-      throw e;
+      rethrow;
     }
   }
 
@@ -193,7 +193,7 @@ class FirestoreService {
       print("Cleared collection: $_contactsCollectionPath");
     } catch (e) {
       print("Error clearing contacts collection: $e");
-      throw e;
+      rethrow;
     }
   }
 

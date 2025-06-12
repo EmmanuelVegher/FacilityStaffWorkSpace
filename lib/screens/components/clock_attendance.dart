@@ -576,7 +576,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
         SizedBox(height: sizes.cardInnerSpacing),
         _buildLocationStatusCard(context, controller, screenSize, sizes),
         SizedBox(height: sizes.cardInnerSpacing),
-        Text(
+        const Text(
           "Location data powered by OpenStreetMap contributors, under the Open Database License.",
           style: TextStyle(fontSize: 12, color: Colors.grey),
           textAlign: TextAlign.center,
@@ -794,7 +794,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
     DateTime lastThursday = DateTime(year, month + 1, 0); // Start from the last day of the month
 
     while (lastThursday.weekday != DateTime.thursday) {
-      lastThursday = lastThursday.subtract(Duration(days: 1));
+      lastThursday = lastThursday.subtract(const Duration(days: 1));
     }
 
     // Ensure the last Thursday falls between the 20th and 30th
@@ -807,7 +807,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
     DateTime lastFriday = DateTime(year, month, 11); // Start from the 11th
 
     while (lastFriday.weekday != DateTime.friday) {
-      lastFriday = lastFriday.subtract(Duration(days: 1));
+      lastFriday = lastFriday.subtract(const Duration(days: 1));
     }
 
     // Ensure the last Friday falls between the 2nd and 11th
@@ -840,7 +840,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => PsychologicalMetricsPage(),
+                builder: (context) => const PsychologicalMetricsPage(),
               ),
             );
             return;

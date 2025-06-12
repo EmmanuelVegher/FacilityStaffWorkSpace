@@ -639,14 +639,14 @@ class _PsychologicalMetricsPageState extends State<PsychologicalMetricsPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Flexible(
+            const Flexible(
               child: Column(
                 children: [
-                  const Icon(Icons.drag_indicator, color: Colors.grey),
-                  const SizedBox(height: 4),
+                  Icon(Icons.drag_indicator, color: Colors.grey),
+                  SizedBox(height: 4),
                   Text(
                     'Press & Hold & Drag up or down to Rearrange',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                     textAlign: TextAlign.center,
                     softWrap: true,
                   ),

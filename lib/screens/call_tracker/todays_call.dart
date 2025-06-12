@@ -1,12 +1,13 @@
 // pages/call_tracker/today_call_page_web.dart (Example Snippet)
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Use Firestore
-import 'package:intl/intl.dart';
 import '../../models/contact.dart';
 import '../../services/firestore_service.dart'; // Use FirestoreService
 // ... other necessary imports (shared_preferences, etc.)
 
 class TodayCallsPageWeb extends StatefulWidget {
+  const TodayCallsPageWeb({super.key});
+
   @override
   _TodayCallsPageWebState createState() => _TodayCallsPageWebState();
 }
@@ -21,11 +22,11 @@ class _TodayCallsPageWebState extends State<TodayCallsPageWeb> {
   Set<String> duplicatePhones = {};
 
   // NMRS User Selection state variables (keep if needed)
-  List<Map<String, dynamic>> _users = [];
+  final List<Map<String, dynamic>> _users = [];
   String? _selectedFullName;
-  bool _isFetchingUsers = false;
-  bool _isEditingUser = false;
-  String _displayedFullName = '';
+  final bool _isFetchingUsers = false;
+  final bool _isEditingUser = false;
+  final String _displayedFullName = '';
 
 
   @override
@@ -161,7 +162,7 @@ class _TodayCallsPageWebState extends State<TodayCallsPageWeb> {
             // Optionally show phone icon that copies number:
             if (hasValidPhoneNumber)
               IconButton(
-                icon: Icon(Icons.content_copy, size: 18, color: Colors.grey),
+                icon: const Icon(Icons.content_copy, size: 18, color: Colors.grey),
                 tooltip: 'Copy Phone Number',
                 onPressed: () {
                   // Clipboard.setData(ClipboardData(text: contact.phoneNumber!));
@@ -204,8 +205,8 @@ class _TodayCallsPageWebState extends State<TodayCallsPageWeb> {
               ),
             ),
             if (!isLoading && todayContacts.isNotEmpty)
-              Padding( // Filter summary
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              const Padding( // Filter summary
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

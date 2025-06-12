@@ -1,15 +1,14 @@
 // pages/call_tracker/upcoming_appointment_web.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For Clipboard
+// For Clipboard
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import '../../models/contact.dart';
 import '../../services/firestore_service.dart'; // FirestoreService
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 
 class UpcomingAppointmentsPageWeb extends StatefulWidget {
+  const UpcomingAppointmentsPageWeb({super.key});
+
   @override
   _UpcomingAppointmentsPageWebState createState() => _UpcomingAppointmentsPageWebState();
 }
@@ -24,10 +23,10 @@ class _UpcomingAppointmentsPageWebState extends State<UpcomingAppointmentsPageWe
   Set<String> duplicatePhones = {};
 
   // NMRS User Selection state
-  bool _isEditingUser = false;
-  String _displayedFullName = '';
+  final bool _isEditingUser = false;
+  final String _displayedFullName = '';
   String? _selectedFullName;
-  List<Map<String, dynamic>> _users = [];
+  final List<Map<String, dynamic>> _users = [];
 
 
   @override
@@ -91,7 +90,7 @@ class _UpcomingAppointmentsPageWebState extends State<UpcomingAppointmentsPageWe
   // --- Build Contact Card (Same as contact_list_web) ---
   Widget _buildContactCard(Contact contact) {
     // ... Use the same _buildContactCard implementation from contact_list_web.dart ...
-    return Card(/* ... */);
+    return const Card(/* ... */);
   }
 
 

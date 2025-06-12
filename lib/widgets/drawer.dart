@@ -7,8 +7,6 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/call_tracker/call_tracker_page.dart';
-import '../screens/call_tracker/report_page.dart';
-import '../screens/delete_account/delete_account.dart';
 import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
 import '../screens/leave_request/leave_request.dart';
@@ -17,7 +15,8 @@ import '../screens/profile_page.dart';
 import '../screens/staff_dashboard.dart';
 import '../screens/timesheet/timesheet.dart';
 import '../screens/timesheet/upload_signature.dart';
-import '../team_survey/team_survey.dart';
+import '../screens/viral_load_tracker/vl_reports_page.dart';
+import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
 
 
@@ -334,11 +333,37 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => CallTrackerPageWeb()),
+                    builder: (context) => const CallTrackerPageWeb()),
 
               );
             },
           ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.biotech_outlined,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Viral Load Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const ReportVlTab()),
+              );
+            },
+          ),
+
 
           const Divider(
             color: Colors.grey,

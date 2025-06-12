@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -172,7 +171,7 @@ class _DeleteDataPageState extends State<DeleteDataPage> {
 }
 
 class DeleteDataConfirmationPage extends StatelessWidget {
-  const DeleteDataConfirmationPage({Key? key}) : super(key: key);
+  const DeleteDataConfirmationPage({super.key});
 
   Future<void> _deleteUserData(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;

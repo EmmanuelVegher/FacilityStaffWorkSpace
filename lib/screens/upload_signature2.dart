@@ -8,7 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 // Ensure Firebase Core is imported
 
-import '../../widgets/drawer.dart';
 
 class UploadSignaturePage2 extends StatefulWidget {
   const UploadSignaturePage2({super.key});

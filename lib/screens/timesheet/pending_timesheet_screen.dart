@@ -1,14 +1,10 @@
 import 'dart:developer';
 import 'dart:html' as html; // Import for web-specific APIs
 import 'dart:convert'; // For base64 encoding if needed
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:http/http.dart' as http; // Import the http package
 import 'package:dio/dio.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
@@ -359,9 +355,9 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
   String? caritasSupervisorSignatureDate;
   String? _caritasSupervisorSignatureLink;
   String? _selectedSupervisorEmail;
-  GlobalKey _globalKey = GlobalKey(); // Define the GlobalKey
-  ScrollController _scrollController = ScrollController(); // Add a scroll controller
-  ScrollController _horizontalScrollController =
+  final GlobalKey _globalKey = GlobalKey(); // Define the GlobalKey
+  final ScrollController _scrollController = ScrollController(); // Add a scroll controller
+  final ScrollController _horizontalScrollController =
   ScrollController(); // Controller for horizontal scrolling
   Uint8List? staffSignature1; // Store staff signature as Uint8List
   String formattedDate = DateFormat('MMMM dd, yyyy').format(DateTime.now());
@@ -799,7 +795,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
 
       // Add Task Summary Page using MultiPage, now passing pre-fetched content
       // Conditionally add Task Summary Page
-      if (_includeTaskSummary && taskSummaryContent != null) {
+      if (_includeTaskSummary) {
         pdf.addPage(
           pw.MultiPage(
             // pageFormat: pageFormat,
@@ -826,7 +822,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
                 pw.SizedBox(height: 20),
                 pw.Center(
                   child: pw.Text(
-                    "Task Summary for ${monthYear1}",
+                    "Task Summary for $monthYear1",
                     style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                   ),
                 ),
@@ -881,8 +877,8 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     Map<DateTime, List<Report4>> reportsByDate = {};
 
     for (DateTime date = startDateOfMonth;
-    date.isBefore(endDateOfMonth.add(Duration(days: 1)));
-    date = date.add(Duration(days: 1))) {
+    date.isBefore(endDateOfMonth.add(const Duration(days: 1)));
+    date = date.add(const Duration(days: 1))) {
       if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
         continue; // skip weekends
       }
@@ -973,7 +969,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       });
 
       content.add(pw.Padding(
-        padding: pw.EdgeInsets.only(bottom: 10, top: 20),
+        padding: const pw.EdgeInsets.only(bottom: 10, top: 20),
         child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date),
             style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
       ));
@@ -982,7 +978,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
         context: null,
         border: pw.TableBorder.all(),
         data: tableData,
-        cellStyle: pw.TextStyle(fontSize: 10),
+        cellStyle: const pw.TextStyle(fontSize: 10),
         headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
       ));
     });
@@ -990,7 +986,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     // Summary of other tasks
     if (otherTasksByDate.isNotEmpty) {
       content.add(pw.Padding(
-        padding: pw.EdgeInsets.only(top: 30),
+        padding: const pw.EdgeInsets.only(top: 30),
         child: pw.Text("Summary of Other Tasks:",
             style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
       ));
@@ -998,7 +994,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       otherTasksByDate.forEach((date, tasks) {
         if (tasks.isNotEmpty) {
           content.add(pw.Padding(
-            padding: pw.EdgeInsets.only(top: 10, bottom: 5),
+            padding: const pw.EdgeInsets.only(top: 10, bottom: 5),
             child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date),
                 style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
           ));
@@ -1008,7 +1004,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Padding(
-                  padding: pw.EdgeInsets.only(right: 5, top: 2),
+                  padding: const pw.EdgeInsets.only(right: 5, top: 2),
                   child: pw.Text('•'),
                 ),
                 pw.Expanded(
@@ -1029,7 +1025,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     final parts = dateString.split('_');
 
     if (parts.length != 2) {
-      return [Center(child: Text("Invalid date format in timesheet data."))];
+      return [const Center(child: Text("Invalid date format in timesheet data."))];
     }
 
     final int month = int.tryParse(parts[0]) ?? 1;
@@ -1047,8 +1043,8 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     Map<DateTime, List<Report4>> reportsByDate = {};
 
     for (DateTime date = startDate;
-    date.isBefore(endDate.add(Duration(days: 1)));
-    date = date.add(Duration(days: 1))) {
+    date.isBefore(endDate.add(const Duration(days: 1)));
+    date = date.add(const Duration(days: 1))) {
       if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) continue;
 
       final formattedDate = DateFormat('dd-MMM-yyyy').format(date);
@@ -1083,7 +1079,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     }
 
     if (reportsByDate.isEmpty && otherTasksByDate.isEmpty) {
-      return [Center(child: Text("No reports or tasks found for this period."))];
+      return [const Center(child: Text("No reports or tasks found for this period."))];
     }
 
     for (var date in reportsByDate.keys) {
@@ -1109,18 +1105,18 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     content.add(Center(
       child: Text(
         "Task Summary for period: ${DateFormat('dd MMMM yyyy').format(startDate)} - ${DateFormat('dd MMMM yyyy').format(endDate)}",
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         textAlign: TextAlign.center,
       ),
     ));
-    content.add(SizedBox(height: 20));
+    content.add(const SizedBox(height: 20));
 
     summaryDataByDate.forEach((date, indicators) {
       content.add(Padding(
-        padding: EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Text(
           DateFormat('EEEE, dd MMMM yyyy').format(date),
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
       ));
 
@@ -1173,26 +1169,26 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
                 cells: [
                   DataCell(
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 200),
-                      child: Text(indicatorName, style: TextStyle(fontSize: 10), softWrap: true),
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(indicatorName, style: const TextStyle(fontSize: 10), softWrap: true),
                     ),
                   ),
                   DataCell(
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 100),
-                      child: Text(enteredStr, style: TextStyle(fontSize: 10), softWrap: true),
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(enteredStr, style: const TextStyle(fontSize: 10), softWrap: true),
                     ),
                   ),
                   DataCell(
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 100),
-                      child: Text(totalStr, style: TextStyle(fontSize: 10), softWrap: true),
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(totalStr, style: const TextStyle(fontSize: 10), softWrap: true),
                     ),
                   ),
                   DataCell(
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 100),
-                      child: Text(formattedPercentage, style: TextStyle(fontSize: 10), softWrap: true),
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(formattedPercentage, style: const TextStyle(fontSize: 10), softWrap: true),
                     ),
                   ),
                 ],
@@ -1204,7 +1200,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     });
 
     if (otherTasksByDate.isNotEmpty) {
-      content.add(Padding(
+      content.add(const Padding(
         padding: EdgeInsets.only(top: 30),
         child: Text(
           "Summary of Other Tasks:",
@@ -1215,10 +1211,10 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       otherTasksByDate.forEach((date, tasks) {
         if (tasks.isNotEmpty) {
           content.add(Padding(
-            padding: EdgeInsets.only(top: 10, bottom: 5),
+            padding: const EdgeInsets.only(top: 10, bottom: 5),
             child: Text(
               DateFormat('EEEE, dd MMMM yyyy').format(date),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ));
 
@@ -1226,7 +1222,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
             content.add(Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
+                const Padding(
                   padding: EdgeInsets.only(right: 5, top: 2),
                   child: Text('•'),
                 ),
@@ -2318,7 +2314,7 @@ $selectedBioFirstName $selectedBioLastName
 
   Future<void> _loadBioData2() async {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return null;
+    if (userId == null) return;
     final bioData = await _fetchBioDataFromFirestore(userId);
     if (bioData != null) {
       setState(() {
@@ -2823,7 +2819,7 @@ $selectedBioFirstName $selectedBioLastName
         actions: [
 
           _isPDFLoading
-              ? CircularProgressIndicator()
+              ? const CircularProgressIndicator()
               : Row(
               children:[
 
@@ -3652,22 +3648,22 @@ $selectedBioFirstName $selectedBioLastName
                                                                   borderRadius: BorderRadius.circular(20),
                                                                   // color: Colors.grey.shade300, // Uncomment if needed
                                                                 ),
-                                                                child: Column(
+                                                                child: const Column(
                                                                   mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
                                                                   children: [
                                                                     Text(
                                                                       "Timesheet Returned",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 16),
+                                                                      style: TextStyle(fontWeight: FontWeight.bold,fontSize: 16),
                                                                     ),
-                                                                    const SizedBox(height: 8),
+                                                                    SizedBox(height: 8),
                                                                     Row(
                                                                       mainAxisAlignment: MainAxisAlignment.center,
                                                                       children: [
-                                                                        const Icon(Icons.check_circle, color: Colors.green),
-                                                                        const SizedBox(width: 8),
+                                                                        Icon(Icons.check_circle, color: Colors.green),
+                                                                        SizedBox(width: 8),
                                                                         Text(
                                                                           "Status: Returned",
-                                                                          style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
+                                                                          style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         ),
                                                                       ],
                                                                     ),
@@ -4204,7 +4200,7 @@ $selectedBioFirstName $selectedBioLastName
 
                                                             }
                                                           } else {
-                                                            return const Text("Timesheet Yet to be submitted for Project Cordinator's Signature", style: const TextStyle(fontWeight: FontWeight.bold,fontSize:12));
+                                                            return const Text("Timesheet Yet to be submitted for Project Cordinator's Signature", style: TextStyle(fontWeight: FontWeight.bold,fontSize:12));
                                                           }
                                                         },
                                                       ),
@@ -4453,22 +4449,22 @@ $selectedBioFirstName $selectedBioLastName
                                                                   borderRadius: BorderRadius.circular(20),
                                                                   // color: Colors.grey.shade300, // Uncomment if needed
                                                                 ),
-                                                                child: Column(
+                                                                child: const Column(
                                                                   mainAxisSize: MainAxisSize.min, // Prevents expanding to fill space
                                                                   children: [
                                                                     Text(
                                                                       "Timesheet Returned",
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 16),
+                                                                      style: TextStyle(fontWeight: FontWeight.bold,fontSize: 16),
                                                                     ),
-                                                                    const SizedBox(height: 8),
+                                                                    SizedBox(height: 8),
                                                                     Row(
                                                                       mainAxisAlignment: MainAxisAlignment.center,
                                                                       children: [
-                                                                        const Icon(Icons.check_circle, color: Colors.green),
-                                                                        const SizedBox(width: 8),
+                                                                        Icon(Icons.check_circle, color: Colors.green),
+                                                                        SizedBox(width: 8),
                                                                         Text(
                                                                           "Status: Returned",
-                                                                          style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
+                                                                          style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                         ),
                                                                       ],
                                                                     ),
@@ -4505,7 +4501,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   padding: const EdgeInsets.all(8.0),
                                                   child: Column(
                                                     children: [
-                                                      Text('Date', style: TextStyle(
+                                                      const Text('Date', style: TextStyle(
                                                           fontWeight: FontWeight.bold, fontSize: 18),),
                                                       SizedBox(height: 5 * marginFactor),
                                                       Text(formattedDate, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -4545,7 +4541,7 @@ $selectedBioFirstName $selectedBioLastName
                                                         mainAxisAlignment : MainAxisAlignment.center,
                                                       children:[
                                                         _isPDFLoading
-                                                            ? CircularProgressIndicator()
+                                                            ? const CircularProgressIndicator()
                                                             :Row(
                                                           children: [
                                                             Checkbox(

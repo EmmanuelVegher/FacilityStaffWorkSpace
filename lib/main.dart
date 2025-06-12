@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Work Manager',
+      title: 'CARITAS Nigeria Service Delivery Workspace',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -38,8 +38,8 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(), // Use SplashScreen as home
       getPages: [
         GetPage(name: '/login', page: () => const LoginPage()),
-        GetPage(name: '/delete-data', page: () => DeleteDataPage()),
-        GetPage(name: '/delete-account', page: () => DeleteAccountPage()),
+        GetPage(name: '/delete-data', page: () => const DeleteDataPage()),
+        GetPage(name: '/delete-account', page: () => const DeleteAccountPage()),
       ],
     );
   }

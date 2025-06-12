@@ -46,7 +46,7 @@ class _ProfilePageState extends State<ProfilePage> {
   var newGender;
   bool isSynced = true;
   bool newSynced = true;
-  String _currentUsername = "";
+  final String _currentUsername = "";
   String? selectedProjectName;
   String? selectedBioFirstName;
   String? selectedBioLastName;

@@ -28,7 +28,7 @@ class _LoginPageState extends State<LoginPage>
 
 
   int _currentCharIndex = 0;
-  final String _title = "Work Manager";
+  final String _title = "CARITAS Nigeria Service Delivery Workspace";
   String _animatedText = "";
 
   @override

@@ -18,6 +18,8 @@ import '../../services/firestore_service.dart';
 // Example: import 'package:simple_vcard_parser/simple_vcard_parser.dart';
 
 class ImportContactsPageWeb extends StatefulWidget {
+  const ImportContactsPageWeb({super.key});
+
   @override
   _ImportContactsPageWebState createState() => _ImportContactsPageWebState();
 }
@@ -75,7 +77,7 @@ class _ImportContactsPageWebState extends State<ImportContactsPageWeb> {
 
 
   // Location data cache (optional optimization)
-  Map<String, LocationModel?> _locationCache = {};
+  final Map<String, LocationModel?> _locationCache = {};
   List<String> _statesList = [];
   Map<String, List<String>> _facilitiesMap = {};
 
@@ -126,7 +128,7 @@ class _ImportContactsPageWebState extends State<ImportContactsPageWeb> {
       // This part depends heavily on how you store locations in Firestore
       print("Loading location data from Firestore..."); // Placeholder
       // Simulate loading
-      await Future.delayed(Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 1));
       setState(() {
         _statesList = ["Placeholder State 1", "Placeholder State 2"];
         _facilitiesMap = {"Placeholder State 1": ["Facility P1", "Facility P2"]};
@@ -590,10 +592,10 @@ class _ImportContactsPageWebState extends State<ImportContactsPageWeb> {
       // Note: Your complex query with function creation might need adjustments
       // or might fail depending on MySQL server permissions from the web host.
       // Consider simplifying or moving to a backend.
-      final queryFunction = ''' DROP FUNCTION IF EXISTS get_concept_name; ''';
-      final query = ''' CREATE FUNCTION get_concept_name... '''; // Shortened
-      final queryy1 = ''' SET SESSION optimizer_switch='block_nested_loop=off'; ''';
-      final query2 = ''' SELECT DISTINCT patient.patient_id AS patient_id, ... WHERE Extracted_Data.NextAppointmentDate between ? and ?; '''; // Shortened
+      const queryFunction = ''' DROP FUNCTION IF EXISTS get_concept_name; ''';
+      const query = ''' CREATE FUNCTION get_concept_name... '''; // Shortened
+      const queryy1 = ''' SET SESSION optimizer_switch='block_nested_loop=off'; ''';
+      const query2 = ''' SELECT DISTINCT patient.patient_id AS patient_id, ... WHERE Extracted_Data.NextAppointmentDate between ? and ?; '''; // Shortened
 
       await conn.query(queryFunction);
       await conn.query(query);
@@ -630,7 +632,7 @@ class _ImportContactsPageWebState extends State<ImportContactsPageWeb> {
           name: row['FullName']?.toString(),
           address: row['Address']?.toString(),
           uniqueID: row['identifier']?.toString(),
-          phoneNumber: row['value']?.toString()?.replaceAll(RegExp(r'[^0-9+]'), ''),
+          phoneNumber: row['value']?.toString().replaceAll(RegExp(r'[^0-9+]'), ''),
           artStatus: row['ART_Status']?.toString(),
           dateOfTermination: row['DateOfTermination'] != null ? DateTime.tryParse(row['DateOfTermination'].toString()) : null,
           sampleCollectionDate: row['sample_collection_date'] != null ? DateTime.tryParse(row['sample_collection_date'].toString()) : null,
@@ -672,7 +674,7 @@ class _ImportContactsPageWebState extends State<ImportContactsPageWeb> {
     try {
       // ... Connect ...
       // ... Execute Functions ...
-      final String query2All = """ SELECT ... FROM ... """; // Your query WITHOUT the WHERE clause for NextAppointmentDate
+      const String query2All = """ SELECT ... FROM ... """; // Your query WITHOUT the WHERE clause for NextAppointmentDate
       var results = await conn?.query(query2All);
       // ... Process results and save to Firestore (same loop as above) ...
       // ... Show success/error toast ...
@@ -1052,7 +1054,7 @@ ON Tb1.patient_id = patient.patient_id
     html.Url.revokeObjectUrl(url); // Clean up
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('SQL script download initiated.')),
+      const SnackBar(content: Text('SQL script download initiated.')),
     );
   }
 
@@ -1085,7 +1087,7 @@ ON Tb1.patient_id = patient.patient_id
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Import Contacts')),
+      appBar: AppBar(title: const Text('Import Contacts')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1100,29 +1102,29 @@ ON Tb1.patient_id = patient.patient_id
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text('Add Contact Manually', style: Theme.of(context).textTheme.titleLarge),
-                      SizedBox(height: 16),
-                      TextField(controller: _nameController, decoration: InputDecoration(labelText: 'Name *', border: OutlineInputBorder())),
-                      SizedBox(height: 12),
-                      TextField(controller: _phoneController, decoration: InputDecoration(labelText: 'Phone Number *', border: OutlineInputBorder()), keyboardType: TextInputType.phone),
-                      SizedBox(height: 12),
-                      TextField(controller: _addressController, decoration: InputDecoration(labelText: 'Address', border: OutlineInputBorder())),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 16),
+                      TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name *', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone Number *', border: OutlineInputBorder()), keyboardType: TextInputType.phone),
+                      const SizedBox(height: 12),
+                      TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
                       Row(children: [ // Date Fields
-                        Expanded(child: TextField(controller: _lastVisitController, decoration: InputDecoration(labelText: 'Last Visit', suffixIcon: IconButton(icon: Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _lastVisitController))), readOnly: true)),
-                        SizedBox(width: 12),
-                        Expanded(child: TextField(controller: _nextVisitController, decoration: InputDecoration(labelText: 'Next Visit', suffixIcon: IconButton(icon: Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _nextVisitController))), readOnly: true)),
+                        Expanded(child: TextField(controller: _lastVisitController, decoration: InputDecoration(labelText: 'Last Visit', suffixIcon: IconButton(icon: const Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _lastVisitController))), readOnly: true)),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextField(controller: _nextVisitController, decoration: InputDecoration(labelText: 'Next Visit', suffixIcon: IconButton(icon: const Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _nextVisitController))), readOnly: true)),
                       ]),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>( // Appointment Type
-                        decoration: InputDecoration(labelText: 'Appointment Type', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(labelText: 'Appointment Type', border: OutlineInputBorder()),
                         value: _selectedAppointmentType,
                         items: ["Actual Next Appointment", "Calculated Next Appointment"].map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
                         onChanged: (v) => setState(() => _selectedAppointmentType = v),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       // State Dropdown (using fetched _statesList)
                       DropdownButtonFormField<String>(
-                        decoration: InputDecoration(labelText: 'State', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(labelText: 'State', border: OutlineInputBorder()),
                         value: _selectedState,
                         items: _statesList.map((state) => DropdownMenuItem(value: state, child: Text(state))).toList(),
                         onChanged: (newValue) {
@@ -1133,10 +1135,10 @@ ON Tb1.patient_id = patient.patient_id
                           });
                         },
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       // Facility Dropdown (filtered by state)
                       DropdownButtonFormField<String>(
-                        decoration: InputDecoration(labelText: 'Facility Name', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(labelText: 'Facility Name', border: OutlineInputBorder()),
                         value: _selectedFacilityName,
                         // Use facilities from _facilitiesMap based on selected state
                         items: (_selectedState != null && _facilitiesMap.containsKey(_selectedState))
@@ -1148,23 +1150,23 @@ ON Tb1.patient_id = patient.patient_id
                           setState(() { _datimCodeController.text = datimCode ?? ''; });
                         },
                       ),
-                      SizedBox(height: 12),
-                      TextField(controller: _uniqueIDController, decoration: InputDecoration(labelText: 'Unique ID (Client ART ID)', border: OutlineInputBorder())),
-                      SizedBox(height: 12),
-                      TextField(controller: _datimCodeController, decoration: InputDecoration(labelText: 'Datim Code', border: OutlineInputBorder()), readOnly: true),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                      TextField(controller: _uniqueIDController, decoration: const InputDecoration(labelText: 'Unique ID (Client ART ID)', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(controller: _datimCodeController, decoration: const InputDecoration(labelText: 'Datim Code', border: OutlineInputBorder()), readOnly: true),
+                      const SizedBox(height: 12),
                       Row(children: [ // Sample Date / VL
-                        Expanded(child: TextField(controller: _sampleCollectionDateController, decoration: InputDecoration(labelText: 'Sample Date', suffixIcon: IconButton(icon: Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _sampleCollectionDateController))), readOnly: true)),
-                        SizedBox(width: 12),
-                        Expanded(child: TextField(controller: _currentViralLoadController, decoration: InputDecoration(labelText: 'Viral Load'), keyboardType: TextInputType.text)), // Allow text like <50
+                        Expanded(child: TextField(controller: _sampleCollectionDateController, decoration: InputDecoration(labelText: 'Sample Date', suffixIcon: IconButton(icon: const Icon(Icons.calendar_today), onPressed: () => _selectDate(context, _sampleCollectionDateController))), readOnly: true)),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextField(controller: _currentViralLoadController, decoration: const InputDecoration(labelText: 'Viral Load'), keyboardType: TextInputType.text)), // Allow text like <50
                       ]),
-                      SizedBox(height: 16),
-                      ElevatedButton(onPressed: _addManualContact, child: Text('Add Contact'), style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 16))),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _addManualContact, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), child: const Text('Add Contact')),
                     ]
                 ),
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // --- File Import Card (Web Specific) ---
             Card(
@@ -1175,22 +1177,22 @@ ON Tb1.patient_id = patient.patient_id
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Import from File (CSV or VCF)', style: Theme.of(context).textTheme.titleLarge),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: _pickAndReadFile, // Use combined picker
-                      child: Text('Select Contacts File (.csv or .vcf)'),
+                      child: const Text('Select Contacts File (.csv or .vcf)'),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     if (uploadedFileName != null)
-                      Center(child: Text('Selected: $uploadedFileName', style: TextStyle(fontStyle: FontStyle.italic))),
-                    SizedBox(height: 16),
+                      Center(child: Text('Selected: $uploadedFileName', style: const TextStyle(fontStyle: FontStyle.italic))),
+                    const SizedBox(height: 16),
                     ElevatedButton(
                       // Disable if no file selected or already importing
                       onPressed: (uploadedFileBytes == null || isImporting) ? null : _processUploadedFile,
-                      child: isImporting ? CircularProgressIndicator(color: Colors.white,) : Text('Import Contacts from Selected File'),
-                      style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 16)),
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: isImporting ? const CircularProgressIndicator(color: Colors.white,) : const Text('Import Contacts from Selected File'),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
                       "Note: For large files, import may take some time. "
                           "Ensure your CSV has columns like 'name', 'phone_number'. "
@@ -1201,7 +1203,7 @@ ON Tb1.patient_id = patient.patient_id
                 ),
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // --- NMRS Import Card (Keep structure, add warnings) ---
             Card(
@@ -1212,45 +1214,45 @@ ON Tb1.patient_id = patient.patient_id
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Import from NigeriaMRS (NMRS)', style: Theme.of(context).textTheme.titleLarge),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     // *** SECURITY WARNING ***
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       color: Colors.orange.shade100,
                       child: Text(
                         'Security Warning: Connecting directly to the NMRS database from the web browser is NOT recommended for production environments due to security risks. Consider using a secure backend API.',
                         style: TextStyle(color: Colors.orange.shade900),
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     // ... NMRS Settings UI (same as mobile) ...
                     // ... Date Range Pickers (same as mobile) ...
                     ElevatedButton(
                       onPressed: (isDatabaseImporting || _savedSettings.isEmpty) ? null : _importContactsFromDatabase, // Uses FirestoreService
-                      child: isDatabaseImporting ? CircularProgressIndicator(color: Colors.white,) : Text('Import Scheduled Appointments Between Dates'),
+                      child: isDatabaseImporting ? const CircularProgressIndicator(color: Colors.white,) : const Text('Import Scheduled Appointments Between Dates'),
                     ),
                     // ... Divider and 'OR' ...
                     ElevatedButton(
                       onPressed: (isDatabaseImporting1 || _savedSettings.isEmpty) ? null : _importAllContactsFromDatabase, // Uses FirestoreService
-                      child: isDatabaseImporting1 ? CircularProgressIndicator(color: Colors.white,) : Text('Import All Client Appointments'),
+                      child: isDatabaseImporting1 ? const CircularProgressIndicator(color: Colors.white,) : const Text('Import All Client Appointments'),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     // ... Download/Share Buttons (use web download) ...
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton.icon(
                           onPressed: _downloadSqlScript, // Uses web download
-                          icon: Icon(Icons.download, color: Colors.white),
-                          label: Text('Download SQL Script', style: TextStyle(color: Colors.white)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800020)),
+                          icon: const Icon(Icons.download, color: Colors.white),
+                          label: const Text('Download SQL Script', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF800020)),
                         ),
-                        SizedBox(width: 16),
+                        const SizedBox(width: 16),
                         ElevatedButton.icon(
                           onPressed: _downloadAndShareSqlScript, // Shows message + downloads
-                          icon: Icon(Icons.share, color: Colors.white),
-                          label: Text('Share SQL Script', style: TextStyle(color: Colors.white)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800020)),
+                          icon: const Icon(Icons.share, color: Colors.white),
+                          label: const Text('Share SQL Script', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF800020)),
                         ),
                       ],
                     ),

@@ -10,8 +10,6 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw; // Changed import prefix to pw for clarity
 import 'dart:html' as html;
-import 'package:flutter/material.dart';
-import 'package:web/web.dart' as web;
 import 'package:pdf/pdf.dart';
 import 'package:flutter/services.dart' show rootBundle; // Import for rootBundle
 
@@ -456,7 +454,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
     final attendanceData = timesheetData['timesheetEntries']?.cast<Map<String, dynamic>>() ?? [];
 
     // Helper function to get duration for a date
-    String _getDurationForDate(DateTime date, String projectName, String category, List<Map<String, dynamic>> data) {
+    String getDurationForDate(DateTime date, String projectName, String category, List<Map<String, dynamic>> data) {
       double totalHoursForDate = 0;
 
       for (var attendance in data) {
@@ -490,7 +488,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
       double totalHours = 0;
       for (var date in daysInRange) {
         if (!isWeekend(date)) {
-          totalHours += double.parse(_getDurationForDate(date, projectName, projectName, attendanceData));
+          totalHours += double.parse(getDurationForDate(date, projectName, projectName, attendanceData));
         }
       }
       return totalHours;
@@ -500,7 +498,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
       double totalHours = 0;
       for (var date in daysInRange) {
         if (!isWeekend(date)) {
-          totalHours += double.parse(_getDurationForDate(date, projectName, category, attendanceData));
+          totalHours += double.parse(getDurationForDate(date, projectName, category, attendanceData));
         }
       }
       return totalHours;
@@ -553,7 +551,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
               padding: const pw.EdgeInsets.all(1.0),
               child: pw.Text(projectName)),
           ...daysInRange.map((date) {
-            String hours = _getDurationForDate(date, projectName, projectName, attendanceData);
+            String hours = getDurationForDate(date, projectName, projectName, attendanceData);
             return pw.Container(
               width: 80,
               alignment: pw.Alignment.center,
@@ -588,7 +586,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
                 padding: const pw.EdgeInsets.all(1.0),
                 child: pw.Text(category)),
             ...daysInRange.map((date) {
-              String hours = _getDurationForDate(date, projectName, category, attendanceData);
+              String hours = getDurationForDate(date, projectName, category, attendanceData);
               return pw.Container(
                 width: 80,
                 alignment: pw.Alignment.center,
@@ -757,7 +755,7 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
         itemCount: timesheets.length,
         itemBuilder: (context, index) {
           final timesheet = timesheets[index];
-          final timesheetDocPath = '/Staff/${timesheet['staffId']}/TimeSheets/${_timesheetCollectionName}';
+          final timesheetDocPath = '/Staff/${timesheet['staffId']}/TimeSheets/$_timesheetCollectionName';
           bool isSelected = selectedTimesheetPaths.contains(timesheetDocPath);
 
 
@@ -780,30 +778,30 @@ class TimesheetStatusListPageState extends State<TimesheetStatusListPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('State: ${timesheet['state'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('Facility Name: ${timesheet['location'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('Staff Email: ${timesheet['staffEmail'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('Status: ${_getApprovalStatusText(timesheet)}'),
-                  SizedBox(height: 8,),
-                  Divider(),
+                  const SizedBox(height: 8,),
+                  const Divider(),
                   Text('Timesheet Submission Date: ${timesheet['timesheetSubmissionTimestamp'] != null ? _formatTimestamp(timesheet['timesheetSubmissionTimestamp']) : 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('Project Coordinator: ${timesheet['facilitySupervisor'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('Project Coordinator Approval Status: ${timesheet['facilitySupervisorSignatureStatus'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('CARITAS Supervisor: ${timesheet['caritasSupervisor'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   Text('CARITAS Supervisor\'s Approval Status: ${timesheet['caritasSupervisorSignatureStatus'] ?? 'N/A'}'),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   _buildApprovalDurationText(
                     title: 'Duration of Approval Time for Project Coordinator',
                     submissionTimestamp: timesheet['timesheetSubmissionTimestamp'],
                     approvalTimestamp: timesheet['facilitySupervisorTimesheetSubmissionTimestamp'],
                   ),
-                  SizedBox(height: 4,),
+                  const SizedBox(height: 4,),
                   _buildApprovalDurationText(
                     title: 'Duration of Approval Time for CARITAS Supervisor',
                     submissionTimestamp: timesheet['timesheetSubmissionTimestamp'],

@@ -46,14 +46,14 @@ class DashboardScreenState extends State<DashboardScreen> {
   bool _isDataLoaded = false; // Add a loading flag
 
   // New variables for month and year filter in Timesheet Status Card
-  DateTime _selectedTimesheetMonthYear = DateTime.now();
-  List<String> _monthNames = [
+  final DateTime _selectedTimesheetMonthYear = DateTime.now();
+  final List<String> _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
   int _selectedMonthIndex = DateTime.now().month - 1;
   int _selectedYear = DateTime.now().year;
-  List<int> _yearList = List.generate(10, (index) => DateTime.now().year - 5 + index); // Example: last 5 years and next 4 years from current year
+  final List<int> _yearList = List.generate(10, (index) => DateTime.now().year - 5 + index); // Example: last 5 years and next 4 years from current year
 
 
   @override
@@ -749,7 +749,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Expected Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('${expectedSubmission} Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+            Text('$expectedSubmission Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
         SizedBox(height: 3 * cardMarginFactor),
@@ -757,7 +757,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('${pendingSubmission} Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+            Text('$pendingSubmission Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
         SizedBox(height: 3 * cardMarginFactor),
@@ -765,7 +765,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('${pendingApproval} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
+            Text('$pendingApproval Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
           ],
         ),
     SizedBox(height: 10 * cardMarginFactor),
@@ -975,7 +975,6 @@ class DashboardScreenState extends State<DashboardScreen> {
     required double fontSizeFactor,
     required double chartLegendFontSizeFactor,
     required double iconSizeFactor,
-    bool isLargeScreen = false,
     required double otherCardHeightFactor,
     required double otherGridTextFontSizeFactor,
   }) {

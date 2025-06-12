@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:rxdart/rxdart.dart'; // Import rxdart for combining streams
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,13 +17,10 @@ import 'login_screen.dart';
 import '../models/facility_staff_model.dart';
 import 'dart:html' as html;
 
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart';
 
 class UserDashboardApp extends StatelessWidget {
   const UserDashboardApp({super.key});
@@ -427,7 +423,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               Padding(
                 padding: EdgeInsets.only(left: 10 * cardMarginFactor),
                 child: Text(
-                  'Work Manager',
+                  'CARITAS Nigeria Service Delivery Workspace',
                    style: TextStyle(
                     color: Colors.white,
                     fontSize: 20 * titleFontSizeFactor,
@@ -453,7 +449,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ),
           actions: [
             _isPDFLoading
-                ? CircularProgressIndicator()
+                ? const CircularProgressIndicator()
                 : Row(
                 children:[
                   IconButton(

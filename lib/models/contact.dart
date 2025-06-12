@@ -67,7 +67,7 @@ class Contact {
     this.dateOfTermination,
     this.sampleCollectionDate,
     this.currentViralLoad
-  }) : uuid = existingUuid ?? Uuid().v4(); // Initialize UUID
+  }) : uuid = existingUuid ?? const Uuid().v4(); // Initialize UUID
 
   // Helper to safely convert Timestamps or null
   static DateTime? _toDateTime(dynamic timestamp) {

@@ -21,10 +21,12 @@ import 'package:flutter/foundation.dart' show kIsWeb; // To check if running on 
 import 'package:universal_html/html.dart' as html; // For web platform detection
 import 'package:url_launcher/url_launcher.dart'; // For web tel: links
 
-import 'package:flutter/services.dart'; // For Clipboard
+// For Clipboard
 
 
 class ContactListPageWeb extends StatefulWidget {
+  const ContactListPageWeb({super.key});
+
   @override
   _ContactListPageWebState createState() => _ContactListPageWebState();
 }
@@ -44,7 +46,7 @@ class _ContactListPageWebState extends State<ContactListPageWeb> {
 
   // NMRS User Selection state variables (keep if linking display/filter)
   // bool _isFetchingUsers = false; // May not be needed if user list isn't fetched here
-  bool _isEditingUser = false;
+  final bool _isEditingUser = false;
   String _displayedFullName = '';
   List<Map<String, dynamic>> _users = []; // Maybe fetch from Firestore 'Staff' collection?
   bool _isMySQLConnected = false;
@@ -271,11 +273,10 @@ on userInfo.person_id = providerInfo.person_id
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Edit Contact Info'),
-              content: SingleChildScrollView( /* ... Dialog content fields ... */ ),
+              content: const SingleChildScrollView( /* ... Dialog content fields ... */ ),
               actions: [
                 TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(context)),
                 ElevatedButton(
-                  child: isSaving ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Update'),
                   onPressed: isSaving ? null : () async {
                     setDialogState(() => isSaving = true);
                     try {
@@ -302,6 +303,7 @@ on userInfo.person_id = providerInfo.person_id
                       }
                     }
                   },
+                  child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Update'),
                 ),
               ],
             );
@@ -344,7 +346,7 @@ on userInfo.person_id = providerInfo.person_id
       conn = await MySqlConnection.connect(settings); // Assign connection
 
       // Fetch Datim Code from NMRS
-      final datimCodeQuery =
+      const datimCodeQuery =
           'SELECT property_value FROM global_property WHERE property = "facility_datim_code" LIMIT 1';
       final datimCodeResult = await conn.query(datimCodeQuery);
       final nmrsDatimCode = datimCodeResult.isNotEmpty &&
@@ -367,7 +369,7 @@ on userInfo.person_id = providerInfo.person_id
 
       final patientId = contact.patientId;
       final phoneNumber = contact.phoneNumber;
-      final date_changed = DateTime.now().toUtc();
+      final dateChanged = DateTime.now().toUtc();
 
       if (patientId == null || phoneNumber == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -378,9 +380,9 @@ on userInfo.person_id = providerInfo.person_id
         return;
       }
 
-      final query =
+      const query =
           'UPDATE person_attribute SET value = ?, changed_by = ?, date_changed = ? WHERE person_id = ?'; // Assuming 9 is person_attribute_type_id for phone_number. You may need to verify this in your DB.
-      await conn.query(query, [phoneNumber, userId,date_changed, patientId]); // Added providerId to the query
+      await conn.query(query, [phoneNumber, userId,dateChanged, patientId]); // Added providerId to the query
 
 
       setState(() {}); // To rebuild the widget and reflect changes immediately
@@ -438,7 +440,7 @@ on userInfo.person_id = providerInfo.person_id
       conn = await MySqlConnection.connect(settings); // Assign connection
 
       // Fetch Datim Code from NMRS
-      final datimCodeQuery =
+      const datimCodeQuery =
           'SELECT property_value FROM global_property WHERE property = "facility_datim_code" LIMIT 1';
       final datimCodeResult = await conn.query(datimCodeQuery);
       final nmrsDatimCode = datimCodeResult.isNotEmpty &&
@@ -461,7 +463,7 @@ on userInfo.person_id = providerInfo.person_id
 
       final patientId = contact.patientId;
       final address = contact.address;
-      final date_changed = DateTime.now().toUtc();
+      final dateChanged = DateTime.now().toUtc();
 
       if (patientId == null || address == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -472,9 +474,9 @@ on userInfo.person_id = providerInfo.person_id
         return;
       }
 
-      final query =
+      const query =
           'UPDATE person_address SET address2 = ?, changed_by = ? , date_changed = ? WHERE person_id = ?'; // Assuming 9 is person_attribute_type_id for phone_number. You may need to verify this in your DB.
-      await conn.query(query, [address, userId,date_changed, patientId]); // Added providerId to the query
+      await conn.query(query, [address, userId,dateChanged, patientId]); // Added providerId to the query
 
       // contact.isAddressSyncedToNMRS = true;
       // await IsarService().updateContact(contact);
@@ -563,7 +565,7 @@ on userInfo.person_id = providerInfo.person_id
   getAvator(CallType callType){
     switch(callType){
       case CallType.outgoing:
-        return CircleAvatar(maxRadius: 30,foregroundColor: Colors.green,backgroundColor: Colors.greenAccent);
+        return const CircleAvatar(maxRadius: 30,foregroundColor: Colors.green,backgroundColor: Colors.greenAccent);
       case CallType.missed:
         return CircleAvatar(maxRadius: 30,foregroundColor: Colors.red[400],backgroundColor: Colors.red[400]);
       default:
@@ -576,30 +578,33 @@ on userInfo.person_id = providerInfo.person_id
   }
 
   getTitle(CallLogEntry entry){
-    if(entry.name == null)
+    if(entry.name == null) {
       return Text(entry.number!);
-    if(entry.name!.isEmpty)
+    }
+    if(entry.name!.isEmpty) {
       return Text(entry.number!);
-    else
+    } else {
       return Text(entry.name!);
+    }
   }
 
   String getTime(int duration){
     Duration d1 = Duration(seconds:duration);
     String formattedDuration = "";
     if(d1.inHours > 0){
-      formattedDuration += d1.inHours.toString() + "h ";
+      formattedDuration += "${d1.inHours}h ";
     }
 
     if(d1.inMinutes > 0){
-      formattedDuration += d1.inMinutes.toString() + "m ";
+      formattedDuration += "${d1.inMinutes}m ";
     }
 
     if(d1.inSeconds > 0){
-      formattedDuration += d1.inSeconds.toString() + "s ";
+      formattedDuration += "${d1.inSeconds}s ";
     }
-    if(formattedDuration.isEmpty)
+    if(formattedDuration.isEmpty) {
       return "0s";
+    }
     return formattedDuration;
   }
 
@@ -619,7 +624,7 @@ on userInfo.person_id = providerInfo.person_id
         print("Attempt $attempts to query call log for $phoneNumber");
         try {
           final DateTime now = DateTime.now();
-          final int from = callStartTime.subtract(Duration(minutes: 1)).millisecondsSinceEpoch;
+          final int from = callStartTime.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch;
           final int to = now.millisecondsSinceEpoch;
 
           Iterable<CallLogEntry> entries = await CallLog.query(
@@ -638,7 +643,7 @@ on userInfo.person_id = providerInfo.person_id
             break;
           } else {
             print("No relevant outgoing call log found yet for $phoneNumber, waiting...");
-            await Future.delayed(Duration(seconds: 3));
+            await Future.delayed(const Duration(seconds: 3));
           }
         } catch (e) {
           _showSnackBar('Error reading call log: $e');
@@ -748,7 +753,7 @@ on userInfo.person_id = providerInfo.person_id
 
         if (state != null && facilityName != null && userId != null && userId.isNotEmpty) {
           final formattedDate = DateFormat('dd-MMM-yyyy').format(contactTracked.dateTracked ?? DateTime.now());
-          final uuid2 = Uuid().v4();
+          final uuid2 = const Uuid().v4();
           final firestorePath = '/Reports/$trackerState/CallTracker/$trackerFacilityLocation/$formattedDate/$firebaseAuthId/$firebaseAuthId/$uuid2';
 
           print("Firestore Path: $firestorePath");
@@ -929,7 +934,7 @@ on userInfo.person_id = providerInfo.person_id
                 ),
               ),
             )
-                : SizedBox.shrink(),
+                : const SizedBox.shrink(),
             contact.isAddressUpdated == true &&
                 contact.isAddressSyncedToNMRS == false
                 ? Padding(
@@ -950,7 +955,7 @@ on userInfo.person_id = providerInfo.person_id
                 ),
               ),
             )
-                : SizedBox.shrink(),
+                : const SizedBox.shrink(),
           ],
         ),
         trailing: Wrap(
@@ -963,7 +968,7 @@ on userInfo.person_id = providerInfo.person_id
             // ** REMOVED Call Button **
             if (hasValidPhoneNumber) // Optional: Add Copy button
               IconButton(
-                icon: Icon(Icons.content_copy, size: 18, color: Colors.grey),
+                icon: const Icon(Icons.content_copy, size: 18, color: Colors.grey),
                 tooltip: 'Copy Phone Number',
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: contact.phoneNumber!));
@@ -1010,7 +1015,7 @@ on userInfo.person_id = providerInfo.person_id
               const PopupMenuItem(value: 'Calculated', child: Text('Calculated Next Appointment')),
               const PopupMenuDivider(),
               const PopupMenuItem(enabled: false, child: Text("Filter by ART Status:", style: TextStyle(fontWeight: FontWeight.bold))),
-              ...artStatuses.map((status) => PopupMenuItem(value: status, child: Text(status))).toList(),
+              ...artStatuses.map((status) => PopupMenuItem(value: status, child: Text(status))),
             ],
           ),
         ],
@@ -1030,10 +1035,10 @@ on userInfo.person_id = providerInfo.person_id
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search by name, phone, ART Status, Unique ID, state, facility...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 suffixIcon: searchQuery.isNotEmpty
-                    ? IconButton(icon: Icon(Icons.clear), onPressed: () {
+                    ? IconButton(icon: const Icon(Icons.clear), onPressed: () {
                   searchController.clear();
                   _onSearchChanged('');
                 })

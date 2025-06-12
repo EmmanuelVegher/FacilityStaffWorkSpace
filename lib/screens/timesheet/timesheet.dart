@@ -2,13 +2,11 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as dev;
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:web/web.dart' as web;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart';
@@ -643,7 +641,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
 
       // Add Task Summary Page using MultiPage, now passing pre-fetched content
       // Conditionally add Task Summary Page
-      if (_includeTaskSummary && taskSummaryContent != null) {
+      if (_includeTaskSummary) {
         pdf.addPage(
           pw.MultiPage(
            // pageFormat: pageFormat,
@@ -727,7 +725,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
       // Fetch Daily Reports (as before - with logging)
       print("_createTaskSummaryPDF: Fetching REPORTS for date: $formattedDateForReportPath");
       // Fetch Daily Reports
-      String reportCollectionPath = 'Reports/${selectedBioState}/${selectedBioState}/${selectedBioLocation}/${formattedDateForReportPath}'; // Construct path dynamically
+      String reportCollectionPath = 'Reports/$selectedBioState/$selectedBioState/$selectedBioLocation/$formattedDateForReportPath'; // Construct path dynamically
       print("_createTaskSummaryPDF: Report Collection Path: $reportCollectionPath"); // ADDED DEBUG LOG
 
       QuerySnapshot<Map<String, dynamic>> reportSnapshot = await FirebaseFirestore.instance
@@ -754,7 +752,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
 
 // Fetch Other Tasks for the date (with detailed logging)
       print("_createTaskSummaryPDF: Fetching TASKS for date: $formattedDateForTaskPath"); // ADDED DEBUG LOG
-      String taskCollectionPath = 'Reports/${selectedBioState}/Task/${selectedBioLocation}/${formattedDateForReportPath}/${selectedFirebaseId}/${selectedFirebaseId}'; // Construct path dynamically
+      String taskCollectionPath = 'Reports/$selectedBioState/Task/$selectedBioLocation/$formattedDateForReportPath/$selectedFirebaseId/$selectedFirebaseId'; // Construct path dynamically
       print("_createTaskSummaryPDF: Task Collection Path: $taskCollectionPath"); // ADDED DEBUG LOG
 
       // Fetch Other Tasks for the date
@@ -1359,7 +1357,7 @@ $selectedBioFirstName $selectedBioLastName
     // Data for the table
     final tableHeaders = [
       'Project Name',
-      ...daysInRange.map((date) => DateFormat('dd').format(date)).toList(),
+      ...daysInRange.map((date) => DateFormat('dd').format(date)),
       'Total Hours',
       '%'
     ];
@@ -1376,7 +1374,7 @@ $selectedBioFirstName $selectedBioLastName
             date, selectedProjectName, selectedProjectName!)
             .round()
             .toString(); // No rounding here
-      }).toList(),
+      }),
       // calculateTotalHours1(selectedProjectName).toStringAsFixed(2),  // Calculate total for project, 2 decimal places
       // '${calculatePercentageWorked1(selectedProjectName).toStringAsFixed(2)}%'
       //  calculateTotalHours1(selectedProjectName).round().toString(), // Round total hours
@@ -1405,7 +1403,7 @@ $selectedBioFirstName $selectedBioLastName
           return isWeekend(date) ? '0' : _getDurationForDate3(date, selectedProjectName, category)
               .round()
               .toString(); // No rounding here
-        }).toList(),
+        }),
         // calculateCategoryHours(category).toStringAsFixed(2), // Calculate total for category, 2 decimal places
         // '${calculateCategoryPercentage(category).toStringAsFixed(1)}%'
         // calculateCategoryHours(category).round().toString(),  // Round category hours
@@ -1530,7 +1528,7 @@ $selectedBioFirstName $selectedBioLastName
               );
             }).toList(),
           );
-        }).toList(),
+        }),
 
 
         // Total Row (updated to use rounded values)
@@ -2618,7 +2616,7 @@ $selectedBioFirstName $selectedBioLastName
                   print("Caritas Supervisor Email: $_selectedSupervisorEmail");
                 }
               },
-              hint: const Text('Select Supervisor', style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
+              hint: const Text('Select Supervisor', style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
             ),
           );
         }
@@ -2668,7 +2666,7 @@ $selectedBioFirstName $selectedBioLastName
                   print("Facility Supervisor Email: $_selectedFacilitySupervisorEmail");
                 }
               },
-              hint: const Text('Select Supervisor', style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
+              hint: const Text('Select Supervisor', style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
             ),
           );
         }
@@ -2855,7 +2853,7 @@ $selectedBioFirstName $selectedBioLastName
         actions: [
 
           _isPDFLoading
-              ? CircularProgressIndicator()
+              ? const CircularProgressIndicator()
               : Row(
               children:[
 
@@ -4215,7 +4213,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             children: [
                                                               //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                               Text(staffSignatureDate
-                                                                  .toString(), style: TextStyle(
+                                                                  .toString(), style: const TextStyle(
                                                                   fontWeight: FontWeight.bold, fontSize: 14 ),),
                                                             ],
                                                           );
@@ -4462,7 +4460,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             null && facilitySupervisorSignatureStatus == "Rejected"){
                                                           return Column(
                                                             children: [
-                                                              const Text("Awaiting Facility Supervisor Signature",style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
+                                                              const Text("Awaiting Facility Supervisor Signature",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
                                                               const SizedBox(height: 8),
                                                               if (facilitySupervisorSignatureStatus == "Rejected")
                                                                 Row(
@@ -4587,7 +4585,7 @@ $selectedBioFirstName $selectedBioLastName
                                                         }
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature",style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
+                                                            "Timesheet Yet to be submitted for Project Cordinator's Signature",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ), // Adjust path and size accordingly
@@ -4643,7 +4641,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               //Image.network(facilitySupervisorSignature!), // Load the image from the cloud URL
                                                               Text(
                                                                   facilitySupervisorDate
-                                                                      .toString(),style: TextStyle(
+                                                                      .toString(),style: const TextStyle(
                                                             fontWeight: FontWeight.bold, fontSize: 14 ,),),
                                                             ],
                                                           );
@@ -4882,7 +4880,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                 // style: TextStyle(fontWeight: FontWeight.bold),
                                                                 softWrap: true,
                                                                 overflow: TextOverflow.visible,
-                                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
+                                                                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                               ),
                                                               const SizedBox(height: 8),
                                                               facilitySupervisorSignatureStatus == "Pending"
@@ -4989,7 +4987,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               const Text(
                                                                 "Awaiting Approved Signature from Facility Supervisor before signature from CARITAS Supervisor ",
                                                                 // style: TextStyle(fontWeight: FontWeight.w100),
-                                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
+                                                                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                                                 softWrap: true,
                                                                 overflow: TextOverflow.visible,
                                                               ),
@@ -5049,7 +5047,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           return Column(
                                                             children: [
                                                               const Text(
-                                                                  "Awaiting Caritas Supervisor Signature", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
+                                                                  "Awaiting Caritas Supervisor Signature", style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),),
                                                               const SizedBox(height: 8),
                                                               caritasSupervisorSignatureStatus ==
                                                                   "Pending"
@@ -5170,7 +5168,7 @@ $selectedBioFirstName $selectedBioLastName
 
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Caritas Supervisor's Signature", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
+                                                            "Timesheet Yet to be submitted for Caritas Supervisor's Signature", style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ), // Adjust path and size accordingly
@@ -5239,11 +5237,11 @@ $selectedBioFirstName $selectedBioLastName
                                                           );
                                                         } else {
                                                           return const Text(
-                                                              "Awaiting Caritas Supervisor Date", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
+                                                              "Awaiting Caritas Supervisor Date", style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                         }
                                                       } else {
                                                         return const Text(
-                                                            "Timesheet Yet to be submitted for Caritas Signature Date", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
+                                                            "Timesheet Yet to be submitted for Caritas Signature Date", style: TextStyle(fontWeight: FontWeight.bold,fontSize: 12),);
                                                       }
                                                     },
                                                   ),
@@ -5518,7 +5516,7 @@ $selectedBioFirstName $selectedBioLastName
         'staffCategory': selectedBioStaffCategory,
         'staffEmail': selectedBioEmail,
         'staffPhone': selectedBioPhone,
-        'month': '${selectedMonth}_${selectedYear}',
+        'month': '${selectedMonth}_$selectedYear',
         'timesheetSubmissionTimestamp': DateTime.now().toIso8601String(),
       };
 

@@ -172,7 +172,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
 
 class DeleteConfirmationPage extends StatelessWidget {
-  const DeleteConfirmationPage({Key? key}) : super(key: key);
+  const DeleteConfirmationPage({super.key});
 
   Future<void> _deleteAccount(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;

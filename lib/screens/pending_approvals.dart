@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:io';
 
 import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
@@ -559,7 +558,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                     backgroundColor: wineColor,
                   ),
                   onPressed: () =>  isApproveLoading
-                      ? CircularProgressIndicator()
+                      ? const CircularProgressIndicator()
                       :_onApprovePressed(doc),
                 ),
               ],

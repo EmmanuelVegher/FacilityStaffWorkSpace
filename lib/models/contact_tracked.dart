@@ -74,7 +74,7 @@ class ContactTracked {
   // ***** ADD THIS METHOD *****
   factory ContactTracked.fromFirestore(Map<String, dynamic> data, [String? docId]) {
     // Helper to safely convert Timestamps or null
-    DateTime? _toDateTime(dynamic timestamp) {
+    DateTime? toDateTime(dynamic timestamp) {
       if (timestamp is Timestamp) {
         return timestamp.toDate();
       }
@@ -95,8 +95,8 @@ class ContactTracked {
       // Map fields from Firestore data map
       name: data['name'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
-      lastVisitDate: _toDateTime(data['lastVisitDate']), // Ensure key matches 'toJson'
-      nextVisitDate: _toDateTime(data['nextVisitDate']), // Ensure key matches 'toJson' if you save it
+      lastVisitDate: toDateTime(data['lastVisitDate']), // Ensure key matches 'toJson'
+      nextVisitDate: toDateTime(data['nextVisitDate']), // Ensure key matches 'toJson' if you save it
       callDuration: data['callDuration'] as int?,
       callStatus: data['callStatus'] as String?,
       state: data['state'] as String?,
@@ -109,14 +109,14 @@ class ContactTracked {
       supervisorName: data['supervisorName'] as String?,
       supervisorEmail: data['supervisorEmail'] as String?,
       trackerFacilityLocation: data['trackerFacilityLocation'] as String?,
-      dateTracked: _toDateTime(data['dateTracked']), // Key MUST match 'toJson' output
+      dateTracked: toDateTime(data['dateTracked']), // Key MUST match 'toJson' output
       patientId: data['patientId'] as int?,
-      dateNextVisitChanged: _toDateTime(data['dateNextVisitChanged']), // Ensure key matches 'toJson'
-      datePhoneNumberUpdated: _toDateTime(data['datePhoneNumberUpdated']), // Ensure key matches 'toJson'
-      dateAddressChanged: _toDateTime(data['dateAddressChanged']), // Ensure key matches 'toJson'
+      dateNextVisitChanged: toDateTime(data['dateNextVisitChanged']), // Ensure key matches 'toJson'
+      datePhoneNumberUpdated: toDateTime(data['datePhoneNumberUpdated']), // Ensure key matches 'toJson'
+      dateAddressChanged: toDateTime(data['dateAddressChanged']), // Ensure key matches 'toJson'
       artStatus: data['artStatus'] as String?,
-      dateOfTermination: _toDateTime(data['dateOfTermination']), // Ensure key matches 'toJson'
-      sampleCollectionDate: _toDateTime(data['sampleCollectionDate']), // Ensure key matches 'toJson'
+      dateOfTermination: toDateTime(data['dateOfTermination']), // Ensure key matches 'toJson'
+      sampleCollectionDate: toDateTime(data['sampleCollectionDate']), // Ensure key matches 'toJson'
       currentViralLoad: data['currentViralLoad'] as String?,
 
       // Sync status flags are generally NOT read from Firestore,

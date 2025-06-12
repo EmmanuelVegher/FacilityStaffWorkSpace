@@ -6,12 +6,15 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/create_activity_page.dart';
+import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/forgot_password2.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/upload_signature2.dart';
+import '../screens/viral_load_tracker/vl_reports_page.dart';
+import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
 
 
@@ -187,6 +190,61 @@ Widget drawer2(
               );
             },
           ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.phone,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Call Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateReportsPageWeb()),
+
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.biotech_outlined,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Viral Load Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateLevelReportTab()),
+
+              );
+            },
+          ),
+
 
 
           const Divider(

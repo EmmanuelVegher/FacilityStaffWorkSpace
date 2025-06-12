@@ -1,15 +1,15 @@
 // pages/call_tracker/missedAndIITPage_web.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For Clipboard
+// For Clipboard
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import '../../models/contact.dart';
 import '../../services/firestore_service.dart'; // FirestoreService
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 
 class MissedAndIITPageWeb extends StatefulWidget {
+  const MissedAndIITPageWeb({super.key});
+
   @override
   _MissedAndIITPageWebState createState() => _MissedAndIITPageWebState();
 }
@@ -28,7 +28,7 @@ class _MissedAndIITPageWebState extends State<MissedAndIITPageWeb> {
   String filterType = 'All'; // For Actual/Calculated appointment status
 
   // NMRS User Selection state (keep if needed)
-  bool _isEditingUser = false;
+  final bool _isEditingUser = false;
   String _displayedFullName = '';
   String? _selectedFullName;
 
@@ -132,7 +132,7 @@ class _MissedAndIITPageWebState extends State<MissedAndIITPageWeb> {
     // (Ensure it doesn't have call/sync buttons)
     String artStatusDisplay = contact.artStatus?.trim() ?? '';
     bool hasValidPhoneNumber = contact.phoneNumber != null && contact.phoneNumber!.isNotEmpty;
-    return Card(/* ... ListTile structure same as contact_list_web ... */);
+    return const Card(/* ... ListTile structure same as contact_list_web ... */);
   }
 
   @override
@@ -166,10 +166,10 @@ class _MissedAndIITPageWebState extends State<MissedAndIITPageWeb> {
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search within Missed/IIT lists...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 suffixIcon: searchQuery.isNotEmpty
-                    ? IconButton(icon: Icon(Icons.clear), onPressed: () {
+                    ? IconButton(icon: const Icon(Icons.clear), onPressed: () {
                   // searchController.clear(); // Assuming you add a controller
                   _onSearchChanged('');
                 })
@@ -227,7 +227,7 @@ class _MissedAndIITPageWebState extends State<MissedAndIITPageWeb> {
                         initiallyExpanded: true,
                         children: [
                           if (filteredMissed.isNotEmpty)
-                            ...filteredMissed.map((contact) => _buildContactCard(contact)).toList()
+                            ...filteredMissed.map((contact) => _buildContactCard(contact))
                           else if (missedAppointments.isNotEmpty && filteredMissed.isEmpty)
                             const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('No matching missed appointments found.')))
                           else
@@ -240,7 +240,7 @@ class _MissedAndIITPageWebState extends State<MissedAndIITPageWeb> {
                         initiallyExpanded: true, // Expand IIT too, or based on preference
                         children: [
                           if (filteredIIT.isNotEmpty)
-                            ...filteredIIT.map((contact) => _buildContactCard(contact)).toList()
+                            ...filteredIIT.map((contact) => _buildContactCard(contact))
                           else if (iitClients.isNotEmpty && filteredIIT.isEmpty)
                             const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('No matching IIT clients found.')))
                           else

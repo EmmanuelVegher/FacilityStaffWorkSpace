@@ -29,7 +29,6 @@ import 'dart:io' show File, Directory;
 import 'dart:convert';
 
 import 'dart:html' as html;
-import 'dart:typed_data';
 import 'package:pdf/widgets.dart' as pw;
 
 String? mimeTypeFromUrl(String url) {
@@ -1431,7 +1430,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           const SizedBox(height: 20),
 
           _isPDFLoading
-              ? CircularProgressIndicator()
+              ? const CircularProgressIndicator()
               : Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -1468,18 +1467,11 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     final pdf = pw.Document(pageMode: PdfPageMode.outlines);
     String monthYear = DateFormat('MMMM, yyyy').format(
         DateTime(_selectedReportingDate.year, _selectedReportingDate.month));
-    final pageFormat = PdfPageFormat.a4;
+    const pageFormat = PdfPageFormat.a4;
 
     try {
       // Load the logo as bytes (no changes here)
-      final ByteData? logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
-      if (logoBytes == null) {
-        Fluttertoast.showToast(msg: "Error: Logo asset not found!");
-        setState(() {
-          _isPDFLoading = false;
-        });
-        return;
-      }
+      final ByteData logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
       final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
 
       // Fetch reports and other tasks (with detailed debugging)
@@ -1537,7 +1529,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
         // Fetch Other Tasks for the date (with detailed logging)
         print("_createTaskSummaryPDF: Fetching TASKS for date: $formattedDateForTaskPath"); // ADDED DEBUG LOG
-        String taskCollectionPath = 'Reports/${selectedBioState}/Task/${selectedBioLocation}/${formattedDateForReportPath}/${selectedFirebaseId}/${selectedFirebaseId}'; // Construct path dynamically
+        String taskCollectionPath = 'Reports/$selectedBioState/Task/$selectedBioLocation/$formattedDateForReportPath/$selectedFirebaseId/$selectedFirebaseId'; // Construct path dynamically
         print("_createTaskSummaryPDF: Task Collection Path: $taskCollectionPath"); // ADDED DEBUG LOG
 
 
@@ -2099,12 +2091,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     // Data Rows
     for (String indicator in indicators) {
       List<Widget> dataCells = [
-        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: TextStyle(fontWeight: FontWeight.bold,fontSize:10))),
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: const TextStyle(fontWeight: FontWeight.bold,fontSize:10))),
       ];
       int monthlyTotal = 0;
       for (String week in _reportPeriodOptions) { // Use _reportPeriodOptions to iterate through weeks
         int weeklyValue = summaryData[week]?[indicator] ?? 0;
-        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(weeklyValue.toString(), style: TextStyle(fontWeight: FontWeight.bold,fontSize:10))));
+        dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(weeklyValue.toString(), style: const TextStyle(fontWeight: FontWeight.bold,fontSize:10))));
         monthlyTotal += weeklyValue;
       }
       dataCells.add(Padding(padding: const EdgeInsets.all(8.0), child: Text(monthlyTotal.toString(), style: const TextStyle(fontWeight: FontWeight.bold,fontSize:10))));
@@ -2840,7 +2832,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
       await reportDocRef.set(report.toFirestore(), SetOptions(merge: true));
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Report status updated !')));
+          const SnackBar(content: Text('Report status updated !')));
       setState(() {}); // Refresh UI
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2983,7 +2975,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
     // Data rows for indicators
     for (String indicator in indicators) {
       List<Widget> dataCells = [
-        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: TextStyle(fontSize: 12))),
+        Padding(padding: const EdgeInsets.all(8.0), child: Text(indicator, style: const TextStyle(fontSize: 12))),
       ];
       int indicatorTotal = 0;
 
@@ -3003,8 +2995,8 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: TextStyle(fontSize: 12)),
-              Text("Reviewed by: $reviewedBy", style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey)),
+              Text(value, style: const TextStyle(fontSize: 12)),
+              Text("Reviewed by: $reviewedBy", style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey)),
               Text("Status: $reviewStatus", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
             ],
           ),
@@ -6052,7 +6044,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       ),
       actions: [
         _isPDFLoading
-            ? CircularProgressIndicator()
+            ? const CircularProgressIndicator()
             : Row(
             children:[
               IconButton(
