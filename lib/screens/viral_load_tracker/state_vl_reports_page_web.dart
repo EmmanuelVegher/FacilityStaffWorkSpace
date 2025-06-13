@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -24,6 +25,10 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
   String? _selectedState;
   String? _selectedFacility; // Null means "All Facilities"
   String? _selectedTracker; // Null means "All Trackers"
+
+  String? _userState;
+
+
 
   // --- State for Data & UI ---
   bool _isLoading = false;
@@ -66,8 +71,49 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
   void initState() {
     super.initState();
     _calculateCurrentAndPreviousQuarters();
-    _loadInitialFilterData();
+
+    // _loadInitialFilterData();
+    _loadUserStateAndData().then((_){
+      _initializeUserContext();
+    });
+
   }
+
+  Future<void> _initializeUserContext() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _errorMessage = "User not logged in.");
+        return;
+      }
+
+      final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
+      final staffData = staffDoc.data();
+      final userState = staffData?['state'] as String?;
+
+      if (userState == null) {
+        setState(() => _errorMessage = "State not found in staff profile.");
+        return;
+      }
+
+      _userState = userState;
+      _availableFacilities = await _getFacilitiesForState(userState);
+
+      setState(() {
+        _isFilterLoading = false;
+      });
+
+      await _loadReportData(); // Load data for all facilities initially
+
+    } catch (e) {
+      debugPrint("Error initializing user state: $e");
+      setState(() {
+        _errorMessage = "Failed to load user profile.";
+        _isFilterLoading = false;
+      });
+    }
+  }
+
 
   void _calculateCurrentAndPreviousQuarters() {
     // This logic remains the same
@@ -94,6 +140,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
     _olderSamplesDisplayTitle = "Older Samples (Collected before $_previousQuarterDisplay)";
   }
 
+
   Future<void> _loadInitialFilterData() async {
     try {
       final snapshot = await _firestore.collection('VlReportSummaries').get();
@@ -119,67 +166,98 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
     }
   }
 
+  Future<List<String>> _getFacilitiesForState(String state) async {
+    try {
+      final snapshot = await _firestore.collection('Location').doc(state).collection(state).get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      debugPrint("Error fetching facilities: $e");
+      return [];
+    }
+  }
+
+  Future<void> _loadUserStateAndData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _errorMessage = "User not logged in.");
+        return;
+      }
+
+      final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
+      if (!staffDoc.exists) {
+        setState(() => _errorMessage = "User profile not found in Staff collection.");
+        return;
+      }
+
+      final staffData = staffDoc.data();
+      final userState = staffData?['state'] as String?;
+
+      if (userState == null) {
+        setState(() => _errorMessage = "User's state not set.");
+        return;
+      }
+
+      setState(() {
+        _selectedState = userState;
+        _availableStates = [userState]; // optionally add to dropdown
+      });
+
+      await _loadReportData(); // Now load VL summaries and call logs
+
+    } catch (e) {
+      debugPrint("Failed to load user state: $e");
+      setState(() => _errorMessage = "Failed to load user state: $e");
+    }
+  }
+
+
+
   Future<void> _loadReportData() async {
-    if (_selectedState == null) return;
+    if (_userState == null) return;
     setState(() => _isLoading = true);
 
     try {
-      // 1. Fetch all summary documents for the selected state and quarter
-      // Your path is /VlReportSummaries/{state}/(subcollection is facility)
-      // We must query each facility collection for the quarter document.
-
       _masterVlSummaries = [];
       _masterCallLogs = [];
 
-      final stateDocRef = _firestore.collection('VlReportSummaries').doc(_selectedState!);
-      // Firestore client SDK cannot list subcollections. We assume we know them
-      // or fetch them from another 'Facilities' collection.
-      // For this example, let's assume we can query across them with a collection group.
-      // This requires the facility-level collections to have a consistent name, e.g., 'QuarterlyReports'.
-      // Based on your path, the facility name *is* the collection name, which is hard to query.
+      final facilityList = _selectedFacility != null
+          ? [_selectedFacility!] // filter mode
+          : await _getFacilitiesForState(_userState!); // default all
 
-      // --- A MORE ROBUST APPROACH (assuming you can list facilities) ---
-      // Let's assume you have a way to get facility names for a state.
-      // For now, we'll have to hard-code a different query strategy based on your path.
-      // Let's use a Collection Group query on the `callLogs` and work backwards.
-      // This is complex. Let's pivot to a simpler data model assumption for this example.
+      for (final facility in facilityList) {
+        final quarterDocRef = _firestore
+            .collection('VlReportSummaries')
+            .doc(_userState!)
+            .collection(facility)
+            .doc(_currentQuarterDisplay);
 
-      // *** ASSUMPTION FOR A SCALABLE QUERY ***
-      // Let's assume your data is flat in a single 'VlReportSummaries' collection like this:
-      // DOC_ID_1: { state: "Enugu", facilityName: "Asata Poly Clinic", quarterName: "Q3 (FY25)", ...metrics }
-      // DOC_ID_2: { state: "Enugu", facilityName: "Other Clinic", quarterName: "Q3 (FY25)", ...metrics }
+        final quarterSnapshot = await quarterDocRef.get();
+        if (!quarterSnapshot.exists) continue;
 
-      Query query = _firestore
-          .collection('VlReportSummaries')
-          .where('state', isEqualTo: _selectedState)
-          .where('quarterName', isEqualTo: _currentQuarterDisplay);
+        _masterVlSummaries.add(
+            VlEligibleModel.fromMap(quarterSnapshot.id, quarterSnapshot.data()!)
+        );
 
-      final summarySnapshot = await query.get();
-      _masterVlSummaries = summarySnapshot.docs
-          .map((doc) => VlEligibleModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
-
-      // 2. Fetch all call logs for the fetched summaries
-      for (final summaryDoc in summarySnapshot.docs) {
-        final callLogsSnapshot = await summaryDoc.reference.collection('callLogs').get();
+        final callLogsSnapshot = await quarterDocRef.collection('callLogs').get();
         _masterCallLogs.addAll(
-            callLogsSnapshot.docs.map((logDoc) => VlCallLogModel.fromMap(logDoc.id, logDoc.data()))
+            callLogsSnapshot.docs.map((logDoc) =>
+                VlCallLogModel.fromMap(logDoc.id, logDoc.data()))
         );
       }
 
-      // 3. Populate filter options based on loaded data
-      _populateDynamicFilters();
-
-      // 4. Apply filters and calculate metrics
-      _applyFiltersAndCalculate();
+      _applyFiltersAndCalculate(); // Filter based on UI state
 
     } catch (e, stack) {
-      debugPrint('Error loading report data: $e\n$stack');
-      setState(() => _errorMessage = "Failed to load report data: $e");
+      debugPrint("Error loading report data: $e\n$stack");
+      setState(() => _errorMessage = "Failed to load data: $e");
     } finally {
       setState(() => _isLoading = false);
     }
   }
+
+
+
 
   void _populateDynamicFilters() {
     if (_masterVlSummaries.isEmpty) return;
@@ -322,48 +400,29 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
       margin: const EdgeInsets.all(8.0),
       elevation: 4,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
         child: Wrap(
           spacing: 20,
           runSpacing: 10,
-          alignment: WrapAlignment.center,
           children: [
-            // State Filter
-            _buildDropdown(
-              label: 'State',
-              value: _selectedState,
-              items: _availableStates,
-              onChanged: (value) {
-                setState(() {
-                  _selectedState = value;
-                  _selectedFacility = null;
-                  _selectedTracker = null;
-                  _availableFacilities = [];
-                  _availableTrackers = [];
-                });
-                if (value != null) {
-                  _loadReportData();
-                }
-              },
-            ),
-            // Facility Filter
-            _buildDropdown(
-              label: 'Facility',
+            DropdownButtonFormField<String>(
+              decoration: InputDecoration(
+                labelText: 'Facility',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
               value: _selectedFacility,
-              items: _availableFacilities,
-              onChanged: _selectedState == null ? null : (value) {
-                setState(() => _selectedFacility = value);
-                _applyFiltersAndCalculate();
-              },
+              items: [
+                DropdownMenuItem(value: null, child: Text('All Facilities', style: TextStyle(fontStyle: FontStyle.italic))),
+                ..._availableFacilities.map((f) => DropdownMenuItem(value: f, child: Text(f))),
+              ],
+              onChanged: (val) => setState(() => _selectedFacility = val),
             ),
-            // Tracker Filter
-            _buildDropdown(
-              label: 'Tracker',
-              value: _selectedTracker,
-              items: _availableTrackers,
-              onChanged: _selectedState == null ? null : (value) {
-                setState(() => _selectedTracker = value);
-                _applyFiltersAndCalculate();
+            ElevatedButton.icon(
+              icon: const Icon(Icons.filter_alt),
+              label: const Text("Apply Filter"),
+              onPressed: () async {
+                await _loadReportData(); // reload with selected facility
               },
             ),
           ],
@@ -371,6 +430,8 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
       ),
     );
   }
+
+
 
   Widget _buildDropdown({
     required String label,

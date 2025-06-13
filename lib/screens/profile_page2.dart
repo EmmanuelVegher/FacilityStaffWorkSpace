@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/staff_model.dart';
+import '../widgets/drawer2.dart';
 import '../widgets/editable_department.dart';
 import '../widgets/editable_designation.dart';
 import '../widgets/editable_gender.dart';
@@ -315,7 +316,7 @@ class _ProfilePage2State extends State<ProfilePage2> {
         double sectionTitlePaddingBottom = isDesktop ? 10 : 8;
 
         return Scaffold(
-          drawer: drawer(context,),
+          drawer: drawer2(context,),
           appBar: AppBar(
             title: const Text('Profile page', style: TextStyle(color: Colors.white)),
             iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white

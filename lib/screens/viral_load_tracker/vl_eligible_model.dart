@@ -21,6 +21,10 @@ class VlEligibleModel {
   final int totalMissedAppointments;
   final int totalIIT;
   final int totalDiscontinuedCare;
+  late final String? facilityName;
+  late final String? state;
+  late final String? updatedByFullName;
+
 
   // Previous Samples Metrics (collected before previous quarter)
   final String? previousQuarter;
@@ -43,6 +47,9 @@ class VlEligibleModel {
 
   VlEligibleModel({
     required this.id,
+    this.state,
+    this.facilityName,
+    this.updatedByFullName,
     this.totalEligibleClientsInFilter = 0,
     this.percentageSamplesCollected = 0.0,
     this.percentageResultsReceived = 0.0,
@@ -84,6 +91,9 @@ class VlEligibleModel {
   factory VlEligibleModel.fromMap(String id, Map<String, dynamic> data) {
     return VlEligibleModel(
       id: id,
+      state:data['trackerState'] as String?,
+      updatedByFullName:data['updatedByFullName'] as String?,
+      facilityName:data['trackerFacilityLocation'] as String?,
       totalEligibleClientsInFilter: data['totalEligibleClientsInFilter'] as int? ?? 0,
       percentageSamplesCollected: (data['percentageSamplesCollected'] as num?)?.toDouble() ?? 0.0,
       percentageResultsReceived: (data['percentageResultsReceived'] as num?)?.toDouble() ?? 0.0,
@@ -129,6 +139,9 @@ class VlEligibleModel {
   Map<String, dynamic> toMap() {
     // This method should also be complete to avoid issues when writing data
     return {
+      'state':state,
+      'facilityName':facilityName,
+      'updatedByFullName':updatedByFullName,
       'totalEligibleClientsInFilter': totalEligibleClientsInFilter,
       'percentageSamplesCollected': percentageSamplesCollected,
       'percentageResultsReceived': percentageResultsReceived,

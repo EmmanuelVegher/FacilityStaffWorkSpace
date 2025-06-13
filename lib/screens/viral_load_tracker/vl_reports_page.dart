@@ -1,5 +1,9 @@
+// REWRITTEN FOR FLUTTER WEB
+// Removed: dart:io, path_provider, share_plus, printing
+// Added: dart:html, dart:convert
 
-import 'dart:io';
+import 'dart:convert' show utf8;
+import 'dart:html' as html; // NEW: Added for web download functionality
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -8,7 +12,7 @@ import 'package:attendanceappmailtool/screens/viral_load_tracker/vl_eligible_mod
 import 'package:attendanceappmailtool/screens/viral_load_tracker/vl_form_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // NEW: Added for Firebase Authentication
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
@@ -16,14 +20,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
-
-
+import '../../widgets/drawer.dart';
 
 // Define separate keys for RepaintBoundary
 final GlobalKey _currentQuarterChartBoundaryKey = GlobalKey();
@@ -46,14 +46,12 @@ class _ChartData {
 }
 
 class _ReportVlTabState extends State<ReportVlTab> {
+  // ... (All state variables and initialization methods like initState, _initializeData, etc., remain the same)
   bool _isLoading = true;
   bool _isExporting = false;
 
-  // REFACTORED: IsarService is replaced with direct Firestore and Auth instances
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-
-
 
   List<VlEligibleModel> _allEligibleList = [];
   List<VlCallLogModel> _callLogs = [];
@@ -126,7 +124,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   String? _trackerState;
   String? _trackerFacilityLocation;
   String? _trackedBy;
-
 
   String? currentUserAuthId;
   String? userFirstName;
@@ -208,7 +205,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
     }
   }
 
-  // REFACTORED: This function now fetches user details from a 'users' collection in Firestore as a fallback.
   Future<void> _loadFirebaseUserDetails1() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -217,7 +213,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
       _trackerState = prefs.getString('trackerState');
       _trackerFacilityLocation = prefs.getString('trackerFacilityLocation');
 
-      // If details are missing from SharedPreferences, try fetching from the user's profile in Firestore.
       if (_firebaseAuthId == null || _trackerState == null || _trackerFacilityLocation == null) {
         final user = _firebaseAuth.currentUser;
         if (user != null) {
@@ -228,7 +223,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
             _trackedBy ??= userData?['fullName'] ?? '${userData?['firstName']} ${userData?['lastName']}'.trim();
             _trackerState ??= userData?['state'];
             _trackerFacilityLocation ??= userData?['facilityLocation'];
-            // Persist fetched data to SharedPreferences for next time
             await prefs.setString('selected_FullName', _trackedBy!);
             await prefs.setString('firebaseAuthId', _firebaseAuthId!);
             await prefs.setString('trackerState', _trackerState!);
@@ -242,8 +236,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
     }
   }
 
-  // REFACTORED: This function now only uploads the calculated summary report.
-  // Individual call logs are assumed to be written to Firestore as they occur elsewhere in the app.
   Future<void> _syncReportDataToServer() async {
     if (_isSyncingToFirebase) return;
 
@@ -263,7 +255,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
 
       _showSnackBar('Uploading report summary to server...');
 
-      // Prepare VL summary data for the current quarter
       final Map<String, dynamic> vlSummaryData = {
         'lastUpdated': FieldValue.serverTimestamp(),
         'updatedByAuthId': _firebaseAuthId,
@@ -288,14 +279,12 @@ class _ReportVlTabState extends State<ReportVlTab> {
         'totalDiscontinuedCare': _totalDiscontinuedCare,
       };
 
-      // Define Firebase reference for the summary document
       final DocumentReference quarterDocRef = _firestore
           .collection('VlReportSummaries')
           .doc(_trackerState)
           .collection(_trackerFacilityLocation!)
           .doc(_currentQuarterDisplay);
 
-      // Set the summary data
       await quarterDocRef.set(vlSummaryData, SetOptions(merge: true));
 
       _showSnackBar('✅ Report summary uploaded successfully!');
@@ -307,8 +296,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
       if (mounted) setState(() => _isSyncingToFirebase = false);
     }
   }
-
-
 
   Future<void> _loadAndCalculateReports({bool applyDateFilter = true}) async {
     try {
@@ -332,24 +319,19 @@ class _ReportVlTabState extends State<ReportVlTab> {
 
       final summarySnapshot = await quarterSummaryDocRef.get();
 
-      // Always start with empty lists
       _masterVlEligibleList = [];
       _masterCallLogs = [];
 
       if (summarySnapshot.exists && summarySnapshot.data() != null) {
-        // Create a single model instance from the summary data
         final summaryModel = VlEligibleModel.fromMap(
           summarySnapshot.id,
           summarySnapshot.data() as Map<String, dynamic>,
         );
-        // Add this single instance to the master list
         _masterVlEligibleList.add(summaryModel);
       }
 
-      // Since date filters don't apply to a single summary, we just copy the list.
       _allEligibleList = List.from(_masterVlEligibleList);
 
-      // Fetch and filter call logs as before
       final callLogSnapshot = await quarterSummaryDocRef.collection('callLogs').get();
       _masterCallLogs = callLogSnapshot.docs
           .map((doc) => VlCallLogModel.fromMap(doc.id, doc.data()))
@@ -364,8 +346,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
         _callLogs = List.from(_masterCallLogs);
       }
 
-      // IMPORTANT: Now we call _calculateMetrics to populate the UI state variables
-      // from the data we just stored in _allEligibleList.
       _calculateMetrics();
 
     } catch (e, stack) {
@@ -377,10 +357,8 @@ class _ReportVlTabState extends State<ReportVlTab> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  // --- The functions below are largely unchanged as they perform calculations on in-memory data ---
 
   void _calculateCurrentAndPreviousQuarters() {
-    // ... (This function's logic is correct and does not depend on the data source)
     final now = DateTime.now();
     int currentMonth = now.month;
     int currentYear = now.year;
@@ -409,7 +387,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   }
 
   bool _isDateInQuarter(DateTime? date, String quarterName, String quarterDisplayName) {
-    // ... (This function's logic is correct and does not depend on the data source)
     try {
       if (date == null) return false;
       final match = RegExp(r'\(FY(\d{2,4})\)').firstMatch(quarterDisplayName);
@@ -432,10 +409,7 @@ class _ReportVlTabState extends State<ReportVlTab> {
     }
   }
 
-// from the single summary model stored in the _allEligibleList.
-// from the single summary model stored in the _allEligibleList.
   void _calculateMetrics() {
-    // Reset all state variables to their defaults before populating them
     setState(() {
       _totalEligibleOverall = 0;
       _percentageSampleCollected = 0.0;
@@ -462,7 +436,7 @@ class _ReportVlTabState extends State<ReportVlTab> {
       _tatExceeded3MonthsPreviousQuarter = 0;
       _tatOver3MonthsWithResultPreviousQuarter = 0;
 
-      _previousQuarterDisplay = ''; // Use the one from the calculation
+      _previousQuarterDisplay = '';
       _olderSamplesDisplayTitle = '';
 
       _samplesCollectedOlder = 0;
@@ -478,11 +452,9 @@ class _ReportVlTabState extends State<ReportVlTab> {
       _averageCallDurationSeconds = 0.0;
     });
 
-    // Populate VL metrics from the single summary object if it exists
     if (_allEligibleList.isNotEmpty) {
       final summary = _allEligibleList.first;
       setState(() {
-        // Current Quarter Metrics (already correct in your code)
         _totalEligibleOverall = summary.totalEligibleClientsInFilter;
         _percentageSampleCollected = summary.percentageSamplesCollected;
         _percentageResultReceived = summary.percentageResultsReceived;
@@ -501,10 +473,7 @@ class _ReportVlTabState extends State<ReportVlTab> {
         _totalIIT = summary.totalIIT;
         _totalDiscontinuedCare = summary.totalDiscontinuedCare;
 
-        // --- FIX STARTS HERE ---
-
-        // Previous Quarter Metrics
-        _previousQuarterDisplay = summary.previousQuarterDisplay ?? _previousQuarterDisplay; // Use calculated value as fallback
+        _previousQuarterDisplay = summary.previousQuarterDisplay ?? _previousQuarterDisplay;
         _samplesCollectedPreviousQuarter = summary.samplesCollectedPreviousQuarter;
         _resultsReturnedPreviousQuarter = summary.resultsReturnedPreviousQuarter;
         _suppressedPreviousQuarter = summary.suppressedPreviousQuarter;
@@ -512,7 +481,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
         _tatExceeded3MonthsPreviousQuarter = summary.tatExceeded3MonthsPreviousQuarter;
         _tatOver3MonthsWithResultPreviousQuarter = summary.tatOver3MonthsWithResultPreviousQuarter;
 
-        // Older Samples Metrics
         _olderSamplesDisplayTitle = summary.olderSamplesDisplayTitle ?? "Older Samples";
         _samplesCollectedOlder = summary.samplesCollectedOlder;
         _resultsReturnedOlder = summary.resultsReturnedOlder;
@@ -520,12 +488,9 @@ class _ReportVlTabState extends State<ReportVlTab> {
         _unsuppressedOlder = summary.unsuppressedOlder;
         _tatExceeded3MonthsOlder = summary.tatExceeded3MonthsOlder;
         _tatOver3MonthsWithResultOlder = summary.tatOver3MonthsWithResultOlder;
-
-        // --- FIX ENDS HERE ---
       });
     }
 
-    // Populate call log metrics by calculating from the call log list (already correct)
     if (_callLogs.isNotEmpty) {
       _totalCallsMade = _callLogs.length;
       _callsAnswered = _callLogs.where((log) => log.callStatus?.toLowerCase() == "answered").length;
@@ -538,7 +503,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
       }
     }
 
-    // Final setState to ensure the UI updates after all calculations.
     if(mounted) setState(() {});
   }
 
@@ -559,7 +523,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
     return phone.length > 4 ? '...${phone.substring(phone.length - 4)}' : phone.replaceAll(RegExp(r'.'), '*');
   }
 
-  // NEW: This function prompts the user for their Firebase password to re-authenticate.
   Future<bool> _promptForPasswordAndReauthenticate() async {
     final passwordController = TextEditingController();
     final user = _firebaseAuth.currentUser;
@@ -568,14 +531,11 @@ class _ReportVlTabState extends State<ReportVlTab> {
       _showSnackBar("Not signed in. Cannot perform action.");
       return false;
     }
-    // Re-authentication requires an email. If the user signed in with a phone number or anonymously, this will fail.
-    // You might need a different re-authentication flow depending on the provider.
     if (user.email == null) {
       _showSnackBar("User email is not available for password authentication.");
       return false;
     }
 
-    // Show dialog to get password
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -643,7 +603,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
     return confirmed ?? false;
   }
 
-  // REFACTORED: Now uses Firebase password authentication instead of a PIN.
   Future<bool> _askToUnmask() async {
     final bool isAuthenticated = await _promptForPasswordAndReauthenticate();
     if (!isAuthenticated && mounted) {
@@ -652,7 +611,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
     return isAuthenticated;
   }
 
-  // REFACTORED: Now uses Firebase password authentication instead of a PIN.
   Future<void> _toggleGlobalUnmask() async {
     if (_allCellsGloballyUnlocked) {
       if (mounted) setState(() => _allCellsGloballyUnlocked = false);
@@ -667,10 +625,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
       }
     }
   }
-
-
-  // --- The functions below for UI, exporting, and date picking are largely unchanged ---
-  // --- except for calls to the new unmasking logic.                       ---
 
   void _showDateRangePicker() {
     showDialog(
@@ -762,19 +716,123 @@ class _ReportVlTabState extends State<ReportVlTab> {
         log.trackedBy ?? 'N/A',
         log.trackerFacility ?? 'N/A',
       ]));
+
       String csvData = const ListToCsvConverter().convert(rows);
-      final directory = await getTemporaryDirectory();
+      final bytes = utf8.encode(csvData);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
       final filename = 'vl_call_log_summary_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final path = '${directory.path}/$filename';
-      await File(path).writeAsString(csvData);
-      if (mounted) _showSnackBar('CSV exported: $filename');
-      await Share.shareXFiles([XFile(path)], text: 'VL Call Log Summary CSV Export');
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
+
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) _showSnackBar('Call Log CSV download started.');
+
     } catch (e) {
       if (mounted) _showSnackBar('Error exporting CSV: $e');
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
+
+  // =========== NEW METHOD FOR SUMMARY CSV EXPORT ============
+  Future<void> _exportSummaryToCSV() async {
+    if (_isExporting) return;
+    if (mounted) setState(() => _isExporting = true);
+
+    try {
+      // Create a list of rows for the CSV in a key-value format
+      List<List<dynamic>> rows = [
+        ['Metric', 'Value'], // Header
+        [], // Blank row for spacing
+
+        // Overall Performance
+        ['--- OVERALL PERFORMANCE ---', ''],
+        ['% Samples Collected (Overall)', '${_percentageSampleCollected.toStringAsFixed(1)}%'],
+        ['% Results Received (Overall)', '${_percentageResultReceived.toStringAsFixed(1)}%'],
+        [],
+
+        // Not Active Client Status
+        ['--- CLIENTS NOT ON ACTIVE TREATMENT ---', ''],
+        ['Total Not Active', _totalNotActive],
+        ['Deaths', _totalDeaths],
+        ['Transferred Out', _totalTransferredOut],
+        ['Missed Appointments', _totalMissedAppointments],
+        ['IIT (Interrupted in Treatment)', _totalIIT],
+        ['Discontinued Care', _totalDiscontinuedCare],
+        [],
+
+        // Current Quarter Summary
+        ['--- VL SUMMARY ($_currentQuarterDisplay) ---', ''],
+        ['Total Eligible Clients (Filtered)', _totalEligibleOverall],
+        ['Due for Refill (In Quarter)', _totalEligibleDueForRefillInQuarter],
+        ['Refill Due (Outside Quarter)', _totalEligibleDueForRefillOutsideQuarter],
+        ['Samples Collected', _samplesCollectedInQuarter],
+        ['Results Returned', _resultsReturnedInQuarter],
+        ['Suppressed (<1k)', _suppressedInQuarter],
+        ['Unsuppressed (>=1k)', _unsuppressedInQuarter],
+        ['TAT: Pending > 90 days', _tatExceeded3MonthsCurrentQuarter],
+        ['TAT: Result Received > 90 days', _tatOver3MonthsWithResultCurrentQuarter],
+        [],
+
+        // Previous Quarter Summary
+        ['--- VL SUMMARY ($_previousQuarterDisplay) ---', ''],
+        ['Samples Collected', _samplesCollectedPreviousQuarter],
+        ['Results Returned', _resultsReturnedPreviousQuarter],
+        ['Suppressed (<1k)', _suppressedPreviousQuarter],
+        ['Unsuppressed (>=1k)', _unsuppressedPreviousQuarter],
+        ['TAT: Pending > 90 days', _tatExceeded3MonthsPreviousQuarter],
+        ['TAT: Result Received > 90 days', _tatOver3MonthsWithResultPreviousQuarter],
+        [],
+
+        // Older Samples Summary
+        ['--- VL SUMMARY ($_olderSamplesDisplayTitle) ---', ''],
+        ['Samples Collected', _samplesCollectedOlder],
+        ['Results Returned', _resultsReturnedOlder],
+        ['Suppressed (<1k)', _suppressedOlder],
+        ['Unsuppressed (>=1k)', _unsuppressedOlder],
+        ['TAT: Pending > 90 days', _tatExceeded3MonthsOlder],
+        ['TAT: Result Received > 90 days', _tatOver3MonthsWithResultOlder],
+        [],
+
+        // Call Log Analysis
+        ['--- CALL LOG ANALYSIS ---', ''],
+        ['Total Calls Made', _totalCallsMade],
+        ['Calls Answered', _callsAnswered],
+        ['Calls Not Answered/Failed', _callsNotAnsweredOrFailed],
+        ['Average Call Duration (Answered)', '${_averageCallDurationSeconds.toStringAsFixed(1)}s'],
+      ];
+
+      String csvData = const ListToCsvConverter().convert(rows);
+      final bytes = utf8.encode(csvData);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final filename = 'vl_dashboard_summary_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
+
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) _showSnackBar('Dashboard Summary CSV download started.');
+
+    } catch (e) {
+      if (mounted) _showSnackBar('Error exporting Summary CSV: $e');
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
 
   Future<void> _exportToPDF() async {
     if (_isExporting) return;
@@ -847,12 +905,23 @@ class _ReportVlTabState extends State<ReportVlTab> {
           ],
         ),
       );
-      final directory = await getTemporaryDirectory();
+
+      final Uint8List pdfBytes = await pdf.save();
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
       final filename = 'vl_report_summary_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
-      final path = '${directory.path}/$filename';
-      await File(path).writeAsBytes(await pdf.save());
-      if(mounted) _showSnackBar('PDF exported: $filename');
-      await Printing.sharePdf(bytes: await pdf.save(), filename: filename);
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
+
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) _showSnackBar('PDF download started.');
+
     } catch (e) {
       if (mounted) _showSnackBar('Error exporting PDF: $e');
     } finally {
@@ -861,7 +930,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   }
 
   Widget _buildMetricCard(String title, String value, {String? subtitle, double? width, Color? valueColor}) {
-    // ... (This function is correct and does not need changes)
     return SizedBox(
       width: width,
       child: Card(
@@ -887,7 +955,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   }
 
   Widget _buildDoughnutChart(String title, List<_ChartData> data, {GlobalKey? boundaryKey}) {
-    // ... (This function is correct and does not need changes)
     List<_ChartData> filteredData = data.where((d) => d.y > 0).toList();
     if (filteredData.isEmpty) return SizedBox.shrink();
 
@@ -920,7 +987,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   }
 
   Map<String, List<VlCallLogModel>> _groupCallLogsByDate() {
-    // ... (This function is correct and does not need changes)
     final Map<String, List<VlCallLogModel>> dailyLogs = {};
     final DateFormat dateKeyFormat = DateFormat('yyyy-MM-dd');
 
@@ -939,7 +1005,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
   }
 
   Widget _buildCallLogSummaryTable() {
-    // ... (This function is correct and does not need changes)
     if (_callLogs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -1010,10 +1075,19 @@ class _ReportVlTabState extends State<ReportVlTab> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-          appBar: AppBar(title: Text('VL Reports Dashboard')),
+
+          appBar: AppBar(
+            title: const Text("Viral Load Tracker", style: TextStyle(color: Colors.white, fontSize: 20)),
+            backgroundColor: const Color(0xFF722F37),
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          drawer: drawer(context),
+         // appBar: AppBar(title: Text('VL Reports Dashboard')),
           body: Center(child: CircularProgressIndicator())
       );
     }
+
+    // ... (Chart data setup and layout widgets remain the same)
 
     final List<_ChartData> currentQuarterChartData = [
       _ChartData('Samples Coll.', _samplesCollectedInQuarter.toDouble(), Colors.orange.shade300),
@@ -1039,7 +1113,7 @@ class _ReportVlTabState extends State<ReportVlTab> {
       _ChartData('Suppressed', _suppressedOlder.toDouble(), Colors.lightGreen.shade300),
       _ChartData('Unsuppressed', _unsuppressedOlder.toDouble(), Colors.orange.shade300),
       _ChartData('TAT >3m No Result', _tatExceeded3MonthsOlder.toDouble(), Colors.grey.shade400),
-      _ChartData('Result TAT >3m', _tatOver3MonthsWithResultOlder.toDouble(), Colors.brown.shade200),
+      _ChartData('TAT: Result TAT >3m', _tatOver3MonthsWithResultOlder.toDouble(), Colors.brown.shade200),
     ];
 
     final List<_ChartData> callStatusData = [
@@ -1094,7 +1168,6 @@ class _ReportVlTabState extends State<ReportVlTab> {
                   value: 'syncToServer',
                   child: ListTile(leading: Icon(Icons.cloud_upload_outlined, color: Colors.blue), title: Text('Upload Report Summary'), dense: true),
                 ),
-                // REFACTORED: Removed "PIN Settings" as it's no longer relevant.
               ],
             ),
           if (_isExporting)
@@ -1103,16 +1176,32 @@ class _ReportVlTabState extends State<ReportVlTab> {
               child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
             )
           else
+          // =========== MODIFIED EXPORT MENU ============
             PopupMenuButton<String>(
               icon: const Icon(Icons.file_download_outlined),
               tooltip: "Export Options",
               onSelected: (value) async {
-                if (value == 'csv') await _exportToCSV();
-                else if (value == 'pdf') await _exportToPDF();
+                switch (value) {
+                  case 'csv_call_log':
+                    await _exportToCSV();
+                    break;
+                  case 'csv_summary': // NEW
+                    await _exportSummaryToCSV();
+                    break;
+                  case 'pdf':
+                    await _exportToPDF();
+                    break;
+                }
               },
               itemBuilder: (context) => [
+                // NEW: Added item for summary CSV
                 PopupMenuItem(
-                    value: 'csv',
+                    value: 'csv_summary',
+                    child: Row(children: [Icon(Icons.summarize_outlined, color: Colors.blue[700]), const SizedBox(width: 8), const Text('Export CSV (Summaries)')])
+                ),
+                // MODIFIED: Renamed value for clarity
+                PopupMenuItem(
+                    value: 'csv_call_log',
                     child: Row(children: [Icon(Icons.grid_on_outlined, color: Colors.green[700]), const SizedBox(width: 8), const Text('Export CSV (Call Log)')])
                 ),
                 PopupMenuItem(

@@ -22,12 +22,13 @@ class _CallTrackerPageWebState extends State<CallTrackerPageWeb> {
 
   // List of WEB screens
   final List<Widget> _screens = [
+    const ReportsPageWeb(), // Use the web reports page
     const TodayCallsPageWeb(),
     const MissedAndIITPageWeb(),
     const UpcomingAppointmentsPageWeb(),
     const ContactListPageWeb(),
     const ImportContactsPageWeb(),
-    const ReportsPageWeb(), // Use the web reports page
+
   ];
 
   @override
@@ -50,12 +51,13 @@ class _CallTrackerPageWebState extends State<CallTrackerPageWeb> {
                   },
                   labelType: NavigationRailLabelType.selected, // Or .all / .none
                   destinations: const <NavigationRailDestination>[
+
+                    NavigationRailDestination(icon: Icon(Icons.assessment_outlined), selectedIcon: Icon(Icons.assessment), label: Text('Reports')),
                     NavigationRailDestination(icon: Icon(Icons.today_outlined), selectedIcon: Icon(Icons.today), label: Text('Today')),
                     NavigationRailDestination(icon: Icon(Icons.schedule_outlined), selectedIcon: Icon(Icons.schedule_rounded), label: Text('Missed')),
                     NavigationRailDestination(icon: Icon(Icons.upcoming_outlined), selectedIcon: Icon(Icons.upcoming), label: Text('Upcoming')),
                     NavigationRailDestination(icon: Icon(Icons.contacts_outlined), selectedIcon: Icon(Icons.contacts), label: Text('Contacts')),
                     NavigationRailDestination(icon: Icon(Icons.upload_file_outlined), selectedIcon: Icon(Icons.upload_file), label: Text('Import')),
-                    NavigationRailDestination(icon: Icon(Icons.assessment_outlined), selectedIcon: Icon(Icons.assessment), label: Text('Reports')),
                   ],
                 );
               } else {

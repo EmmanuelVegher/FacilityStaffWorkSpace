@@ -11,7 +11,7 @@ class VlCallLogModel {
   final String? callStatus;
   final int? callDurationInSeconds;
   final String? trackedBy;
-  final String? trackerFacility;
+  late final String? trackerFacility;
   final String? trackerState;
   final String? firebaseAuthId;
   final bool isSyncedToFirebase;

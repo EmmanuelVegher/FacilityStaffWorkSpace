@@ -13,6 +13,7 @@ import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/upload_signature2.dart';
+import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
@@ -212,7 +213,7 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const StateReportsPageWeb()),
+                    builder: (context) => const ReportsPageWeb2()),
 
               );
             },
@@ -222,6 +223,7 @@ Widget drawer2(
             color: Colors.grey,
             height: 1,
           ),
+
 
           ListTile(
             leading: Icon(
@@ -239,7 +241,7 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const StateLevelReportTab()),
+                    builder: (context) => const StateVlReportTab2()),
 
               );
             },
