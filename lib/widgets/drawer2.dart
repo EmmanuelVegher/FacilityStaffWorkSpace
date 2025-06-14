@@ -8,6 +8,7 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
+import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
@@ -242,6 +243,34 @@ Widget drawer2(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const StateVlReportTab2()),
+
+              );
+            },
+          ),//
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          ListTile(
+            leading: Icon(
+              Icons.art_track,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'EAC Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateEacHistoricalReportTab()),
 
               );
             },
