@@ -7,6 +7,7 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/call_tracker/call_tracker_page.dart';
+import '../screens/eac_tracker/report_eac_web_tab.dart';
 import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
 import '../screens/leave_request/leave_request.dart';
@@ -363,6 +364,31 @@ Widget drawer(
               );
             },
           ),
+          Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.art_track,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'EAC Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => ReportEacWebTab()),
+              );
+            },
+          ),
+
 
 
           const Divider(
@@ -390,30 +416,6 @@ Widget drawer(
             },
           ),
 
-          // Divider(
-          //   color: Colors.grey,
-          //   height: 1,
-          // ),
-          // ListTile(
-          //   leading: Icon(
-          //     Icons.access_time,
-          //     size: _drawerIconSize,
-          //     color: Colors.blue,
-          //   ),
-          //   title: Text(
-          //     'Pending TimeSheet',
-          //     style: TextStyle(
-          //         fontSize: _drawerFontSize,
-          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
-          //   ),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //           builder: (context) => PendingTimesheetsScreen()),
-          //     );
-          //   },
-          // ),
 
 
 
