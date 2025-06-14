@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/create_activity_page.dart';
+import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
@@ -13,6 +14,7 @@ import '../screens/forgot_password2.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
+import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
@@ -141,7 +143,29 @@ Widget drawer2(
 
                       )),
                 );
-              }),
+              }),//AttendanceAnalysisPage
+
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.timer_3,
+                size: drawerIconSize, color: Colors.red),
+            title: Text(
+              'Attendance Analysis',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AttendanceAnalysisPage()),
+              );
+            },
+          ),
 
 
           const Divider(
@@ -164,7 +188,6 @@ Widget drawer2(
               );
             },
           ),
-
 
           const Divider(
             color: Colors.grey,
@@ -271,6 +294,34 @@ Widget drawer2(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const StateEacHistoricalReportTab()),
+
+              );
+            },
+          ),//TimesheetManagementDashboard
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          ListTile(
+            leading: Icon(
+              Icons.lock_clock,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'View Timesheets',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const TimesheetReviewPage()),
 
               );
             },

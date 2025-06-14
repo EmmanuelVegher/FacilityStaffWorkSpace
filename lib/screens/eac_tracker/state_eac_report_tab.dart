@@ -3,10 +3,15 @@
 
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:csv/csv.dart';
@@ -79,16 +84,19 @@ class VlSummary {
   int unsuppressed;
   int totalUniqueClients;
   VlSummary({this.withRepeatVl = 0, this.withRepeatVlResult = 0, this.suppressedLessThan1000 = 0, this.suppressedLessThan50 = 0, this.unsuppressed = 0, this.totalUniqueClients = 0});
-  factory VlSummary.fromMap(Map<String, dynamic> map, {int totalClients = 0}) => VlSummary(
-    withRepeatVl: map['withRepeatVl'] as int? ?? 0,
-    withRepeatVlResult: map['withRepeatVlResult'] as int? ?? 0,
-    suppressedLessThan1000: map['suppressedLessThan1000'] as int? ?? 0,
-    suppressedLessThan50: map['suppressedLessThan50'] as int? ?? 0,
-    unsuppressed: map['unsuppressed'] as int? ?? 0,
-    totalUniqueClients: totalClients,
-  );
-}
 
+  factory VlSummary.fromMap(Map<String, dynamic> map, {int totalClients = 0}) {
+    // The totalClients might come from the root document, so we pass it in.
+    return VlSummary(
+      withRepeatVl: map['withRepeatVl'] as int? ?? 0,
+      withRepeatVlResult: map['withRepeatVlResult'] as int? ?? 0,
+      suppressedLessThan1000: map['suppressedLessThan1000'] as int? ?? 0,
+      suppressedLessThan50: map['suppressedLessThan50'] as int? ?? 0,
+      unsuppressed: map['unsuppressed'] as int? ?? 0,
+      totalUniqueClients: totalClients,
+    );
+  }
+}
 class EacCallLogModel {
   final String? clientName, artId, phoneNumber, eacSessionType, outcome;
   final String? trackedBy, trackerFacility, designation, supervisorName, supervisorEmail;
@@ -152,9 +160,16 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   bool _isFilterLoading = true;
+  bool _isExporting = false; // <-- ADD THIS LINE
   bool _isLoading = false;
   bool _isInitialState = true;
   String? _errorMessage;
+
+  // NEW: GlobalKeys for capturing charts for PDF
+  final GlobalKey _tatBarChartKey = GlobalKey();
+  final GlobalKey _sessionBarChartKey = GlobalKey();
+  final GlobalKey _tatTrendChartKey = GlobalKey();
+  final GlobalKey _sessionTrendChartKey = GlobalKey();
 
   // --- Filter & User Context ---
   String? _userState;
@@ -162,6 +177,7 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
   String? _selectedFacilityName;
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 29));
   DateTime _endDate = DateTime.now();
+
 
   // --- Data & Aggregation Holders ---
   List<EacReportModel> _allReports = [];
@@ -177,6 +193,167 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
   void initState() {
     super.initState();
     _initializeUserContext();
+  }
+
+  // --- NEW EXPORT AND HELPER METHODS ---
+
+  Future<void> _exportSummaryToCsv() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    final totals = _totalAggregatedMetrics;
+    List<List<dynamic>> rows = [
+      ['State-Wide EAC Summary Report'],
+      ['State', _userState],
+      ['Facility Filter', _selectedFacilityName],
+      ['Date Range', '${DateFormat.yMd().format(_startDate)} - ${DateFormat.yMd().format(_endDate)}'],
+      [],
+      ['Metric', 'Value'],
+      [],
+      ['--- Overall Performance ---', ''],
+      ['Total Clients on EAC', totals.vlSummary.totalUniqueClients],
+      ['Repeat VL with Result', totals.vlSummary.withRepeatVlResult],
+      ['Unsuppressed (>=1k)', totals.vlSummary.unsuppressed],
+      ['Suppressed (<50)', totals.vlSummary.suppressedLessThan50],
+      [],
+      ['--- Turn-Around Time (TAT) ---', ''],
+      ['<= 3 Months', totals.tat.lessThan90Days],
+      ['3-5 Months', totals.tat.between90and150Days],
+      ['> 5 Months', totals.tat.moreThan150Days],
+      [],
+      ['--- EAC Session Completion ---', ''],
+      ['>= 3 Sessions', totals.eacSessions.withAtLeast3Sessions],
+      ['< 3 Sessions', totals.eacSessions.without3Sessions],
+    ];
+
+    String csvData = const ListToCsvConverter().convert(rows);
+    _triggerDownload(utf8.encode(csvData), 'eac_summary_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+
+    setState(() => _isExporting = false);
+  }
+
+  Future<void> _exportDetailsToCsv() async {
+    if (_isExporting) return;
+    bool proceed = _allCellsGloballyUnlocked;
+    if(!proceed) {
+      proceed = await _promptForPasswordAndReauthenticate();
+      if(!proceed) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Authentication failed. Export cancelled.")));
+        return;
+      }
+    }
+    setState(() => _isExporting = true);
+
+    // Facility Summary Data
+    List<List<dynamic>> rows = [
+      ['Facility-Level Summary (Aggregated over selected period)'],
+      [],
+      [
+        'Facility', 'Clients', 'TAT <3m', 'TAT 3-5m', 'TAT >5m', 'Sess. >=3', 'Sess. <3',
+        'Rpt. VL', 'Rpt. VL w/ Result', 'Unsupp.', 'Supp. <1k', 'Supp. <50'
+      ],
+      ..._facilityAggregatedMetrics.values.map((agg) => [
+        agg.name, agg.vlSummary.totalUniqueClients, agg.tat.lessThan90Days, agg.tat.between90and150Days,
+        agg.tat.moreThan150Days, agg.eacSessions.withAtLeast3Sessions, agg.eacSessions.without3Sessions,
+        agg.vlSummary.withRepeatVl, agg.vlSummary.withRepeatVlResult, agg.vlSummary.unsuppressed,
+        agg.vlSummary.suppressedLessThan1000, agg.vlSummary.suppressedLessThan50
+      ]),
+      [],
+      [],
+      ['Call Log Details'],
+      [],
+      [
+        'Facility', 'Date', 'Client Name', 'Phone', 'Outcome', 'Duration (s)',
+        'EAC Session', 'Tracker', 'Designation', 'Supervisor'
+      ],
+      ..._allCallLogs.map((log) => [
+        log.trackerFacility ?? 'N/A', DateFormat.yMd().add_jm().format(log.callDateTime),
+        log.clientName, log.phoneNumber, log.outcome ?? 'N/A', log.duration,
+        log.eacSessionType ?? 'N/A', log.trackedBy ?? 'N/A', log.designation ?? 'N/A',
+        log.supervisorName ?? 'N/A'
+      ])
+    ];
+
+    String csvData = const ListToCsvConverter().convert(rows);
+    _triggerDownload(utf8.encode(csvData), 'eac_details_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+
+    setState(() => _isExporting = false);
+  }
+
+  Future<void> _exportChartsToPdf() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    try {
+      final tatBarBytes = await _captureChartPng(_tatBarChartKey);
+      final sessionBarBytes = await _captureChartPng(_sessionBarChartKey);
+      final tatTrendBytes = await _captureChartPng(_tatTrendChartKey);
+      final sessionTrendBytes = await _captureChartPng(_sessionTrendChartKey);
+
+      final pdf = pw.Document();
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        header: (context) => pw.Header(text: "EAC Performance Charts Report"),
+        build: (context) => [
+          pw.Text("Facility Filter: $_selectedFacilityName", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text("Date Range: ${DateFormat.yMd().format(_startDate)} to ${DateFormat.yMd().format(_endDate)}"),
+          pw.Divider(),
+          pw.SizedBox(height: 10),
+          if (tatBarBytes != null || sessionBarBytes != null)
+            pw.Text("Overall Summary Charts", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (tatBarBytes != null) pw.Image(pw.MemoryImage(tatBarBytes), width: 380),
+                if (sessionBarBytes != null) pw.Image(pw.MemoryImage(sessionBarBytes), width: 380),
+              ]
+          ),
+          pw.SizedBox(height: 20),
+          if (tatTrendBytes != null || sessionTrendBytes != null)
+            pw.Text("Historical Trend Charts", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 10),
+          if(tatTrendBytes != null) pw.Image(pw.MemoryImage(tatTrendBytes), width: 700),
+          pw.SizedBox(height: 20),
+          if(sessionTrendBytes != null) pw.Image(pw.MemoryImage(sessionTrendBytes), width: 700),
+        ],
+      ));
+
+      final pdfBytes = await pdf.save();
+      _triggerDownload(pdfBytes, 'eac_charts_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf', 'application/pdf');
+
+    } catch(e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
+    } finally {
+      if(mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<Uint8List?> _captureChartPng(GlobalKey key) async {
+    try {
+      if (key.currentContext == null) return null;
+      RenderRepaintBoundary boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      // Wrap the chart in a white container for clean capture
+      ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint("Error capturing chart: $e");
+      return null;
+    }
+  }
+
+  void _triggerDownload(List<int> bytes, String filename, [String mimeType = 'text/csv']) {
+    final blob = html.Blob([bytes], mimeType);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.document.createElement('a') as html.AnchorElement
+      ..href = url
+      ..style.display = 'none'
+      ..download = filename;
+    html.document.body!.children.add(anchor);
+    anchor.click();
+    html.document.body!.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
   }
 
   Future<void> _initializeUserContext() async {
@@ -201,6 +378,8 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
       if (mounted) setState(() => _isFilterLoading = false);
     }
   }
+
+
 
   Future<List<String>> _getFacilitiesForState(String state) async {
     final snapshot = await _firestore.collection('Location').doc(state).collection(state).get();
@@ -372,6 +551,38 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
             tooltip: _allCellsGloballyUnlocked ? 'Mask Data' : 'Unmask Data',
             onPressed: _toggleGlobalUnmask,
           ),
+          if (_isExporting)
+            const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+            )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: "Download Options",
+              onSelected: (value) {
+                if(value == 'csv_summary') _exportSummaryToCsv();
+                if(value == 'csv_details') _exportDetailsToCsv();
+                if(value == 'pdf_charts') _exportChartsToPdf();
+              },
+              enabled: !_isInitialState && !_isLoading && _allReports.isNotEmpty,
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                    value: 'csv_summary',
+                    child: ListTile(leading: Icon(Icons.summarize_outlined), title: Text("Export Summary (CSV)"))
+                ),
+                const PopupMenuItem(
+                    value: 'csv_details',
+                    child: ListTile(leading: Icon(Icons.table_rows_outlined), title: Text("Export Details (CSV)"))
+                ),
+                const PopupMenuItem(
+                    value: 'pdf_charts',
+                    child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text("Export Charts (PDF)"))
+                ),
+              ],
+            )
         ],
       ),
       drawer: drawer2(context),
@@ -381,14 +592,28 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildFilterBar(),
-            if (_errorMessage != null) Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red))),
-            if (_isLoading) const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-            else if (_isInitialState)
-              const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("Please select filters and click 'Apply' to view the report.")))
-            else if (_allReports.isEmpty)
-                const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No EAC reports found for the selected criteria.")))
-              else
-                _buildReportBody(),
+
+            // Show guidance text on initial load, but don't hide the report body.
+            if (_isInitialState)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
+                child: Center(
+                  child: Text(
+                    "Please select filters and click 'Apply' to view the report.",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ),
+              ),
+
+            if (_errorMessage != null)
+              Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red))),
+
+            // The main body is now built immediately, showing 0s initially.
+            // It gets hidden only during the loading phase.
+            if (_isLoading)
+              const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+            else
+              _buildReportBody(),
           ],
         ),
       ),
@@ -406,7 +631,7 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
           children: [
             if (_isFilterLoading) const Text("Loading filters...") else
               ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 250, maxWidth: 350),
+                constraints: const BoxConstraints(minWidth: 250, maxWidth: 600),
                 child: DropdownButtonFormField<String>(
                   value: _selectedFacilityName,
                   hint: const Text('Select Facility'),
@@ -446,12 +671,12 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
           _createLineSeries(name: '≤ 3m', color: Colors.green, yValueMapper: (d, _) => d.tat.lessThan90Days),
           _createLineSeries(name: '3-5m', color: Colors.orange, yValueMapper: (d, _) => d.tat.between90and150Days),
           _createLineSeries(name: '> 5m', color: Colors.red, yValueMapper: (d, _) => d.tat.moreThan150Days),
-        ]),
+        ], key: _tatTrendChartKey),
         const SizedBox(height: 24),
         _buildTrendChart('EAC Session Completion Trend', [
           _createLineSeries(name: '≥ 3 Sessions', color: Colors.blue, yValueMapper: (d, _) => d.eacSessions.withAtLeast3Sessions),
           _createLineSeries(name: '< 3 Sessions', color: Colors.purple, yValueMapper: (d, _) => d.eacSessions.without3Sessions),
-        ]),
+        ], key: _sessionTrendChartKey),
         const Divider(height: 40, thickness: 1),
         Text("Detailed Breakdowns", style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
@@ -462,23 +687,36 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
     );
   }
 
-  // NEW: Builds the top summary section with KPIs and Bar Charts
+
+  // BUILDS THE TOP SUMMARY SECTION WITH KPIs AND BAR CHARTS
   Widget _buildOverallSummarySection() {
     final totals = _totalAggregatedMetrics;
+
+    // Data for TAT Chart
     final tatData = [
       _ChartData('≤ 3m', totals.tat.lessThan90Days, Colors.green),
       _ChartData('3-5m', totals.tat.between90and150Days, Colors.orange),
       _ChartData('> 5m', totals.tat.moreThan150Days, Colors.red),
     ];
+
+    // Data for Session Chart
     final sessionData = [
       _ChartData('≥ 3 Sess.', totals.eacSessions.withAtLeast3Sessions, Colors.blue),
       _ChartData('< 3 Sess.', totals.eacSessions.without3Sessions, Colors.purple),
     ];
 
+    // NEW: Data for Suppression Chart (calculated to be mutually exclusive)
+    final int suppressed50to999 = totals.vlSummary.suppressedLessThan1000 - totals.vlSummary.suppressedLessThan50;
+    final vlSuppressionData = [
+      _ChartData('Unsupp. (≥1k)', totals.vlSummary.unsuppressed, Colors.red.shade600),
+      _ChartData('Supp. (50-999)', suppressed50to999, Colors.orangeAccent.shade400),
+      _ChartData('Supp. (<50)', totals.vlSummary.suppressedLessThan50, Colors.teal.shade500),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Overall Summary", style: Theme.of(context).textTheme.headlineSmall),
+        Text("Overall Summary for Period", style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
         Wrap(
           spacing: 16, runSpacing: 16,
@@ -494,11 +732,16 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 450, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.5
+              maxCrossAxisExtent: 450,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1.5
           ),
           children: [
-            _buildBarChart("Total TAT Distribution", tatData),
-            _buildBarChart("Total Session Completion", sessionData),
+            _buildBarChart("Total TAT Distribution", tatData, key: _tatBarChartKey),
+            _buildBarChart("Total Session Completion", sessionData, key: _sessionBarChartKey),
+            // NEW: Add the suppression chart to the grid
+            _buildBarChart("Repeat VL Suppression Status", vlSuppressionData, key: GlobalKey()), // Assign a key if you want to export it
           ],
         ),
       ],
@@ -524,11 +767,16 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
     );
   }
 
-  Widget _buildBarChart(String title, List<_ChartData> data) {
+  Widget _buildBarChart(String title, List<_ChartData> data, {Key? key}) {
     return Card(
       elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
+      child:
+
+      RepaintBoundary(
+        key: key,
+        child: Container( // Wrap with container for clean PDF background
+          color: Colors.white,
+          padding: const EdgeInsets.all(12.0),
         child: SfCartesianChart(
           title: ChartTitle(text: title),
           primaryXAxis: CategoryAxis(),
@@ -543,15 +791,20 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
             )
           ],
         ),
-      ),
+      ),),
+
+
     );
   }
 
-  Widget _buildTrendChart(String title, List<LineSeries<DailyAggregatedEacMetrics, DateTime>> series) {
+  Widget _buildTrendChart(String title, List<LineSeries<DailyAggregatedEacMetrics, DateTime>> series, {Key? key}) {
     return Card(
       elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      child: RepaintBoundary(
+        key: key,
+        child: Container( // Wrap with container for clean PDF background
+          color: Colors.white,
+          padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -568,7 +821,7 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
               ),
             ),
           ],
-        ),
+        ),),
       ),
     );
   }
