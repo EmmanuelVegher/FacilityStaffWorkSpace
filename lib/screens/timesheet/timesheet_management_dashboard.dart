@@ -365,7 +365,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
               DropdownButtonFormField<String>(
                 value: _selectedFacilityName,
                 hint: const Text('Select Facility'),
-                decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 250)),
+                decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 600)),
                 items: _availableFacilities.map((name) => DropdownMenuItem(value: name, child: Text(name))).toList(),
                 onChanged: (value) => setState(() => _selectedFacilityName = value),
               ),

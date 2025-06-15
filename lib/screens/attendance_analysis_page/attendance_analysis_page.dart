@@ -96,8 +96,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           _userState = staffDoc.data()?['state'] as String?;
         });
         if(_userState != null) {
-          final facilities = await _getUniqueFieldValues('location');
-          final designations = await _getUniqueFieldValues('designation');
+          final facilities = await _getUniqueFieldValues2('location');
+          final designations = await _getUniqueFieldValues2('designation');
           if(mounted) {
             setState(() {
               _availableFacilities = ['All Facilities', ...facilities];
@@ -129,6 +129,25 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     return sortedList;
   }
 
+
+
+  Future<List<String>> _getUniqueFieldValues2(String field) async {
+    if(_userState == null) return [];
+    final snapshot = await _firestore.collection('Staff').where('state', isEqualTo: _userState).where('staffCategory', isEqualTo: "Facility Staff").get();
+
+    // FIX IS HERE: Using a for-loop with an explicit null check
+    final Set<String> values = {}; // Use a Set to automatically handle duplicates
+    for (final doc in snapshot.docs) {
+      final value = doc.data()[field] as String?;
+      if (value != null && value.isNotEmpty) {
+        values.add(value);
+      }
+    }
+
+    final sortedList = values.toList();
+    sortedList.sort();
+    return sortedList;
+  }
   Future<void> _updateStaffFilter() async {
     if(_userState == null) return;
     var query = _firestore.collection('Staff').where('state', isEqualTo: _userState);
@@ -274,19 +293,19 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             ),
             DropdownButtonFormField<String>(
               value: _selectedFacility, hint: const Text('Facility'),
-              decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
+              decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 600)),
               items: _availableFacilities.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (value) => setState(() { _selectedFacility = value; _updateStaffFilter(); }),
             ),
             DropdownButtonFormField<String>(
               value: _selectedDesignation, hint: const Text('Designation'),
-              decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
+              decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 400)),
               items: _availableDesignations.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (value) => setState(() { _selectedDesignation = value; _updateStaffFilter(); }),
             ),
             DropdownButtonFormField<String>(
               value: _selectedStaffId, hint: const Text('Staff'),
-              decoration: const InputDecoration(labelText: 'Staff', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
+              decoration: const InputDecoration(labelText: 'Staff', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 400)),
               items: [const DropdownMenuItem<String>(value: null, child: Text('All Staff')), ..._availableStaff.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, overflow: TextOverflow.ellipsis)))],
               onChanged: (value) => setState(() => _selectedStaffId = value),
             ),
@@ -301,6 +320,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       ),
     );
   }
+
 
   void _showDateRangePicker() {
     showDialog(
