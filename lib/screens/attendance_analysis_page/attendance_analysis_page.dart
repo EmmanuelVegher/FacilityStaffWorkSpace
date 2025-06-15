@@ -1,4 +1,4 @@
-// A DEDICATED, FEATURE-RICH PAGE FOR ATTENDANCE ANALYSIS
+// A DEDICATED, FEATURE-RICH PAGE FOR ATTENDANCE ANALYSIS (HIGHLY OPTIMIZED)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,10 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
-
 import '../../widgets/drawer2.dart'; // Assuming a state-level drawer
 
-// --- DATA MODELS FOR THE DASHBOARD ---
+// --- DATA MODELS (No changes needed here) ---
 
 class StaffInfo {
   final String id;
@@ -96,8 +95,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           _userState = staffDoc.data()?['state'] as String?;
         });
         if(_userState != null) {
-          final facilities = await _getUniqueFieldValues2('location');
-          final designations = await _getUniqueFieldValues2('designation');
+          final facilities = await _getUniqueFieldValues('location');
+          final designations = await _getUniqueFieldValues('designation');
           if(mounted) {
             setState(() {
               _availableFacilities = ['All Facilities', ...facilities];
@@ -114,40 +113,15 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   Future<List<String>> _getUniqueFieldValues(String field) async {
     if(_userState == null) return [];
     final snapshot = await _firestore.collection('Staff').where('state', isEqualTo: _userState).get();
-
-    // FIX IS HERE: Using a for-loop with an explicit null check
-    final Set<String> values = {}; // Use a Set to automatically handle duplicates
+    final Set<String> values = {};
     for (final doc in snapshot.docs) {
       final value = doc.data()[field] as String?;
-      if (value != null && value.isNotEmpty) {
-        values.add(value);
-      }
+      if (value != null && value.isNotEmpty) values.add(value);
     }
-
-    final sortedList = values.toList();
-    sortedList.sort();
+    final sortedList = values.toList()..sort();
     return sortedList;
   }
 
-
-
-  Future<List<String>> _getUniqueFieldValues2(String field) async {
-    if(_userState == null) return [];
-    final snapshot = await _firestore.collection('Staff').where('state', isEqualTo: _userState).where('staffCategory', isEqualTo: "Facility Staff").get();
-
-    // FIX IS HERE: Using a for-loop with an explicit null check
-    final Set<String> values = {}; // Use a Set to automatically handle duplicates
-    for (final doc in snapshot.docs) {
-      final value = doc.data()[field] as String?;
-      if (value != null && value.isNotEmpty) {
-        values.add(value);
-      }
-    }
-
-    final sortedList = values.toList();
-    sortedList.sort();
-    return sortedList;
-  }
   Future<void> _updateStaffFilter() async {
     if(_userState == null) return;
     var query = _firestore.collection('Staff').where('state', isEqualTo: _userState);
@@ -175,6 +149,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
   }
 
+  // --- REWRITTEN & HIGHLY OPTIMIZED DATA LOADING ---
   Future<void> _loadDashboardData() async {
     if (_userState == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User state not found.")));
@@ -183,6 +158,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     setState(() { _isLoading = true; _isInitialState = false; _errorMessage = null; });
 
     try {
+      // 1. Get the list of staff that match the filters (this is one fast query).
       var staffQuery = _firestore.collection('Staff').where('state', isEqualTo: _userState);
       if(_selectedFacility != null && _selectedFacility != 'All Facilities') staffQuery = staffQuery.where('location', isEqualTo: _selectedFacility);
       if(_selectedDesignation != null && _selectedDesignation != 'All Designations') staffQuery = staffQuery.where('designation', isEqualTo: _selectedDesignation);
@@ -191,18 +167,39 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       final staffSnapshot = await staffQuery.get();
       final staffList = staffSnapshot.docs.map((doc) => StaffInfo(id: doc.id, name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(), location: doc.data()['location'] ?? 'N/A', designation: doc.data()['designation'] ?? 'N/A')).toList();
 
-      List<AttendanceRecord> allRecords = [];
+      if (staffList.isEmpty) {
+        _processAndAggregateData([], [], []);
+        return;
+      }
+
+      // 2. Create a list to hold all the asynchronous read operations.
+      final List<Future<DocumentSnapshot>> futures = [];
       final dateRange = List.generate(_endDate.difference(_startDate).inDays + 1, (i) => _startDate.add(Duration(days: i)));
 
       for (var staff in staffList) {
         for(var date in dateRange) {
           final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
-          final recordDoc = await _firestore.collection('Staff').doc(staff.id).collection('Record').doc(dateStr).get();
-          if(recordDoc.exists) {
-            allRecords.add(AttendanceRecord(staffId: staff.id, date: date, hoursWorked: (recordDoc.data()!['noOfHours'] as num? ?? 0).toDouble()));
-          }
+          // 3. IMPORTANT: DO NOT `await` here. Just add the Future to the list.
+          futures.add(_firestore.collection('Staff').doc(staff.id).collection('Record').doc(dateStr).get());
         }
       }
+
+      // 4. Execute all reads in parallel and wait for them all to complete.
+      final List<DocumentSnapshot> results = await Future.wait(futures);
+
+      // 5. Now process the results in memory (this is very fast).
+      List<AttendanceRecord> allRecords = [];
+      int i = 0;
+      for (var staff in staffList) {
+        for(var date in dateRange) {
+          final recordDoc = results[i];
+          if(recordDoc.exists) {
+            allRecords.add(AttendanceRecord(staffId: staff.id, date: date, hoursWorked: (recordDoc.data() as Map<String, dynamic>)['noOfHours'] as double? ?? 0.0));
+          }
+          i++;
+        }
+      }
+
       _processAndAggregateData(allRecords, staffList, dateRange);
 
     } catch (e, stack) {
@@ -293,19 +290,19 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             ),
             DropdownButtonFormField<String>(
               value: _selectedFacility, hint: const Text('Facility'),
-              decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 600)),
+              decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
               items: _availableFacilities.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (value) => setState(() { _selectedFacility = value; _updateStaffFilter(); }),
             ),
             DropdownButtonFormField<String>(
               value: _selectedDesignation, hint: const Text('Designation'),
-              decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 400)),
+              decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
               items: _availableDesignations.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (value) => setState(() { _selectedDesignation = value; _updateStaffFilter(); }),
             ),
             DropdownButtonFormField<String>(
               value: _selectedStaffId, hint: const Text('Staff'),
-              decoration: const InputDecoration(labelText: 'Staff', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 400)),
+              decoration: const InputDecoration(labelText: 'Staff', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 220)),
               items: [const DropdownMenuItem<String>(value: null, child: Text('All Staff')), ..._availableStaff.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, overflow: TextOverflow.ellipsis)))],
               onChanged: (value) => setState(() => _selectedStaffId = value),
             ),
@@ -320,7 +317,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       ),
     );
   }
-
 
   void _showDateRangePicker() {
     showDialog(
@@ -366,14 +362,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           const SizedBox(height: 24),
           _buildChartCard("Top 10 Facilities by Hours",
               SfCartesianChart(
-                  primaryXAxis: CategoryAxis(
-                      labelRotation: -45,
-                      majorGridLines: const MajorGridLines(width: 0) // Cleaner look
-                  ),
-                  primaryYAxis: NumericAxis(
-                      majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5]) // Dotted grid lines
-                  ),
-                  // FIX IS HERE: Changed ChartSeries to CartesianSeries
+                  primaryXAxis: CategoryAxis(labelRotation: -45, majorGridLines: const MajorGridLines(width: 0)),
+                  primaryYAxis: NumericAxis(majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5])),
                   series: <CartesianSeries>[
                     BarSeries<_ChartData, String>(
                         dataSource: chartData,
