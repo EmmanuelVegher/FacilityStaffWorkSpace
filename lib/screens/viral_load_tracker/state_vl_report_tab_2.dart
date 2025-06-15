@@ -84,6 +84,9 @@ class _StateVlReportTab2State extends State<StateVlReportTab2> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
+  final ScrollController _vlSummaryTableController = ScrollController();
+  final ScrollController _callLogTableController = ScrollController();
+
   // --- State variables for filters and user context ---
   bool _isFilterLoading = true;
   String? _userState;
@@ -161,6 +164,14 @@ class _StateVlReportTab2State extends State<StateVlReportTab2> {
     _tooltipBehavior = TooltipBehavior(enable: true);
     // Only initializes filters, does not load report data.
     _initializeUserContext();
+  }
+
+  @override
+  void dispose() {
+    // NEW: Dispose of the controllers
+    _vlSummaryTableController.dispose();
+    _callLogTableController.dispose();
+    super.dispose();
   }
 
   /// Initializes the user's context by fetching their state and the list of
@@ -1073,92 +1084,7 @@ class _StateVlReportTab2State extends State<StateVlReportTab2> {
     );
   }
 
-  // REWRITTEN WIDGET: Builds the detailed table of call logs.
-  Widget _buildCallLogSummaryTable() {
-    if (_isInitialState && _callLogs.isEmpty) {
-      return const SizedBox.shrink(); // Don't show anything on initial load
-    }
-    if (_callLogs.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16.0),
-        child: Center(child: Text('No call logs available for this selection.')),
-      );
-    }
-
-    // Sort logs by date descending for a more logical view
-    _callLogs.sort((a, b) => (b.callDateTime ?? DateTime(1900)).compareTo(a.callDateTime ?? DateTime(1900)));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            "Detailed Call Logs",
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-        ),
-        Card(
-          elevation: 2,
-          clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
-              columns: const [
-                DataColumn(label: Text('State', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Facility', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Tracked By', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Client Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('ART ID', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Call Date & Time', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Duration (s)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-
-              ],
-              rows: _callLogs.map((log) {
-                return DataRow(
-                  color: WidgetStateProperty.resolveWith<Color?>((states) {
-                    if (log.callStatus?.toLowerCase() == 'answered') return Colors.green.withOpacity(0.08);
-                    if (log.callStatus?.toLowerCase().contains('fail') ?? false) return Colors.red.withOpacity(0.08);
-                    return null;
-                  }),
-                  cells: [
-                    DataCell(Text(log.trackerState ?? 'N/A')),
-                    DataCell(Text(log.trackerFacility ?? 'N/A')),
-                    DataCell(Text(log.trackedBy ?? 'N/A')),
-                    DataCell(Text(_maskClientName(log.clientName))),
-                    DataCell(Text(_maskArtId(log.artId))),
-                    DataCell(Text(_maskPhoneNumber(log.phoneNumberCalled))),
-                    DataCell(Text(log.callDateTime != null ? DateFormat('yyyy-MM-dd HH:mm').format(log.callDateTime!) : 'N/A')),
-                    DataCell(
-                      Row(
-                        children: [
-                          Icon(
-                            log.callStatus?.toLowerCase() == 'answered' ? Icons.call_received : Icons.call_missed_outgoing,
-                            color: log.callStatus?.toLowerCase() == 'answered' ? Colors.green.shade700 : Colors.red.shade700,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(log.callStatus ?? 'N/A'),
-                        ],
-                      ),
-                    ),
-                    DataCell(Text(log.callDurationInSeconds?.toString() ?? '0')),
-
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-
-  // NEW WIDGET: Builds the detailed VL summary table by facility.
+  // REPLACED: This method now includes scroll buttons
   Widget _buildVlSummaryTable() {
     if (_allEligibleList.isEmpty) return const SizedBox.shrink();
 
@@ -1175,59 +1101,209 @@ class _StateVlReportTab2State extends State<StateVlReportTab2> {
         Card(
           elevation: 2,
           clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
-              columns: const [
-                DataColumn(label: Text('State', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Facility Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Total\nEligible'), numeric: true),
-                DataColumn(label: Text('Refills Due\n(In Qtr)'), numeric: true),
-                DataColumn(label: Text('Samples Coll.\n(Current Qtr)'), numeric: true),
-                DataColumn(label: Text('Results Rcvd\n(Current Qtr)'), numeric: true),
-                DataColumn(label: Text('Suppressed\n(Current Qtr)'), numeric: true),
-                DataColumn(label: Text('Unsuppressed\n(Current Qtr)'), numeric: true),
-                DataColumn(label: Text('Samples Coll.\n(Prev Qtr)'), numeric: true),
-                DataColumn(label: Text('Results Rcvd\n(Prev Qtr)'), numeric: true),
-                DataColumn(label: Text('Suppressed\n(Prev Qtr)'), numeric: true),
-                DataColumn(label: Text('Unsuppressed\n(Prev Qtr)'), numeric: true),
-                DataColumn(label: Text('Samples Coll.\n(Older)'), numeric: true),
-                DataColumn(label: Text('Results Rcvd\n(Older)'), numeric: true),
-                DataColumn(label: Text('Suppressed\n(Older)'), numeric: true),
-                DataColumn(label: Text('Unsuppressed\n(Older)'), numeric: true),
-                DataColumn(label: Text('Deaths'), numeric: true),
-                DataColumn(label: Text('Transferred\nOut'), numeric: true),
-                DataColumn(label: Text('IIT'), numeric: true),
-                DataColumn(label: Text('Missed\nAppts'), numeric: true),
-                DataColumn(label: Text('Discontinued'), numeric: true),
-              ],
-              rows: _allEligibleList.map((summary) {
-                return DataRow(cells: [
-                  DataCell(Text(summary.state ?? 'N/A')),
-                  DataCell(Text(summary.facilityName ?? 'N/A')),
-                  DataCell(Text(summary.totalEligibleClientsInFilter.toString())),
-                  DataCell(Text(summary.refillsDueInQuarter.toString())),
-                  DataCell(Text(summary.samplesCollected.toString())),
-                  DataCell(Text(summary.resultsReturned.toString())),
-                  DataCell(Text(summary.suppressed.toString())),
-                  DataCell(Text(summary.unsuppressed.toString())),
-                  DataCell(Text(summary.samplesCollectedPreviousQuarter.toString())),
-                  DataCell(Text(summary.resultsReturnedPreviousQuarter.toString())),
-                  DataCell(Text(summary.suppressedPreviousQuarter.toString())),
-                  DataCell(Text(summary.unsuppressedPreviousQuarter.toString())),
-                  DataCell(Text(summary.samplesCollectedOlder.toString())),
-                  DataCell(Text(summary.resultsReturnedOlder.toString())),
-                  DataCell(Text(summary.suppressedOlder.toString())),
-                  DataCell(Text(summary.unsuppressedOlder.toString())),
-                  DataCell(Text(summary.totalDeaths.toString())),
-                  DataCell(Text(summary.totalTransferredOut.toString())),
-                  DataCell(Text(summary.totalIIT.toString())),
-                  DataCell(Text(summary.totalMissedAppointments.toString())),
-                  DataCell(Text(summary.totalDiscontinuedCare.toString())),
-                ]);
-              }).toList(),
-            ),
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _vlSummaryTableController, // Assign controller
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  // ... (DataTable columns and rows are unchanged)
+                  headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
+                  columns: const [
+                    DataColumn(label: Text('State', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Facility Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Total\nEligible'), numeric: true),
+                    DataColumn(label: Text('Refills Due\n(In Qtr)'), numeric: true),
+                    DataColumn(label: Text('Samples Coll.\n(Current Qtr)'), numeric: true),
+                    DataColumn(label: Text('Results Rcvd\n(Current Qtr)'), numeric: true),
+                    DataColumn(label: Text('Suppressed\n(Current Qtr)'), numeric: true),
+                    DataColumn(label: Text('Unsuppressed\n(Current Qtr)'), numeric: true),
+                    DataColumn(label: Text('Samples Coll.\n(Prev Qtr)'), numeric: true),
+                    DataColumn(label: Text('Results Rcvd\n(Prev Qtr)'), numeric: true),
+                    DataColumn(label: Text('Suppressed\n(Prev Qtr)'), numeric: true),
+                    DataColumn(label: Text('Unsuppressed\n(Prev Qtr)'), numeric: true),
+                    DataColumn(label: Text('Samples Coll.\n(Older)'), numeric: true),
+                    DataColumn(label: Text('Results Rcvd\n(Older)'), numeric: true),
+                    DataColumn(label: Text('Suppressed\n(Older)'), numeric: true),
+                    DataColumn(label: Text('Unsuppressed\n(Older)'), numeric: true),
+                    DataColumn(label: Text('Deaths'), numeric: true),
+                    DataColumn(label: Text('Transferred\nOut'), numeric: true),
+                    DataColumn(label: Text('IIT'), numeric: true),
+                    DataColumn(label: Text('Missed\nAppts'), numeric: true),
+                    DataColumn(label: Text('Discontinued'), numeric: true),
+                  ],
+                  rows: _allEligibleList.map((summary) {
+                    return DataRow(cells: [
+                      DataCell(Text(summary.state ?? 'N/A')),
+                      DataCell(Text(summary.facilityName ?? 'N/A')),
+                      DataCell(Text(summary.totalEligibleClientsInFilter.toString())),
+                      DataCell(Text(summary.refillsDueInQuarter.toString())),
+                      DataCell(Text(summary.samplesCollected.toString())),
+                      DataCell(Text(summary.resultsReturned.toString())),
+                      DataCell(Text(summary.suppressed.toString())),
+                      DataCell(Text(summary.unsuppressed.toString())),
+                      DataCell(Text(summary.samplesCollectedPreviousQuarter.toString())),
+                      DataCell(Text(summary.resultsReturnedPreviousQuarter.toString())),
+                      DataCell(Text(summary.suppressedPreviousQuarter.toString())),
+                      DataCell(Text(summary.unsuppressedPreviousQuarter.toString())),
+                      DataCell(Text(summary.samplesCollectedOlder.toString())),
+                      DataCell(Text(summary.resultsReturnedOlder.toString())),
+                      DataCell(Text(summary.suppressedOlder.toString())),
+                      DataCell(Text(summary.unsuppressedOlder.toString())),
+                      DataCell(Text(summary.totalDeaths.toString())),
+                      DataCell(Text(summary.totalTransferredOut.toString())),
+                      DataCell(Text(summary.totalIIT.toString())),
+                      DataCell(Text(summary.totalMissedAppointments.toString())),
+                      DataCell(Text(summary.totalDiscontinuedCare.toString())),
+                    ]);
+                  }).toList(),
+                ),
+              ),
+              // NEW: Row for scroll buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Scroll Left',
+                    onPressed: () {
+                      _vlSummaryTableController.animateTo(
+                        _vlSummaryTableController.offset - 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: 'Scroll Right',
+                    onPressed: () {
+                      _vlSummaryTableController.animateTo(
+                        _vlSummaryTableController.offset + 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                ],
+              )
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  // REPLACED: This method now includes scroll buttons
+  Widget _buildCallLogSummaryTable() {
+    if (_isInitialState && _callLogs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (_callLogs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16.0),
+        child: Center(child: Text('No call logs available for this selection.')),
+      );
+    }
+
+    _callLogs.sort((a, b) => (b.callDateTime ?? DateTime(1900)).compareTo(a.callDateTime ?? DateTime(1900)));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            "Detailed Call Logs",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+        Card(
+          elevation: 2,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _callLogTableController, // Assign controller
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  // ... (DataTable columns and rows are unchanged)
+                  headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
+                  columns: const [
+                    DataColumn(label: Text('State', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Facility', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Tracked By', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Client Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('ART ID', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Call Date & Time', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Duration (s)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                  ],
+                  rows: _callLogs.map((log) {
+                    return DataRow(
+                      color: WidgetStateProperty.resolveWith<Color?>((states) {
+                        if (log.callStatus?.toLowerCase() == 'answered') return Colors.green.withOpacity(0.08);
+                        if (log.callStatus?.toLowerCase().contains('fail') ?? false) return Colors.red.withOpacity(0.08);
+                        return null;
+                      }),
+                      cells: [
+                        DataCell(Text(log.trackerState ?? 'N/A')),
+                        DataCell(Text(log.trackerFacility ?? 'N/A')),
+                        DataCell(Text(log.trackedBy ?? 'N/A')),
+                        DataCell(Text(_maskClientName(log.clientName))),
+                        DataCell(Text(_maskArtId(log.artId))),
+                        DataCell(Text(_maskPhoneNumber(log.phoneNumberCalled))),
+                        DataCell(Text(log.callDateTime != null ? DateFormat('yyyy-MM-dd HH:mm').format(log.callDateTime!) : 'N/A')),
+                        DataCell(
+                          Row(
+                            children: [
+                              Icon(
+                                log.callStatus?.toLowerCase() == 'answered' ? Icons.call_received : Icons.call_missed_outgoing,
+                                color: log.callStatus?.toLowerCase() == 'answered' ? Colors.green.shade700 : Colors.red.shade700,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(log.callStatus ?? 'N/A'),
+                            ],
+                          ),
+                        ),
+                        DataCell(Text(log.callDurationInSeconds?.toString() ?? '0')),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+              // NEW: Row for scroll buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Scroll Left',
+                    onPressed: () {
+                      _callLogTableController.animateTo(
+                        _callLogTableController.offset - 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: 'Scroll Right',
+                    onPressed: () {
+                      _callLogTableController.animateTo(
+                        _callLogTableController.offset + 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                ],
+              )
+            ],
           ),
         ),
       ],

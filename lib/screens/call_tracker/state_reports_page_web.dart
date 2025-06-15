@@ -57,6 +57,9 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   String? userDesignation;
   String? userState;
 
+  // NEW: Add a ScrollController for the detailed log table
+  final ScrollController _logTableController = ScrollController();
+
   // Chart Data Holders
   List<MapEntry<String, int>> callStatusChartData = [];
   List<_ChartDataPoint> callDurationTrendData = [];
@@ -70,6 +73,13 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     startDate = DateTime(now.year, now.month, now.day - 6);
     endDate = DateTime(now.year, now.month, now.day);
     _initializeFilters();
+  }
+
+  @override
+  void dispose() {
+    // NEW: Dispose of the controller
+    _logTableController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeFilters() async {
@@ -931,7 +941,9 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                         title: Text(displayDateKey, style: const TextStyle(fontWeight: FontWeight.bold)),
                         initiallyExpanded: index == 0,
                         children: <Widget>[
+                          // The SingleChildScrollView now has a controller
                           SingleChildScrollView(
+                            controller: _logTableController, // Assign controller
                             scrollDirection: Axis.horizontal,
                             child: Padding(
                               padding: const EdgeInsets.all(8.0),
@@ -985,6 +997,34 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                               ),
                             ),
                           ),
+                          // NEW: Row for scroll buttons
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_back),
+                                tooltip: 'Scroll Left',
+                                onPressed: () {
+                                  _logTableController.animateTo(
+                                    _logTableController.offset - 350, // scroll left
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOut,
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.arrow_forward),
+                                tooltip: 'Scroll Right',
+                                onPressed: () {
+                                  _logTableController.animateTo(
+                                    _logTableController.offset + 350, // scroll right
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOut,
+                                  );
+                                },
+                              ),
+                            ],
+                          )
                         ],
                       ),
                     );

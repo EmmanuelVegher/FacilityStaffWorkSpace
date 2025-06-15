@@ -178,6 +178,10 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 29));
   DateTime _endDate = DateTime.now();
 
+  // NEW: Add ScrollControllers for the tables
+  final ScrollController _facilityTableController = ScrollController();
+  final ScrollController _callLogTableController = ScrollController();
+
 
   // --- Data & Aggregation Holders ---
   List<EacReportModel> _allReports = [];
@@ -193,6 +197,14 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
   void initState() {
     super.initState();
     _initializeUserContext();
+  }
+
+  @override
+  void dispose() {
+    // NEW: Dispose of the controllers
+    _facilityTableController.dispose();
+    _callLogTableController.dispose();
+    super.dispose();
   }
 
   // --- NEW EXPORT AND HELPER METHODS ---
@@ -839,6 +851,7 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
     );
   }
 
+  // REPLACED: This method now includes scroll buttons
   Widget _buildFacilitySummaryTable() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,38 +859,73 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
         Text("Summary by Facility (Aggregated)", style: Theme.of(context).textTheme.headlineSmall),
         Card(
           clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Facility')), DataColumn(label: Text('Clients'), numeric: true),
-                DataColumn(label: Text('TAT <3m'), numeric: true), DataColumn(label: Text('TAT 3-5m'), numeric: true),
-                DataColumn(label: Text('TAT >5m'), numeric: true), DataColumn(label: Text('Sess. ≥3'), numeric: true),
-                DataColumn(label: Text('Sess. <3'), numeric: true), DataColumn(label: Text('Rpt. VL'), numeric: true),
-                DataColumn(label: Text('Rpt. VL w/ Result'), numeric: true), DataColumn(label: Text('Unsupp.'), numeric: true),
-                DataColumn(label: Text('Supp. <1k'), numeric: true), DataColumn(label: Text('Supp. <50'), numeric: true),
-              ],
-              rows: _facilityAggregatedMetrics.values.map((agg) => DataRow(cells: [
-                DataCell(Text(agg.name)),
-                DataCell(Text(agg.vlSummary.totalUniqueClients.toString())),
-                DataCell(Text(agg.tat.lessThan90Days.toString())),
-                DataCell(Text(agg.tat.between90and150Days.toString())),
-                DataCell(Text(agg.tat.moreThan150Days.toString())),
-                DataCell(Text(agg.eacSessions.withAtLeast3Sessions.toString())),
-                DataCell(Text(agg.eacSessions.without3Sessions.toString())),
-                DataCell(Text(agg.vlSummary.withRepeatVl.toString())),
-                DataCell(Text(agg.vlSummary.withRepeatVlResult.toString())),
-                DataCell(Text(agg.vlSummary.unsuppressed.toString())),
-                DataCell(Text(agg.vlSummary.suppressedLessThan1000.toString())),
-                DataCell(Text(agg.vlSummary.suppressedLessThan50.toString())),
-              ])).toList(),
-            ),
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _facilityTableController, // Assign controller
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  // ... (DataTable columns and rows are unchanged)
+                  columns: const [
+                    DataColumn(label: Text('Facility')), DataColumn(label: Text('Clients'), numeric: true),
+                    DataColumn(label: Text('TAT <3m'), numeric: true), DataColumn(label: Text('TAT 3-5m'), numeric: true),
+                    DataColumn(label: Text('TAT >5m'), numeric: true), DataColumn(label: Text('Sess. ≥3'), numeric: true),
+                    DataColumn(label: Text('Sess. <3'), numeric: true), DataColumn(label: Text('Rpt. VL'), numeric: true),
+                    DataColumn(label: Text('Rpt. VL w/ Result'), numeric: true), DataColumn(label: Text('Unsupp.'), numeric: true),
+                    DataColumn(label: Text('Supp. <1k'), numeric: true), DataColumn(label: Text('Supp. <50'), numeric: true),
+                  ],
+                  rows: _facilityAggregatedMetrics.values.map((agg) => DataRow(cells: [
+                    DataCell(Text(agg.name)),
+                    DataCell(Text(agg.vlSummary.totalUniqueClients.toString())),
+                    DataCell(Text(agg.tat.lessThan90Days.toString())),
+                    DataCell(Text(agg.tat.between90and150Days.toString())),
+                    DataCell(Text(agg.tat.moreThan150Days.toString())),
+                    DataCell(Text(agg.eacSessions.withAtLeast3Sessions.toString())),
+                    DataCell(Text(agg.eacSessions.without3Sessions.toString())),
+                    DataCell(Text(agg.vlSummary.withRepeatVl.toString())),
+                    DataCell(Text(agg.vlSummary.withRepeatVlResult.toString())),
+                    DataCell(Text(agg.vlSummary.unsuppressed.toString())),
+                    DataCell(Text(agg.vlSummary.suppressedLessThan1000.toString())),
+                    DataCell(Text(agg.vlSummary.suppressedLessThan50.toString())),
+                  ])).toList(),
+                ),
+              ),
+              // NEW: Row for scroll buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Scroll Left',
+                    onPressed: () {
+                      _facilityTableController.animateTo(
+                        _facilityTableController.offset - 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: 'Scroll Right',
+                    onPressed: () {
+                      _facilityTableController.animateTo(
+                        _facilityTableController.offset + 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
+  // REPLACED: This method now includes scroll buttons
   Widget _buildCallLogTable() {
     if (_allCallLogs.isEmpty) return const SizedBox.shrink();
     _allCallLogs.sort((a,b) => b.callDateTime.compareTo(a.callDateTime));
@@ -888,29 +936,63 @@ class _StateEacHistoricalReportTabState extends State<StateEacHistoricalReportTa
         Text("Call Log Details", style: Theme.of(context).textTheme.headlineSmall),
         Card(
           clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Facility')), DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Client Name')), DataColumn(label: Text('Phone')),
-                DataColumn(label: Text('Outcome')), DataColumn(label: Text('Duration')),
-                DataColumn(label: Text('EAC Session')), DataColumn(label: Text('Tracker')),
-                DataColumn(label: Text('Designation')), DataColumn(label: Text('Supervisor')),
-              ],
-              rows: _allCallLogs.map((log) => DataRow(cells: [
-                DataCell(Text(log.trackerFacility ?? 'N/A')),
-                DataCell(Text(DateFormat.yMd().add_jm().format(log.callDateTime))),
-                DataCell(Text(_maskClientName(log.clientName))),
-                DataCell(Text(_maskPhoneNumber(log.phoneNumber))),
-                DataCell(Text(log.outcome ?? 'N/A')),
-                DataCell(Text('${log.duration}s')),
-                DataCell(Text(log.eacSessionType ?? 'N/A')),
-                DataCell(Text(log.trackedBy ?? 'N/A')),
-                DataCell(Text(log.designation ?? 'N/A')),
-                DataCell(Text(log.supervisorName ?? 'N/A')),
-              ])).toList(),
-            ),
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _callLogTableController, // Assign controller
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  // ... (DataTable columns and rows are unchanged)
+                  columns: const [
+                    DataColumn(label: Text('Facility')), DataColumn(label: Text('Date')),
+                    DataColumn(label: Text('Client Name')), DataColumn(label: Text('Phone')),
+                    DataColumn(label: Text('Outcome')), DataColumn(label: Text('Duration')),
+                    DataColumn(label: Text('EAC Session')), DataColumn(label: Text('Tracker')),
+                    DataColumn(label: Text('Designation')), DataColumn(label: Text('Supervisor')),
+                  ],
+                  rows: _allCallLogs.map((log) => DataRow(cells: [
+                    DataCell(Text(log.trackerFacility ?? 'N/A')),
+                    DataCell(Text(DateFormat.yMd().add_jm().format(log.callDateTime))),
+                    DataCell(Text(_maskClientName(log.clientName))),
+                    DataCell(Text(_maskPhoneNumber(log.phoneNumber))),
+                    DataCell(Text(log.outcome ?? 'N/A')),
+                    DataCell(Text('${log.duration}s')),
+                    DataCell(Text(log.eacSessionType ?? 'N/A')),
+                    DataCell(Text(log.trackedBy ?? 'N/A')),
+                    DataCell(Text(log.designation ?? 'N/A')),
+                    DataCell(Text(log.supervisorName ?? 'N/A')),
+                  ])).toList(),
+                ),
+              ),
+              // NEW: Row for scroll buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Scroll Left',
+                    onPressed: () {
+                      _callLogTableController.animateTo(
+                        _callLogTableController.offset - 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: 'Scroll Right',
+                    onPressed: () {
+                      _callLogTableController.animateTo(
+                        _callLogTableController.offset + 400,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

@@ -151,7 +151,7 @@ Widget drawer2(
             height: 1,
           ),
           ListTile(
-            leading: Icon(Icons.timer_3,
+            leading: Icon(Icons.timer,
                 size: drawerIconSize, color: Colors.red),
             title: Text(
               'Attendance Analysis',
