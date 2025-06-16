@@ -16,6 +16,7 @@ import '../screens/profile_page.dart';
 import '../screens/staff_dashboard.dart';
 import '../screens/timesheet/timesheet.dart';
 import '../screens/timesheet/upload_signature.dart';
+import '../screens/user_guide/user_guide.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
@@ -487,6 +488,30 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+              );
+            },
+          ),//
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.book,
+              size: drawerIconSize,
+              color: Colors.purple,
+            ),
+            title: Text(
+              'User Guide',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserGuidePage()),
               );
             },
           ),
