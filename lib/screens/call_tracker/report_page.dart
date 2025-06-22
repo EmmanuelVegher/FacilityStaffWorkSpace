@@ -115,20 +115,100 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
     }
   }
 
+  // Future<void> _loadContacts1({DateTime? start, DateTime? end}) async {
+  //   if (_isUserBioLoading || currentUserAuthId == null || userState == null || userLocation == null) {
+  //     if (!_isUserBioLoading && mounted) {
+  //       setState(() {
+  //         isLoading = false;
+  //         _errorMessage = _errorMessage ?? "Cannot load reports: User details (State/Facility) missing.";
+  //         trackedContacts = [];
+  //         _prepareChartData();
+  //       });
+  //     } else if (mounted) {
+  //       setState(() { isLoading = true; });
+  //     }
+  //     return;
+  //   }
+  //   if (start == null || end == null) {
+  //     if (mounted) {
+  //       setState(() {
+  //         isLoading = false;
+  //         trackedContacts = [];
+  //         _prepareChartData();
+  //         _errorMessage = "Please select a date range to load reports.";
+  //       });
+  //     }
+  //     return;
+  //   }
+  //
+  //   setState(() {
+  //     isLoading = true;
+  //     _errorMessage = null;
+  //     trackedContacts = [];
+  //   });
+  //
+  //   List<ContactTracked> fetchedContacts = [];
+  //   DateTime currentDate = start;
+  //   final DateFormat pathDateFormat = DateFormat('dd-MMM-yyyy');
+  //
+  //   try {
+  //     while (currentDate.isBefore(end.add(const Duration(days: 1)))) {
+  //       String formattedDate = pathDateFormat.format(currentDate);
+  //       String dailyUserCollectionPath = '/Reports/$userState/CallTracker/$userLocation/$formattedDate/$currentUserAuthId/$currentUserAuthId';
+  //
+  //       try {
+  //         QuerySnapshot dailySnapshot = await _firestore.collection(dailyUserCollectionPath).get();
+  //         for (var doc in dailySnapshot.docs) {
+  //           if (doc.exists && doc.data() != null) {
+  //             fetchedContacts.add(ContactTracked.fromFirestore(doc.data() as Map<String, dynamic>, doc.id));
+  //           }
+  //         }
+  //       } catch (dailyError) {
+  //         // This error is expected if no calls were made on a given day.
+  //         // print("No data for path $dailyUserCollectionPath or error: $dailyError");
+  //       }
+  //       currentDate = currentDate.add(const Duration(days: 1));
+  //     }
+  //
+  //     if (mounted) {
+  //       setState(() {
+  //         trackedContacts = fetchedContacts;
+  //         _prepareChartData();
+  //         isLoading = false;
+  //       });
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       setState(() {
+  //         isLoading = false;
+  //         _errorMessage = "Error loading reports: $e";
+  //         trackedContacts = [];
+  //         _prepareChartData();
+  //       });
+  //     }
+  //   }
+  // }
+
+  // In _ReportsPageWebState class
+
+  /// Fetches contact logs for the current user from the flattened 'CallLogs' collection within a specific date range.
+// In _ReportsPageWebState class
+
+  /// Fetches contact logs for the current user from the flattened 'CallLogs' collection
+  /// for the specified date range.
   Future<void> _loadContacts({DateTime? start, DateTime? end}) async {
-    if (_isUserBioLoading || currentUserAuthId == null || userState == null || userLocation == null) {
+    // 1. Guard against running without necessary information.
+    // Check if user details are still loading or are missing.
+    if (_isUserBioLoading || currentUserAuthId == null) {
       if (!_isUserBioLoading && mounted) {
         setState(() {
           isLoading = false;
-          _errorMessage = _errorMessage ?? "Cannot load reports: User details (State/Facility) missing.";
-          trackedContacts = [];
-          _prepareChartData();
+          _errorMessage = "Cannot load reports: User details are missing.";
         });
-      } else if (mounted) {
-        setState(() { isLoading = true; });
       }
       return;
     }
+    // Check if a valid date range has been provided.
     if (start == null || end == null) {
       if (mounted) {
         setState(() {
@@ -141,43 +221,45 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
       return;
     }
 
+    // 2. Set the UI to a loading state.
     setState(() {
       isLoading = true;
       _errorMessage = null;
-      trackedContacts = [];
+      trackedContacts = []; // Clear previous results before fetching new ones
     });
 
-    List<ContactTracked> fetchedContacts = [];
-    DateTime currentDate = start;
-    final DateFormat pathDateFormat = DateFormat('dd-MMM-yyyy');
-
     try {
-      while (currentDate.isBefore(end.add(const Duration(days: 1)))) {
-        String formattedDate = pathDateFormat.format(currentDate);
-        String dailyUserCollectionPath = '/Reports/$userState/CallTracker/$userLocation/$formattedDate/$currentUserAuthId/$currentUserAuthId';
+      // 3. Define and execute the efficient Firestore query.
+      // This single query replaces the old, inefficient date-looping logic.
+      final QuerySnapshot querySnapshot = await _firestore
+          .collection('CallLogs') // Query the new flattened collection
+          .where('firebaseAuthId', isEqualTo: currentUserAuthId) // Filter by the current user's ID
+          .where('dateTracked', isGreaterThanOrEqualTo: start) // Filter by start date
+          .where('dateTracked', isLessThanOrEqualTo: end.add(const Duration(days: 1))) // Filter by end date (inclusive)
+          .orderBy('dateTracked', descending: true) // Order by date for easy display
+          .get();
 
-        try {
-          QuerySnapshot dailySnapshot = await _firestore.collection(dailyUserCollectionPath).get();
-          for (var doc in dailySnapshot.docs) {
-            if (doc.exists && doc.data() != null) {
-              fetchedContacts.add(ContactTracked.fromFirestore(doc.data() as Map<String, dynamic>, doc.id));
-            }
-          }
-        } catch (dailyError) {
-          // This error is expected if no calls were made on a given day.
-          // print("No data for path $dailyUserCollectionPath or error: $dailyError");
-        }
-        currentDate = currentDate.add(const Duration(days: 1));
+      // 4. Process the results.
+      if (querySnapshot.docs.isEmpty) {
+        print("No call logs found for user $currentUserAuthId in the selected date range.");
       }
 
+      // Map the document snapshots to a list of ContactTracked objects.
+      final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
+        // Call the 'fromJson' factory constructor to create an instance from the map.
+        return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
+      }).toList();
+
+      // 5. Update the UI with the fetched data.
       if (mounted) {
         setState(() {
           trackedContacts = fetchedContacts;
-          _prepareChartData();
+          _prepareChartData(); // Recalculate chart data with the new contacts
           isLoading = false;
         });
       }
     } catch (e) {
+      // 6. Handle any errors during the process.
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -186,6 +268,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
           _prepareChartData();
         });
       }
+      print("Error loading reports: $e");
     }
   }
 

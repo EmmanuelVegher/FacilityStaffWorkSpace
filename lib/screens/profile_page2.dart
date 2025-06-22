@@ -442,7 +442,7 @@ class _ProfilePage2State extends State<ProfilePage2> {
                                     children: <Widget>[
                                       EditableGenderTile(
                                         icon: Icons.person,
-                                        title: "Gender",
+                                        title: "Sex",
                                         initialValue: _staffData?.gender ?? '',
                                         onSave: (newValue) {
                                           _updateFirestoreField('gender', newValue);

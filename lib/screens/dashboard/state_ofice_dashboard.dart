@@ -60,7 +60,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _initializeData().then((_){
-      _loadTimesheetStatusData();
+     // _loadTimesheetStatusData();
     }); // Call a separate async function for initialization
 
   }

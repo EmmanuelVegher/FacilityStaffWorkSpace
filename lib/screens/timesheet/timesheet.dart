@@ -318,6 +318,10 @@ class TimesheetScreen extends StatefulWidget {
 }
 
 class _TimesheetScreenState extends State<TimesheetScreen> {
+  // ADDED: State for handling split September timesheets
+  int _selectedTimesheetPart = 1; // 1 for the first half, 2 for the second
+  bool _isSeptemberSelected = false; // To conditionally show the part selector UI
+
   late DateTime startDate;
   late DateTime endDate;
   List<DateTime> daysInRange = [];
@@ -414,6 +418,20 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     setState(() {
       _pageLoading = false; // Stop loading after bio data and initial data are loaded
     });
+  }
+
+  // NEW: Helper getter to generate the correct Firestore document ID
+  String get _timesheetDocId {
+    final monthFormat = DateFormat('MMMM_yyyy');
+    final baseId = monthFormat.format(DateTime(selectedYear, selectedMonth + 1));
+
+    // For September (month index 8), append the part number to make the ID unique
+    if (selectedMonth == 8) {
+      return '${baseId}_part$_selectedTimesheetPart';
+    }
+
+    // For all other months, return the standard ID
+    return baseId;
   }
 
   Future<void> _loadInitialData() async {
@@ -583,7 +601,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     }
   }
 
-  Future<void> _createAndExportPDF() async {
+  Future<void> _createAndExportPDF2() async {
 
     setState(() {
       _isPDFLoading = true;
@@ -692,6 +710,97 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
     } catch (e) {
       print("Error generating PDF: $e");
     }finally {
+      setState(() {
+        _isPDFLoading = false;
+      });
+    }
+  }
+
+  Future<void> _createAndExportPDF() async {
+    setState(() {
+      _isPDFLoading = true;
+    });
+
+    final pdf = pw.Document();
+
+    // CHANGED: Logic to handle display titles and filenames for the split fiscal period
+    String monthYearDisplay; // For the title inside the PDF
+    String monthYearFilename; // For the downloaded file's name
+
+    if (selectedMonth == 8) { // September is month index 8
+      monthYearDisplay = "September, $selectedYear (Part $_selectedTimesheetPart)";
+      monthYearFilename = "September_${selectedYear}_part${_selectedTimesheetPart}";
+    } else {
+      monthYearDisplay = DateFormat('MMMM, yyyy').format(DateTime(selectedYear, selectedMonth + 1));
+      monthYearFilename = DateFormat('MMMM_yyyy').format(DateTime(selectedYear, selectedMonth + 1));
+    }
+
+    try {
+      final ByteData logoBytes = await rootBundle.load('assets/image/ccfn_logo.png');
+      final Uint8List logoImageData = logoBytes.buffer.asUint8List();
+      final pw.MemoryImage logoImage = pw.MemoryImage(logoImageData);
+
+      final supervisorNames = await _getSupervisorNames();
+      final signatureColumns = await _buildSignatureColumns(supervisorNames);
+      final taskSummaryContent = await _prepareTaskSummaryContent();
+
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(children: [
+                      pw.Text("CARITAS NIGERIA", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
+                      pw.SizedBox(height: 10),
+                      // Use the new display title variable
+                      pw.Text("Monthly Time Sheet ($monthYearDisplay)", style: pw.TextStyle(fontSize: 14))
+                    ]),
+                    pw.Image(logoImage, width: 50, height: 50),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+                _buildStaffInfo(context),
+                pw.SizedBox(height: 10),
+                _buildTimesheetTable(context),
+                pw.SizedBox(height: 10),
+                _buildSignatureSection(context, signatureColumns),
+              ],
+            );
+          },
+        ),
+      );
+
+      if (_includeTaskSummary) {
+        pdf.addPage(
+          pw.MultiPage(
+            header: (pw.Context context) => pw.Header(level: 0, child: pw.Text('Task Summary Report - $monthYearDisplay')),
+            build: (pw.Context context) => [
+              pw.SizedBox(height: 20),
+              pw.Center(child: pw.Text("Task Summary for ${DateFormat('MMMM yyyy').format(DateTime(selectedYear, selectedMonth + 1))}", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold))),
+              pw.SizedBox(height: 20),
+              _buildTaskSummaryPage(logoImage, taskSummaryContent),
+            ],
+          ),
+        );
+      }
+
+      final Uint8List pdfBytes = await pdf.save();
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+
+      // Use the new filename variable
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", "Timesheet_${monthYearFilename}_${selectedBioFirstName}_$selectedBioLastName.pdf")
+        ..click();
+
+      html.Url.revokeObjectUrl(url);
+    } catch (e) {
+      print("Error generating PDF: $e");
+    } finally {
       setState(() {
         _isPDFLoading = false;
       });
@@ -1127,7 +1236,7 @@ $selectedBioFirstName $selectedBioLastName
   }
 
 
-  Future<Map<String, String>> _getSupervisorNames() async {
+  Future<Map<String, String>> _getSupervisorNames1() async {
     try {
       String monthYear = DateFormat('MMMM_yyyy').format(
           DateTime(selectedYear, selectedMonth + 1));
@@ -1185,6 +1294,61 @@ $selectedBioFirstName $selectedBioLastName
       };
     }
   }
+
+  Future<Map<String, String>> _getSupervisorNames() async {
+    try {
+      // CHANGED: Uses the helper getter for the correct document ID
+      final timesheetDoc = await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(selectedFirebaseId)
+          .collection("TimeSheets")
+          .doc(_timesheetDocId)
+          .get();
+
+      if (timesheetDoc.exists) {
+        final data = timesheetDoc.data() as Map<String, dynamic>;
+        return {
+          'staffName': data['staffName'] as String? ?? 'Not Assigned',
+          'projectCoordinatorName': data['facilitySupervisor'] as String? ?? 'Not Assigned',
+          'caritasSupervisorName': data['caritasSupervisor'] as String? ?? 'Not Assigned',
+          'projectCoordinatorSignature': data['facilitySupervisorSignature'] as String? ?? '',
+          'caritasSupervisorSignature': data['caritasSupervisorSignature'] as String? ?? '',
+          'staffSignature': data['staffSignature'] as String? ?? '',
+          'staffSignatureDate': data['staffSignatureDate'] as String? ?? '',
+          'facilitySupervisorSignatureDate': data['facilitySupervisorSignatureDate'] as String? ?? '',
+          'caritasSupervisorSignatureDate': data['caritasSupervisorSignatureDate'] as String? ?? '',
+        };
+      } else {
+        // Return default values if the document doesn't exist
+        return {
+          'staffName': 'Not Assigned',
+          'projectCoordinatorName': 'Not Assigned',
+          'caritasSupervisorName': 'Not Assigned',
+          'projectCoordinatorSignature': '',
+          'caritasSupervisorSignature': '',
+          'staffSignature': '',
+          'staffSignatureDate': '',
+          'facilitySupervisorSignatureDate': '',
+          'caritasSupervisorSignatureDate': '',
+        };
+      }
+    } catch (e) {
+      print("Error fetching supervisor data: $e");
+      // Return error values
+      return {
+        'staffName': 'Error fetching name',
+        'projectCoordinatorName': 'Error fetching name',
+        'caritasSupervisorName': 'Error fetching name',
+        'projectCoordinatorSignature': '',
+        'caritasSupervisorSignature': '',
+        'staffSignature': '',
+        'staffSignatureDate': '',
+        'facilitySupervisorSignatureDate': '',
+        'caritasSupervisorSignatureDate': '',
+      };
+    }
+  }
+
 
 
   pw.Widget _buildStaffInfo(pw.Context context) {
@@ -2282,7 +2446,7 @@ $selectedBioFirstName $selectedBioLastName
   }
 
 
-  void initializeDateRange(int month, int year) {
+  void initializeDateRange1(int month, int year) {
     DateTime selectedMonthDate = DateTime(year, month + 1, 1);
     startDate = DateTime(selectedMonthDate.year, selectedMonthDate.month - 1,
         20); //Start from the 19th of previous month
@@ -2299,6 +2463,47 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
+  void initializeDateRange(int month, int year) {
+    // month is 0-indexed (0=Jan, 8=Sep, 9=Oct)
+
+    // Update the UI state to show/hide the September part selector
+    setState(() {
+      _isSeptemberSelected = (month == 8);
+      // If the newly selected month is not September, reset the part to its default
+      if (!_isSeptemberSelected) {
+        _selectedTimesheetPart = 1;
+      }
+    });
+
+    if (month == 8) { // Special case: September (FY End)
+      if (_selectedTimesheetPart == 1) {
+        // Part 1: August 20th to September 19th
+        startDate = DateTime(year, 8, 20); // August 20th
+        endDate = DateTime(year, 9, 19);   // September 19th
+      } else { // Part 2
+        // Part 2: September 20th to September 30th
+        startDate = DateTime(year, 9, 20); // September 20th
+        endDate = DateTime(year, 9, 30);   // September 30th
+      }
+    } else if (month == 9) { // Special case: October (FY Start)
+      // October 1st to October 19th
+      startDate = DateTime(year, 10, 1);  // October 1st
+      endDate = DateTime(year, 10, 19); // October 19th
+    } else { // Standard case for all other months
+      // The 19th of the selected month
+      endDate = DateTime(year, month + 1, 19);
+      // The 20th of the previous month. Using `endDate` as a reference is robust.
+      startDate = DateTime(endDate.year, endDate.month - 1, 20);
+    }
+
+    // This part remains common: populate the list of days for the determined range
+    daysInRange = [];
+    DateTime currentDate = startDate;
+    while (currentDate.isAtSameMomentAs(endDate) || currentDate.isBefore(endDate)) {
+      daysInRange.add(currentDate);
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+  }
   // // Dummy data for supervisors
   // List<String> facilitySupervisors = ['Supervisor A', 'Supervisor B', 'Supervisor C'];
   // List<String> caritasSupervisors = ['Caritas A', 'Caritas B', 'Caritas C'];
@@ -2446,8 +2651,7 @@ $selectedBioFirstName $selectedBioLastName
   }
 
 
-  Future<void> getSupervisor(String selectedFirebaseId, int selectedYear,
-      int selectedMonth) async {
+  Future<void> getSupervisor1(String selectedFirebaseId, int selectedYear, int selectedMonth) async {
     log("getSupervisor selectedFirebaseId == $selectedFirebaseId");
     try {
       final docSnapshot = await FirebaseFirestore.instance
@@ -2476,8 +2680,36 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
+
+  Future<void> getSupervisor(String selectedFirebaseId, int selectedYear, int selectedMonth) async {
+    log("getSupervisor selectedFirebaseId == $selectedFirebaseId");
+    try {
+      // CHANGED: Uses the helper getter for the correct document ID
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(selectedFirebaseId)
+          .collection("TimeSheets")
+          .doc(_timesheetDocId)
+          .get();
+
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data() as Map<String, dynamic>;
+        final facilitySupervisor2 = data['facilitySupervisor'];
+        final caritasSupervisor2 = data['caritasSupervisor'];
+        setState(() {
+          facilitySupervisor = facilitySupervisor2;
+          caritasSupervisor = caritasSupervisor2;
+        });
+      } else {
+        print("No timesheet data found for doc ID: $_timesheetDocId");
+      }
+    } catch (e) {
+      print("Error fetching facility supervisor: $e");
+    }
+  }
+
   // Function to create the Firestore stream
-  Stream<DocumentSnapshot> getSupervisorStream(String selectedFirebaseId,
+  Stream<DocumentSnapshot> getSupervisorStream1(String selectedFirebaseId,
       int selectedYear, int selectedMonth) {
     return FirebaseFirestore.instance
         .collection("Staff")
@@ -2485,6 +2717,16 @@ $selectedBioFirstName $selectedBioLastName
         .collection("TimeSheets")
         .doc(DateFormat('MMMM_yyyy').format(
         DateTime(selectedYear, selectedMonth + 1)))
+        .snapshots();
+  }
+
+  Stream<DocumentSnapshot> getSupervisorStream(String selectedFirebaseId, int selectedYear, int selectedMonth) {
+    // CHANGED: Uses the helper getter for the correct document ID
+    return FirebaseFirestore.instance
+        .collection("Staff")
+        .doc(selectedFirebaseId)
+        .collection("TimeSheets")
+        .doc(_timesheetDocId)
         .snapshots();
   }
 
@@ -2941,62 +3183,118 @@ $selectedBioFirstName $selectedBioLastName
             // Month Picker Dropdown
             Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0 * paddingFactor),
-              child: Row(
+              child: Column(
                 children: [
-                  SizedBox(width: 10 * marginFactor),
-                  const Text(
-                    'Select Month:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  SizedBox(width: 10 * marginFactor),
-                  DropdownButton<int>(
-                    value: selectedMonth,
-                    items: List.generate(12, (index) {
-                      DateTime monthDate = DateTime(2024, index + 1, 1);
-                      return DropdownMenuItem<int>(
-                        value: index,
-                        child: Text(DateFormat.MMMM().format(monthDate), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
-                      );
-                    }),
-                    onChanged: (int? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          selectedMonth = newValue;
-                          initializeDateRange(selectedMonth, selectedYear);
-                        });
-                      }
-                    },
-                  ),
+
+                  Row(
+                    children: [
+                      SizedBox(width: 10 * marginFactor),
+                      const Text(
+                        'Select Month:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      SizedBox(width: 10 * marginFactor),
+                      DropdownButton<int>(
+                        value: selectedMonth,
+                        items: List.generate(12, (index) {
+                          DateTime monthDate = DateTime(2024, index + 1, 1);
+                          return DropdownMenuItem<int>(
+                            value: index,
+                            child: Text(DateFormat.MMMM().format(monthDate), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
+                          );
+                        }),
+                        onChanged: (int? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedMonth = newValue;
+                              initializeDateRange(selectedMonth, selectedYear);
+                            });
+                          }
+                        },
+                      ),
 
 
-                  SizedBox(width: 10 * marginFactor),
-                  const Text(
-                    'Select Year:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  SizedBox(width: 10 * marginFactor),
+                      SizedBox(width: 10 * marginFactor),
+                      const Text(
+                        'Select Year:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      SizedBox(width: 10 * marginFactor),
 
 
-                  DropdownButton<int>(
-                    value: selectedYear,
-                    items: List.generate(10, (index) {
-                      int year = DateTime
-                          .now()
-                          .year - index;
-                      return DropdownMenuItem<int>(
-                        value: year,
-                        child: Text(year.toString(), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
-                      );
-                    }),
-                    onChanged: (int? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          selectedYear = newValue;
-                          initializeDateRange(selectedMonth, selectedYear);
-                        });
-                      }
-                    },
+                      DropdownButton<int>(
+                        value: selectedYear,
+                        items: List.generate(10, (index) {
+                          int year = DateTime
+                              .now()
+                              .year - index;
+                          return DropdownMenuItem<int>(
+                            value: year,
+                            child: Text(year.toString(), style: TextStyle(fontSize: 14 * dropdownFontSizeFactor)),
+                          );
+                        }),
+                        onChanged: (int? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedYear = newValue;
+                              initializeDateRange(selectedMonth, selectedYear);
+                            });
+                          }
+                        },
+                      ),
+
+
+                    ],
                   ),
+
+                  // ... after the Year DropdownButton
+
+                  if (_isSeptemberSelected) // This boolean is set in initializeDateRange
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Select Timesheet Period for September:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          ToggleButtons(
+                            isSelected: [
+                              _selectedTimesheetPart == 1,
+                              _selectedTimesheetPart == 2,
+                            ],
+                            onPressed: (int index) {
+                              setState(() {
+                                _selectedTimesheetPart = index + 1; // Part 1 or Part 2
+                                // Re-calculate the date range and refresh related data
+                                initializeDateRange(selectedMonth, selectedYear);
+                                if (bioData != null) {
+                                  getSupervisor(bioData!.firebaseAuthId!, selectedYear, selectedMonth);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8.0),
+                            selectedBorderColor: Colors.red[700],
+                            selectedColor: Colors.white,
+                            fillColor: Colors.red[200],
+                            color: Colors.red[400],
+                            constraints: const BoxConstraints(minHeight: 40.0),
+                            children: const <Widget>[
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text('Part 1 (Aug 20 - Sep 19)'),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text('Part 2 (Sep 20 - Sep 30)'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -5417,7 +5715,7 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-  Future<void> _saveTimesheetToFirestore() async {
+  Future<void> _saveTimesheetToFirestore1() async {
     print("Step One");
 
     if (staffSignatureLink == null) {
@@ -5539,6 +5837,108 @@ $selectedBioFirstName $selectedBioLastName
       );
     } catch (e) {
       print('Error saving timesheet: $e');
+    }
+  }
+
+  Future<void> _saveTimesheetToFirestore() async {
+    print("Step One: Starting timesheet save process.");
+
+    // --- Pre-submission Checks ---
+    if (staffSignatureLink == null || staffSignatureLink!.isEmpty) {
+      Fluttertoast.showToast(msg: "Cannot submit timesheet without a staff signature. Please upload one.");
+      return;
+    }
+
+    if (selectedSupervisor == null || _selectedFacilitySupervisorFullName == null) {
+      Fluttertoast.showToast(msg: "Please select both a Project Coordinator and a CARITAS Supervisor before submitting.");
+      return;
+    }
+
+    log("Selected Project Coordinator: $_selectedFacilitySupervisorFullName");
+    log("Selected CARITAS Supervisor: $selectedSupervisor");
+
+    // --- Data Aggregation and Firestore Save ---
+
+    // CHANGED: Use the helper getter to generate the correct, unique Firestore document ID.
+    final String timesheetDocumentId = _timesheetDocId;
+
+    // CHANGED: Create a unique identifier for the 'month' field inside the document.
+    final String monthFieldIdentifier = selectedMonth == 8
+        ? '${selectedMonth}_${selectedYear}_part$_selectedTimesheetPart'
+        : '${selectedMonth}_$selectedYear';
+
+    try {
+      log("Start Pushing timesheet with doc ID: $timesheetDocumentId");
+
+      List<Map<String, dynamic>> timesheetEntries = [];
+      for (var date in daysInRange) {
+        Map<String, dynamic>? entryForDate;
+        for (var attendance in attendanceData) {
+          try {
+            DateTime attendanceDate = DateFormat('dd-MMMM-yyyy').parse(attendance.date!);
+            if (attendanceDate.year == date.year &&
+                attendanceDate.month == date.month &&
+                attendanceDate.day == date.day) {
+              entryForDate = {
+                'date': DateFormat('yyyy-MM-dd').format(date),
+                'noOfHours': attendance.noOfHours,
+                'projectName': selectedProjectName,
+                'offDay': attendance.offDay,
+                'durationWorked': attendance.durationWorked,
+              };
+              break;
+            }
+          } catch (e) {
+            log("Error parsing date: $e");
+          }
+        }
+        if (entryForDate != null) {
+          timesheetEntries.add(entryForDate);
+        }
+      }
+
+      Map<String, dynamic> timesheetData = {
+        'projectName': selectedProjectName,
+        'staffName': '$selectedBioFirstName $selectedBioLastName',
+        'staffSignature': staffSignatureLink,
+        'staffSignatureDate': DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+        'facilitySupervisorSignatureDate': null,
+        'caritasSupervisorSignatureDate': null,
+        'department': selectedBioDepartment,
+        'state': selectedBioState,
+        'facilitySupervisorSignatureStatus': 'Pending',
+        'caritasSupervisorSignatureStatus': 'Pending',
+        'facilitySupervisorTimesheetSubmissionTimestamp': null,
+        'caritasSupervisorTimesheetSubmissionTimestamp': null,
+        'timesheetEntries': timesheetEntries,
+        'facilitySupervisor': _selectedFacilitySupervisorFullName,
+        'facilitySupervisorEmail': _selectedFacilitySupervisorEmail,
+        'facilitySupervisorSignature': facilitySupervisorSignature,
+        'caritasSupervisor': selectedSupervisor,
+        'caritasSupervisorSignature': caritasSupervisorSignature,
+        'caritasSupervisorEmail': _selectedSupervisorEmail,
+        'staffId': selectedFirebaseId,
+        'designation': selectedBioDesignation,
+        'location': selectedBioLocation,
+        'staffCategory': selectedBioStaffCategory,
+        'staffEmail': selectedBioEmail,
+        'staffPhone': selectedBioPhone,
+        'month': monthFieldIdentifier, // CHANGED: Use the unique month field identifier
+        'timesheetSubmissionTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await FirebaseFirestore.instance
+          .collection("Staff")
+          .doc(selectedFirebaseId)
+          .collection("TimeSheets")
+          .doc(timesheetDocumentId) // CHANGED: Use the unique document ID
+          .set(timesheetData, SetOptions(merge: true));
+
+      print('Timesheet saved to Firestore with ID: $timesheetDocumentId');
+      Fluttertoast.showToast(msg: "Timesheet sent to supervisor successfully!");
+    } catch (e) {
+      print('Error saving timesheet: $e');
+      Fluttertoast.showToast(msg: "Error saving timesheet: $e");
     }
   }
 

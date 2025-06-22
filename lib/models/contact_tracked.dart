@@ -1,12 +1,15 @@
-// model/contact_tracked.dart
+// lib/model/contact_tracked.dart
 import 'package:isar/isar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore Timestamp
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 
 
-
+@collection // <-- ADD THIS ANNOTATION
 class ContactTracked {
   Id id = Isar.autoIncrement;
 
+
+  String? uuid; // <-- ADD UUID FIELD
 
   String? name;
   String? phoneNumber;
@@ -16,7 +19,7 @@ class ContactTracked {
   int? callDuration;
   String? state;
   String? facilityName;
-  String? uniqueID;
+  String? uniqueID; // ART ID
   String? datimCode;
   String? supervisorName;
   String? supervisorEmail;
@@ -25,9 +28,7 @@ class ContactTracked {
   String? designation;
   String? trackerFacilityLocation;
   DateTime? dateTracked;
-
   int? patientId;
-
   DateTime? dateNextVisitChanged;
   DateTime? datePhoneNumberUpdated;
   DateTime? dateAddressChanged;
@@ -36,11 +37,12 @@ class ContactTracked {
   DateTime? sampleCollectionDate;
   String? currentViralLoad;
 
-  // New fields
-  bool isUpdated = false; // Set to true after Firestore sync
-  bool isSynced = false;  // Set to true after Firestore sync
+  // Sync status fields for local database management
+  bool isUpdated;
+  bool isSynced;
+  DateTime? syncedAt;
 
-  // Constructor - Generate UUID here
+  // Constructor - Now includes UUID generation
   ContactTracked({
     this.name,
     this.phoneNumber,
@@ -67,36 +69,31 @@ class ContactTracked {
     this.dateOfTermination,
     this.sampleCollectionDate,
     this.currentViralLoad,
-    // Don't initialize isUpdated/isSynced here, keep defaults
-  }); // Generate a v4 UUID automatically
+    this.isUpdated = false,
+    this.isSynced = false,
+    this.syncedAt,
+    this.uuid,
+  }) {
+    // Ensure every record has a unique ID
+    uuid ??= const Uuid().v4();
+  }
 
   // --- Factory Constructor for Firestore Data ---
-  // ***** ADD THIS METHOD *****
-  factory ContactTracked.fromFirestore(Map<String, dynamic> data, [String? docId]) {
-    // Helper to safely convert Timestamps or null
+  // RENAMED from 'fromFirestore' to 'fromJson' for consistency
+  factory ContactTracked.fromJson(Map<String, dynamic> data) {
+    // Helper to safely convert Timestamps to DateTime
     DateTime? toDateTime(dynamic timestamp) {
-      if (timestamp is Timestamp) {
-        return timestamp.toDate();
-      }
-      // Handle potential String dates if necessary (though Timestamp is standard)
-      // if (timestamp is String) {
-      //   return DateTime.tryParse(timestamp);
-      // }
+      if (timestamp is Timestamp) return timestamp.toDate();
+      if (timestamp is String) return DateTime.tryParse(timestamp);
       return null;
     }
 
-    // Use docId as UUID if it exists AND is intended to be the UUID,
-    // otherwise try getting 'uuid' from the data, or generate as a last resort.
-//    final String objectUuid = docId ?? data['uuid'] as String? ?? Uuid().v4();
-
     return ContactTracked(
-
-
-      // Map fields from Firestore data map
+      uuid: data['uuid'] as String?, // Read the UUID from Firestore
       name: data['name'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
-      lastVisitDate: toDateTime(data['lastVisitDate']), // Ensure key matches 'toJson'
-      nextVisitDate: toDateTime(data['nextVisitDate']), // Ensure key matches 'toJson' if you save it
+      lastVisitDate: toDateTime(data['lastVisitDate']),
+      nextVisitDate: toDateTime(data['nextVisitDate']),
       callDuration: data['callDuration'] as int?,
       callStatus: data['callStatus'] as String?,
       state: data['state'] as String?,
@@ -109,33 +106,29 @@ class ContactTracked {
       supervisorName: data['supervisorName'] as String?,
       supervisorEmail: data['supervisorEmail'] as String?,
       trackerFacilityLocation: data['trackerFacilityLocation'] as String?,
-      dateTracked: toDateTime(data['dateTracked']), // Key MUST match 'toJson' output
+      dateTracked: toDateTime(data['dateTracked']),
       patientId: data['patientId'] as int?,
-      dateNextVisitChanged: toDateTime(data['dateNextVisitChanged']), // Ensure key matches 'toJson'
-      datePhoneNumberUpdated: toDateTime(data['datePhoneNumberUpdated']), // Ensure key matches 'toJson'
-      dateAddressChanged: toDateTime(data['dateAddressChanged']), // Ensure key matches 'toJson'
+      dateNextVisitChanged: toDateTime(data['dateNextVisitChanged']),
+      datePhoneNumberUpdated: toDateTime(data['datePhoneNumberUpdated']),
+      dateAddressChanged: toDateTime(data['dateAddressChanged']),
       artStatus: data['artStatus'] as String?,
-      dateOfTermination: toDateTime(data['dateOfTermination']), // Ensure key matches 'toJson'
-      sampleCollectionDate: toDateTime(data['sampleCollectionDate']), // Ensure key matches 'toJson'
+      dateOfTermination: toDateTime(data['dateOfTermination']),
+      sampleCollectionDate: toDateTime(data['sampleCollectionDate']),
       currentViralLoad: data['currentViralLoad'] as String?,
-
-      // Sync status flags are generally NOT read from Firestore,
-      // as fetching from Firestore implies it's synced.
-      // isUpdated: data['isUpdated'] ?? false, // Example if you did save them
-      // isSynced: data['isSynced'] ?? true,
+      // When reading from Firestore, we can consider it synced.
+      isSynced: true,
+      syncedAt: toDateTime(data['syncedAt']),
     );
   }
-  // ***** END OF METHOD TO ADD *****
 
-
-  // --- Method to convert to Map for Firestore (Existing toJson) ---
+  // --- Method to convert to Map for Firestore ---
   Map<String, dynamic> toJson() {
-    // Make sure the keys here exactly match the keys used in fromFirestore
     return {
+      'uuid': uuid, // Include the UUID when writing to Firestore
       'name': name,
       'phoneNumber': phoneNumber,
       'lastVisitDate': lastVisitDate != null ? Timestamp.fromDate(lastVisitDate!) : null,
-      'nextVisitDate': nextVisitDate != null ? Timestamp.fromDate(nextVisitDate!) : null, // Save if needed
+      'nextVisitDate': nextVisitDate != null ? Timestamp.fromDate(nextVisitDate!) : null,
       'callDuration': callDuration,
       'callStatus': callStatus,
       'state': state,
@@ -148,7 +141,7 @@ class ContactTracked {
       'supervisorName': supervisorName,
       'supervisorEmail': supervisorEmail,
       'trackerFacilityLocation': trackerFacilityLocation,
-      'dateTracked': dateTracked != null ? Timestamp.fromDate(dateTracked!) : null, // This key is crucial
+      'dateTracked': dateTracked != null ? Timestamp.fromDate(dateTracked!) : null,
       'patientId': patientId,
       'dateNextVisitChanged': dateNextVisitChanged != null ? Timestamp.fromDate(dateNextVisitChanged!) : null,
       'datePhoneNumberUpdated': datePhoneNumberUpdated != null ? Timestamp.fromDate(datePhoneNumberUpdated!) : null,
@@ -157,12 +150,7 @@ class ContactTracked {
       'dateOfTermination': dateOfTermination != null ? Timestamp.fromDate(dateOfTermination!) : null,
       'sampleCollectionDate': sampleCollectionDate != null ? Timestamp.fromDate(sampleCollectionDate!) : null,
       'currentViralLoad': currentViralLoad,
-
-      // Decide IF you need to save these sync statuses to Firestore. Usually not necessary for reads.
-      'isUpdated': isUpdated,
-      'isSynced': isSynced,
-      'syncedAt': isSynced ? Timestamp.now() : null, // Optional: Timestamp of sync
-      'clientWriteTime': Timestamp.now(), // Add a client timestamp for debugging potentially
+      'syncedAt': syncedAt != null ? Timestamp.fromDate(syncedAt!) : null,
     };
   }
 }

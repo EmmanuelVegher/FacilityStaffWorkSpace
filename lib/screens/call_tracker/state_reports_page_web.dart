@@ -159,7 +159,108 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 // This version avoids the "ghost document" problem by first fetching a list of users.
 // --- THE NEW, FAST & SIMPLE DATA LOADING METHOD ---
 // This works because the `_syncPendingRecords` fix creates real, queryable documents.
+
+//   Future<void> _loadReports() async {
+//     if (_selectedFacility == null) {
+//       _showSnackBar("Please select a facility to generate a report.");
+//       return;
+//     }
+//     if (startDate == null || endDate == null) {
+//       _showSnackBar("Please select a valid date range.");
+//       return;
+//     }
+//     if (userState == null) {
+//       _showSnackBar("Cannot load reports: User state is missing.");
+//       return;
+//     }
+//
+//     setState(() {
+//       isLoading = true;
+//       _isInitialState = false;
+//       _errorMessage = null;
+//       trackedContacts.clear();
+//     });
+//
+//     try {
+//       List<String> facilitiesToQuery;
+//       if (_selectedFacility == 'All Facilities') {
+//         facilitiesToQuery = List.from(_availableFacilities)..remove('All Facilities');
+//       } else {
+//         facilitiesToQuery = [_selectedFacility!];
+//       }
+//
+//       List<ContactTracked> fetchedContacts = [];
+//       final DateFormat pathDateFormat = DateFormat('dd-MMM-yyyy');
+//
+//       // Loop 1: Iterate through each selected facility
+//       for (final facility in facilitiesToQuery) {
+//         final String facilityName = facility.trim();
+//
+//         DateTime currentDate = startDate!;
+//         // Loop 2: Iterate through each day in the date range
+//         while (currentDate.isBefore(endDate!.add(const Duration(days: 1)))) {
+//           String formattedDate = pathDateFormat.format(currentDate);
+//
+//           try {
+//             // 1. Get a reference to the collection of USERS for that day
+//             CollectionReference usersCollectionRef = _firestore
+//                 .collection('Reports')
+//                 .doc(userState!)
+//                 .collection('CallTracker')
+//                 .doc(facilityName)
+//                 .collection(formattedDate); // The date is a collection
+//
+//             // 2. Get all REAL documents from that date collection. This will now work!
+//             QuerySnapshot userSnapshot = await usersCollectionRef.get();
+//
+//             // Loop 3: Iterate through each user document found for that day
+//             for (final userDoc in userSnapshot.docs) {
+//               String userId = userDoc.id;
+//
+//               // 3. Get the sub-collection of calls
+//               CollectionReference callsCollectionRef = userDoc.reference.collection(userId);
+//
+//               QuerySnapshot callsSnapshot = await callsCollectionRef.get();
+//               for (var callDoc in callsSnapshot.docs) {
+//                 if (callDoc.exists && callDoc.data() != null) {
+//                   fetchedContacts.add(ContactTracked.fromFirestore(callDoc.data() as Map<String, dynamic>, callDoc.id));
+//                 }
+//               }
+//             }
+//           } catch (e) {
+//             // Safely ignore errors for non-existent paths
+//           }
+//           currentDate = currentDate.add(const Duration(days: 1));
+//         }
+//       }
+//
+//       if (mounted) {
+//         setState(() {
+//           trackedContacts = fetchedContacts;
+//           _prepareChartData();
+//           isLoading = false;
+//         });
+//       }
+//     } catch (e) {
+//       if (mounted) {
+//         setState(() {
+//           isLoading = false;
+//           _errorMessage = "A major error occurred while loading reports: $e";
+//           trackedContacts = [];
+//           _prepareChartData();
+//         });
+//       }
+//     }
+//   }
+
+  // In _ReportsPageWeb2State class
+
+  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
+// In _ReportsPageWeb2State class
+
+  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
   Future<void> _loadReports() async {
+    // 1. Validate Filters
     if (_selectedFacility == null) {
       _showSnackBar("Please select a facility to generate a report.");
       return;
@@ -169,7 +270,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       return;
     }
     if (userState == null) {
-      _showSnackBar("Cannot load reports: User state is missing.");
+      _showSnackBar("Cannot load reports: Your state is not defined.");
       return;
     }
 
@@ -181,58 +282,51 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     });
 
     try {
-      List<String> facilitiesToQuery;
-      if (_selectedFacility == 'All Facilities') {
-        facilitiesToQuery = List.from(_availableFacilities)..remove('All Facilities');
+      // --- 2. Build the Firestore Query ---
+
+      // Start with a base query on the flattened 'CallLogs' collection
+      Query query = _firestore.collection('CallLogs');
+
+      // Add print statements to see the exact values being used for filtering
+      print("--- Firestore Query Parameters ---");
+      print("State Filter: '$userState'");
+
+      // Apply required filters
+      query = query
+          .where('state', isEqualTo: userState)
+          .where('dateTracked', isGreaterThanOrEqualTo: startDate)
+          .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
+
+      // Conditionally add the facility filter
+      if (_selectedFacility != 'All Facilities') {
+        print("Facility Filter: '$_selectedFacility'");
+        query = query.where('facilityName', isEqualTo: _selectedFacility);
       } else {
-        facilitiesToQuery = [_selectedFacility!];
+        print("Facility Filter: All Facilities (no filter applied)");
       }
 
-      List<ContactTracked> fetchedContacts = [];
-      final DateFormat pathDateFormat = DateFormat('dd-MMM-yyyy');
+      // Add ordering
+      query = query.orderBy('dateTracked', descending: true);
+      print("----------------------------------");
 
-      // Loop 1: Iterate through each selected facility
-      for (final facility in facilitiesToQuery) {
-        final String facilityName = facility.trim();
+      // --- 3. Execute the Query ---
+      final QuerySnapshot querySnapshot = await query.get();
 
-        DateTime currentDate = startDate!;
-        // Loop 2: Iterate through each day in the date range
-        while (currentDate.isBefore(endDate!.add(const Duration(days: 1)))) {
-          String formattedDate = pathDateFormat.format(currentDate);
+      // --- 4. Process the Results ---
+      print("Query executed. Found ${querySnapshot.docs.length} documents.");
 
-          try {
-            // 1. Get a reference to the collection of USERS for that day
-            CollectionReference usersCollectionRef = _firestore
-                .collection('Reports')
-                .doc(userState!)
-                .collection('CallTracker')
-                .doc(facilityName)
-                .collection(formattedDate); // The date is a collection
-
-            // 2. Get all REAL documents from that date collection. This will now work!
-            QuerySnapshot userSnapshot = await usersCollectionRef.get();
-
-            // Loop 3: Iterate through each user document found for that day
-            for (final userDoc in userSnapshot.docs) {
-              String userId = userDoc.id;
-
-              // 3. Get the sub-collection of calls
-              CollectionReference callsCollectionRef = userDoc.reference.collection(userId);
-
-              QuerySnapshot callsSnapshot = await callsCollectionRef.get();
-              for (var callDoc in callsSnapshot.docs) {
-                if (callDoc.exists && callDoc.data() != null) {
-                  fetchedContacts.add(ContactTracked.fromFirestore(callDoc.data() as Map<String, dynamic>, callDoc.id));
-                }
-              }
-            }
-          } catch (e) {
-            // Safely ignore errors for non-existent paths
-          }
-          currentDate = currentDate.add(const Duration(days: 1));
-        }
+      if (querySnapshot.docs.isEmpty && _selectedFacility != 'All Facilities') {
+        _showSnackBar("No call logs found for $_selectedFacility in the selected date range.");
+      } else if (querySnapshot.docs.isEmpty) {
+        _showSnackBar("No call logs found for any facility in this state for the selected date range.");
       }
 
+      final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
+        return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
+      }).toList();
+
+
+      // --- 5. Update the UI State ---
       if (mounted) {
         setState(() {
           trackedContacts = fetchedContacts;
@@ -244,14 +338,15 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       if (mounted) {
         setState(() {
           isLoading = false;
+          // This will now catch and display the "Missing Index" error from Firestore
           _errorMessage = "A major error occurred while loading reports: $e";
           trackedContacts = [];
           _prepareChartData();
         });
       }
+      print("Firestore Query Error: $e");
     }
   }
-
 
 
   void _prepareChartData() {

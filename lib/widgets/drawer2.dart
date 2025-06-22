@@ -152,7 +152,7 @@ Widget drawer2(
           ),
           ListTile(
             leading: Icon(Icons.timer,
-                size: drawerIconSize, color: Colors.red),
+                size: drawerIconSize, color: Colors.orangeAccent),
             title: Text(
               'Attendance Analysis',
               style: TextStyle(
