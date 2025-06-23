@@ -36,6 +36,10 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // NEW: State variables for call cost calculation
+  double _totalCallCost = 0.0;
+  final double _costPerSecond = 0.23; // 0.24 Naira per second
+
   List<ContactTracked> trackedContacts = [];
   DateTime? startDate;
   DateTime? endDate;
@@ -196,80 +200,152 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
 
   /// Fetches contact logs for the current user from the flattened 'CallLogs' collection
   /// for the specified date range.
+  // In _ReportsPageWebState class
+
+  /// Fetches contact logs and calculates the estimated call cost.
   Future<void> _loadContacts({DateTime? start, DateTime? end}) async {
     // 1. Guard against running without necessary information.
-    // Check if user details are still loading or are missing.
     if (_isUserBioLoading || currentUserAuthId == null) {
       if (!_isUserBioLoading && mounted) {
-        setState(() {
-          isLoading = false;
-          _errorMessage = "Cannot load reports: User details are missing.";
-        });
+        setState(() { isLoading = false; _errorMessage = "Cannot load reports: User details are missing."; });
       }
       return;
     }
-    // Check if a valid date range has been provided.
     if (start == null || end == null) {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-          trackedContacts = [];
-          _prepareChartData();
-          _errorMessage = "Please select a date range to load reports.";
-        });
+        setState(() { isLoading = false; trackedContacts = []; _prepareChartData(); _errorMessage = "Please select a date range."; });
       }
       return;
     }
 
-    // 2. Set the UI to a loading state.
+    // 2. Set the UI to a loading state and reset previous data.
     setState(() {
       isLoading = true;
       _errorMessage = null;
-      trackedContacts = []; // Clear previous results before fetching new ones
+      trackedContacts = [];
+      _totalCallCost = 0.0; // Reset the cost for a new query
     });
 
     try {
-      // 3. Define and execute the efficient Firestore query.
-      // This single query replaces the old, inefficient date-looping logic.
+      // 3. Execute the Firestore query.
       final QuerySnapshot querySnapshot = await _firestore
-          .collection('CallLogs') // Query the new flattened collection
-          .where('firebaseAuthId', isEqualTo: currentUserAuthId) // Filter by the current user's ID
-          .where('dateTracked', isGreaterThanOrEqualTo: start) // Filter by start date
-          .where('dateTracked', isLessThanOrEqualTo: end.add(const Duration(days: 1))) // Filter by end date (inclusive)
-          .orderBy('dateTracked', descending: true) // Order by date for easy display
+          .collection('CallLogs')
+          .where('firebaseAuthId', isEqualTo: currentUserAuthId)
+          .where('dateTracked', isGreaterThanOrEqualTo: start)
+          .where('dateTracked', isLessThanOrEqualTo: end.add(const Duration(days: 1)))
+          .orderBy('dateTracked', descending: true)
           .get();
 
       // 4. Process the results.
-      if (querySnapshot.docs.isEmpty) {
-        print("No call logs found for user $currentUserAuthId in the selected date range.");
-      }
-
-      // Map the document snapshots to a list of ContactTracked objects.
       final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
-        // Call the 'fromJson' factory constructor to create an instance from the map.
         return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
       }).toList();
 
-      // 5. Update the UI with the fetched data.
+      // --- THIS IS THE NEW CALCULATION LOGIC ---
+      int totalDurationInSeconds = fetchedContacts.fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+      double calculatedCost = totalDurationInSeconds * _costPerSecond;
+      // ------------------------------------------
+
+      // 5. Update the UI with the fetched data and the calculated cost.
       if (mounted) {
         setState(() {
           trackedContacts = fetchedContacts;
-          _prepareChartData(); // Recalculate chart data with the new contacts
+          _totalCallCost = calculatedCost; // Set the calculated cost
+          _prepareChartData();
           isLoading = false;
         });
       }
     } catch (e) {
-      // 6. Handle any errors during the process.
+      // 6. Handle any errors.
       if (mounted) {
         setState(() {
           isLoading = false;
           _errorMessage = "Error loading reports: $e";
           trackedContacts = [];
+          _totalCallCost = 0.0; // Reset cost on error
           _prepareChartData();
         });
       }
       print("Error loading reports: $e");
     }
+  }
+
+  // Add these two methods inside the _ReportsPageWebState class
+
+  // Add these two methods inside the _ReportsPageWebState class
+
+  Widget _buildSummaryInfoCard() {
+    final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
+    final numberFormatter = NumberFormat.compact();
+    final totalDuration = trackedContacts.fold<int>(0, (sum, item) => sum + (item.callDuration ?? 0));
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 24.0),
+      elevation: 2.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Wrap(
+          alignment: WrapAlignment.spaceAround,
+          spacing: 20.0,
+          runSpacing: 16.0,
+          children: [
+            _buildInfoTile(
+              iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
+              label: 'Total Calls Logged',
+              value: numberFormatter.format(trackedContacts.length),
+            ),
+            _buildInfoTile(
+              iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
+              label: 'Total Call Duration',
+              value: formatDuration(totalDuration),
+            ),
+            // _buildInfoTile(
+            //   iconWidget: Text(
+            //     '₦',
+            //     style: TextStyle(
+            //       fontSize: 36,
+            //       fontWeight: FontWeight.bold,
+            //       color: Colors.green.shade800,
+            //     ),
+            //   ),
+            //   label: 'Estimated Call Cost',
+            //   value: currencyFormatter.format(_totalCallCost),
+            //   subtitle: '(at ₦${_costPerSecond}/sec)',
+            // ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Helper for the summary card tiles
+  Widget _buildInfoTile({
+    required Widget iconWidget,
+    required String label,
+    required String value,
+    String? subtitle,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        iconWidget,
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+            Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            if (subtitle != null && subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
   }
 
   void _prepareChartData() {
@@ -749,6 +825,9 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
+              // NEW: Add the summary card here
+              _buildSummaryInfoCard(),
 
               // --- Charts Section ---
               Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),

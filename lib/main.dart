@@ -4,9 +4,9 @@ import 'package:attendanceappmailtool/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
-import 'firebase_options.dart';
 import 'package:js/js.dart';
-import 'dart:async'; // Import dart:async for Future.delayed
+import 'package:lottie/lottie.dart';
+import 'firebase_options.dart';
 
 // Declare the JS function from face_recognition.js
 @JS('loadModels')
@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const SplashScreen(), // Use SplashScreen as home
+      home: const SplashScreen(),
       getPages: [
         GetPage(name: '/login', page: () => const LoginPage()),
         GetPage(name: '/delete-data', page: () => const DeleteDataPage()),
@@ -60,22 +60,28 @@ class SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    await Firebase.initializeApp( // Initialize Firebase again here for extra safety in SplashScreen
+    await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    await loadModels(); // Load face-api models
+    await loadModels();
 
-    // Delay navigation slightly to ensure everything is initialized
-    await Future.delayed(const Duration(milliseconds: 100)); // Adjust delay if needed
+    // Short delay to show animation
+    await Future.delayed(const Duration(seconds: 2));
 
-    Get.offNamed('/login'); // Navigate to login after initialization
+    Get.offNamed('/login');
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.white, // You can change this if needed
       body: Center(
-        child: CircularProgressIndicator(), // Show loading indicator
+        child: Lottie.asset(
+          'assets/lottie/loading.json',
+          width: 200,
+          height: 200,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }

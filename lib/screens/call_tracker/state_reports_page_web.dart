@@ -66,6 +66,13 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   List<_UpdateChartData> updateMetricsData = [];
   List<MapEntry<String, int>> artStatusChartData = [];
 
+  // --- NEW State variables for extra filters and calculations ---
+  List<ContactTracked> _masterContactList = []; // Holds all data from Firestore before final filtering
+  List<String> _availableTrackers = ['All Trackers'];
+  String _selectedTracker = 'All Trackers';
+  double _totalCallCost = 0.0;
+  final double _costPerSecond = 0.23; // Call cost rate as specified
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +87,68 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     // NEW: Dispose of the controller
     _logTableController.dispose();
     super.dispose();
+  }
+
+  // In _ReportsPageWeb2State class
+
+  /// Populates the tracker dropdown list from the master data.
+// In _ReportsPageWeb2State class
+
+  /// Populates the tracker dropdown list from the master data.
+  void _updateAvailableTrackers() {
+    if (_masterContactList.isEmpty) {
+      setState(() {
+        _availableTrackers = ['All Trackers'];
+        _selectedTracker = 'All Trackers';
+      });
+      return;
+    }
+
+    // Use a Set to get unique tracker names from the fetched data
+    final trackers = _masterContactList
+        .map((contact) => contact.trackedBy) // 1. Get an Iterable<String?>
+        .whereType<String>()                 // 2. Filter out nulls AND get a type-safe Iterable<String>
+        .where((name) => name.isNotEmpty)   // 3. Now safely filter out empty strings
+        .toSet();                           // 4. This results in a Set<String>
+
+    setState(() {
+      // This assignment is now type-safe because 'trackers' is a Set<String>
+      _availableTrackers = ['All Trackers', ...trackers.toList()..sort()];
+
+      // If the previously selected tracker is no longer in the list after a refresh, reset it.
+      if (!_availableTrackers.contains(_selectedTracker)) {
+        _selectedTracker = 'All Trackers';
+      }
+    });
+  }
+
+  /// Applies the selected tracker filter to the master list and recalculates all metrics.
+  // In _ReportsPageWeb2State class
+
+  /// Applies the selected tracker filter to the master list and recalculates all metrics.
+  void _applyTrackerAndRecalculate() {
+    List<ContactTracked> filteredList;
+
+    // Filter the master list based on the selected tracker
+    if (_selectedTracker != 'All Trackers') {
+      filteredList = _masterContactList.where((c) => c.trackedBy == _selectedTracker).toList();
+    } else {
+      // If 'All Trackers' is selected, use the whole master list
+      filteredList = List.from(_masterContactList);
+    }
+
+    // Calculate total call cost based on the *final filtered* list
+    int totalDurationInSeconds = filteredList.fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+
+    // --- CALCULATION UPDATED ---
+    // The cost is now total seconds multiplied by the cost per second.
+    double calculatedCost = totalDurationInSeconds * _costPerSecond;
+
+    setState(() {
+      trackedContacts = filteredList; // This is the list the UI will display
+      _totalCallCost = calculatedCost;
+      _prepareChartData(); // Re-run chart calculations on the final filtered data
+    });
   }
 
   Future<void> _initializeFilters() async {
@@ -259,7 +328,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 // In _ReportsPageWeb2State class
 
   /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
-  Future<void> _loadReports() async {
+  Future<void> _loadReports1() async {
     // 1. Validate Filters
     if (_selectedFacility == null) {
       _showSnackBar("Please select a facility to generate a report.");
@@ -348,6 +417,83 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     }
   }
 
+  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
+// In _ReportsPageWeb2State class
+
+  /// Fetches contact logs from the flattened 'CallLogs' collection and prepares for display.
+  Future<void> _loadReports() async {
+    // 1. Validate that all necessary filters are selected.
+    if (_selectedFacility == null) {
+      _showSnackBar("Please select a facility to generate a report.");
+      return;
+    }
+    if (startDate == null || endDate == null) {
+      _showSnackBar("Please select a valid date range.");
+      return;
+    }
+    if (userState == null) {
+      _showSnackBar("Cannot load reports: Your state is not defined in your profile.");
+      return;
+    }
+
+    // 2. Set the UI to a loading state.
+    setState(() {
+      isLoading = true;
+      _isInitialState = false;
+      _errorMessage = null;
+      _masterContactList.clear(); // Clear the master list for a new query
+      trackedContacts.clear();
+      _totalCallCost = 0.0;
+    });
+
+    try {
+      // 3. Build the Firestore Query dynamically.
+      Query query = _firestore.collection('CallLogs');
+
+      query = query
+          .where('trackerFacilityState', isEqualTo: userState)
+          .where('dateTracked', isGreaterThanOrEqualTo: startDate)
+          .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
+
+      if (_selectedFacility != 'All Facilities') {
+        query = query.where('trackerFacilityLocation', isEqualTo: _selectedFacility);
+      }
+
+      query = query.orderBy('dateTracked', descending: true);
+
+      // 4. Execute the Query.
+      final QuerySnapshot querySnapshot = await query.get();
+
+      // 5. Process the results.
+      final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
+        return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
+      }).toList();
+
+      // 6. Update the UI State using the new helper methods.
+      if (mounted) {
+        setState(() {
+          _masterContactList = fetchedContacts;
+          _updateAvailableTrackers(); // Populate the tracker dropdown
+          _applyTrackerAndRecalculate(); // Filter by tracker and calculate metrics
+          isLoading = false;
+        });
+        if (fetchedContacts.isEmpty) {
+          _showSnackBar("No call logs found for the selected criteria.");
+        }
+      }
+    } catch (e) {
+      // 7. Handle any errors during the process.
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          _errorMessage = "An error occurred while loading reports: $e";
+          trackedContacts = [];
+          _prepareChartData();
+        });
+      }
+      debugPrint("Firestore Query Error: $e");
+    }
+  }
 
   void _prepareChartData() {
     callStatusChartData = _getCallStatusData();
@@ -763,87 +909,177 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     );
   }
 
+  // In _ReportsPageWeb2State class
+
   Widget _buildFilterBar() {
-    // REWRITTEN FOR FLUTTER WEB & FACILITY-LEVEL FILTERING (PATH-BASED COMPATIBLE VERSION)
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: _isFilterLoading
-            ? const Center(
-          child: Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text("Loading filters..."),
-          ),
-        )
+            ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: Text("Loading filters...")))
             : Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 16.0, // Horizontal spacing between elements
-          runSpacing: 12.0, // Vertical spacing if they wrap
+          spacing: 16.0,
+          runSpacing: 12.0,
           alignment: WrapAlignment.center,
           children: [
-            // 1. Facility Dropdown (now flexible)
+            // 1. Facility Dropdown
             ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 250, // Ensures it doesn't get too small on wide screens
-                maxWidth: 350, // Prevents it from getting too large and allows wrapping
-              ),
+              constraints: const BoxConstraints(minWidth: 220, maxWidth: 600),
               child: DropdownButtonFormField<String>(
                 value: _selectedFacility,
                 hint: const Text('Select a Facility'),
-                isExpanded: true, // Allows dropdown text to use available space
-                decoration: const InputDecoration(
-                  labelText: 'Facility',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                ),
+                decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15)),
                 items: _availableFacilities.map((String facilityName) {
-                  return DropdownMenuItem<String>(
-                    value: facilityName,
-                    child: Text(facilityName, overflow: TextOverflow.ellipsis),
-                  );
+                  return DropdownMenuItem<String>(value: facilityName, child: Text(facilityName, overflow: TextOverflow.ellipsis));
                 }).toList(),
                 onChanged: (String? newName) {
-                  setState(() => _selectedFacility = newName);
+                  if (newName != null && newName != _selectedFacility) {
+                    setState(() {
+                      _selectedFacility = newName;
+                      // Reset sub-filter when primary filter changes
+                      _selectedTracker = 'All Trackers';
+                      _availableTrackers = ['All Trackers'];
+                    });
+                  }
                 },
               ),
             ),
 
-            // 2. Date Range Filter (as requested)
+            // 2. NEW: Tracked By Dropdown
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 220, maxWidth: 300),
+              child: DropdownButtonFormField<String>(
+                value: _selectedTracker,
+                hint: const Text('Select Tracker'),
+                // Disable dropdown if there's no data or if it's loading
+                disabledHint: const Text('Apply filter first'),
+                decoration: const InputDecoration(labelText: 'Tracked By', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15)),
+                items: _availableTrackers.map((String trackerName) {
+                  return DropdownMenuItem<String>(value: trackerName, child: Text(trackerName, overflow: TextOverflow.ellipsis));
+                }).toList(),
+                onChanged: (_masterContactList.isEmpty || isLoading)
+                    ? null // Disable if no master data is loaded
+                    : (String? newName) {
+                  setState(() => _selectedTracker = newName ?? 'All Trackers');
+                  _applyTrackerAndRecalculate(); // Re-filter and re-calculate on change
+                },
+              ),
+            ),
+
+            // 3. Date Range Filter
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
               label: Text(
-                (startDate != null && endDate != null)
-                    ? '${DateFormat.yMd().format(startDate!)} - ${DateFormat.yMd().format(endDate!)}'
-                    : 'Select Date Range',
+                (startDate != null && endDate != null) ? '${DateFormat.yMd().format(startDate!)} - ${DateFormat.yMd().format(endDate!)}' : 'Select Date Range',
                 style: const TextStyle(fontWeight: FontWeight.normal),
               ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
             ),
 
-            // 3. Apply Filter Button
+            // 4. Apply Filter Button
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
               label: const Text('Apply Filter'),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // In _ReportsPageWeb2State class
+
+
+// In _ReportsPageWeb2State class
+
+  Widget _buildSummaryInfoCard() {
+    final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
+    final numberFormatter = NumberFormat.compact();
+    final totalDuration = trackedContacts.fold<int>(0, (sum, item) => sum + (item.callDuration ?? 0));
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 24.0),
+      elevation: 2.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Wrap(
+          alignment: WrapAlignment.spaceAround,
+          spacing: 20.0,
+          runSpacing: 16.0,
+          children: [
+            _buildInfoTile(
+              // Pass a full Icon widget
+              iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
+              label: 'Total Calls Logged',
+              value: numberFormatter.format(trackedContacts.length),
+            ),
+            _buildInfoTile(
+              // Pass a full Icon widget
+              iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
+              label: 'Total Call Duration',
+              value: formatDuration(totalDuration),
+            ),
+            _buildInfoTile(
+              // NEW: Pass a styled Text widget as the icon
+              iconWidget: Text(
+                '₦',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade800,
+                ),
+              ),
+              label: 'Estimated Call Cost',
+              value: currencyFormatter.format(_totalCallCost),
+              subtitle: '(at ₦${_costPerSecond}/sec)',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+// Helper for the summary card tiles
+  // In _ReportsPageWeb2State class
+
+// In _ReportsPageWeb2State class
+
+// Helper for the summary card tiles
+  Widget _buildInfoTile({
+    required Widget iconWidget, // UPDATED: Changed from IconData to Widget
+    required String label,
+    required String value,
+    String? subtitle,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // We no longer need to wrap this in an Icon widget.
+        // We just display the widget that was passed in.
+        iconWidget,
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+            Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            if (subtitle != null && subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
@@ -880,6 +1116,10 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
+              // NEW: Add the summary card here
+              if (!_isInitialState && !isLoading)
+                _buildSummaryInfoCard(),
 
               Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 16),

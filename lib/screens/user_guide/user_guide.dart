@@ -98,9 +98,7 @@ class UserGuidePage extends StatelessWidget {
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      drawer: drawer(
-        context,
-      ),
+      drawer: drawer(context),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -121,7 +119,7 @@ class UserGuidePage extends StatelessWidget {
                   "•  **Attendance Quick View:** Shows your total clock-ins and clock-outs for the currently selected date range."),
           // MODIFIED: Pass context to _buildImage to handle navigation
           _buildImage(context, "assets/screens/dashboard_user_profile_header.png",
-              "User Profile and Quick Attendance Stats."),
+              "User Profile and Quick Attendance Stats. "),
 
           _buildSubHeader("2. Date Range Filters & Report Generation"),
           _buildParagraph(
@@ -129,7 +127,7 @@ class UserGuidePage extends StatelessWidget {
                   "•  **Start Date & End Date Pickers:** Select a specific period to view your attendance data and analytics.\n"
                   "•  **Generate Button:** Click this to refresh the dashboard and all charts with data from the selected date range."),
           _buildImage(context, "assets/screens/dashboard_date_filters.png",
-              "Date Filters and Generate Button."),
+              "Date Filters and Generate Button. "),
 
           _buildSubHeader("3. PDF Export & Sharing"),
           _buildParagraph(
@@ -359,84 +357,127 @@ class UserGuidePage extends StatelessWidget {
           _buildParagraph(
               "**Automatic Sync with Attendance:** Once a leave request is 'Approved' by your supervisor, the system will automatically create corresponding 'Off-Day' entries in your Attendance records for the approved dates if no attendance exists for those days."),
 
+// =================== REWRITTEN SECTION STARTS HERE ===================
+
           _buildSection("📞 Call Tracker Module"),
           _buildParagraph(
-              "The Call Tracker module helps manage client interactions. It's PIN-protected and syncs data with Firebase and NMRS. Navigation is via bottom tabs:"),
+              "The Call Tracker is a powerful, secure tool designed to help you manage all patient interactions effectively. It allows you to import patient lists, make and log calls, document outcomes, and sync crucial data back to the central server (Firebase) and the official NMRS database. For security, this entire module is protected by a 4-digit PIN."),
           _buildImage(
               context,
               "assets/screens/call_tracker_main_navigation.png",
-              "Call Tracker Tabs. "),
+              "The six main tabs of the Call Tracker module."),
 
-          _buildSubHeader("Import Tab (File Upload Icon)"),
+
+          _buildSubHeader("1. Reports Tab (First Tab)"),
+          _buildParagraph(
+              "This tab provides a complete analytical overview of all your call tracking activities, helping you understand your performance and impact."),
           _buildBulletPoints([
-            "**Add Contact Manually:** Enter client details (Name, Phone, Address, Visit Dates, Appointment Type, State, Facility, Unique ID, DATIM Code, VL info) one by one.",
-            "**Import from CSV:** Select a CSV file. Required columns: `patient_id`, `name`, `phone_number`. Optional: `last_visit_date`, `next_visit_date`, etc. Existing contacts are cleared before CSV import.",
-            "**Import from NigeriaMRS (NMRS):** Configure MySQL settings (Host, Port, User, Password, Database, Timeout). Import contacts based on a next appointment date range or all client appointments using a specific SQL script (downloadable/shareable from this tab).",
-            "**Weekly Data Wipe:** Local contacts are cleared on Mondays or if the last import was over 7 days ago to maintain data freshness.",
+            "**Key Metrics Summary Card:** At the very top, you'll find a summary card with essential metrics for the selected period: 'Total Calls Logged', 'Total Call Duration'.",
+            "**Filter by Date:** Tap the calendar icon (🗓️) in the app bar to select a start and end date, generating a report for that specific period, such as the last week or month.",
+            "**Summary Charts:** View easy-to-understand charts that visualize your work, including: 'Call Status Distribution' (how many were answered vs. missed), 'ART Status Distribution' (the health status of the clients you called), 'Average Call Duration Trend', and 'Monthly Update Trends' (how often contact details are corrected).",
+            "**Detailed Logs & Summaries:** Review a comprehensive table of every call you've made, grouped by date, and a summary table showing total calls per client. This is useful for detailed audits or performance reviews.",
+            "**Actions Menu (⋮ Icon):** This menu in the top-right corner provides several options:",
+            "  •  **Sync to Server:** Uploads all pending call logs to Firebase. This does NOT sync to NMRS, but it backs up your call activity for reporting purposes.",
+            "  •  **Filter by Date:** Another way to open the date range picker.",
+            "  •  **Refresh Data:** Reloads the report with the very latest data from your device.",
+            "  •  **Export as CSV/PDF:** Export your report as a CSV (for spreadsheets) or a PDF. **Important:** Before exporting, you must unmask the data using your PIN (see the 👁️ icon) if you want the patient's full details included in the file.",
+            "  •  **Manage PIN:** A shortcut to the PIN management screen where you can change your 4-digit security PIN."
+          ]),
+          _buildImage(context, "assets/screens/call_tracker_reports_tab.jpeg",
+              "The Reports tab with performance charts and detailed logs."),
+
+          _buildSubHeader("2. Import Tab (Second Tab)"),
+          _buildParagraph(
+              "This is your starting point. Before you can track calls, you must load your patient lists into the app. You have three ways to do this:"),
+          _buildBulletPoints([
+            "**Add Contact Manually:** Ideal for adding a single patient quickly. You can enter all their details one by one, including their Name, Phone Number, Visit Dates, Facility, Unique ART ID, and Viral Load information.",
+            "**Import from CSV File:** Perfect for loading a large list of patients from a spreadsheet. Prepare a CSV file with the required columns: `patient_id`, `name`, and `phone_number`. You can also include other optional details. **Important:** Importing from a CSV file will completely replace any existing patient list in the app.",
+            "**Import from NigeriaMRS (NMRS):** This is the most powerful method. After configuring the connection to the NMRS database (a one-time setup of Host, Port, User, etc.), you can pull patient data directly. You can either import patients with appointments in a specific date range or import the entire list of active clients. You can also download the SQL script used for this process to share with your IT/Admin staff.",
+            "**Weekly Data Wipe:** To ensure you are always working with the most current patient data, the app automatically clears your local contact list every Monday or if your last import was more than 7 days ago. This prompts you to perform a fresh import from NMRS or a new CSV file."
           ]),
           _buildImage(context, "assets/screens/call_tracker_import_tab.png",
-              "Call Tracker - Import Tab. "),
+              "The Import Tab, showing options for manual, CSV, and NMRS import."),
 
-          _buildSubHeader("Today's Calls Tab (Calendar Icon)"),
+          _buildSubHeader("3. Contacts Tab (Third Tab)"),
+          _buildParagraph(
+              "This is your master list. It contains every single patient you have imported into the app, regardless of their appointment date or status. It is the central 'phonebook' for the module."),
           _buildBulletPoints([
-            "**View Today's Appointments:** Lists clients scheduled for today.",
-            "**Search & Filter:** Search contacts; filter by 'Actual' or 'Calculated' appointment types.",
-            "**Direct Calling & Logging:** Tap the call icon (📞) to call. After outgoing/incoming calls (from monitored numbers), the app logs details (status, duration).",
-            "**Tracking Form:** For answered calls over a minimum duration, a form appears to capture interaction details (reason, outcome, verification, discontinuation). This form syncs to NMRS.",
-            "**Edit Contact Info:** Modify visit dates, phone, address. Changes can be synced to NMRS if applicable (DATIM code match required for phone/address).",
-            "**Data Masking & PIN:** Sensitive data (name, phone, ID) is masked. Unmask all contacts via PIN using the (👁️) icon in the app bar.",
-            "**Sync:** Buttons sync local call logs to Firebase and completed tracking forms to NMRS (requires provider status & DATIM match).",
+            "**Comprehensive View:** See all your patients in one place.",
+            "**Search & Filter:** Use the search bar for quick lookups. You can also filter the list using:",
+            "  •  **Date Range Filter (🗓️ Icon):** Tap the calendar icon in the app bar to filter by the patient's next appointment date.",
+            "  •  **ART Status Filter (⋮ Icon):** From the menu, you can filter the list to show only patients with a specific ART Status, such as `Active`, `Missed Appointment`, or `IIT`.",
+            "**Select NMRS User (CRITICAL STEP):** To attribute all your work correctly in the NMRS database, you must first select your official user profile.",
+            "  1.  Tap the **'Edit'** button next to the 'Selected User on NMRS' field.",
+            "  2.  Ensure your device is connected to the **same Wi-Fi network as the NMRS server**. The app will then connect to the database and fetch an up-to-date list of all registered users.",
+            "  3.  From the dropdown menu that appears, **select your name** from the list.",
+            "  4.  Click the **'Save'** button to confirm your selection. Your name will now be displayed as the selected user.",
+            "  5.  **This step is mandatory before you can successfully sync any tracking forms or contact updates to NMRS.**",
+            "**Edit and Sync Contact Details:** Just like other list tabs, you can tap the 'Edit' icon (✏️) on any patient card. When you save an updated phone number or address, a special **'Update on NMRS'** button will appear on that card, allowing you to sync that specific change.",
+            "**Actions Menu (⋮ Icon):** Besides filtering by ART Status, this menu contains:",
+            "  •  **Sync All to NMRS:** A comprehensive sync that pushes all pending contact updates (phone/address) and completed tracking forms to the NMRS database.",
+            "  •  **Sync Call Logs to Server:** Syncs basic call data to Firebase for reporting."
+          ]),
+          _buildImage(context, "assets/screens/call_tracker_contacts_tab.jpeg",
+              "The Contacts tab, your master patient list and where you select your NMRS user profile."),
+
+          _buildSubHeader("4. Upcoming Appointments Tab (Fourth Tab)"),
+          _buildParagraph(
+              "This tab allows you to plan ahead and engage with patients *before* their scheduled visit."),
+          _buildBulletPoints([
+            "**View Future Appointments:** See a list of all patients who have an appointment scheduled for a future date.",
+            "**Proactive Reminders:** This is the perfect place to make pre-appointment reminder calls to reduce the number of missed appointments.",
+            "**Filtering:** Use the **Date Range Filter (🗓️ Icon)** to narrow down upcoming appointments to a specific period (e.g., show me all appointments for next week). Use the **Appointment Type Filter (⋮ Icon)** to see `All Types`, `Actual`, or `Calculated` appointments.",
+            "**Full Functionality:** You have full access to search, call, log calls, and fill out the Tracking Form.",
+            "**Edit and Sync Contact Details:** You can edit patient information. If you update a phone number or address, a special **'Update on NMRS'** button appears on the card to sync that specific change.",
+            "**Actions Menu (⋮ Icon):** Includes `Sync to NMRS`, `Sync to Server`, and appointment type filters."
+          ]),
+          _buildImage(context, "assets/screens/call_tracker_upcoming_tab.jpeg",
+              "The Upcoming Appointments tab for proactive patient engagement."),
+
+          _buildSubHeader("5. Missed & IIT Tab (Fifth Tab)"),
+          _buildParagraph(
+              "This tab helps you focus on patients who need urgent follow-up. It is divided into two expandable sections:"),
+          _buildBulletPoints([
+            "**Missed Appointments:** Lists all patients who have missed their scheduled appointment.",
+            "**Interruption In Treatment (IIT):** Lists patients who have been identified as having an interruption in their treatment.",
+            "**Filtering:** Use the **Date Range Filter (🗓️ Icon)** to see patients whose missed/IIT status falls within a specific date range, and the **Appointment Type Filter (⋮ Icon)** for more refinement.",
+            "**Edit and Sync Contact Details:** Edit patient info as needed. When a phone number or address is updated, the **'Update on NMRS'** button appears for a targeted sync.",
+            "**Full Functionality:** You can search, call patients, log the interactions, and fill out the detailed Tracking Form after a successful call.",
+            "**Actions Menu (⋮ Icon):** Provides the same `Sync to NMRS`, `Sync to Server`, and filter options.",
+            "**Incoming Call Logging:** The app also monitors for incoming calls. If a patient from this list calls you, the call will be automatically logged."
           ]),
           _buildImage(
               context,
-              "assets/screens/call_tracker_today_calls_tab.png",
-              "Call Tracker - Today's Calls Tab. "),
+              "assets/screens/call_tracker_missed_iit_tab.jpeg",
+              "The Missed & IIT tab for high-priority follow-ups."),
+
+          _buildSubHeader("6. Today's Calls Tab (Sixth Tab)"),
+          _buildParagraph(
+              "This tab is your daily workspace, showing all patients with appointments scheduled for the current day. It's designed for action:"),
+          _buildBulletPoints([
+            "**View & Find Patients:** A clear list of today's patients is displayed. You can use the search bar to find a specific person instantly.",
+            "**Filtering:** Refine your view using the **Date Range Filter (🗓️ Icon)** or the **Appointment Type Filter (⋮ Icon)**.",
+            "**Direct Calling & Automatic Logging:** Tap the green phone icon (📞) to call a patient. The app automatically logs the call status and duration.",
+            "**The Tracking Form:** If a call is answered and lasts for more than a few seconds, the **Tracking Form** will automatically appear. You must fill this out to document the interaction for NMRS.",
+            "**Edit and Sync Contact Details:** You can update a patient's information directly from their card.",
+            "  •  **How to Edit:** Tap the 'Edit' icon (✏️). A dialog box will appear allowing you to change the `Next Visit Date`, `Phone Number`, and `Address`.",
+            "  •  **Syncing Phone/Address to NMRS:** When you save a new phone number or address, a special blue button will appear on that patient's card (e.g., 'Update Phone on NMRS'). This button is for a targeted sync. Tapping it will push **only that specific change** to the NMRS database. This requires a successful NMRS connection and a matching facility DATIM code. The button will disappear once the sync is successful.",
+            "**Data Privacy (Masking & PIN):** To protect patient confidentiality, sensitive information is hidden by default. Tap the eye icon (👁️) and enter your PIN to unmask.",
+            "**Actions Menu (⋮ Icon):**",
+            "  •  **Sync All to NMRS:** Pushes all pending contact updates and completed tracking forms to NMRS.",
+            "  •  **Sync Call Logs to Server:** Syncs basic call data to Firebase.",
+            "  •  **Filter by Appointment Type:** Refine your list by 'Actual' or 'Calculated' appointments."
+          ]),
+          _buildImage(
+              context,
+              "assets/screens/call_tracker_today_calls_tab.jpeg",
+              "The Today's Calls tab, your daily action list."),
           _buildImage(
               context,
               "assets/screens/call_tracker_tracking_form.png",
-              "Call Tracker - Tracking Form Dialog. "),
+              "The detailed Tracking Form for documenting patient interactions."),
 
-          _buildSubHeader("Missed & IIT Tab (Schedule Icon)"),
-          _buildBulletPoints([
-            "**View Missed Appointments:** Lists clients with 'Missed Appointment' ART status.",
-            "**View IIT Clients:** Lists clients with 'IIT' (Interruption In Treatment) ART status.",
-            "**Functionality:** Similar to 'Today's Calls' tab (search, filter, call, log, forms, edit, sync, data masking).",
-            "**Automatic Call Logging:** Monitors and logs incoming calls from contacts in these lists.",
-          ]),
-          _buildImage(
-              context,
-              "assets/screens/call_tracker_missed_iit_tab.png",
-              "Call Tracker - Missed & IIT Tab. "),
-
-          _buildSubHeader("Upcoming Appointments Tab (Upcoming Icon)"),
-          _buildBulletPoints([
-            "**View Future Appointments:** Lists contacts with appointments scheduled after today.",
-            "**Functionality:** Same as other list tabs (search, filter, call, log, forms, edit, sync, data masking).",
-            "**Automatic Call Logging:** Monitors and logs incoming calls from contacts in this list.",
-          ]),
-          _buildImage(context, "assets/screens/call_tracker_upcoming_tab.png",
-              "Call Tracker - Upcoming Appointments Tab. "),
-
-          _buildSubHeader("Contacts Tab (Contacts Icon)"),
-          _buildBulletPoints([
-            "**View All Imported Contacts:** A comprehensive list of all local contacts.",
-            "**Functionality:** Offers the same set of actions as other list tabs: search, filter (by appointment type), call, log calls, fill tracking forms, edit contact details, and sync information.",
-            "**NMRS User Selection:** Allows selecting the current NMRS user profile for syncing data to NMRS. This is crucial for attributing actions correctly in NMRS.",
-          ]),
-          _buildImage(context, "assets/screens/call_tracker_contacts_tab.png",
-              "Call Tracker - Contacts Tab. "),
-
-          _buildSubHeader("Reports Tab (Assessment Icon)"),
-          _buildBulletPoints([
-            "**Filter by Date Range:** View reports for specific periods.",
-            "**Summary Charts:** Visualizes call status distribution, ART status, average call duration trends, and monthly update trends (phone, address, next visit).",
-            "**Calls per Client Summary:** Table showing total calls and status counts per client.",
-            "**Detailed Logs:** Expandable table of all tracked call records, grouped by date.",
-            "**Export Data:** Export the report data as CSV or PDF (data masked unless globally unmasked via PIN).",
-            "**PIN Management:** Access PIN setup/change screen.",
-          ]),
-          _buildImage(context, "assets/screens/call_tracker_reports_tab.png",
-              "Call Tracker - Reports Tab. "),
+          // =================== REWRITTEN SECTION ENDS HERE ===================
 
           _buildSection("🛡️ Enhance Adherence Counselling (EAC) Module"),
           _buildParagraph(
@@ -604,7 +645,7 @@ class UserGuidePage extends StatelessWidget {
             "**From NigeriaMRS (NMRS):** Configure MySQL connection settings (Host, Port, User, Password, Database, Timeout). This will import Pharmacy and Laboratory item definitions from the NMRS `inv_item` table, replacing existing local Pharmacy/Lab items. Specific items like 'Tenofovir/Lamivudine/Efavirenz(30)(300/300/600mg)' are excluded, and some names like 'Darunavir/Ritonavir(30)(800mg/100mg)' are modified to 'Darunavir/Ritonavir(30)(400mg/100mg)' during import.",
             "**Add Predefined SI Items:** Click a button to add a standard list of SI tools (e.g., 'Daily HIV Testing Worksheet', 'ART Register') to your inventory. These items start with a stock count of 0.",
           ]),
-          _buildImage(context, "assets/screens/inventory_import_page.png",
+          _buildImage(context, "assets/screens/inventory_import_page.jpeg",
               "Inventory Import Page. "),
 
           _buildSubHeader(
@@ -620,11 +661,11 @@ class UserGuidePage extends StatelessWidget {
             "  •  **Stock Adjustment:** Correct stock levels. Enter the change in quantity (positive or negative) and a mandatory reason.",
             "**View History:** Access the transaction history for a specific item.",
           ]),
-          _buildImage(context, "assets/screens/inventory_list_page.png",
+          _buildImage(context, "assets/screens/inventory_list_page.jpeg",
               "Inventory List with Item Details and Actions. "),
           _buildImage(
               context,
-              "assets/screens/inventory_transaction_dialog.png",
+              "assets/screens/inventory_transaction_dialog.jpeg",
               "Inventory Transaction Dialog. "),
 
           _buildSubHeader("Inventory Reports (Coming Soon/Separate Section)"),
@@ -638,29 +679,42 @@ class UserGuidePage extends StatelessWidget {
             "  •  **Inventory Item Types:** Pie chart showing the distribution of items by category (Pharmacy, Lab, SI Tools).",
             "**Export Data:** (Likely feature) Ability to export reports to CSV or PDF.",
           ]),
-          _buildImage(context, "assets/screens/inventory_reports_page.png",
+          _buildImage(context, "assets/screens/inventory_reports_page.jpeg",
               "Inventory Reports Page with Charts. "),
 
           // Updated Timesheet Section
+          // =================== REWRITTEN SECTION STARTS HERE ===================
+
           _buildSection("🕓 Timesheet Module"),
           _buildParagraph(
-              "The Timesheet module allows you to generate, review, and manage your monthly timesheets based on your attendance records and daily tasks. It also includes a signature workflow for approvals."),
+              "The Timesheet module allows you to generate, review, and manage your monthly timesheets based on your attendance records and daily tasks. It automatically calculates work hours, handles leave and holidays, and includes a signature workflow for approvals. A key feature is its ability to handle special fiscal period splits for September and October."),
           _buildSubHeader("Generating and Viewing Your Timesheet"),
           _buildBulletPoints([
             "**Select Month & Year:** Choose the specific month and year for which you want to generate or view the timesheet.",
+            "**Special Fiscal Periods (September & October):**",
+            "  •  **September:** When you select September, the app will show two options: **'Part 1 (Aug 20 - Sep 19)'** and **'Part 2 (Sep 20 - Sep 30)'**. You must select which part of the split fiscal month you are reporting for.",
+            "  •  **October:** When you select October, the timesheet automatically covers the period from **October 1st to October 19th**.",
+            "  •  **Other Months:** All other months follow the standard period from the 20th of the previous month to the 19th of the selected month.",
             "**Project Selection:** Select the relevant project for the timesheet period from a dropdown list.",
             "**Supervisor Selection:** Choose your Facility Supervisor and Caritas Supervisor from dropdown lists. Their email addresses will be automatically fetched.",
             "**Timesheet Display:** The timesheet is presented in a table format, showing days of the month. For each day:",
             "  •  Hours worked on the selected project are displayed.",
-            "  •  Hours for 'Out-of-office' categories (Annual Leave, Holiday, Paternity, Maternity) are also shown.",
-            "  •  Weekend days are typically marked and show '0' hours.",
-            "**Totals:** The table includes total hours worked on the project, total hours for each out-of-office category, and a grand total of hours for the month. Percentage of time worked against expected hours is also calculated.",
+            "  •  Hours for 'Out-of-office' categories (Annual Leave, Holiday, Maternity) are also shown.",
+            "  •  Weekend days are clearly marked and show '0' hours.",
+            "**Work Hour Rules:** The timesheet automatically applies the standard work hour rules:",
+            "  •  **Monday - Thursday:** Expected work time is **8.5 hours**.",
+            "  •  **Friday:** Expected work time is **6 hours**.",
+            "**Totals:** The table includes total hours worked on the project, total hours for each out-of-office category, and a grand total of hours for the month. The percentage of time worked is calculated against the total expected hours for that specific period, respecting the daily hour rules.",
             "**Staff Information:** Your name, department, designation, location, and state are displayed at the top.",
           ]),
           _buildImage(
               context,
               "assets/screens/timesheet_generation_view.png",
-              "Timesheet Generation/View. "),
+              "Timesheet Generation/View, showing project and supervisor selection."),
+          _buildImage(
+              context,
+              "assets/screens/timesheet_september_split.jpeg", // Assumed screenshot name
+              "When September is selected, you must choose Part 1 or Part 2."),
 
           _buildSubHeader("Signature Workflow & Submission"),
           _buildBulletPoints([
@@ -677,7 +731,7 @@ class UserGuidePage extends StatelessWidget {
           _buildImage(
               context,
               "assets/screens/timesheet_signature_section.png",
-              "Timesheet Signature Section. "),
+              "Timesheet Signature Section."),
 
           _buildSubHeader("Download & Share"),
           _buildBulletPoints([
@@ -685,13 +739,16 @@ class UserGuidePage extends StatelessWidget {
             "**Share PDF (📤):** Generates the PDF and allows you to share it via other apps (e.g., email, messaging).",
           ]),
 
+          // =================== REWRITTEN SECTION ENDS HERE ===================
+
+
           _buildSection("🏅 Team Player & Staff Feedback (Weekly Survey)"),
           _buildParagraph(
               "The app includes a feature to gather weekly feedback from staff, including a nomination for the 'Best Team Player' within your facility. This is typically done through a short survey, and the results contribute to recognizing outstanding team members and understanding overall team sentiment."),
           _buildImage(
               context,
-              "assets/screens/staff_feedback_survey_overview.png",
-              "Staff Feedback Survey Page. "),
+              "assets/screens/staff_feedback_survey_overview.jpeg",
+              "Staff Feedback Survey Page."),
 
           _buildSubHeader("Accessing and Completing the Feedback Survey:"),
           _buildBulletPoints([
@@ -713,7 +770,7 @@ class UserGuidePage extends StatelessWidget {
           ]),
           _buildImage(
               context,
-              "assets/screens/team_player_nomination_reorder.png",
+              "assets/screens/team_player_nomination_reorder.jpeg",
               "Nominating Team Player by reordering list. "),
 
           _buildSubHeader("Data Handling and Synchronization:"),
