@@ -150,6 +150,7 @@ dependencies:
   call_log:
   phone_state:
   mysql1:
+  multi_select_flutter:
 
 
 
