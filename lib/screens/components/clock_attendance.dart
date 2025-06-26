@@ -824,28 +824,28 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
 
         // Check if today is the last Thursday between the 20th and 30th
         DateTime now = DateTime.now();
-        if (isLastThursdayOfMonth(DateTime.now())) {
-          final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
-          if (!hasSurvey) {
-            Fluttertoast.showToast(
-              msg: "Kindly Fill the Survey Before Clocking In",
-              toastLength: Toast.LENGTH_LONG,
-              backgroundColor: Colors.black54,
-              gravity: ToastGravity.BOTTOM,
-              timeInSecForIosWeb: 1,
-              textColor: Colors.white,
-              fontSize: 16.0,
-            );
-            // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PsychologicalMetricsPage(),
-              ),
-            );
-            return;
-          }
-        }
+        // if (isLastThursdayOfMonth(DateTime.now())) {
+        //   final hasSurvey = await controller.firestoreService.hasSurveyResponseForToday(controller.firestoreService.getUserId()!);
+        //   if (!hasSurvey) {
+        //     Fluttertoast.showToast(
+        //       msg: "Kindly Fill the Survey Before Clocking In",
+        //       toastLength: Toast.LENGTH_LONG,
+        //       backgroundColor: Colors.black54,
+        //       gravity: ToastGravity.BOTTOM,
+        //       timeInSecForIosWeb: 1,
+        //       textColor: Colors.white,
+        //       fontSize: 16.0,
+        //     );
+        //     // Navigate to PsychologicalMetricsPage if it's last thursday and no survey
+        //     Navigator.pushReplacement(
+        //       context,
+        //       MaterialPageRoute(
+        //         builder: (context) => const PsychologicalMetricsPage(),
+        //       ),
+        //     );
+        //     return;
+        //   }
+        // }
         await controller.clockInUpdated(
             context, controller.lati.value, controller.longi.value, controller.location.value); // Pass context here
       },
