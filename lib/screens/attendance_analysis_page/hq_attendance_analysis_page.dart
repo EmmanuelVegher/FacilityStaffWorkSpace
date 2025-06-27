@@ -1,6 +1,7 @@
-// A DEDICATED, FEATURE-RICH PAGE FOR ATTENDANCE ANALYSIS (FINAL OPTIMIZED VERSION)
-// FINAL REFACTOR: IMPLEMENTED EFFICIENT collectionGroup QUERY FOR SCALABILITY
-// REWRITTEN BY GEMINI WITH INTERACTIVE CHARTS AND ROBUST ERROR HANDLING
+// A DEDICATED, FEATURE-RICH PAGE FOR HQ ATTENDANCE ANALYSIS
+// REWRITTEN FOR HEADQUARTERS TO MONITOR ALL STATES CENTRALLY
+// FEATURES: CASCADING FILTERS (STATE -> FACILITY/DESIGNATION -> STAFF) AND SCALABLE QUERIES
+// ** VERSION 2: CORRECTED TYPE ASSIGNMENT AND GENERIC TYPE INFERENCE ERRORS **
 
 import 'dart:convert';
 import 'dart:math';
@@ -9,7 +10,6 @@ import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
@@ -24,7 +24,7 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'dart:html' as html;
 
 
-import '../../widgets/drawer2.dart'; // Assuming a state-level drawer
+import '../../widgets/drawer2.dart'; // Assuming a generic app drawer
 
 // (AnimatedNumberText widget remains the same)
 class AnimatedNumberText extends StatelessWidget {
@@ -63,7 +63,7 @@ class AnimatedNumberText extends StatelessWidget {
   }
 }
 
-// --- DATA MODELS ---
+// --- DATA MODELS (Unchanged) ---
 class StaffInfo {
   final String id;
   final String name;
@@ -79,7 +79,6 @@ class FacilityDetails {
 
   FacilityDetails({required this.name, required this.coordinates, required this.radius});
 }
-
 
 class AttendanceRecord {
   final String staffId;
@@ -131,17 +130,16 @@ class _ChartData {
   _ChartData(this.category, this.value, [this.color]);
 }
 
-// --- MAIN WIDGET ---
-class AttendanceAnalysisPage extends StatefulWidget {
-  const AttendanceAnalysisPage({super.key});
+// --- MAIN WIDGET: HQAttendanceAnalysisPage ---
+class HQAttendanceAnalysisPage extends StatefulWidget {
+  const HQAttendanceAnalysisPage({super.key});
   @override
-  _AttendanceAnalysisPageState createState() => _AttendanceAnalysisPageState();
+  _HQAttendanceAnalysisPageState createState() => _HQAttendanceAnalysisPageState();
 }
 
-class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
+class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   // --- Services & State ---
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   final ScrollController _facilityTableController = ScrollController();
   final ScrollController _designationTableController = ScrollController();
@@ -150,23 +148,27 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   bool _isLoading = false;
   bool _isExporting = false;
   String? _errorMessage;
-  String? _userState;
 
   // --- Filter State ---
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
 
+  // Filter Options Constants
+  static const String _allStatesOption = "(All States)";
   static const String _allFacilitiesOption = "(All Facilities)";
   static const String _allDesignationsOption = "(All Designations)";
   static const String _allStaffOption = "(All Staff)";
 
+  // Available options for dropdowns
+  List<String> _availableStates = [];
   List<String> _availableFacilities = [];
-  List<String> _selectedFacilities = [];
-
   List<String> _availableDesignations = [];
-  List<String> _selectedDesignations = [];
-
   List<StaffInfo> _availableStaff = [];
+
+  // Selected filter values
+  List<String> _selectedStates = [];
+  List<String> _selectedFacilities = [];
+  List<String> _selectedDesignations = [];
   List<String> _selectedStaffIds = [];
 
   // --- Data & Chart Keys ---
@@ -179,8 +181,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   final GlobalKey _barChartKey = GlobalKey();
   final GlobalKey _facilityPieChartKey = GlobalKey();
   final GlobalKey _designationPieChartKey = GlobalKey();
-
-  // *** NEW: TooltipBehavior for interactive charts ***
   late TooltipBehavior _tooltipBehavior;
 
   // --- Map and Outlier State ---
@@ -198,13 +198,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   void initState() {
     super.initState();
     _tooltipBehavior = TooltipBehavior(enable: true);
-    _initializeFilters();
+    _initializeStateFilter(); // Start by loading the top-level state filter
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _isPageReady = true;
-        });
-      }
+      if (mounted) setState(() => _isPageReady = true);
     });
   }
 
@@ -216,144 +212,213 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     super.dispose();
   }
 
+  // --- HQ FILTERING LOGIC ---
 
-  Future<void> _initializeFilters() async {
+  // Fetches data using chunked 'whereIn' queries to overcome Firestore's 30-item limit.
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchWithChunkedIn(
+      Query<Map<String, dynamic>> baseQuery,
+      String field,
+      List<String> values
+      ) async {
+    if (values.isEmpty) return [];
+
+    final List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs = [];
+    // Firestore limits 'whereIn' to 30 values. We chunk the list to handle this.
+    for (var i = 0; i < values.length; i += 30) {
+      final chunk = values.sublist(i, min(i + 30, values.length));
+      final snapshot = await baseQuery.where(field, whereIn: chunk).get();
+      allDocs.addAll(snapshot.docs);
+    }
+    return allDocs;
+  }
+
+  // Step 1: Load the list of all available states.
+  Future<void> _initializeStateFilter() async {
     try {
-      final user = _firebaseAuth.currentUser;
-      if (user == null) throw Exception("User not logged in.");
-      final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
-      if(mounted) {
-        setState(() {
-          _userState = staffDoc.data()?['state'] as String?;
-        });
-        if(_userState != null) {
-          final facilitiesSnapshot = await _firestore
-              .collection('Facilities')
-              .where('state', isEqualTo: _userState)
-              .where('category', isEqualTo: 'Facility')
-              .get();
-
-          final List<String> facilities = [];
-          final Map<String, FacilityDetails> facilityDetailsMap = {};
-
-          for (var doc in facilitiesSnapshot.docs) {
-            final data = doc.data();
-            final name = data['LocationName'] as String?;
-            final latString = data['Latitude'] as String?;
-            final lonString = data['Longitude'] as String?;
-            final radiusString = data['Radius'] as String?;
-
-            if (name != null && latString != null && lonString != null && radiusString != null) {
-              final lat = double.tryParse(latString);
-              final lon = double.tryParse(lonString);
-              final radius = double.tryParse(radiusString);
-
-              if (lat != null && lon != null && radius != null) {
-                facilities.add(name);
-                facilityDetailsMap[name] = FacilityDetails(
-                  name: name,
-                  coordinates: GeoPoint(lat, lon),
-                  radius: radius,
-                );
-              }
-            }
-          }
-          facilities.sort();
-
-          final designations = await _getUniqueFieldValues('designation');
-          if(mounted) {
-            setState(() {
-              _availableFacilities = facilities;
-              _facilityDetails = facilityDetailsMap;
-              _availableDesignations = designations;
-            });
-          }
+      // Fetch all documents from 'Facilities' to extract the unique state names.
+      final facilitiesSnapshot = await _firestore.collection('Facilities').get();
+      final Set<String> states = {};
+      for (final doc in facilitiesSnapshot.docs) {
+        final state = doc.data()['state'] as String?;
+        if (state != null && state.isNotEmpty) {
+          states.add(state);
         }
       }
+      if (mounted) {
+        setState(() {
+          _availableStates = states.toList()..sort();
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _errorMessage = "Error initializing state filter: $e");
+    }
+  }
+
+  // Step 2: When states are selected, update the dependent filters.
+  Future<void> _onStateSelectionChange(List<String> results) async {
+    setState(() {
+      _isLoading = true;
+      // Handle the "(All States)" selection
+      if (results.contains(_allStatesOption)) {
+        _selectedStates = List<String>.from(_availableStates);
+      } else {
+        _selectedStates = results;
+      }
+
+      // Reset all child filters
+      _selectedFacilities = [];
+      _availableFacilities = [];
+      _selectedDesignations = [];
+      _availableDesignations = [];
+      _selectedStaffIds = [];
+      _availableStaff = [];
+    });
+
+    // Now, fetch the new options for facilities and designations based on selected states.
+    await _updateFacilityAndDesignationFilters();
+
+    setState(() => _isLoading = false);
+  }
+
+  // Step 3: Fetch available facilities and designations for the selected states.
+  Future<void> _updateFacilityAndDesignationFilters() async {
+    if (_selectedStates.isEmpty) return;
+
+    try {
+      // Fetch facilities
+      final facilityDocs = await _fetchWithChunkedIn(
+        _firestore.collection('Facilities').where('category', isEqualTo: 'Facility'),
+        'state',
+        _selectedStates,
+      );
+
+      final List<String> facilities = [];
+      final Map<String, FacilityDetails> facilityDetailsMap = {};
+
+      for (var doc in facilityDocs) {
+        final data = doc.data();
+        final name = data['LocationName'] as String?;
+        final lat = double.tryParse(data['Latitude']?.toString() ?? '');
+        final lon = double.tryParse(data['Longitude']?.toString() ?? '');
+        final radius = double.tryParse(data['Radius']?.toString() ?? '');
+
+        if (name != null && lat != null && lon != null && radius != null) {
+          facilities.add(name);
+          facilityDetailsMap[name] = FacilityDetails(
+            name: name,
+            coordinates: GeoPoint(lat, lon),
+            radius: radius,
+          );
+        }
+      }
+      facilities.sort();
+
+      // Fetch designations
+      final staffDocs = await _fetchWithChunkedIn(
+        _firestore.collection('Staff').where('staffCategory', isEqualTo: "Facility Staff"),
+        'state',
+        _selectedStates,
+      );
+
+      final Set<String> designations = {};
+      for (final doc in staffDocs) {
+        final value = doc.data()['designation'] as String?;
+        if (value != null && value.isNotEmpty) designations.add(value);
+      }
+      final sortedDesignations = designations.toList()..sort();
+
+      if(mounted) {
+        setState(() {
+          _availableFacilities = facilities;
+          _facilityDetails = facilityDetailsMap;
+          _availableDesignations = sortedDesignations;
+        });
+      }
     } catch(e) {
-      if(mounted) setState(() => _errorMessage = "Error initializing filters: $e");
+      if(mounted) setState(() => _errorMessage = "Error updating filters: $e");
     }
   }
 
-  Future<List<String>> _getUniqueFieldValues(String field) async {
-    if(_userState == null) return [];
-    final snapshot = await _firestore.collection('Staff').where('state', isEqualTo: _userState).where('staffCategory', isEqualTo: "Facility Staff").get();
-    final Set<String> values = {};
-    for (final doc in snapshot.docs) {
-      final value = doc.data()[field] as String?;
-      if (value != null && value.isNotEmpty) values.add(value);
-    }
-    final sortedList = values.toList()..sort();
-    return sortedList;
-  }
-
+  // Step 4: When facilities or designations change, update the staff filter.
   Future<void> _updateStaffFilter() async {
-    if(_userState == null) return;
-    var query = _firestore.collection('Staff').where('state', isEqualTo: _userState);
+    if (_selectedStates.isEmpty) return;
 
-    if(_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30){
-      query = query.where('designation', whereIn: _selectedDesignations);
-    }
+    setState(() => _isLoading = true);
 
-    final snapshot = await query.get();
-    var staffList = snapshot.docs.map((doc) => StaffInfo(
-        id: doc.id,
-        name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
-        location: doc.data()['location'] ?? '',
-        designation: doc.data()['designation'] ?? ''
-    )).toList();
+    try {
+      // **FIXED**: Explicitly type baseQuery as Query<> to allow reassignment.
+      Query<Map<String, dynamic>> baseQuery = _firestore.collection('Staff');
 
-    if (_selectedFacilities.isNotEmpty) {
-      staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
-    }
+      // Apply designation filter at the query level if possible (efficient)
+      if (_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30) {
+        baseQuery = baseQuery.where('designation', whereIn: _selectedDesignations);
+      }
 
-    staffList.sort((a, b) => a.name.compareTo(b.name));
+      final staffDocs = await _fetchWithChunkedIn(baseQuery, 'state', _selectedStates);
 
-    if(mounted){
-      setState(() {
-        _availableStaff = staffList;
-        final availableStaffIds = _availableStaff.map((s) => s.id).toSet();
-        _selectedStaffIds.retainWhere((id) => availableStaffIds.contains(id));
-      });
+      var staffList = staffDocs.map((doc) => StaffInfo(
+          id: doc.id,
+          name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
+          location: doc.data()['location'] ?? '',
+          designation: doc.data()['designation'] ?? ''
+      )).toList();
+
+      // Apply facility filter client-side
+      if (_selectedFacilities.isNotEmpty) {
+        staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
+      }
+
+      staffList.sort((a, b) => a.name.compareTo(b.name));
+
+      if(mounted){
+        setState(() {
+          _availableStaff = staffList;
+          // Ensure selected staff are still valid after filtering
+          final availableStaffIds = _availableStaff.map((s) => s.id).toSet();
+          _selectedStaffIds.retainWhere((id) => availableStaffIds.contains(id));
+        });
+      }
+    } catch (e) {
+      if(mounted) setState(() => _errorMessage = "Error updating staff filter: $e");
+    } finally {
+      if(mounted) setState(() => _isLoading = false);
     }
   }
+
+
+  // --- DATA LOADING & PROCESSING ---
 
   Future<void> _loadDashboardData() async {
-    if (_userState == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User state not found.")));
+    if (_selectedStates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state to load data.")));
       return;
     }
     setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      var staffQuery = _firestore.collection('Staff').where('state', isEqualTo: _userState);
+      // Build the primary query for staff based on all filters
+      List<StaffInfo> staffToQuery;
 
       if (_selectedStaffIds.isNotEmpty) {
-        if (_selectedStaffIds.length <= 30) {
-          staffQuery = staffQuery.where(FieldPath.documentId, whereIn: _selectedStaffIds);
-        }
-      } else if (_selectedDesignations.isNotEmpty) {
-        if (_selectedDesignations.length <= 30) {
-          staffQuery = staffQuery.where('designation', whereIn: _selectedDesignations);
-        }
+        // If specific staff are selected, they are our target list
+        staffToQuery = _availableStaff.where((s) => _selectedStaffIds.contains(s.id)).toList();
+      } else {
+        // Otherwise, use all available staff based on the current State/Facility/Designation filters
+        await _updateStaffFilter(); // Refresh the available staff list just in case
+        staffToQuery = List<StaffInfo>.from(_availableStaff);
       }
 
-      final staffSnapshot = await staffQuery.get();
-      var staffList = staffSnapshot.docs.map((doc) => StaffInfo(id: doc.id, name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(), location: doc.data()['location'] ?? 'N/A', designation: doc.data()['designation'] ?? 'N/A')).toList();
-
-      if (_selectedFacilities.isNotEmpty) {
-        staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
-      }
-
-      if (staffList.isEmpty) {
-        _processAndAggregateData([], [], []);
+      if (staffToQuery.isEmpty) {
+        _processAndAggregateData([], []);
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      final filteredStaffIds = staffList.map((s) => s.id).toSet();
-      final staffInfoMap = {for (var s in staffList) s.id: s};
+      final filteredStaffIds = staffToQuery.map((s) => s.id).toSet();
+      final staffInfoMap = {for (var s in staffToQuery) s.id: s};
 
+      // The collectionGroup query is efficient as it scans all records across the app.
+      // We will filter them client-side based on the staff we identified.
       final recordsSnapshot = await _firestore.collectionGroup('Record')
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
           .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
@@ -370,17 +435,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
 
           GeoPoint? clockInPoint;
-          final clockInLat = (data['clockInLatitude'] as num?)?.toDouble();
-          final clockInLon = (data['clockInLongitude'] as num?)?.toDouble();
-          if (clockInLat != null && clockInLon != null) {
-            clockInPoint = GeoPoint(clockInLat, clockInLon);
+          if (data['clockInLatitude'] != null && data['clockInLongitude'] != null) {
+            clockInPoint = GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble());
           }
 
           GeoPoint? clockOutPoint;
-          final clockOutLat = (data['clockOutLatitude'] as num?)?.toDouble();
-          final clockOutLon = (data['clockOutLongitude'] as num?)?.toDouble();
-          if (clockOutLat != null && clockOutLon != null) {
-            clockOutPoint = GeoPoint(clockOutLat, clockOutLon);
+          if (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) {
+            clockOutPoint = GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble());
           }
 
           allRecords.add(
@@ -398,26 +459,36 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       }
 
       final dateRange = List.generate(_endDate.difference(_startDate).inDays + 1, (i) => _startDate.add(Duration(days: i)));
-      _processAndAggregateData(allRecords, staffList, dateRange);
+      _processAndAggregateData(allRecords, dateRange);
 
     } catch (e, stack) {
       debugPrint("Error loading dashboard data: $e\n$stack");
       if (mounted) {
-        setState(() => _errorMessage = "An error occurred. Make sure the required Firestore index has been created. Error: $e");
+        setState(() => _errorMessage = "An error occurred while loading data. Please check Firestore indexes. Error: $e");
       }
     } finally {
       if(mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _processAndAggregateData(List<AttendanceRecord> records, List<StaffInfo> staff, List<DateTime> dateRange){
+  void _processAndAggregateData(List<AttendanceRecord> records, List<DateTime> dateRange) {
+    // This method now dynamically determines staff info from the records themselves,
+    // as the full staff list might be very large.
     final facilityData = <String, AggregatedSummary>{};
     final designationData = <String, AggregatedSummary>{};
     final facilityStaffData = <String, Map<String, AggregatedSummary>>{};
-    final staffMap = {for(var s in staff) s.id: s};
+
+    // Create a map of staff details from the records for processing
+    final staffDetailsFromRecords = <String, StaffInfo>{};
+    for(final record in records) {
+      if (!staffDetailsFromRecords.containsKey(record.staffId)) {
+        final staffInfo = _availableStaff.firstWhere((s) => s.id == record.staffId, orElse: () => StaffInfo(id: record.staffId, name: record.staffName, location: record.assignedFacility, designation: 'Unknown'));
+        staffDetailsFromRecords[record.staffId] = staffInfo;
+      }
+    }
 
     for(final record in records) {
-      final staffInfo = staffMap[record.staffId];
+      final staffInfo = staffDetailsFromRecords[record.staffId];
       if(staffInfo == null) continue;
 
       final day = DateTime(record.date.year, record.date.month, record.date.day);
@@ -448,13 +519,14 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
   }
 
+
   // --- WIDGET BUILD METHODS ---
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance Analysis Dashboard", style: TextStyle(color: Colors.white)),
+        title: const Text("HQ Attendance Analysis Dashboard", style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -525,9 +597,45 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
+
+            // --- NEW: State Filter ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField(
+              // **FIXED**: Added explicit type <String> and wrapped async call in a void lambda.
+              child: MultiSelectDialogField<String>(
+                items: [
+                  MultiSelectItem<String>(_allStatesOption, _allStatesOption),
+                  ..._availableStates.map((s) => MultiSelectItem<String>(s, s)),
+                ],
+                initialValue: _selectedStates,
+                title: const Text("Select States"),
+                selectedColor: Colors.deepPurple,
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.1),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  border: Border.all(color: Colors.deepPurple, width: 1),
+                ),
+                buttonIcon: const Icon(Icons.map_outlined, color: Colors.deepPurple),
+                buttonText: Text(
+                  _selectedStates.length == _availableStates.length && _availableStates.isNotEmpty
+                      ? "All States Selected"
+                      : _selectedStates.isEmpty
+                      ? "State"
+                      : "${_selectedStates.length} State${_selectedStates.length == 1 ? '' : 's'} selected",
+                  style: TextStyle(color: Colors.deepPurple[800], fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onConfirm: (results) {
+                  _onStateSelectionChange(results);
+                },
+                chipDisplay: MultiSelectChipDisplay.none(),
+              ),
+            ),
+
+            // --- Facility Filter (Now dependent on State) ---
+            Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: MultiSelectDialogField<String>(
                 items: [
                   MultiSelectItem<String>(_allFacilitiesOption, _allFacilitiesOption),
                   ..._availableFacilities.map((f) => MultiSelectItem<String>(f, f)),
@@ -551,24 +659,21 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 onConfirm: (results) {
-                  // This callback fires when the user presses "OK", which closes the dropdown.
-                  // The logic here ensures that if "(All Facilities)" was selected, it behaves as intended.
                   setState(() {
-                    final castedResults = results.cast<String>();
-                    if (castedResults.contains(_allFacilitiesOption)) {
-                      // User selected "All", so we populate the list with all available facilities.
+                    if (results.contains(_allFacilitiesOption)) {
                       _selectedFacilities = List<String>.from(_availableFacilities);
                     } else {
-                      // User made specific selections.
-                      _selectedFacilities = castedResults;
+                      _selectedFacilities = results;
                     }
-                    // After updating facilities, the list of available staff might change.
-                    _updateStaffFilter();
+                    _selectedStaffIds = []; // Reset staff selection
                   });
+                  _updateStaffFilter(); // Update staff list based on new facility selection
                 },
                 chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
+
+            // --- Designation Filter (Now dependent on State) ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
@@ -593,21 +698,21 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     overflow: TextOverflow.ellipsis
                 ),
                 onConfirm: (values) {
-                  // This callback fires when the user presses "OK", closing the dropdown.
-                  // It handles the "All" selection case correctly.
                   setState(() {
-                    final castedValues = values.cast<String>();
-                    if (castedValues.contains(_allDesignationsOption)) {
+                    if (values.contains(_allDesignationsOption)) {
                       _selectedDesignations = List<String>.from(_availableDesignations);
                     } else {
-                      _selectedDesignations = castedValues;
+                      _selectedDesignations = values;
                     }
-                    _updateStaffFilter();
+                    _selectedStaffIds = []; // Reset staff selection
                   });
+                  _updateStaffFilter(); // Update staff list based on new designation selection
                 },
                 chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
+
+            // --- Staff Filter (Dependent on all above) ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
@@ -632,20 +737,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 onConfirm: (values) {
-                  // This callback fires when the user presses "OK", closing the dropdown.
-                  // It handles the "All" selection case correctly.
                   setState(() {
-                    final castedValues = values.cast<String>();
-                    if (castedValues.contains(_allStaffOption)) {
+                    if (values.contains(_allStaffOption)) {
                       _selectedStaffIds = _availableStaff.map((s) => s.id).toList();
                     } else {
-                      _selectedStaffIds = castedValues;
+                      _selectedStaffIds = values;
                     }
                   });
                 },
                 chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
+
             ElevatedButton.icon(
               icon: const Icon(Icons.bar_chart_rounded),
               label: const Text('Load Dashboard'),
@@ -657,6 +760,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       ),
     );
   }
+
+  // --- All other methods from _showDateRangePicker onwards remain the same ---
+  // They are generic and will work correctly with the data loaded by the new
+  // HQ-level filtering logic.
 
   void _showDateRangePicker() {
     showDialog(
@@ -1006,8 +1113,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     );
   }
 
-  // --- HELPER METHODS (UNCHANGED FROM HERE) ---
-
+  // --- HELPER METHODS (UNCHANGED) ---
   void _generateMapMarkers(List<AttendanceRecord> records) {
     final Set<Marker> markers = {};
     if (records.isEmpty) {
@@ -1136,7 +1242,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       rows.add([key, value.totalHours.toStringAsFixed(2)]);
     });
     String csvData = const ListToCsvConverter().convert(rows);
-    _triggerDownload(utf8.encode(csvData), 'attendance_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+    _triggerDownload(utf8.encode(csvData), 'hq_attendance_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
     setState(() => _isExporting = false);
   }
 
@@ -1149,12 +1255,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       final pdf = pw.Document();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        header: (context) => pw.Header(text: "Attendance Charts Report"),
+        header: (context) => pw.Header(text: "HQ Attendance Charts Report"),
         build: (context) => [
           pw.Text("Filters Applied", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
           pw.Text("Date Range: ${DateFormat('dd/MM/yyyy').format(_startDate)} to ${DateFormat('dd/MM/yyyy').format(_endDate)}"),
-          pw.Text("Facility: ${_selectedFacilities.length == _availableFacilities.length ? 'All' : _selectedFacilities.join(', ')}"),
-          pw.Text("Designation: ${_selectedDesignations.length == _availableDesignations.length ? 'All' : _selectedDesignations.join(', ')}"),
+          pw.Text("States: ${_selectedStates.length == _availableStates.length ? 'All' : _selectedStates.join(', ')}"),
+          pw.Text("Facilities: ${_selectedFacilities.length == _availableFacilities.length ? 'All' : _selectedFacilities.join(', ')}"),
+          pw.Text("Designations: ${_selectedDesignations.length == _availableDesignations.length ? 'All' : _selectedDesignations.join(', ')}"),
           pw.Divider(height: 20),
           if (barChartBytes != null) ...[
             pw.Text("Top 15 Facilities by Hours", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -1173,7 +1280,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         ],
       ));
       final pdfBytes = await pdf.save();
-      _triggerDownload(pdfBytes, 'attendance_charts_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf', 'application/pdf');
+      _triggerDownload(pdfBytes, 'hq_attendance_charts_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf', 'application/pdf');
     } catch(e) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
     } finally {

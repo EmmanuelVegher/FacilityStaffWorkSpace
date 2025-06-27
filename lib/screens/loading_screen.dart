@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'dashboard/hq_dashboard_screen.dart';
 import 'dashboard/state_ofice_dashboard.dart';
 
 class LoadingScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
             context,
             MaterialPageRoute(
               builder: (context) =>
-              role == 'User' ? const UserDashboardPage() : const DashboardScreen(),
+              role == 'User' ? const UserDashboardPage() : role == 'State Office Staff' ? const DashboardScreen() :const HQDashboardScreen(),
             ),
           );
         }

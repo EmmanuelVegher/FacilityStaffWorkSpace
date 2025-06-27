@@ -1,15 +1,132 @@
-import 'dart:math';
+// STATE-LEVEL MONITORING DASHBOARD
+// REWRITTEN FOR PERFORMANCE USING STREAMS AND ADVANCED FILTERING
+// ** VERSION 10 (FINAL & COMPLETE): FACILITY STAFF FILTER, "YET TO CLOCK-IN" LIST, & UI ENHANCEMENTS **
 
-import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
-import 'package:syncfusion_flutter_gauges/gauges.dart';
-import 'package:intl/intl.dart';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:syncfusion_flutter_gauges/gauges.dart' as gauges;
 
 import '../../widgets/drawer2.dart';
-import '../timesheet/timesheet_status_list_page.dart';
+// Note: Ensure this path is correct for your project structure
+import '../attendance_analysis_page/attendance_analysis_page.dart';
+import '../attendance_analysis_page/hq_attendance_analysis_page.dart';
+import '../timesheet/timesheet_management_dashboard.dart';
+
+// --- ENUMS & MODELS ---
+
+enum AttendanceFilter { all, onTime, late }
+
+class StaffInfo {
+  final String id;
+  final String name;
+  final String gender;
+  final String? imageUrl;
+  final String location;
+  StaffInfo({
+    required this.id,
+    required this.name,
+    required this.gender,
+    required this.location,
+    this.imageUrl,
+  });
+}
+
+class AttendanceRecord {
+  final String staffId;
+  final String staffName;
+  final String staffLocation;
+  final DateTime timestamp;
+  final String clockInTime;
+  final bool isLate;
+  AttendanceRecord({
+    required this.staffId,
+    required this.staffName,
+    required this.staffLocation,
+    required this.timestamp,
+    required this.clockInTime,
+    this.isLate = false,
+  });
+}
+
+
+class DashboardData {
+  final List<StaffInfo> staffList;
+  final List<AttendanceRecord> attendanceRecords;
+  final List<StaffInfo> yetToClockIn;
+  final List<LeaveRequest> pendingLeaves;
+
+  DashboardData({
+    required this.staffList,
+    required this.attendanceRecords,
+    required this.yetToClockIn,
+    required this.pendingLeaves, // Added to constructor
+  });
+}
+
+class TimesheetMetrics {
+  final int totalExpected;
+  final int totalSubmitted;
+  final int pendingApproval;
+  final int fullyApproved;
+  TimesheetMetrics({
+    this.totalExpected = 0,
+    this.totalSubmitted = 0,
+    this.pendingApproval = 0,
+    this.fullyApproved = 0,
+  });
+}
+
+// FIX: New model for Leave Requests
+class LeaveRequest {
+  final String staffName;
+  final String leaveType;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String status;
+
+  LeaveRequest({
+    required this.staffName,
+    required this.leaveType,
+    required this.startDate,
+    required this.endDate,
+    required this.status,
+  });
+
+  factory LeaveRequest.fromMap(Map<String, dynamic> map) {
+    // Helper to safely parse date strings
+    DateTime _parseDate(String? dateStr) {
+      if (dateStr == null) return DateTime.now();
+      try {
+        return DateTime.parse(dateStr);
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+
+    return LeaveRequest(
+      staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
+      leaveType: map['type'] ?? 'N/A',
+      startDate: _parseDate(map['startDate']),
+      endDate: _parseDate(map['endDate']),
+      status: map['status'] ?? 'Pending',
+    );
+  }
+}
+
+
+class ChartData {
+  final String category;
+  final num value;
+  final Color? color;
+  ChartData(this.category, this.value, [this.color]);
+}
+
+// --- MAIN WIDGET ---
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,1525 +136,285 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
-  late List<AttendanceData> attendanceData;
-  late List<WeeklyTrendData> weeklyTrendData;
-  late List<TaskCompletionData> taskCompletionData;
-  late List<GeolocationComplianceData> geolocationComplianceData;
-  late List<AttendanceData> attendanceChartData;
-  late List<WeeklyAttendanceTrend1> weeklyTrendData1;
-  late List<LeaveRequestData> pendingLeaveRequests;
-  late List<LeaveRequestData> upcomingLeaves;
-  late List<TaskData> taskStatusData;
-
-  Map<String, dynamic>? _timesheetStatusData; // Store timesheet status data here
-  bool _isTimesheetStatusDataLoading = false; // Loading state for timesheet card
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String? _currentUserState;
-  String? _currentUserLocation;
-  String? _currentUserStaffCategory;
-  final bool _isLoadingClockInData = false;
-  String _selectedDateRange = "Today";
-  DateTime? _startDateFilter;
-  DateTime? _endDateFilter;
-  int malePresentCount1 = 0;
-  int malePresentCount2 = 0;
-  int maleAbsentCount1 = 0;
-  int maleLateCount1 = 0;
-  bool _isDataLoaded = false; // Add a loading flag
+  Stream<DashboardData>? _dashboardStream;
+  final _filterController = BehaviorSubject<AttendanceFilter>.seeded(AttendanceFilter.all);
+  final _dateRangeController = BehaviorSubject<DateTimeRange>();
 
-  // New variables for month and year filter in Timesheet Status Card
-  final DateTime _selectedTimesheetMonthYear = DateTime.now();
-  final List<String> _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  int _selectedMonthIndex = DateTime.now().month - 1;
-  int _selectedYear = DateTime.now().year;
-  final List<int> _yearList = List.generate(10, (index) => DateTime.now().year - 5 + index); // Example: last 5 years and next 4 years from current year
+  late int _selectedTimesheetMonth;
+  late int _selectedTimesheetYear;
+  StreamController<TimesheetMetrics> _timesheetStreamController = StreamController.broadcast();
+  bool _isTimesheetLoading = false;
 
+  late Timer _timer;
+  String _liveTime = '';
 
   @override
   void initState() {
     super.initState();
-    _initializeData().then((_){
-     // _loadTimesheetStatusData();
-    }); // Call a separate async function for initialization
+    final now = DateTime.now();
+    _selectedTimesheetMonth = now.month;
+    _selectedTimesheetYear = now.year;
 
-  }
+    _dateRangeController.add(DateTimeRange(
+      start: DateTime(now.year, now.month, now.day),
+      end: DateTime(now.year, now.month, now.day),
+    ));
+    _initializeStreams();
 
-  Future<void> _initializeData() async {
-    await _loadCurrentUserBioDataForClockInCard(); // Await user bio data loading
-
-    attendanceData = getAttendanceData(); // You can keep these synchronous data initializations here as they are dummy data
-    weeklyTrendData = getWeeklyTrendData();
-    taskCompletionData = getTaskCompletionData();
-    geolocationComplianceData = getGeolocationComplianceData();
-    attendanceChartData = getAttendanceData();
-    weeklyTrendData1 = getWeeklyTrendData1();
-    pendingLeaveRequests = getPendingLeaveRequests();
-    upcomingLeaves = getUpcomingLeaves();
-    taskStatusData = getTaskStatusData();
-    _isDataLoaded = true; // Set the flag to true when data is loaded
-    setState(() {}); // Trigger a rebuild to reflect the data loading completion
-  }
-  Future<void> _loadTimesheetStatusData() async {
-    setState(() {
-      _isTimesheetStatusDataLoading = true;
+    _liveTime = DateFormat('hh:mm:ss a').format(DateTime.now());
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+      if(mounted) {
+        setState(() {
+          _liveTime = DateFormat('hh:mm:ss a').format(DateTime.now());
+        });
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _filterController.close();
+    _dateRangeController.close();
+    _timesheetStreamController.close();
+    _timer.cancel();
+    super.dispose();
+  }
+
+  DateTime _parseTime(String timeString) {
     try {
-      final data = await _getTimesheetStatusData(month: _selectedMonthIndex + 1, year: _selectedYear); // Pass selected month and year
-      _timesheetStatusData = data;
+      final now = DateTime.now();
+      final format = DateFormat("hh:mm a");
+      final dt = format.parse(timeString);
+      return DateTime(now.year, now.month, now.day, dt.hour, dt.minute);
     } catch (e) {
-      print("Error loading timesheet status data: $e");
-      // Handle error appropriately
-    } finally {
-      setState(() {
-        _isTimesheetStatusDataLoading = false;
-      });
+      return DateTime.now().add(const Duration(days: 1));
+    }
+  }
+
+  void _initializeStreams() async {
+    try {
+      await _loadCurrentUserBioData();
+      if (_currentUserState != null) {
+        _dashboardStream = Rx.combineLatest2(
+            _dateRangeController.stream,
+            _filterController.stream,
+                (dateRange, attendanceFilter) => {'range': dateRange, 'filter': attendanceFilter}
+        ).switchMap((filters) {
+          final dateRange = filters['range'] as DateTimeRange;
+          final attendanceFilter = filters['filter'] as AttendanceFilter;
+          return _fetchDashboardData(dateRange, attendanceFilter);
+        });
+        _loadTimesheetMetrics();
+      }
+      if (mounted) setState(() {});
+    } catch (e, s) {
+      // FIX: Catch any errors during initialization
+      debugPrint("FATAL: Error during stream initialization: $e\n$s");
     }
   }
 
 
-  Future<void> _loadCurrentUserBioDataForClockInCard() async {
+  Future<void> _loadCurrentUserBioData() async {
     try {
-      final userUUID = FirebaseAuth.instance.currentUser?.uid;
-      if (userUUID == null) {
-        print("No user logged in.");
-        return;
+      final userUUID = _auth.currentUser?.uid;
+      if (userUUID == null) return;
+      final doc = await _firestore.collection("Staff").doc(userUUID).get();
+      if (doc.exists && mounted) {
+        _currentUserState = doc.data()?['state'] as String?;
       }
+    } catch (e) {
+      debugPrint("Error loading user bio data: $e");
+    }
+  }
 
-      DocumentSnapshot<Map<String, dynamic>> bioDataSnapshot =
-      await FirebaseFirestore.instance.collection("Staff").doc(userUUID).get();
+  Stream<DashboardData> _fetchDashboardData(DateTimeRange dateRange, AttendanceFilter filter) {
+    if (_currentUserState == null) return Stream.value(DashboardData(staffList: [], attendanceRecords: [], yetToClockIn: [], pendingLeaves: []));
 
-      if (bioDataSnapshot.exists) {
-        final bioData = bioDataSnapshot.data();
-        if (bioData != null) {
-          setState(() {
-            _currentUserState = bioData['state'] as String?;
-            _currentUserLocation = bioData['location'] as String?;
-            _currentUserStaffCategory = bioData['staffCategory'] as String?;
-          });
-          print(
-              "Current User State: $_currentUserState, Location: $_currentUserLocation");
-        } else {
-          print("Bio data is null for UUID: $userUUID");
+    final staffQuery = _firestore.collection('Staff')
+        .where('state', isEqualTo: _currentUserState)
+        .where('staffCategory', isEqualTo: 'Facility Staff');
+
+    // FIX: Create a new stream for leave requests
+    final leaveRequestStream = _firestore.collectionGroup('Leave Request')
+        .where('staffState', isEqualTo: _currentUserState)
+        .where('status', isEqualTo: 'Pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => LeaveRequest.fromMap(doc.data())).toList());
+
+    return Rx.combineLatest2(
+        staffQuery.snapshots(),
+        leaveRequestStream,
+            (staffSnapshot, pendingLeaves) {
+          return {'staff': staffSnapshot, 'leaves': pendingLeaves};
         }
-      } else {
-        print("No bio data found for UUID: $userUUID");
-      }
-    } catch (e) {
-      print("Error loading bio data: $e");
-    }
-  }
+    ).switchMap((data) {
+      final staffSnapshot = data['staff'] as QuerySnapshot<Map<String, dynamic>>;
+      final pendingLeaves = data['leaves'] as List<LeaveRequest>;
 
-  void _handleDateRangeSelection(String value) {
-    setState(() {
-      _selectedDateRange = value;
-      _startDateFilter = null;
-      _endDateFilter = null;
+      final staffList = staffSnapshot.docs.map((doc) {
+        final data = doc.data();
+        return StaffInfo(
+            id: doc.id,
+            name: '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim(),
+            gender: data['gender'] ?? 'Unknown',
+            location: data['location'] ?? 'N/A',
+            imageUrl: data['imageUrl'] as String?);
+      }).toList();
 
-      DateTime now = DateTime.now();
-      if (value == "Past 2 days") {
-        _endDateFilter = now;
-        _startDateFilter = now.subtract(const Duration(days: 2));
-      } else if (value == "Past 7 days") {
-        _endDateFilter = now;
-        _startDateFilter = now.subtract(const Duration(days: 7));
-      } else if (value == "Past 2 weeks") {
-        _endDateFilter = now;
-        _startDateFilter = now.subtract(const Duration(days: 14));
-      } else if (value == "Past 1 Month") {
-        _endDateFilter = now;
-        _startDateFilter = DateTime(now.year, now.month - 1, now.day);
-      } else if (value == "Past 3 Month(s)") {
-        _endDateFilter = now;
-        _startDateFilter = DateTime(now.year, now.month - 3, now.day);
-      } else if (value == "Past 6 Month(s)") {
-        _endDateFilter = now;
-        _startDateFilter = DateTime(now.year, now.month - 6, now.day);
-      } else if (value == "Past 1 year") {
-        _endDateFilter = now;
-        _startDateFilter = DateTime(now.year - 1, now.month, now.day);
-      }
+      if (staffList.isEmpty) return Stream.value(DashboardData(staffList: [], attendanceRecords: [], yetToClockIn: [], pendingLeaves: []));
+
+      final staffMap = {for (var staff in staffList) staff.id: staff};
+      final lateCutoff = DateTime(dateRange.start.year, dateRange.start.month, dateRange.start.day, 8, 0, 1);
+
+      Query recordsQuery = _firestore
+          .collectionGroup('Record')
+          .where('timestamp', isGreaterThanOrEqualTo: dateRange.start)
+          .where('timestamp', isLessThan: dateRange.end.add(const Duration(days: 1)));
+
+      return recordsQuery.snapshots().map((recordsSnapshot) {
+        final allRecordsForPeriod = recordsSnapshot.docs.map((doc) {
+          final staffInfo = staffMap[doc.reference.parent.parent!.id];
+          if (staffInfo == null) return null;
+          final data = doc.data() as Map<String, dynamic>;
+          final timestamp = (data['timestamp'] as Timestamp).toDate();
+          final clockInTime = data['clockIn'] ?? 'N/A';
+          final parsedClockInTime = _parseTime(clockInTime);
+          return AttendanceRecord(
+              staffId: staffInfo.id,
+              staffName: staffInfo.name,
+              staffLocation: staffInfo.location,
+              timestamp: timestamp,
+              clockInTime: clockInTime,
+              isLate: parsedClockInTime.isAfter(lateCutoff));
+        }).whereType<AttendanceRecord>().toList();
+
+        List<AttendanceRecord> filteredRecords;
+        switch(filter) {
+          case AttendanceFilter.onTime:
+            filteredRecords = allRecordsForPeriod.where((r) => !r.isLate).toList();
+            break;
+          case AttendanceFilter.late:
+            filteredRecords = allRecordsForPeriod.where((r) => r.isLate).toList();
+            break;
+          case AttendanceFilter.all:
+          default:
+            filteredRecords = allRecordsForPeriod;
+            break;
+        }
+        filteredRecords.sort((a, b) => _parseTime(a.clockInTime).compareTo(_parseTime(b.clockInTime)));
+
+        final todaysRecords = allRecordsForPeriod.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(DateTime.now()));
+        final clockedInIds = todaysRecords.map((r) => r.staffId).toSet();
+        final yetToClockIn = staffList.where((staff) => !clockedInIds.contains(staff.id)).toList();
+
+        return DashboardData(
+          staffList: staffList,
+          attendanceRecords: filteredRecords,
+          yetToClockIn: yetToClockIn,
+          pendingLeaves: pendingLeaves,
+        );
+      });
     });
   }
 
+  void _loadTimesheetMetrics() async {
+    if (_currentUserState == null) return;
+    if (mounted) setState(() => _isTimesheetLoading = true);
+    try {
+      final metrics = await _fetchTimesheetMetrics(
+          state: _currentUserState!,
+          year: _selectedTimesheetYear,
+          month: _selectedTimesheetMonth
+      );
+      if (!_timesheetStreamController.isClosed) {
+        _timesheetStreamController.add(metrics);
+      }
+    } catch (e, s) {
+      // FIX: Print error and stack trace here too
+      debugPrint("Error loading timesheet metrics: $e\n$s");
+      if (!_timesheetStreamController.isClosed) {
+        _timesheetStreamController.addError(e);
+      }
+    } finally {
+      if (mounted) setState(() => _isTimesheetLoading = false);
+    }
+  }
+
+  Future<TimesheetMetrics> _fetchTimesheetMetrics({required String state, required int year, required int month}) async {
+    final facilityStaffQuery = _firestore.collection('Staff').where('state', isEqualTo: state).where('staffCategory', isEqualTo: 'Facility Staff');
+    final staffSnapshot = await facilityStaffQuery.get();
+    if (staffSnapshot.docs.isEmpty) return TimesheetMetrics();
+    int expected = staffSnapshot.docs.length;
+    int submitted = 0;
+    int pending = 0;
+    int approved = 0;
+    final monthName = DateFormat('MMMM').format(DateTime(year, month));
+    final timesheetDocId = '${monthName}_$year';
+    final futures = staffSnapshot.docs.map((staffDoc) => staffDoc.reference.collection('TimeSheets').doc(timesheetDocId).get());
+    final results = await Future.wait(futures);
+    for (final doc in results) {
+      if (doc.exists) {
+        submitted++;
+        final data = doc.data() as Map<String, dynamic>;
+        final facilityStatus = data['facilitySupervisorSignatureStatus'] ?? 'Pending';
+        final caritasStatus = data['caritasSupervisorSignatureStatus'] ?? 'Pending';
+        if (facilityStatus == 'Approved' && caritasStatus == 'Approved') {
+          approved++;
+        } else {
+          pending++;
+        }
+      }
+    }
+    return TimesheetMetrics(totalExpected: expected, totalSubmitted: submitted, pendingApproval: pending, fullyApproved: approved);
+  }
+
+  // --- BUILD METHODS ---
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Define screen size breakpoints
-    bool isMobile = screenWidth < 600;
-    bool isTablet = screenWidth >= 600 && screenWidth < 1200;
-    bool isDesktop = screenWidth >= 1200 && screenWidth < 1920;
-    bool isLargeDesktop = screenWidth >= 1920;
-
-    // Scaling factors for responsiveness based on screen size
-    double appBarHeightFactor;
-    double titleFontSizeFactor;
-    double cardPaddingFactor;
-    double cardMarginFactor;
-    double fontSizeFactor;
-    double iconSizeFactor;
-    double chartHeightFactor;
-    double gridSpacingFactor;
-    double appBarIconSizeFactor;
-    double chartLegendFontSizeFactor;
-    double summaryCardHeightFactor;
-    double otherCardHeightFactor;
-    double generateAnalyticsButtonPaddingFactor;
-    double chartCardVerticalPaddingFactor;
-    double cardHeightFactor;
-    double otherGridTextFontSizeFactor; // New factor for OtherGrid text
-
-    if (isMobile) {
-      appBarHeightFactor = screenHeight < 600 ? 0.6 : 0.9;
-      titleFontSizeFactor = 0.55;
-      cardPaddingFactor = 0.55;
-      cardMarginFactor = 0.8;
-      fontSizeFactor = 0.55;
-      iconSizeFactor = 0.55;
-      chartHeightFactor = 0.8;
-      gridSpacingFactor = 0.2;
-      appBarIconSizeFactor = 0.55;
-      chartLegendFontSizeFactor = 0.45;
-      summaryCardHeightFactor = 1.6;
-      otherCardHeightFactor = 2.5;
-      generateAnalyticsButtonPaddingFactor = 0.55;
-      chartCardVerticalPaddingFactor = 0.55;
-      cardHeightFactor = 0.8;
-      otherGridTextFontSizeFactor = 1.0; // Base text size for mobile
-    } else if (isTablet) {
-      appBarHeightFactor = 0.9;
-      titleFontSizeFactor = 0.75;
-      cardPaddingFactor = 0.75;
-      cardMarginFactor = 1.0;
-      fontSizeFactor = 0.75;
-      iconSizeFactor = 0.75;
-      chartHeightFactor = 0.9;
-      gridSpacingFactor = 0.5;
-      appBarIconSizeFactor = 0.75;
-      chartLegendFontSizeFactor = 0.65;
-      summaryCardHeightFactor = 1.4;
-      otherCardHeightFactor = 2.8;
-      generateAnalyticsButtonPaddingFactor = 0.75;
-      chartCardVerticalPaddingFactor = 0.75;
-      cardHeightFactor = 1.0;
-      otherGridTextFontSizeFactor = 0.95; // Slightly reduced text size for tablet
-    } else if (isDesktop) {
-      appBarHeightFactor = 1.1;
-      titleFontSizeFactor = 0.95;
-      cardPaddingFactor = 0.95;
-      cardMarginFactor = 1.3;
-      fontSizeFactor = 0.95;
-      iconSizeFactor = 0.95;
-      chartHeightFactor = 1.0;
-      gridSpacingFactor = 0.7;
-      appBarIconSizeFactor = 0.95;
-      chartLegendFontSizeFactor = 0.85;
-      summaryCardHeightFactor = 1.2;
-      otherCardHeightFactor = 3.0;
-      generateAnalyticsButtonPaddingFactor = 0.95;
-      chartCardVerticalPaddingFactor = 0.95;
-      cardHeightFactor = 1.1;
-      otherGridTextFontSizeFactor = 0.90; // Reduced text size for desktop
-    } else { // isLargeDesktop
-      appBarHeightFactor = 1.3;
-      titleFontSizeFactor = 1.0;
-      cardPaddingFactor = 1.0;
-      cardMarginFactor = 1.5;
-      fontSizeFactor = 1.0;
-      iconSizeFactor = 1.0;
-      chartHeightFactor = 1.1;
-      gridSpacingFactor = 0.8;
-      appBarIconSizeFactor = 1.0;
-      chartLegendFontSizeFactor = 0.9;
-      summaryCardHeightFactor = 1.1;
-      otherCardHeightFactor = 3.2;
-      generateAnalyticsButtonPaddingFactor = 1.0;
-      chartCardVerticalPaddingFactor = 1.0;
-      cardHeightFactor = 1.2;
-      otherGridTextFontSizeFactor = 0.85; // Further reduced text size for large desktop
-    }
-
-    // Set summary grid to always be 1 column
-    int summaryGridCrossAxisCount = 1;
-    double summaryGridChildAspectRatio;
-
-    if (isMobile) {
-      summaryGridChildAspectRatio = 2.0;
-    } else if (isTablet) {
-      summaryGridChildAspectRatio = 1.8;
-    } else if (isDesktop) {
-      summaryGridChildAspectRatio = 3.0;
-    } else { // isLargeDesktop
-      summaryGridChildAspectRatio = 3.5;
-    }
-
-
-    int otherCardsGridCrossAxisCount = isMobile ? 1 : isTablet ? 2 : isDesktop ? 3 : 3;
-    double otherCardsGridChildAspectRatio = isMobile ? 1.8 : isTablet ? 1.5 : isDesktop ? 1.3 : 1.1;
-
-
     return Scaffold(
-      drawer: drawer2(
-        context,
-      ),
+      drawer: drawer2(context),
       appBar: AppBar(
-        title: Text(
-          'Monitoring Dashboard',
-          style: TextStyle(fontSize: 20 * titleFontSizeFactor),
-        ),
+        title: Text('$_currentUserState Monitoring'),
         centerTitle: true,
-        toolbarHeight: 60 * appBarHeightFactor,
-      ),
-      body: _isDataLoaded // Conditionally build the UI
-          ? SingleChildScrollView(
-        padding: EdgeInsets.all(16.0 * cardPaddingFactor),
-        child: Column(
-          children: [
-            _buildSummaryGrid(
-              context,
-              cardPaddingFactor,
-              cardMarginFactor,
-              fontSizeFactor,
-              iconSizeFactor,
-              chartHeightFactor,
-              gridSpacingFactor,
-              summaryGridCrossAxisCount,
-              summaryGridChildAspectRatio,
-              summaryCardHeightFactor,
-              isTablet || isDesktop || isLargeDesktop,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: Text(_liveTime, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
-            SizedBox(height: 20 * gridSpacingFactor),
-            _buildOtherCardsGrid(
-              context,
-              cardPaddingFactor,
-              cardMarginFactor,
-              fontSizeFactor,
-              iconSizeFactor,
-              chartHeightFactor,
-              gridSpacingFactor,
-              otherCardsGridCrossAxisCount,
-              otherCardsGridChildAspectRatio,
-              chartLegendFontSizeFactor,
-              summaryCardHeightFactor,
-              otherCardHeightFactor,
-              chartCardVerticalPaddingFactor,
-              otherGridTextFontSizeFactor, // Pass the new factor here
-            ),
-          ],
-        ),
-      )
-          : const Center(child: CircularProgressIndicator()), // Show loading indicator
-    );
-  }
-
-  Widget _buildSummaryGrid(
-      BuildContext context,
-      double cardPaddingFactor,
-      double cardMarginFactor,
-      double fontSizeFactor,
-      double iconSizeFactor,
-      double chartHeightFactor,
-      double gridSpacingFactor,
-      int crossAxisCount,
-      double childAspectRatio,
-      double summaryCardHeightFactor,
-      bool isLargeScreen) {
-    return GridView.count(
-      crossAxisCount: 1,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 20 * gridSpacingFactor,
-      mainAxisSpacing: 20 * gridSpacingFactor,
-      childAspectRatio: childAspectRatio,
-      children: [
-        _buildCard(
-          title: 'Attendance Overview',
-          child: _buildAttendanceChart(
-              cardPaddingFactor: cardPaddingFactor,
-              cardMarginFactor: cardMarginFactor,
-              fontSizeFactor: fontSizeFactor,
-              iconSizeFactor: iconSizeFactor,
-              isLargeScreen: isLargeScreen),
-          cardPaddingFactor: cardPaddingFactor,
-          cardMarginFactor: cardMarginFactor,
-          fontSizeFactor: fontSizeFactor,
-          chartLegendFontSizeFactor: max(0.8, min(1.2, MediaQuery.of(context).size.width / 800)),
-          iconSizeFactor: iconSizeFactor,
-          isLargeScreen: isLargeScreen,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOtherCardsGrid(
-      BuildContext context,
-      double cardPaddingFactor,
-      double cardMarginFactor,
-      double fontSizeFactor,
-      double iconSizeFactor,
-      double chartHeightFactor,
-      double gridSpacingFactor,
-      int crossAxisCount,
-      double childAspectRatio,
-      double chartLegendFontSizeFactor,
-      double summaryCardHeightFactor,
-      double otherCardHeightFactor,
-      double chartCardVerticalPaddingFactor,
-      double otherGridTextFontSizeFactor) {
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 20 * gridSpacingFactor,
-      mainAxisSpacing: 20 * gridSpacingFactor,
-      childAspectRatio: childAspectRatio,
-      children: [
-        _buildCard(
-          title: 'Weekly Trends',
-          child: _buildWeeklyTrendChart(
-              cardPaddingFactor: cardPaddingFactor,
-              cardMarginFactor: cardMarginFactor,
-              fontSizeFactor: fontSizeFactor,
-              chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-              chartHeightFactor: chartHeightFactor),
-          cardPaddingFactor: cardPaddingFactor,
-          cardMarginFactor: cardMarginFactor,
-          fontSizeFactor: fontSizeFactor,
-          chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-          iconSizeFactor: iconSizeFactor,
-        ),
-        _buildCard(
-          title: 'Performance Gauge',
-          child: _buildPerformanceGauge(
-              cardPaddingFactor: cardPaddingFactor,
-              cardMarginFactor: cardMarginFactor,
-              fontSizeFactor: fontSizeFactor,
-              chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-              iconSizeFactor: iconSizeFactor,
-              chartHeightFactor: chartHeightFactor),
-          cardPaddingFactor: cardPaddingFactor,
-          cardMarginFactor: cardMarginFactor,
-          fontSizeFactor: fontSizeFactor,
-          chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-          iconSizeFactor: iconSizeFactor,
-        ),
-        _buildCard(
-          title: 'Late Arrivals & Geolocation compliance Trends',
-          child: _buildTaskCompletionChart(
-              cardPaddingFactor: cardPaddingFactor,
-              cardMarginFactor: cardMarginFactor,
-              fontSizeFactor: fontSizeFactor,
-              chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-              chartHeightFactor: chartHeightFactor),
-          cardPaddingFactor: cardPaddingFactor,
-          cardMarginFactor: cardMarginFactor,
-          fontSizeFactor: fontSizeFactor,
-          chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-          iconSizeFactor: iconSizeFactor,
-        ),
-        _buildCard(
-          title: 'Live Facility Clock-In',
-          child: _buildFacilityClockInCard(context, cardPaddingFactor, cardMarginFactor, fontSizeFactor, iconSizeFactor, otherCardHeightFactor), // REPLACED HERE
-          cardPaddingFactor: cardPaddingFactor,
-          cardMarginFactor: cardMarginFactor,
-          fontSizeFactor: fontSizeFactor,
-          chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-          iconSizeFactor: iconSizeFactor,
-        ),
-        _buildTimesheetStatusCard( // Modified to pass pre-loaded data and loading state
-            _timesheetStatusData,
-            _isTimesheetStatusDataLoading,
-            cardPaddingFactor,
-            cardMarginFactor,
-            fontSizeFactor,
-            chartLegendFontSizeFactor,
-            iconSizeFactor,
-            otherCardHeightFactor,
-            otherGridTextFontSizeFactor),// Pass new factor
-        _buildLeaveRequestsCard(cardPaddingFactor, cardMarginFactor, fontSizeFactor,
-            chartLegendFontSizeFactor, iconSizeFactor, max(1.2, min(2.0, MediaQuery.of(context).size.height / 700)), otherGridTextFontSizeFactor), // Pass new factor
-        _buildTaskManagementCard(cardPaddingFactor, cardMarginFactor, fontSizeFactor,
-            chartLegendFontSizeFactor, iconSizeFactor, otherCardHeightFactor, otherGridTextFontSizeFactor) // Pass new factor
-      ],
-    );
-  }
-
-
-  Widget _buildLeaveRequestsCard(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartLegendFontSizeFactor, double iconSizeFactor, double otherCardHeightFactor, double otherGridTextFontSizeFactor) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(20.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Leave Requests',
-              style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold), // Apply factor here
-            ),
-            SizedBox(height: 20 * cardMarginFactor),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Pending Requests:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                Text('${pendingLeaveRequests.length} Requests', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-              ],
-            ),
-            const SizedBox(height: 2),
-            SizedBox(
-              height: 50 * cardMarginFactor * otherCardHeightFactor,
-              child: ListView.builder(
-                itemCount: pendingLeaveRequests.length,
-                itemBuilder: (context, index) {
-                  final request = pendingLeaveRequests[index];
-                  return ListTile(
-                    contentPadding: EdgeInsets.symmetric(vertical: 2 * cardMarginFactor),
-                    leading: Icon(Icons.pending_actions, color: Colors.orange, size: 24 * iconSizeFactor),
-                    title: Text(request.employeeName, style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                    subtitle: Text('${request.leaveType} - ${request.startDate}', style: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                    trailing: IconButton(
-                      icon: Icon(Icons.arrow_forward_ios, size: 20 * iconSizeFactor),
-                      onPressed: () {
-                        print('Navigate to Leave Request Details for ${request.employeeName}');
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-            SizedBox(height: 10 * cardMarginFactor),
-            Text('Upcoming Leaves', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-            const SizedBox(height: 2),
-            SizedBox(
-              height: 50 * cardMarginFactor * otherCardHeightFactor,
-              child: ListView.builder(
-                itemCount: upcomingLeaves.length,
-                itemBuilder: (context, index) {
-                  final leave = upcomingLeaves[index];
-                  return ListTile(
-                    contentPadding: EdgeInsets.symmetric(vertical: 2 * cardMarginFactor),
-                    leading: Icon(Icons.calendar_today, color: Colors.green, size: 24 * iconSizeFactor),
-                    title: Text(leave.employeeName, style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                    subtitle: Text('${leave.leaveType} - ${leave.startDate}', style: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 2),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: TextButton(
-                onPressed: () {
-                  print('Navigate to Leave Requests Module');
-                },
-                child: Text('View All Leave Requests', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  //
-  // Widget _buildTimesheetStatusCard1(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartLegendFontSizeFactor, double iconSizeFactor, double otherCardHeightFactor, double otherGridTextFontSizeFactor) {
-  //   return Card(
-  //     elevation: 4,
-  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-  //     child: Padding(
-  //       padding: EdgeInsets.all(20.0 * cardPaddingFactor),
-  //       child: Column(
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         children: <Widget>[
-  //           FutureBuilder<Map<String, dynamic>>(
-  //             future: _getTimesheetStatusData(),
-  //             builder: (context, snapshot) {
-  //               if (snapshot.connectionState == ConnectionState.waiting) {
-  //                 return const CircularProgressIndicator();
-  //               }
-  //               if (snapshot.hasError) {
-  //                 return Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold));
-  //               }
-  //               final timesheetStatusData = snapshot.data ?? {};
-  //               final expectedSubmission = timesheetStatusData['expectedSubmission'] ?? 0;
-  //               final pendingSubmission = timesheetStatusData['pendingSubmission'] ?? 0;
-  //               final pendingApproval = timesheetStatusData['pendingApproval'] ?? 0;
-  //               final timesheetMonthTitle = timesheetStatusData['timesheetMonthTitle'] ?? 'Timesheet Status';
-  //               final completionPercentage = timesheetStatusData['completionPercentage'] ?? 0.0;
-  //
-  //               return Column(
-  //                 crossAxisAlignment: CrossAxisAlignment.start,
-  //                 children: [
-  //                   Text(
-  //                     timesheetMonthTitle,
-  //                     style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
-  //                   ),
-  //                   SizedBox(height: 20 * cardMarginFactor),
-  //                   Row(
-  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                     children: [
-  //                       Text('Expected Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                       Text('${expectedSubmission} Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                     ],
-  //                   ),
-  //                   SizedBox(height: 5 * cardMarginFactor),
-  //                   Row(
-  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                     children: [
-  //                       Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                       Text('${pendingSubmission} Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                     ],
-  //                   ),
-  //                   SizedBox(height: 5 * cardMarginFactor),
-  //                   Row(
-  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                     children: [
-  //                       Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                       Text('${pendingApproval} Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                     ],
-  //                   ),
-  //                   SizedBox(height: 10 * cardMarginFactor),
-  //                   Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                   const SizedBox(height: 10),
-  //                   SizedBox(
-  //                     height: 40 * cardMarginFactor * otherCardHeightFactor,
-  //                     child: SfLinearGauge(
-  //                       minimum: 0,
-  //                       maximum: 100,
-  //                       orientation: LinearGaugeOrientation.horizontal,
-  //                       majorTickStyle: LinearTickStyle(length: 12 * cardMarginFactor),
-  //                       minorTickStyle: LinearTickStyle(length: 8 * cardMarginFactor),
-  //                       axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor),
-  //                       barPointers: <LinearBarPointer>[
-  //                         LinearBarPointer(
-  //                           value: completionPercentage,
-  //                           thickness: 20 * cardMarginFactor,
-  //                           color: Colors.green.shade400,
-  //                           edgeStyle: LinearEdgeStyle.bothCurve,
-  //                         ),
-  //                       ],
-  //                       markerPointers: <LinearShapePointer>[
-  //                         LinearShapePointer(
-  //                           value: completionPercentage,
-  //                           offset: 25 * cardMarginFactor,
-  //                           shapeType: LinearShapePointerType.circle,
-  //                           color: Colors.green.shade700,
-  //                         ),
-  //                       ],
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 10),
-  //                   Align(
-  //                     alignment: Alignment.bottomRight,
-  //                     child: TextButton(
-  //                       onPressed: () {
-  //                         Navigator.push(
-  //                           context,
-  //                           MaterialPageRoute(
-  //                             builder: (context) => TimesheetStatusListPage(),
-  //                           ),
-  //                         );
-  //                       },
-  //                       child: Text('View Timesheets', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               );
-  //             },
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
-
-
-  Widget _buildTimesheetStatusCard(
-      Map<String, dynamic>? timesheetStatusData,
-      bool isLoading,
-      double cardPaddingFactor,
-      double cardMarginFactor,
-      double fontSizeFactor,
-      double chartLegendFontSizeFactor,
-      double iconSizeFactor,
-      double otherCardHeightFactor,
-      double otherGridTextFontSizeFactor) {
-    return _buildCardContent(
-      title: timesheetStatusData?['timesheetMonthTitle'] ?? 'Timesheet Status',
-      cardPaddingFactor: cardPaddingFactor,
-      cardMarginFactor: cardMarginFactor,
-      fontSizeFactor: fontSizeFactor,
-      iconSizeFactor: iconSizeFactor,
-      otherCardHeightFactor: otherCardHeightFactor,
-      otherGridTextFontSizeFactor: otherGridTextFontSizeFactor,
-      chartLegendFontSizeFactor: chartLegendFontSizeFactor,
-      content: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: [
-              DropdownButton<int>(
-                value: _selectedMonthIndex,
-                hint: const Text('Select Month', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
-                items: List.generate(_monthNames.length, (index) => DropdownMenuItem<int>(
-                  value: index,
-                  child: Text(_monthNames[index]),
-                )),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedMonthIndex = value!;
-                  });
-                },
-              ),
-              const SizedBox(width: 10),
-              DropdownButton<int>(
-                value: _selectedYear,
-                hint: const Text('Select Year'),
-                items: _yearList.map((year) => DropdownMenuItem<int>(
-                  value: year,
-                  child: Text(year.toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-                )).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedYear = value!;
-                  });
-                },
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: _loadTimesheetStatusData,
-                child: const Text('Load', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
-            ],
           ),
-          SizedBox(height: 10 * cardMarginFactor),
-          if (isLoading)
-            const CircularProgressIndicator()
-          else if (timesheetStatusData == null)
-            Text('Error loading Timesheet Status', style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold))
-          else
-            _buildTimesheetStatusContent(timesheetStatusData, cardMarginFactor, fontSizeFactor, otherGridTextFontSizeFactor, otherCardHeightFactor, context),
         ],
       ),
-    );
-  }
-
-
-  Widget _buildTimesheetStatusContent(Map<String, dynamic> timesheetStatusData, double cardMarginFactor, double fontSizeFactor, double otherGridTextFontSizeFactor, double otherCardHeightFactor, BuildContext context) {
-    final expectedSubmission = timesheetStatusData['expectedSubmission'] ?? 0;
-    final pendingSubmission = timesheetStatusData['pendingSubmission'] ?? 0;
-    final pendingApproval = timesheetStatusData['pendingApproval'] ?? 0;
-    final timesheetMonthTitle = timesheetStatusData['timesheetMonthTitle'] ?? 'Timesheet Status';
-    final completionPercentage = timesheetStatusData['completionPercentage'] ?? 0.0;
-    final List<Map<String, dynamic>> fetchedTimesheetDocuments = (timesheetStatusData['timesheetDocuments'] as List<Map<String, dynamic>>?) ?? [];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Text(
-        //   timesheetMonthTitle,
-        //   style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold),
-        // ),
-        // // SizedBox(height: 15 * cardMarginFactor),
-        // Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Expected Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('$expectedSubmission Staffs', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-          ],
-        ),
-        SizedBox(height: 3 * cardMarginFactor),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Pending Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('$pendingSubmission Staffs', style: TextStyle(color: Colors.orange, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-          ],
-        ),
-        SizedBox(height: 3 * cardMarginFactor),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Pending Approval:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-            Text('$pendingApproval Timesheets', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-          ],
-        ),
-    SizedBox(height: 10 * cardMarginFactor),
-        // Divider(),
-        Text('Timesheet Completion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-        //const SizedBox(height: 10),
-        SizedBox(
-          height: 25 * cardMarginFactor * otherCardHeightFactor,
-          child: SfLinearGauge(
-            minimum: 0,
-            maximum: 100,
-            orientation: LinearGaugeOrientation.horizontal,
-            majorTickStyle: LinearTickStyle(length: 12 * cardMarginFactor),
-            minorTickStyle: LinearTickStyle(length: 8 * cardMarginFactor),
-            axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor),
-            barPointers: <LinearBarPointer>[
-              LinearBarPointer(
-                value: completionPercentage,
-                thickness: 20 * cardMarginFactor,
-                color: Colors.green.shade400,
-                edgeStyle: LinearEdgeStyle.bothCurve,
-              ),
-            ],
-            markerPointers: <LinearShapePointer>[
-              LinearShapePointer(
-                value: completionPercentage,
-                offset: 25 * cardMarginFactor,
-                shapeType: LinearShapePointerType.circle,
-                color: Colors.green.shade700,
-              ),
-            ],
-          ),
-        ),
-       // const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: TextButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TimesheetStatusListPage(
-                    timesheetDataList: fetchedTimesheetDocuments,
-                  ),
-                ),
-              );
-            },
-            child: Text('View Timesheets', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<Map<String, dynamic>> _getTimesheetStatusData({required int month, required int year}) async {
-    print("_getTimesheetStatusData started");
-
-    DateTime selectedMonthYear = DateTime(year, month);
-    String timesheetCollectionName = DateFormat('MMMM_yyyy').format(selectedMonthYear);
-    String timesheetMonthTitle = 'Timesheet Status - ${DateFormat('MMMM yyyy').format(selectedMonthYear)}';
-
-
-    print("Timesheet Collection Name: $timesheetCollectionName");
-    print("Current User State: $_currentUserState");
-
-    int expectedSubmissionCount = 0;
-    int submittedTimesheetCount = 0;
-    int pendingApprovalCount = 0;
-    List<Map<String, dynamic>> timesheetDocuments = [];
-
-    if (_currentUserState != null) {
-      QuerySnapshot staffSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .where('state', isEqualTo: _currentUserState)
-          .where('staffCategory', isEqualTo: "Facility Staff")
-          .get();
-      expectedSubmissionCount = staffSnapshot.docs.length;
-      print("Staff Snapshot Docs Length: ${staffSnapshot.docs.length}");
-      print("Expected Submission Count: $expectedSubmissionCount");
-
-      for (var staffDoc in staffSnapshot.docs) {
-        final staffId = staffDoc.id;
-        DocumentSnapshot timesheetDoc = await staffDoc.reference
-            .collection('TimeSheets')
-            .doc(timesheetCollectionName)
-            .get();
-
-        print("Staff ID: $staffId");
-        print("Timesheet Doc Exists: ${timesheetDoc.exists}");
-
-        if (timesheetDoc.exists) {
-          submittedTimesheetCount++;
-          final timesheetData = timesheetDoc.data() as Map<String, dynamic>?;
-          if (timesheetData != null) {
-            timesheetDocuments.add({...timesheetData, 'staffId': staffId});
-            if (timesheetData['caritasSupervisorSignatureStatus'] != 'Approved' ) {
-              pendingApprovalCount++;
-            }
-          }
-        }
-      }
-    }
-
-    double completionPercentage = 0.0;
-    if (expectedSubmissionCount > 0) {
-      completionPercentage = (submittedTimesheetCount / expectedSubmissionCount) * 100;
-    }
-
-    print("Submitted Timesheet Count: $submittedTimesheetCount");
-    print("Pending Approval Count: $pendingApprovalCount");
-    print("Completion Percentage: $completionPercentage");
-    print("_getTimesheetStatusData finished");
-
-    return {
-      'timesheetMonthTitle': timesheetMonthTitle,
-      'expectedSubmission': expectedSubmissionCount,
-      'pendingSubmission': expectedSubmissionCount - submittedTimesheetCount,
-      'pendingApproval': pendingApprovalCount,
-      'completionPercentage': completionPercentage,
-      'timesheetDocuments': timesheetDocuments,
-    };
-  }
-
-
-
-
-  Widget _buildTaskManagementCard(double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double chartLegendFontSizeFactor, double iconSizeFactor, double otherCardHeightFactor, double otherGridTextFontSizeFactor) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(20.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Task Management',
-              style: TextStyle(fontSize: 20 * fontSizeFactor * otherGridTextFontSizeFactor, fontWeight: FontWeight.bold), // Apply factor here
-            ),
-            SizedBox(height: 20 * cardMarginFactor),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Tasks In Progress:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                Text('${12} Tasks', style: TextStyle(color: Colors.blue, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-              ],
-            ),
-            SizedBox(height: 10 * cardMarginFactor),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Overdue Tasks:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-                Text('${2} Tasks', style: TextStyle(color: Colors.red, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-              ],
-            ),
-            SizedBox(height: 20 * cardMarginFactor),
-            Text('Task Completion Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-            SizedBox(height: 10 * cardMarginFactor),
-            SizedBox(
-              height: 50 * cardMarginFactor * otherCardHeightFactor,
-              child: SfLinearGauge(
-                minimum: 0,
-                maximum: 100,
-                orientation: LinearGaugeOrientation.horizontal,
-                majorTickStyle: LinearTickStyle(length: 12 * cardMarginFactor),
-                minorTickStyle: LinearTickStyle(length: 8 * cardMarginFactor),
-                axisLabelStyle: TextStyle(fontSize: 12 * fontSizeFactor * otherGridTextFontSizeFactor), // Apply factor here
-                barPointers: <LinearBarPointer>[
-                  LinearBarPointer(
-                    value: 60,
-                    thickness: 20 * cardMarginFactor,
-                    color: Colors.green.shade400,
-                    edgeStyle: LinearEdgeStyle.bothCurve,
-                  ),
-                ],
-                markerPointers: <LinearShapePointer>[
-                  LinearShapePointer(
-                    value: 60,
-                    offset: 25 * cardMarginFactor,
-                    shapeType: LinearShapePointerType.circle,
-                    color: Colors.green.shade700,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: TextButton(
-                onPressed: () {
-                  print('Navigate to Task Management Module');
-                },
-                child: Text('View Tasks', style: TextStyle(fontSize: 14 * fontSizeFactor * otherGridTextFontSizeFactor)), // Apply factor here
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCardContent({
-    required String title,
-    required Widget content,
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double chartLegendFontSizeFactor,
-    required double iconSizeFactor,
-    required double otherCardHeightFactor,
-    required double otherGridTextFontSizeFactor,
-  }) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(16.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10 * cardMarginFactor),
-            content,
-          ],
-        ),
-      ),
-    );
-  }
-
-
-
-
-  Widget _buildCard({
-    required String title,
-    required Widget child,
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double chartLegendFontSizeFactor,
-    required double iconSizeFactor,
-    bool isLargeScreen = false,
-  }) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10 * cardMarginFactor)),
-      child: Padding(
-        padding: EdgeInsets.all(16.0 * cardPaddingFactor),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10 * cardMarginFactor),
-            Expanded(child: child),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceChart({
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double iconSizeFactor,
-    bool isLargeScreen = false,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          flex: isLargeScreen ? 4 : 1,
-          child: Padding(
-            padding: EdgeInsets.all(8.0 * cardPaddingFactor),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipOval(
-                  child: Image.asset(
-                    'assets/image/headshot.png',
-                    fit: BoxFit.cover,
-                    height: 100 * cardMarginFactor,
-                    width: 100 * cardMarginFactor,
-                  ),
-                ),
-                SizedBox(height: 8 * cardMarginFactor),
-                Text(
-                  "Punctuality Champion",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor),
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  "Emmanuel Vegher",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12 * fontSizeFactor),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          flex: isLargeScreen ? 3 : 1,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0 * cardPaddingFactor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Dis-Aggregated Data',
-                  style: TextStyle(fontSize: 16 * fontSizeFactor, fontWeight: FontWeight.bold, color: Colors.black54),
-                ),
-                SizedBox(height: 20 * cardMarginFactor),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Male', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
-                          SizedBox(height: 8 * cardMarginFactor),
-                          StreamBuilder<List<AttendanceData>>( // StreamBuilder for Male Data
-                            stream: _facilityAttendanceDataStream(), // Use the new stream
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const CircularProgressIndicator(); // Loading indicator
-                              }
-                              if (snapshot.hasError) {
-                                return Text('Error: ${snapshot.error}'); // Error message
-                              }
-                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                return const Text('No attendance data'); // No data message
-                              }
-                              List<AttendanceData> attendanceData = snapshot.data!;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _buildAttendanceSummary('Male', attendanceData, fontSizeFactor, iconSizeFactor), // Use stream data
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Females', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor)),
-                          SizedBox(height: 8 * cardMarginFactor),
-                          StreamBuilder<List<AttendanceData>>( // StreamBuilder for Female Data (You might need a separate stream for female if you want to optimize queries, but for now, using the same stream and filtering in UI is fine)
-                            stream: _facilityAttendanceDataStream(), // Re-use the same stream for now
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const CircularProgressIndicator();
-                              }
-                              if (snapshot.hasError) {
-                                return Text('Error: ${snapshot.error}');
-                              }
-                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                return const Text('No attendance data');
-                              }
-                              List<AttendanceData> attendanceData = snapshot.data!;
-
-                              // Calculate total present and total staff count
-                              int totalPresent = 0;
-                              int totalCount = 0;
-                              for (var data in attendanceData) {
-                                totalCount += data.count;
-                                if (data.status == 'Present') {
-                                  totalPresent = data.count;
-                                }
-                              }
-
-                              // Calculate percentage
-                              double percentage = 0.0;
-                              if (totalCount > 0) {
-                                percentage = (totalPresent / totalCount) * 100;
-                              }
-
-                              // Format percentage string
-                              String percentageString = '${percentage.toStringAsFixed(1)}%'; // Format to 1 decimal place
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _buildAttendanceSummary('Female', attendanceData, fontSizeFactor, iconSizeFactor), // Use stream data
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20 * cardMarginFactor),
-                Row(
-                  children: [
-                    _buildLegendItem(Colors.orange.shade400, 'Total Staffs', fontSizeFactor),
-                    SizedBox(width: 16 * cardMarginFactor),
-                    _buildLegendItem(Colors.green.shade400, '% Clocked-In', fontSizeFactor),
-                  ],
-                )
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          flex: isLargeScreen ? 3 : 1,
-          child: StreamBuilder<List<AttendanceData>>( // StreamBuilder for Chart Data
-            stream: _facilityAttendanceDataStream(), // Use the new stream
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const CircularProgressIndicator();
-              }
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Text('No attendance data for chart');
-              }
-              List<AttendanceData> chartData = snapshot.data!;
-
-              // Calculate total present and total staff count
-              int totalPresent = 0;
-              int totalCount = 0;
-              for (var data in chartData) {
-                totalCount += data.count;
-                if (data.status == 'Present') {
-                  totalPresent = data.count;
-                }
-              }
-
-              // Calculate percentage
-              double percentage = 0.0;
-              if (totalCount > 0) {
-                percentage = (totalPresent / totalCount) * 100;
-              }
-
-              // Format percentage string
-              String percentageString = '${percentage.toStringAsFixed(1)}%'; // Format to 1 decimal place
-
-              return SfCircularChart(
-                series: <CircularSeries<AttendanceData, String>>[
-                  DoughnutSeries<AttendanceData, String>(
-                    dataSource: chartData, // Use stream data for chart
-                    xValueMapper: (AttendanceData data, _) => data.status,
-                    yValueMapper: (AttendanceData data, _) => data.count,
-                    dataLabelSettings: const DataLabelSettings(isVisible: false),
-                    enableTooltip: true,
-                    strokeWidth: 2,
-                    strokeColor: Colors.white,
-                    innerRadius: '70%',
-                    pointColorMapper: (AttendanceData data, _) {
-                      if (data.status == 'Present') return Colors.green.shade400;
-                      if (data.status == 'Absent') return Colors.orange.shade400;
-                      if (data.status == 'Late') return Colors.red.shade400;
-                      if (data.status == 'On Leave') return Colors.blue.shade400; // Color for On Leave
-                      return Colors.grey.shade400;
-                    },
-                  )
-                ],
-                annotations: <CircularChartAnnotation>[
-                  CircularChartAnnotation(
-                    widget: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Total Clocked In", // Display total staff count
-                          style: TextStyle(fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          '$totalPresent ClockedIn / $totalCount Staffs', // Display dynamic percentage
-                          style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildAttendanceSummary(String gender, List<AttendanceData> data, double fontSizeFactor, double iconSizeFactor) {
-    return data.map((item) {
-      Color color;
-      if (item.status == 'Present') {
-        color = Colors.green.shade400;
-      } else if (item.status == 'Absent') color = Colors.orange.shade400;
-      else if (item.status == 'Late') color = Colors.red.shade400;
-      else color = Colors.grey.shade400;
-
-      String statusText = '';
-      if (item.status == 'Present') {
-        statusText = 'Present';
-      } else if (item.status == 'Absent') statusText = 'Absent';
-      else if (item.status == 'Late') statusText = 'Late';
-      else statusText = item.status;
-
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 30 * 0.8 * iconSizeFactor,
-              height: 30 * 0.8 * iconSizeFactor,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(Icons.person, size: 20 * iconSizeFactor, color: color),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(statusText, style: TextStyle(fontSize: 12 * fontSizeFactor)),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-
-  Widget _buildLegendItem(Color color, String text, double fontSizeFactor) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12 * 0.8 * fontSizeFactor,
-          height: 12 * 0.8 * fontSizeFactor,
-          color: color,
-        ),
-        SizedBox(width: 5 * 0.8 * fontSizeFactor),
-        Text(text, style: TextStyle(fontSize: 12 * fontSizeFactor)),
-      ],
-    );
-  }
-
-
-  Widget _buildWeeklyTrendChart({
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double chartLegendFontSizeFactor,
-    required double chartHeightFactor,
-  }) {
-    return SfCartesianChart(
-      primaryXAxis: CategoryAxis(labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
-      primaryYAxis: NumericAxis(labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
-      title: ChartTitle(text: 'Weekly Attendance Trend', textStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
-      legend: const Legend(isVisible: false),
-      series: [
-        LineSeries<WeeklyTrendData, String>(
-          dataSource: weeklyTrendData,
-          xValueMapper: (WeeklyTrendData data, _) => data.day,
-          yValueMapper: (WeeklyTrendData data, _) => data.percentage,
-          markerSettings: MarkerSettings(isVisible: true, height: 5 * chartHeightFactor * fontSizeFactor, width: 5 * chartHeightFactor * fontSizeFactor),
-          dataLabelSettings: const DataLabelSettings(isVisible: false),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPerformanceGauge({
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double chartLegendFontSizeFactor,
-    required double iconSizeFactor,
-    required double chartHeightFactor,
-  }) {
-    return SfRadialGauge(
-      axes: [
-        RadialAxis(
-          minimum: 0,
-          maximum: 100,
-          axisLineStyle: AxisLineStyle(thickness: 20 * cardMarginFactor * fontSizeFactor,),
-          pointers: [
-            NeedlePointer(
-              value: 75,
-              needleLength: 0.7,
-              enableAnimation: true,
-              animationDuration: 1500,
-              needleColor: Colors.blue.shade700,
-              tailStyle: TailStyle(length: 0.2, width: 20 * cardMarginFactor * fontSizeFactor, color: Colors.blue.shade700),
-              knobStyle: KnobStyle(knobRadius: 0.09, color: Colors.white, borderColor: Colors.blue.shade700, borderWidth: 10 * fontSizeFactor),
-            ),
-          ],
-          annotations: <GaugeAnnotation>[
-            GaugeAnnotation(widget: Text('75%', style: TextStyle(fontSize: 24 * fontSizeFactor, fontWeight: FontWeight.bold, color: Colors.blue.shade700)), angle: 90, positionFactor: 0.5)
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildTaskCompletionChart({
-    required double cardPaddingFactor,
-    required double cardMarginFactor,
-    required double fontSizeFactor,
-    required double chartLegendFontSizeFactor,
-    required double chartHeightFactor,
-  }) {
-    return SfCartesianChart(
-      title: ChartTitle(text: 'Late Arrivals &\nGeolocation compliance Trends', textStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
-      primaryXAxis: CategoryAxis(
-          title: AxisTitle(text: 'Hour', textStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
-          labelIntersectAction: AxisLabelIntersectAction.multipleRows,
-          labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)
-      ),
-      primaryYAxis: NumericAxis(
-          title: AxisTitle(text: '', textStyle: TextStyle(fontSize: 10 * fontSizeFactor)),
-          minimum: 0,
-          maximum: 900,
-          interval: 200,
-          labelStyle: TextStyle(fontSize: 10 * fontSizeFactor)
-      ),
-      legend: Legend(isVisible: true, position: LegendPosition.bottom, textStyle: TextStyle(fontSize: 12 * chartLegendFontSizeFactor)),
-      series: <AreaSeries<GeolocationComplianceData, String>>[
-        AreaSeries<GeolocationComplianceData, String>(
-          dataSource: geolocationComplianceData,
-          xValueMapper: (GeolocationComplianceData data, _) => data.hour,
-          yValueMapper: (GeolocationComplianceData data, _) => data.locationCompliance,
-          name: 'Location compliance',
-          color: const Color(0xFF24B3A8),
-        ),
-        AreaSeries<GeolocationComplianceData, String>(
-          dataSource: geolocationComplianceData,
-          xValueMapper: (GeolocationComplianceData data, _) => data.hour,
-          yValueMapper: (GeolocationComplianceData data, _) => data.other,
-          name: 'other',
-          color: const Color(0xFFD9E3EA),
-        ),
-      ],
-    );
-  }
-
-
-  Widget _buildFacilityClockInCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
-    return Container(
-      padding: EdgeInsets.all(15 * cardPaddingFactor * otherCardHeightFactor),
-      decoration: BoxDecoration(
-        //color: Colors.white,
-        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      body: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'All Facility Clock-In (Live Feed) - $_selectedDateRange',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontSize: 16 * fontSizeFactor,
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, size: 24 * iconSizeFactor),
-                onSelected: _handleDateRangeSelection,
-                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
-                    value: "Past 2 days",
-                    child: Text('Past 2 days'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 7 days",
-                    child: Text('Past 7 days'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 2 weeks",
-                    child: Text('Past 2 weeks'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 1 Month",
-                    child: Text('Past 1 Month'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 3 Month(s)",
-                    child: Text('Past 3 Month(s)'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 6 Month(s)",
-                    child: Text('Past 6 Month(s)'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Past 1 year",
-                    child: Text('Past 1 year'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "Today",
-                    child: Text('Today'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Divider(height: 10 * cardMarginFactor,),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor, vertical: 4.0 * cardPaddingFactor),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Name & Date", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
-                Text("Clock-In Time", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
-              ],
-            ),
-          ),
+          _buildTopFilterBar(),
           Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _facilityClockInDataStream(startDate: _startDateFilter, endDate: _endDateFilter),
+            child: StreamBuilder<DashboardData>(
+              stream: _dashboardStream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                // FIX: Enhanced error handling to print to console
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                List<Map<String, dynamic>> facilityClockInData = snapshot.data ?? [];
-
-                // Sort the list by clock-in time
-                facilityClockInData.sort((a, b) {
-                  final timeFormat = DateFormat('hh:mm a');
-                  DateTime? timeA, timeB;
-                  try {
-                    timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-                  } catch (e) {
-                    timeA = DateTime(0); // Fallback in case of parsing error
-                  }
-                  try {
-                    timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-                  } catch (e) {
-                    timeB = DateTime(0); // Fallback in case of parsing error
-                  }
-
-                  if (a['clockIn'] == 'N/A' && b['clockIn'] == 'N/A') return 0;
-                  if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
-                  if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
-
-                  return timeA.compareTo(timeB);
-                });
-
-
-                if (facilityClockInData.isEmpty) {
+                  debugPrint("Dashboard Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
                   return Center(
-                      child: Text("No Clock-Ins for $_selectedDateRange",
-                          style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text("An error occurred. Please check the console logs.\n${snapshot.error}", style: const TextStyle(color: Colors.red)),
+                    ),
+                  );
                 }
-                return SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: facilityClockInData.map((data) => _buildClockInListItem(
-                      data['fullName'] ?? 'Unknown Staff',
-                      data['date'] ?? 'N/A',
-                      data['clockIn'] ?? 'N/A',
-                      data['clockOut'] ?? '--/--', // Ensure clockOut is not null, default to '--/--'
-                      fontSizeFactor,
-                      cardMarginFactor,
-                      cardPaddingFactor,
-                    )).toList(),
-                  ),
-                );
+                if (!snapshot.hasData || snapshot.data!.staffList.isEmpty) {
+                  return const Center(child: Text("No 'Facility Staff' found for this state."));
+                }
+                final data = snapshot.data!;
+                return _buildDashboardContent(data);
               },
             ),
           ),
@@ -1546,580 +423,563 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
-  Widget _buildClockInListItem(String title, String date, String clockInTime, String clockOutTime, double fontSizeFactor, double cardMarginFactor, double cardPaddingFactor) {
+  Widget _buildTopFilterBar() {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0 * cardMarginFactor, horizontal: 8.0 * cardPaddingFactor), // Added horizontal padding
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically center
+      padding: const EdgeInsets.all(8.0),
+      child: SegmentedButton<AttendanceFilter>(
+        segments: const [
+          ButtonSegment(value: AttendanceFilter.all, label: Text('All'), icon: Icon(Icons.people)),
+          ButtonSegment(value: AttendanceFilter.onTime, label: Text('On Time'), icon: Icon(Icons.timer_outlined)),
+          ButtonSegment(value: AttendanceFilter.late, label: Text('Late'), icon: Icon(Icons.history_toggle_off)),
+        ],
+        selected: {_filterController.value},
+        onSelectionChanged: (newSelection) {
+          _filterController.add(newSelection.first);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDashboardContent(DashboardData data) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
+    bool isTablet = screenWidth >= 600 && screenWidth < 1200;
+    int otherCardsGridCrossAxisCount = isMobile ? 1 : isTablet ? 2 : 3;
+    double otherCardsGridChildAspectRatio = isMobile ? 1.5 : isTablet ? 1.4 : 1.3;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 14 * fontSizeFactor),
-                ),
-                Text(
-                  date,
-                  style: TextStyle(color: Colors.black54, fontSize: 12 * fontSizeFactor),
-                ),
-              ],
-            ),
-          ),
-          Row( // Wrap Clock-In Time and Tick in a Row
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center, // Align tick vertically center
-            children: [
-              Text(
-                clockInTime,
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor), // Increased font size
-              ),
-              SizedBox(width: 5 * cardMarginFactor),
-              if (clockInTime != 'N/A' && clockOutTime == '--/--')
-                Column(
-                  children: [
-                    Icon(Icons.check, color: Colors.orange, size: 16 * fontSizeFactor),
-                    SizedBox(width: 3 * cardMarginFactor),
-                    Text("Clocked-In,Yet to Clock Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.orange),)
-                  ],
-                )
-              else if (clockInTime != 'N/A' && clockOutTime != '--/--')
-                Column(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 16 * fontSizeFactor),
-                    SizedBox(width: 3 * cardMarginFactor),
-                    Text("Clocked-In and Clocked Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.green),)
-                  ],
-                )
-              else
-                const SizedBox.shrink(), // No icon if clockIn is 'N/A'
-            ],
-          ),
+          _buildSummaryGrid(data, isLargeScreen: !isMobile),
+          const SizedBox(height: 20),
+          _buildOtherCardsGrid(data, otherCardsGridCrossAxisCount, otherCardsGridChildAspectRatio),
+          const SizedBox(height: 20),
+         // _buildMoreAnalysisButton(),
         ],
       ),
     );
   }
 
-  Stream<List<Map<String, dynamic>>> _facilityClockInDataStream({DateTime? startDate, DateTime? endDate}) {
-    final currentUserUUID = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserUUID == null || _currentUserState == null || _currentUserLocation == null || _currentUserStaffCategory == null) {
-      print("Could not retrieve user info to load facility clock-in data stream.");
-      return Stream.value([]); // Return an empty stream if user info is missing
-    }
-
-    DateFormat dateFormatter = DateFormat('dd-MMMM-yyyy');
-    DateTime queryStartDate = startDate ?? DateTime.now();
-    DateTime queryEndDate = endDate ?? DateTime.now();
-
-
-    BehaviorSubject<List<Map<String, dynamic>>> dataSubject = BehaviorSubject<List<Map<String, dynamic>>>();
-
-    Future<void> fetchData() async {
-      List<Map<String, dynamic>> allClockInData = [];
-      List<DateTime> dateRange = [];
-
-      // Generate date range in reverse chronological order
-      for (DateTime date = queryEndDate; date.isAfter(queryStartDate.subtract(const Duration(days: 1))); date = date.subtract(const Duration(days: 1))) {
-        dateRange.add(date);
-      }
-
-      // Fetch data for each date in the reversed range
-      for (DateTime date in dateRange) {
-        String formattedDate = dateFormatter.format(date);
-
-        // Fetch current user's record
-        DocumentSnapshot currentUserRecordSnapshot = await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(currentUserUUID)
-            .collection('Record')
-            .doc(formattedDate)
-            .get();
-        if (currentUserRecordSnapshot.exists) {
-          Map<String, dynamic> recordData = currentUserRecordSnapshot.data() as Map<String, dynamic>? ?? {};
-          DocumentSnapshot staffDataSnapshot = await FirebaseFirestore.instance.collection('Staff').doc(currentUserUUID).get();
-          Map<String, dynamic> staffData = staffDataSnapshot.data() as Map<String, dynamic>? ?? {};
-
-          allClockInData.add({
-            'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
-            'date': recordData['date'] ?? formattedDate, // Use formattedDate if date is null from Firestore
-            'clockIn': recordData['clockIn'] ?? 'N/A',
-            'clockOut': recordData['clockOut'] ?? '--/--',
-          });
-        }
-
-        // Fetch facility staff records
-        QuerySnapshot facilityStaffSnapshot = await FirebaseFirestore.instance
-            .collection('Staff')
-            .where('state', isEqualTo: _currentUserState)
-            .where('location', isEqualTo: _currentUserLocation)
-            .get();
-
-        for (var staffDoc in facilityStaffSnapshot.docs) {
-          if (staffDoc.id == currentUserUUID) continue;
-          DocumentSnapshot recordSnapshot = await staffDoc.reference
-              .collection('Record')
-              .doc(formattedDate)
-              .get();
-          if (recordSnapshot.exists) {
-            Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>? ?? {};
-            Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>? ?? {};
-
-            allClockInData.add({
-              'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
-              'date': recordData['date'] ?? formattedDate, // Use formattedDate if date is null from Firestore
-              'clockIn': recordData['clockIn'] ?? 'N/A',
-              'clockOut': recordData['clockOut'] ?? '--/--',
-            });
-          }
-        }
-      }
-
-      // Sort the data by date (descending) and then by clock-in time (ascending)
-      allClockInData.sort((a, b) {
-        // First, compare dates
-        DateFormat displayDateFormat = DateFormat('dd-MMMM-yyyy');
-        DateTime? dateA, dateB;
-        try {
-          dateA = displayDateFormat.parse(a['date'] ?? '01-January-1970'); // Default to epoch for 'N/A'
-        } catch (e) {
-          dateA = DateTime(0); // Fallback in case of parsing error
-        }
-        try {
-          dateB = displayDateFormat.parse(b['date'] ?? '01-January-1970'); // Default to epoch for 'N/A'
-        } catch (e) {
-          dateB = DateTime(0); // Fallback in case of parsing error
-        }
-
-        int dateComparison = dateB.compareTo(dateA); // Reverse order for dates (descending)
-        if (dateComparison != 0) {
-          return dateComparison; // Dates are different, return date comparison
-        }
-
-        // If dates are the same, compare clock-in times
-        final timeFormat = DateFormat('hh:mm a');
-        DateTime? timeA, timeB;
-        try {
-          timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-        } catch (e) {
-          timeA = DateTime(0); // Fallback in case of parsing error
-        }
-        try {
-          timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-        } catch (e) {
-          timeB = DateTime(0); // Fallback in case of parsing error
-        }
-
-        if (a['clockIn'] == 'N/A' && b['clockIn'] == 'N/A') return 0;
-        if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
-        if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
-
-        return timeA.compareTo(timeB); // Ascending order for times
-      });
-      dataSubject.add(allClockInData);
-    }
-
-    fetchData(); // Initial data fetch
-    return dataSubject.stream;
+  Widget _buildSummaryGrid(DashboardData data, {bool isLargeScreen = false}) {
+    return GridView.count(
+      crossAxisCount: 1,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: isLargeScreen ? 3.0 : 1.8,
+      children: [
+        _buildCard(
+          title: 'Today\'s Attendance Overview',
+          child: _buildAttendanceChart(data, isLargeScreen: isLargeScreen),
+        ),
+      ],
+    );
   }
 
-  // Helper function to parse time from string
-  DateTime _parseTime(String timeString) {
-    try {
-      return DateFormat("hh:mm a").parse(timeString); // e.g., "08:00 AM"
-    } catch (e) {
-      print("Error parsing time: $e");
-      return DateTime(2000); // Return a default value if parsing fails
+  Widget _buildOtherCardsGrid(DashboardData data, int crossAxisCount, double childAspectRatio) {
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 20,
+      mainAxisSpacing: 20,
+      childAspectRatio: childAspectRatio,
+      children: [
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => LiveFeedFullScreenPage(records: data.attendanceRecords),
+            ));
+          },
+          child: _buildCard(
+            title: 'Live Clock-In Feed',
+            trailing: Tooltip(
+                message: "View Full Feed",
+                child: Icon(Icons.open_in_full, color: Colors.grey.shade400)),
+            child: _buildFacilityClockInCard(data),
+          ),
+        ),
+        _buildCard(title: 'Staff Yet to Clock-In Today', child: _buildYetToClockInCard(data)),
+        _buildCard(title: 'Timesheet Status', child: _buildTimesheetStatusCard()),
+        _buildCard(title: 'Weekly Trends', child: _buildWeeklyTrendChart(data)),
+        _buildCard(title: 'Attendance Gauge', child: _buildPerformanceGauge(data)),
+        _buildCard(title: 'Pending Leave Requests', child: _buildLeaveRequestCard(data)),
+      ],
+    );
+  }
+
+  Widget _buildCard({required String title, required Widget child, Widget? trailing}) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18), overflow: TextOverflow.ellipsis)),
+                if (trailing != null) trailing,
+              ],
+            ),
+            const SizedBox(height: 10),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceChart(DashboardData data, {bool isLargeScreen = false}) {
+    final today = DateTime.now();
+    final allStaffInState = data.staffList;
+    final todaysRecords = data.attendanceRecords.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(today)).toList();
+
+    AttendanceRecord? championRecord;
+    if (todaysRecords.isNotEmpty) {
+      final punctualRecords = todaysRecords.where((r) => !r.isLate).toList();
+      if(punctualRecords.isNotEmpty) {
+        punctualRecords.sort((a,b) => _parseTime(a.clockInTime).compareTo(_parseTime(b.clockInTime)));
+        championRecord = punctualRecords.first;
+      }
     }
+    final championInfo = championRecord != null ? allStaffInState.firstWhere((s) => s.id == championRecord!.staffId) : null;
+
+    final presentIds = todaysRecords.map((e) => e.staffId).toSet();
+    final lateCount = todaysRecords.where((r) => r.isLate).length;
+    final onTimeCount = presentIds.length - lateCount;
+    final absentCount = allStaffInState.length - presentIds.length;
+
+    final maleStaff = allStaffInState.where((s) => s.gender == 'Male').toList();
+    final femaleStaff = allStaffInState.where((s) => s.gender == 'Female').toList();
+    final malePresent = presentIds.where((id) => maleStaff.any((s) => s.id == id)).length;
+    final femalePresent = presentIds.where((id) => femaleStaff.any((s) => s.id == id)).length;
+
+    final chartData = [
+      ChartData('On Time', onTimeCount, Colors.green.shade400),
+      ChartData('Absent', absentCount, Colors.orange.shade400),
+      ChartData('Late', lateCount, Colors.red.shade400),
+    ];
+
+    return Column(
+      children: [
+        // FIX: Moved button here
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const AttendanceAnalysisPage(),
+              ));
+            },
+            child: const Text("Tap to View Detailed Attendance Analysis..."),
+          ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              if (isLargeScreen) Expanded(flex: 4, child: _buildPunctualityChampion(championInfo, championRecord)),
+              Expanded(
+                flex: isLargeScreen ? 4 : 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Dis-Aggregated Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
+                    const SizedBox(height: 20),
+                    Text('Male: $malePresent / ${maleStaff.length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('Female: $femalePresent / ${femaleStaff.length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: isLargeScreen ? 3 : 2,
+                child: SfCircularChart(
+                  tooltipBehavior: TooltipBehavior(enable: true, format: 'point.x: point.y'),
+                  series: <CircularSeries<ChartData, String>>[
+                    DoughnutSeries<ChartData, String>(
+                      dataSource: chartData.where((d) => d.value > 0).toList(),
+                      xValueMapper: (data, _) => data.category,
+                      yValueMapper: (data, _) => data.value,
+                      pointColorMapper: (data, _) => data.color,
+                      dataLabelSettings: const DataLabelSettings(isVisible: false),
+                      innerRadius: '70%',
+                    )
+                  ],
+                  annotations: <CircularChartAnnotation>[
+                    CircularChartAnnotation(
+                      widget: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("${presentIds.length}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text("Clocked In /\n${allStaffInState.length} Staffs", textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPunctualityChampion(StaffInfo? champion, AttendanceRecord? record) {
+    if (champion == null || record == null) {
+      return const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shield_moon_outlined, size: 80, color: Colors.grey),
+          SizedBox(height: 8),
+          Text("Punctuality Champion", style: TextStyle(fontWeight: FontWeight.bold)),
+          Text("No punctual staff today", style: TextStyle(color: Colors.grey)),
+        ],
+      );
+    }
+    final championImage = champion.imageUrl;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircleAvatar(
+          radius: 40,
+          backgroundColor: Colors.grey.shade200,
+          child: championImage != null && championImage.isNotEmpty
+              ? ClipOval(
+            child: Image.network(
+              championImage,
+              fit: BoxFit.cover, width: 80, height: 80,
+              loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : const CircularProgressIndicator(),
+              errorBuilder: (context, error, stackTrace) => Icon(champion.gender == 'Male' ? Icons.person : Icons.person_2, size: 50, color: Colors.grey),
+            ),
+          )
+              : Icon(champion.gender == 'Male' ? Icons.person : Icons.person_2, size: 50, color: Colors.grey.shade700),
+        ),
+        const SizedBox(height: 8),
+        const Text("Punctuality Champion", style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(champion.name, textAlign: TextAlign.center),
+        Text(champion.location, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Text(record.clockInTime, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildYetToClockInCard(DashboardData data) {
+    final yetToClockInList = data.yetToClockIn;
+    if (yetToClockInList.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 40),
+            SizedBox(height: 8),
+            Text("All staff have clocked in!", textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: yetToClockInList.length,
+      itemBuilder: (context, index) {
+        final staff = yetToClockInList[index];
+        return ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(
+            backgroundColor: Colors.red.shade100,
+            child: Text(
+              staff.name.isNotEmpty ? staff.name[0] : '?',
+              style: TextStyle(color: Colors.red.shade800),
+            ),
+          ),
+          title: Text(staff.name, style: const TextStyle(fontSize: 14)),
+          subtitle: Text(staff.location, style: const TextStyle(fontSize: 12)),
+        );
+      },
+    );
+  }
+
+  Widget _buildFacilityClockInCard(DashboardData data) {
+    return Column(
+      children: [
+        Expanded(
+          child: data.attendanceRecords.isEmpty
+              ? const Center(child: Text("No clock-in records found."))
+              : ListView.builder(
+            itemCount: data.attendanceRecords.length,
+            itemBuilder: (context, index) {
+              final record = data.attendanceRecords[index];
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(record.staffName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: Text('${record.staffLocation}\n${DateFormat('dd-MMM-yyyy').format(record.timestamp)}'),
+                isThreeLine: true,
+                trailing: Text(record.clockInTime, style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: record.isLate ? Colors.red : Colors.green
+                )),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimesheetStatusCard() {
+    return Column(
+      children: [
+        Text(
+            DateFormat('MMMM yyyy').format(DateTime(_selectedTimesheetYear, _selectedTimesheetMonth)),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)
+        ),
+        Expanded(
+          child: StreamBuilder<TimesheetMetrics>(
+            stream: _timesheetStreamController.stream,
+            builder: (context, snapshot) {
+              if (_isTimesheetLoading) return const Center(child: CircularProgressIndicator());
+              // FIX: Enhanced error handling to print to console
+              if (snapshot.hasError) {
+                debugPrint("Timesheet Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
+                return Center(child: Text("Error", style: const TextStyle(color: Colors.red)));
+              }
+              if (!snapshot.hasData || snapshot.data == null || snapshot.data!.totalExpected == 0) {
+                return const Center(child: Text("No Data", style: TextStyle(color: Colors.grey)));
+              }
+
+              final metrics = snapshot.data!;
+              final pendingSubmission = metrics.totalExpected - metrics.totalSubmitted;
+              final completionPercentage = metrics.totalExpected > 0 ? (metrics.fullyApproved / metrics.totalExpected) * 100 : 0.0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    _buildStatusRow('Expected', '${metrics.totalExpected} Staff', Colors.blue),
+                    _buildStatusRow('Pending Submission', '$pendingSubmission Staff', Colors.orange),
+                    _buildStatusRow('Pending Approval', '${metrics.pendingApproval} Timesheets', Colors.red),
+                    const Spacer(),
+                    Text('Overall Approval: ${completionPercentage.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: completionPercentage / 100,
+                      minHeight: 10,
+                      borderRadius: BorderRadius.circular(5),
+                      backgroundColor: Colors.grey.shade300,
+                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                    ),
+                    const Spacer(),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const TimesheetReviewPage()),
+                          );
+                        },
+                        child: const Text('View Details'),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildStatusRow(String title, String count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.circle, color: color, size: 10),
+              const SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          Text(count, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyTrendChart(DashboardData data) {
+    Map<String, Set<String>> dailyUniqueStaff = {};
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    for (var record in data.attendanceRecords) {
+      String day = DateFormat('E').format(record.timestamp);
+      dailyUniqueStaff.update(day, (value) => value..add(record.staffId), ifAbsent: () => {record.staffId});
+    }
+    final trendData = days.map((day) => ChartData(day, dailyUniqueStaff[day]?.length ?? 0)).toList();
+    return SfCartesianChart(
+      primaryXAxis: CategoryAxis(),
+      primaryYAxis: NumericAxis(title: AxisTitle(text: 'Unique Staff Count')),
+      tooltipBehavior: TooltipBehavior(enable: true),
+      series: [
+        ColumnSeries<ChartData, String>(
+          dataSource: trendData,
+          xValueMapper: (data, _) => data.category,
+          yValueMapper: (data, _) => data.value,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPerformanceGauge(DashboardData data) {
+    final totalStaff = data.staffList.length;
+    final presentToday = data.attendanceRecords.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(DateTime.now())).map((r) => r.staffId).toSet().length;
+    final percentage = totalStaff > 0 ? (presentToday / totalStaff) * 100 : 0.0;
+    return gauges.SfRadialGauge(
+      axes: [
+        gauges.RadialAxis(
+          minimum: 0,
+          maximum: 100,
+          showLabels: false,
+          showTicks: false,
+          axisLineStyle: gauges.AxisLineStyle(thickness: 0.2, thicknessUnit: gauges.GaugeSizeUnit.factor, cornerStyle: gauges.CornerStyle.bothCurve),
+          pointers: [
+            gauges.RangePointer(value: percentage, width: 0.2, sizeUnit: gauges.GaugeSizeUnit.factor, cornerStyle: gauges.CornerStyle.bothCurve, color: Colors.teal),
+            gauges.MarkerPointer(value: percentage, markerHeight: 10, markerWidth: 10, markerType: gauges.MarkerType.circle, color: Colors.white)
+          ],
+          annotations: <gauges.GaugeAnnotation>[
+            gauges.GaugeAnnotation(
+                widget: Text('${percentage.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)),
+                angle: 90,
+                positionFactor: 0.1)
+          ],
+        )
+      ],
+    );
+  }
+
+  // --- NEW LEAVE REQUEST CARD ---
+  Widget _buildLeaveRequestCard(DashboardData data) {
+
+    final pendingLeaves = data.pendingLeaves;
+    if (pendingLeaves.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.green, size: 40),
+            SizedBox(height: 8),
+            Text("No pending leave requests.", textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        Text(
+          "${pendingLeaves.length} Pending Request(s)",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+        ),
+        const Divider(),
+        Expanded(
+          child: ListView.builder(
+            itemCount: pendingLeaves.length,
+            itemBuilder: (context, index) {
+              final leave = pendingLeaves[index];
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(leave.staffName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                subtitle: Text(
+                    '${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})',
+                    style: const TextStyle(fontSize: 12)
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
 
-  Stream<List<AttendanceData>> _facilityAttendanceDataStream() {
-    final currentUserUUID = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserUUID == null || _currentUserState == null || _currentUserLocation == null) {
-      print("Could not retrieve user info to load facility attendance data stream.");
-      return Stream.value([]); // Return an empty stream if user info is missing
-    }
+  Widget _buildMoreAnalysisButton() {
+    return Center(
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.analytics_outlined),
+        label: const Text("View Detailed Attendance Analysis"),
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const HQAttendanceAnalysisPage(),
+          ));
+        },
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          textStyle: const TextStyle(fontSize: 16),
+        ),
+      ),
+    );
+  }
 
-    BehaviorSubject<List<AttendanceData>> dataSubject = BehaviorSubject<List<AttendanceData>>();
+  Widget _buildPlaceholderCard({required String title, required IconData icon}) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: Colors.grey.shade400),
+            const SizedBox(height: 10),
+            Text(title, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+            const Text("(To be implemented)", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    Future<void> fetchData() async {
-      DateFormat dateFormatter = DateFormat('dd-MMMM-yyyy');
-      String currentDateFormatted = dateFormatter.format(DateTime.now());
-      List<AttendanceData> attendanceDataList = [];
+// --- NEW FULL-SCREEN PAGE FOR LIVE FEED ---
+class LiveFeedFullScreenPage extends StatelessWidget {
+  final List<AttendanceRecord> records;
+  const LiveFeedFullScreenPage({super.key, required this.records});
 
-      int malePresentCount = 0;
-      int maleAbsentCount = 0;
-      int maleLateCount = 0;
-      int maleOnLeaveCount = 0;
-
-      int femalePresentCount = 0;
-      int femaleAbsentCount = 0;
-      int femaleLateCount = 0;
-      int femaleOnLeaveCount = 0;
-
-      int otherGenderPresentCount = 0; // For staff with no/unrecognized gender
-      int otherGenderAbsentCount = 0;
-      int otherGenderLateCount = 0;
-      int otherGenderOnLeaveCount = 0;
-
-
-      // --- All Staff Data (within location/state, no gender filter in query) ---
-      QuerySnapshot allStaffSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .where('state', isEqualTo: _currentUserState)
-          .where('location', isEqualTo: _currentUserLocation)
-          .get();
-
-      List<QueryDocumentSnapshot> maleStaffDocs = [];
-      List<QueryDocumentSnapshot> femaleStaffDocs = [];
-      List<QueryDocumentSnapshot> otherStaffDocs = [];
-
-      for (var staffDoc in allStaffSnapshot.docs) {
-        Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>;
-        // print("staffData ==$staffData");
-        String? gender = staffData['gender'] as String?;
-        if (gender == 'Male') {
-          print("MalestaffData ==$staffDoc");
-          maleStaffDocs.add(staffDoc);
-        } else if (gender == 'Female') {
-          // print("FemalestaffData ==$staffDoc");
-          femaleStaffDocs.add(staffDoc);
-        } else {
-          //print("OtherstaffData ==$staffDoc");
-          otherStaffDocs.add(staffDoc); // Staff with missing or other gender values
-        }
-      }
-
-      int totalMaleStaffCount = maleStaffDocs.length;
-      int totalFemaleStaffCount = femaleStaffDocs.length;
-      int totalOtherStaffCount = otherStaffDocs.length;
-
-
-      // --- Process Male Staff ---
-      // Reset counts before processing
-      malePresentCount2 = 0;
-      maleAbsentCount1 = 0;
-      maleLateCount1 = 0;
-
-      for (var staffDoc in maleStaffDocs) {
-        DocumentSnapshot recordSnapshot = await staffDoc.reference
-            .collection('Record')
-            .doc(currentDateFormatted)
-            .get();
-
-        print("MaleRecordSnapshot === $recordSnapshot");
-
-        if (recordSnapshot.exists) {
-          malePresentCount2++; // Increment present count
-          print("malePresentCount2Count ==$malePresentCount2");
-
-          // Check if "clockIn" field exists in the sub-document
-          var clockInTime = recordSnapshot.get("clockIn") ?? "";
-
-          if (clockInTime.isNotEmpty) {
-            DateTime parsedClockInTime = _parseTime(clockInTime);
-            DateTime lateThreshold = _parseTime("08:00 AM");
-
-            if (parsedClockInTime.isAfter(lateThreshold) || parsedClockInTime.isAtSameMomentAs(lateThreshold)) {
-              maleLateCount1++; // Increment late count
-            }
-          }
-
-          await _processAttendanceRecord(
-            recordSnapshot,
-            isMale: true,
-            onPresent: () => malePresentCount++,
-            onLate: () => maleLateCount++,
-            onLeave: () => maleOnLeaveCount++,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Full Clock-In Feed'),
+      ),
+      body: records.isEmpty
+          ? const Center(child: Text("No clock-in records to display."))
+          : ListView.builder(
+        padding: const EdgeInsets.all(8.0),
+        itemCount: records.length,
+        itemBuilder: (context, index) {
+          final record = records[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 4.0),
+            child: ListTile(
+              title: Text(record.staffName, style: const TextStyle(fontWeight: FontWeight.w500)),
+              subtitle: Text('${record.staffLocation} - ${DateFormat('dd-MMM-yyyy').format(record.timestamp)}'),
+              trailing: Text(record.clockInTime, style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: record.isLate ? Colors.red.shade700 : Colors.green.shade700,
+              )),
+            ),
           );
-
-          malePresentCount++; // Count as present if record exists and not late or on leave
-          print("malePresentCount === $malePresentCount");
-        } else {
-          maleAbsentCount1++; // Increment absent count if no record exists
-        }
-        // Print final global variable values
-        print("Global malePresentCount1 === $malePresentCount2");
-        print("Global maleAbsentCount1 === $maleAbsentCount1");
-        print("Global maleLateCount1 === $maleLateCount1");
-      }
-      maleAbsentCount = totalMaleStaffCount - malePresentCount - maleLateCount - maleOnLeaveCount;
-      if (maleAbsentCount < 0) maleAbsentCount = 0;
-
-
-      // --- Process Female Staff ---
-      for (var staffDoc in femaleStaffDocs) {
-        DocumentSnapshot recordSnapshot = await staffDoc.reference
-            .collection('Record')
-            .doc(currentDateFormatted)
-            .get();
-        if (await _processAttendanceRecord(recordSnapshot, isMale: false, onPresent: () => femalePresentCount++, onLate: () => femaleLateCount++, onLeave: () => femaleOnLeaveCount++)) {
-          femalePresentCount++; // Count as present if record exists and _processAttendanceRecord didn't handle late or leave
-        }
-        // Leave Request Check is now handled in _processAttendanceRecord
-      }
-      femaleAbsentCount = totalFemaleStaffCount - femalePresentCount - femaleLateCount - femaleOnLeaveCount;
-      if (femaleAbsentCount < 0) femaleAbsentCount = 0;
-
-
-      // --- Process Other Gender Staff (or missing gender) ---
-      int malePresentCount1 = 0;
-
-      for (var staffDoc in maleStaffDocs) {
-        DocumentSnapshot recordSnapshot = await staffDoc.reference
-            .collection('Record')
-            .doc(currentDateFormatted)
-            .get();
-
-        print("MaleRecordSnapshot === $recordSnapshot");
-
-        if (recordSnapshot.exists) {
-          malePresentCount1++; // Increment count if a record exists for the current month
-
-          await _processAttendanceRecord(
-            recordSnapshot,
-            isMale: true,
-            onPresent: () => malePresentCount++,
-            onLate: () => maleLateCount++,
-            onLeave: () => maleOnLeaveCount++,
-          );
-
-          malePresentCount++; // Count as present if record exists and no late or leave detected
-          print("malePresentCount === $malePresentCount");
-        }
-      }
-
-      print("malePresentCount1 === $malePresentCount1");
-
-      otherGenderAbsentCount = totalOtherStaffCount - otherGenderPresentCount - otherGenderLateCount - otherGenderOnLeaveCount;
-      if (otherGenderAbsentCount < 0) otherGenderAbsentCount = 0;
-
-
-      // --- Overall Attendance Data for Chart ---
-      attendanceDataList.add(AttendanceData('Present', malePresentCount + femalePresentCount + otherGenderPresentCount));
-      attendanceDataList.add(AttendanceData('Absent', maleAbsentCount + femaleAbsentCount + otherGenderAbsentCount));
-      attendanceDataList.add(AttendanceData('Late', maleLateCount + femaleLateCount + otherGenderLateCount));
-      attendanceDataList.add(AttendanceData('On Leave', maleOnLeaveCount + femaleOnLeaveCount + otherGenderOnLeaveCount));
-
-
-      // --- Update UI via Stream ---
-      dataSubject.add(attendanceDataList);
-    }
-
-    fetchData(); // Initial data fetch
-    return dataSubject.stream;
+        },
+      ),
+    );
   }
-
-  // Helper function to process attendance record and leave request (DRY principle)
-  Future<bool> _processAttendanceRecord(DocumentSnapshot recordSnapshot, {required bool isMale, required VoidCallback onPresent, required VoidCallback onLate, required VoidCallback onLeave}) async {
-    DateFormat dateFormatter = DateFormat('dd-MMMM-yyyy');
-    String currentDateFormatted = dateFormatter.format(DateTime.now());
-
-    String genderType = isMale ? 'Male' : 'Female'; // For potential logging/debugging
-
-    if (recordSnapshot.exists) {
-      Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>? ?? {};
-      String? clockInTime = recordData['clockIn'] as String?;
-      if (clockInTime != null) {
-        try {
-          DateFormat timeFormat = DateFormat('hh:mm a');
-          DateTime clockInDateTime = timeFormat.parse(clockInTime);
-          DateTime lateTime = timeFormat.parse('8:00 AM');
-          if (clockInDateTime.isAfter(lateTime) || clockInDateTime.isAtSameMomentAs(lateTime)) {
-            onLate(); // Increment late count
-            return false; // Indicate not just 'present' - was handled as late
-          }
-        } catch (e) {
-          print("Error parsing clockIn time for $genderType staff: $e");
-        }
-      }
-
-      // Leave Request Check - Moved inside _processAttendanceRecord for reusability
-      final staffDocRef = recordSnapshot.reference.parent.parent; // Get the Staff document reference
-
-      if (staffDocRef != null) { // Null check here!
-        QuerySnapshot leaveRequestSnapshot = await staffDocRef.collection('Leave Request').get();
-        for (var leaveDoc in leaveRequestSnapshot.docs) {
-          Map<String, dynamic> leaveData = leaveDoc.data() as Map<String, dynamic>? ?? {};
-          var startDateFieldValue = leaveData['startDate'];
-          var endDateFieldValue = leaveData['endDate'];
-
-          Timestamp? startDateTimestamp;
-          Timestamp? endDateTimestamp;
-
-          if (startDateFieldValue is Timestamp) {
-            startDateTimestamp = startDateFieldValue;
-          } else {
-            print("Warning: startDate is not a Timestamp for $genderType staff, Leave Doc ${leaveDoc.id}. Value: $startDateFieldValue, Type: ${startDateFieldValue.runtimeType}");
-            continue;
-          }
-          if (endDateFieldValue is Timestamp) {
-            endDateTimestamp = endDateFieldValue;
-          } else {
-            print("Warning: endDate is not a Timestamp for $genderType staff, Leave Doc ${leaveDoc.id}. Value: $endDateFieldValue, Type: ${endDateFieldValue.runtimeType}");
-            continue;
-          }
-
-          DateTime startDate = startDateTimestamp.toDate();
-          DateTime endDate = endDateTimestamp.toDate();
-          DateTime now = DateTime.now();
-          if (now.isAfter(startDate.subtract(const Duration(days: 1))) && now.isBefore(endDate.add(const Duration(days: 1)))) {
-            onLeave(); // Increment on leave count
-            return false; // Indicate not just 'present' - was handled as on leave
-          }
-                }
-      } else {
-        print("Warning: Could not get Staff Document Reference to check for Leave Requests.");
-      }
-
-
-      onPresent(); // Increment present if not late and not on leave
-      return true; // Indicate was handled as present (or potentially late/leave in callbacks)
-    }
-    return false; // No record, not present (will be counted as absent)
-  }
-
-}
-
-class AttendanceData {
-  final String status;
-  final int count;
-  AttendanceData(this.status, this.count);
-}
-
-class WeeklyTrendData {
-  final String day;
-  final double percentage;
-  WeeklyTrendData(this.day, this.percentage);
-}
-
-class TaskCompletionData {
-  final String task;
-  final double completion;
-  TaskCompletionData(this.task, this.completion);
-}
-
-class GeolocationComplianceData {
-  final String hour;
-  final double locationCompliance;
-  final double other;
-
-  GeolocationComplianceData(this.hour, this.locationCompliance, this.other);
-}
-
-
-List<AttendanceData> getAttendanceData() {
-  return [
-    AttendanceData('Present', 120),
-    AttendanceData('Absent', 30),
-    AttendanceData('Late', 20),
-    AttendanceData('On Leave', 10),
-  ];
-}
-
-
-List<WeeklyTrendData> getWeeklyTrendData() {
-  return [
-    WeeklyTrendData('Mon', 80),
-    WeeklyTrendData('Tue', 85),
-    WeeklyTrendData('Wed', 78),
-    WeeklyTrendData('Thu', 88),
-    WeeklyTrendData('Fri', 90),
-  ];
-}
-
-List<TaskCompletionData> getTaskCompletionData() {
-  return [
-    TaskCompletionData('Task A', 90),
-    TaskCompletionData('Task B', 75),
-    TaskCompletionData('Task C', 60),
-    TaskCompletionData('Task D', 85),
-    TaskCompletionData('Task E', 70),
-  ];
-}
-
-List<GeolocationComplianceData> getGeolocationComplianceData() {
-  return [
-    GeolocationComplianceData('0h', 100, 50),
-    GeolocationComplianceData('1h', 200, 100),
-    GeolocationComplianceData('2h', 300, 150),
-    GeolocationComplianceData('3h', 400, 200),
-    GeolocationComplianceData('4h', 500, 250),
-    GeolocationComplianceData('5h', 600, 300),
-    GeolocationComplianceData('6h', 700, 400),
-    GeolocationComplianceData('7h', 800, 500),
-    GeolocationComplianceData('8h', 700, 400),
-    GeolocationComplianceData('9h', 600, 300),
-    GeolocationComplianceData('10h', 500, 200),
-    GeolocationComplianceData('11h', 400, 150),
-  ];
-}
-
-
-class LeaveRequestData {
-  final String employeeName;
-  final String leaveType;
-  final String startDate;
-  LeaveRequestData(this.employeeName, this.leaveType, this.startDate);
-}
-
-List<LeaveRequestData> getPendingLeaveRequests() {
-  return [
-    LeaveRequestData('John Doe', 'Vacation', '2024-08-10'),
-    LeaveRequestData('Jane Smith', 'Sick Leave', '2024-08-12'),
-  ];
-}
-
-List<LeaveRequestData> getUpcomingLeaves() {
-  return [
-    LeaveRequestData('Alice Johnson', 'Vacation', '2024-08-15'),
-    LeaveRequestData('Bob Williams', 'Personal Leave', '2024-08-18'),
-  ];
-}
-
-class TaskData {
-  final String status;
-  final int count;
-  TaskData(this.status, this.count);
-}
-
-List<TaskData> getTaskStatusData() {
-  return [
-    TaskData('In Progress', 12),
-    TaskData('Overdue', 2),
-  ];
-}
-
-class AttendanceData1 {
-  final String status;
-  final int count;
-  AttendanceData1(this.status, this.count);
-}
-
-List<AttendanceData> getAttendanceData1() {
-  return [
-    AttendanceData('Present', 85),
-    AttendanceData('Absent', 5),
-    AttendanceData('On Leave', 8),
-    AttendanceData('Late', 2),
-  ];
-}
-
-class WeeklyAttendanceTrend1 {
-  final String day;
-  final double onTimePercentage;
-  WeeklyAttendanceTrend1(this.day, this.onTimePercentage);
-}
-
-List<WeeklyAttendanceTrend1> getWeeklyTrendData1() {
-  return [
-    WeeklyAttendanceTrend1('Mon', 92),
-    WeeklyAttendanceTrend1('Tue', 95),
-    WeeklyAttendanceTrend1('Wed', 90),
-    WeeklyAttendanceTrend1('Thu', 93),
-    WeeklyAttendanceTrend1('Fri', 96),
-  ];
 }

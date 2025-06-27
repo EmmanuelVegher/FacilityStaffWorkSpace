@@ -18,7 +18,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await loadModels(); // Load models first
+  await loadModels(); // Load models once here
 
   runApp(const MyApp());
 }
@@ -56,25 +56,18 @@ class SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    _goToLogin();
   }
 
-  Future<void> _initializeApp() async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    await loadModels();
-
-    // Short delay to show animation
-    await Future.delayed(const Duration(seconds: 2));
-
-    Get.offNamed('/login');
+  Future<void> _goToLogin() async {
+    await Future.delayed(const Duration(seconds: 3));
+    Get.offNamed('/login'); // Navigate to login screen
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // You can change this if needed
+      backgroundColor: Colors.white,
       body: Center(
         child: Lottie.asset(
           'assets/lottie/loading.json',

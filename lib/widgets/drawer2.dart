@@ -11,6 +11,7 @@ import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
+import '../screens/leave_request/leave_request_review_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
@@ -194,27 +195,27 @@ Widget drawer2(
             height: 1,
           ),
 
-          ListTile(
-            leading: Icon(
-              Icons.task,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Create Activity',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const CreateActivityPage()),
-
-              );
-            },
-          ),
+          // ListTile(
+          //   leading: Icon(
+          //     Icons.task,
+          //     size: drawerIconSize,
+          //     color: Colors.blue,
+          //   ),
+          //   title: Text(
+          //     'Create Activity',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //           builder: (context) => const CreateActivityPage()),
+          //
+          //     );
+          //   },
+          // ),
 
           const Divider(
             color: Colors.grey,
@@ -228,7 +229,7 @@ Widget drawer2(
               color: Colors.blue,
             ),
             title: Text(
-              'Call Tracker',
+              'Call Tracking Report',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -256,7 +257,7 @@ Widget drawer2(
               color: Colors.blue,
             ),
             title: Text(
-              'Viral Load Tracker',
+              'Viral Load Tracking Report',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -284,7 +285,7 @@ Widget drawer2(
               color: Colors.blue,
             ),
             title: Text(
-              'EAC Tracker',
+              'EAC Tracking Report',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -322,6 +323,34 @@ Widget drawer2(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const TimesheetReviewPage()),
+
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          ListTile(
+            leading: Icon(
+              Icons.holiday_village,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'View Leave Requests',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const LeaveRequestReviewPage()),
 
               );
             },
