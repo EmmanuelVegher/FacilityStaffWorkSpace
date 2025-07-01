@@ -41,18 +41,30 @@ class AnimatedNumberText extends StatelessWidget {
   }
 }
 
+// In --- WIDGETS AND MODELS --- section
 
 class StaffInfo {
   final String id;
   final String name;
   final String state;
-  StaffInfo({required this.id, required this.name, required this.state});
+  final String location;     // Added
+  final String emailAddress; // Added
+
+  StaffInfo({
+    required this.id,
+    required this.name,
+    required this.state,
+    required this.location,     // Added
+    required this.emailAddress, // Added
+  });
 }
 
 // FIX 2: 'totalStaff' is no longer final to allow for modification during aggregation.
+// In --- WIDGETS AND MODELS --- section
+
 class StateAttendanceData {
   final String state;
-  int totalStaff; // Removed 'final' to make it mutable
+  int totalStaff;
   int present;
   int late;
   int onLeave;
@@ -65,8 +77,11 @@ class StateAttendanceData {
     this.onLeave = 0,
   });
 
-  int get absent => totalStaff - present - onLeave;
-  double get attendancePercentage => totalStaff > 0 ? (present / (totalStaff - onLeave)) * 100 : 0.0;
+  // Add this new getter
+  int get expectedAttendance => totalStaff - onLeave;
+
+  int get absent => expectedAttendance - present; // Also makes sense to update absent logic
+  double get attendancePercentage => expectedAttendance > 0 ? (present / expectedAttendance) * 100 : 0.0;
 }
 
 class NationwideSummary {
@@ -104,6 +119,9 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
   String _selectedState = 'All States';
   List<String> _states = ['All States'];
 
+  // Add this map to store detailed staff info
+  Map<String, StaffInfo> _staffMap = {};
+
   NationwideSummary _nationwideSummary = NationwideSummary();
   List<StateAttendanceData> _attendanceByStateData = [];
   List<Map<String, dynamic>> _liveClockInData = [];
@@ -125,7 +143,11 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
 
   Future<void> _fetchAvailableStates() async {
     try {
-      final staffSnapshot = await _firestore.collection('Staff').get();
+      // --- UPDATE THIS LINE ---
+      final staffSnapshot = await _firestore
+          .collection('Staff')
+          .where('staffCategory', isEqualTo: 'Facility Staff') // Add this filter
+          .get();
 
       // FIX 1: Use `whereType<String>()` to filter out nulls and correctly cast the collection type.
       final statesSet = staffSnapshot.docs
@@ -138,6 +160,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
           _states = ['All States', ...statesSet.toList()..sort()];
         });
       }
+
     } catch (e) {
       debugPrint("Error fetching states: $e");
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching states: $e")));
@@ -151,17 +174,25 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
     final lateCutoff = DateTime(now.year, now.month, now.day, 9, 0, 0);
 
     Query<Map<String, dynamic>> staffQuery = _firestore.collection('Staff');
+
+    // Add the filter for "Facility Staff"
+    staffQuery = staffQuery.where('staffCategory', isEqualTo: 'Facility Staff');
+
     if (_selectedState != 'All States') {
       staffQuery = staffQuery.where('state', isEqualTo: _selectedState);
     }
 
     final staffSnapshot = await staffQuery.get();
+    // Update this map creation to include the new fields
     final staffMap = {
       for (var doc in staffSnapshot.docs)
         doc.id: StaffInfo(
             id: doc.id,
             name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
-            state: doc.data()['state'] ?? 'Unknown'
+            state: doc.data()['state'] ?? 'Unknown',
+            // Fetch new fields, with fallbacks for null data
+            location: doc.data()['location'] ?? doc.data()['state'] ?? 'N/A',
+            emailAddress: doc.data()['emailAddress'] ?? 'No Email Provided'
         )
     };
     final staffIds = staffMap.keys.toList();
@@ -221,6 +252,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
 
     if (mounted) {
       setState(() {
+        _staffMap = staffMap; // Store the detailed staff map in the state variable
         _attendanceByStateData = stateDataMap.values.toList()..sort((a,b) => a.state.compareTo(b.state));
         _nationwideSummary = summary;
         _liveClockInData = liveFeed;
@@ -376,42 +408,174 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
     );
   }
 
+// In class HQDashboardScreenState
+
+// In class HQDashboardScreenState
+
+
+// In class HQDashboardScreenState
+
+// In class HQDashboardScreenState
+
+// In class HQDashboardScreenState
+
   Widget _buildAttendanceByStateChart() {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Attendance Rate by State', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 300,
-              child: SfCartesianChart(
-                primaryXAxis: CategoryAxis(majorGridLines: const MajorGridLines(width: 0)),
-                primaryYAxis: NumericAxis(maximum: 100, title: AxisTitle(text: 'Attendance %'), majorTickLines: const MajorTickLines(size: 0)),
-                tooltipBehavior: TooltipBehavior(enable: true, format: 'point.x: point.y%'),
-                series: <CartesianSeries<StateAttendanceData, String>>[
-                  ColumnSeries<StateAttendanceData, String>(
-                      dataSource: _attendanceByStateData,
-                      xValueMapper: (data, _) => data.state,
-                      yValueMapper: (data, _) => data.attendancePercentage,
-                      name: 'Attendance',
-                      color: Colors.teal,
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      dataLabelSettings: DataLabelSettings(isVisible: true, labelAlignment: ChartDataLabelAlignment.top, builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
-                        return Text('${(data as StateAttendanceData).attendancePercentage.toStringAsFixed(0)}%');
-                      }))
-                ],
-              ),
+        child: SizedBox(
+          height: 350,
+          child: SfCartesianChart(
+            title: ChartTitle(
+                text: 'Attendance by State',
+                textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)
             ),
-          ],
+            primaryXAxis: CategoryAxis(
+              majorGridLines: const MajorGridLines(width: 0),
+              axisLine: const AxisLine(width: 0.8, color: Colors.black54),
+            ),
+            primaryYAxis: NumericAxis(
+              title: AxisTitle(text: 'Number of Staff'),
+              majorGridLines: const MajorGridLines(width: 0.5),
+              axisLine: const AxisLine(width: 0),
+              majorTickLines: const MajorTickLines(size: 0),
+            ),
+            legend: const Legend(
+              isVisible: true,
+              position: LegendPosition.bottom,
+              overflowMode: LegendItemOverflowMode.wrap,
+            ),
+            tooltipBehavior: TooltipBehavior(enable: true, format: 'point.series.name: point.y'),
+            selectionType: SelectionType.point,
+            selectionGesture: ActivationMode.singleTap,
+            onSelectionChanged: (SelectionArgs args) {
+              if (args.pointIndex != null) {
+                final String tappedState = _attendanceByStateData[args.pointIndex!].state;
+                _showUsersInStateDialog(tappedState);
+              }
+            },
+            series: <CartesianSeries<StateAttendanceData, String>>[
+              // --- BAR 1: Total Expected Attendance (Updated) ---
+              ColumnSeries<StateAttendanceData, String>(
+                dataSource: _attendanceByStateData,
+                xValueMapper: (data, _) => data.state,
+                yValueMapper: (data, _) => data.expectedAttendance,
+                name: 'Total Expected Attendance',
+                // 1. Warmer Color
+                color: const Color(0xFFE57373), // A soft, warm red
+                // 2. Curved Edges
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                // 3. Space between bars
+                spacing: 0.2,
+                selectionBehavior: SelectionBehavior(enable: true),
+                // 4. Data label with total figure
+                dataLabelSettings: const DataLabelSettings(
+                  isVisible: true,
+                  textStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+              // --- BAR 2: Total Present Today (Updated) ---
+              ColumnSeries<StateAttendanceData, String>(
+                dataSource: _attendanceByStateData,
+                xValueMapper: (data, _) => data.state,
+                yValueMapper: (data, _) => data.present,
+                name: 'Total Present Today',
+                // 1. Warmer Color
+                color: const Color(0xFFFFB74D), // A warm amber/gold
+                // 2. Curved Edges
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                // 3. Space between bars
+                spacing: 0.2,
+                selectionBehavior: SelectionBehavior(enable: true),
+                // 4. Data label with total figure AND percentage
+                dataLabelSettings: DataLabelSettings(
+                  isVisible: true,
+                  builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
+                    final stateData = data as StateAttendanceData;
+                    final percentage = stateData.attendancePercentage;
+
+                    // Don't show a label if no one is present
+                    if (stateData.present <= 0) {
+                      return const SizedBox.shrink();
+                    }
+
+                    // Combine the total count and the percentage in one string
+                    final labelText = '${stateData.present} (${percentage.toStringAsFixed(0)}%)';
+
+                    return Text(
+                      labelText,
+                      style: const TextStyle(
+                        // 5. Black text color
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+
+  void _showUsersInStateDialog(String state) {
+    // Filter the staff list based on the selected state from the chart
+    final List<StaffInfo> usersInState =
+    _staffMap.values.where((user) => user.state == state).toList();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Users in $state'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: usersInState.isEmpty
+                ? const Center(
+                child: Text('No user data available for this state.'))
+                : ListView.builder(
+              shrinkWrap: true,
+              itemCount: usersInState.length,
+              itemBuilder: (context, index) {
+                final user = usersInState[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: ListTile(
+                    title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text('Location: ${user.location}'),
+                        Text('Email: ${user.emailAddress}'),
+                      ],
+                    ),
+                    isThreeLine: true,
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 
 
   Widget _buildLiveClockInCard() {

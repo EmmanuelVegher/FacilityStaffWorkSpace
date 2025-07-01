@@ -1052,7 +1052,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
                   return DataRow(cells: [
                     DataCell(Text(_maskClientName(contact.name))), DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
                     DataCell(Text(contact.artStatus ?? 'N/A')), DataCell(Text(contact.facilityName ?? 'N/A')),
-                    DataCell(Text(contact.state ?? 'N/A')), DataCell(Text(contact.uniqueID ?? 'N/A')), DataCell(Text(contact.datimCode ?? 'N/A')),
+                    DataCell(Text(contact.state ?? 'N/A')), DataCell(Text(_maskClientName(contact.uniqueID))), DataCell(Text(contact.datimCode ?? 'N/A')),
                     DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
                     DataCell(Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
