@@ -82,6 +82,7 @@ class TimesheetMetrics {
 }
 
 // FIX: New model for Leave Requests
+// FIX: New model for Leave Requests
 class LeaveRequest {
   final String staffName;
   final String leaveType;
@@ -98,21 +99,37 @@ class LeaveRequest {
   });
 
   factory LeaveRequest.fromMap(Map<String, dynamic> map) {
-    // Helper to safely parse date strings
-    DateTime _parseDate(String? dateStr) {
-      if (dateStr == null) return DateTime.now();
-      try {
-        return DateTime.parse(dateStr);
-      } catch (e) {
-        return DateTime.now();
+    // --- CORRECTED HELPER FUNCTION ---
+    // This new helper can handle both Firestore Timestamps and String dates.
+    DateTime _parseFirestoreDate(dynamic dateValue) {
+      if (dateValue == null) return DateTime.now();
+
+      // Check if the value is a Firestore Timestamp
+      if (dateValue is Timestamp) {
+        return dateValue.toDate();
       }
+
+      // Check if the value is a String (for legacy data or other formats)
+      if (dateValue is String) {
+        try {
+          return DateTime.parse(dateValue);
+        } catch (e) {
+          // Fallback if parsing fails
+          return DateTime.now();
+        }
+      }
+
+      // Fallback for any other unexpected type
+      return DateTime.now();
     }
+    // --- END OF CORRECTION ---
 
     return LeaveRequest(
       staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parseDate(map['startDate']),
-      endDate: _parseDate(map['endDate']),
+      // Now use the new, robust helper function
+      startDate: _parseFirestoreDate(map['startDate']),
+      endDate: _parseFirestoreDate(map['endDate']),
       status: map['status'] ?? 'Pending',
     );
   }

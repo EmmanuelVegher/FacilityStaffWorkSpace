@@ -48,7 +48,6 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   // --- State variables for filters and context ---
   bool _isFilterLoading = true;
   bool _isInitialState = true;
-  String? _selectedFacility;
   List<String> _availableFacilities = [];
 
   // User Bio Details
@@ -57,8 +56,12 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   String? userDesignation;
   String? userState;
 
-  // NEW: Add a ScrollController for the detailed log table
-  final ScrollController _logTableController = ScrollController();
+  // --- REWRITTEN: Controller management for expandable widgets ---
+  List<ScrollController> _logTableControllers = [];
+  int _currentlyExpandedDateIndex = -1;
+  bool _isClientSummaryExpanded = false;
+  final ScrollController _clientSummaryScrollController = ScrollController();
+
 
   // Chart Data Holders
   List<MapEntry<String, int>> callStatusChartData = [];
@@ -66,12 +69,18 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   List<_UpdateChartData> updateMetricsData = [];
   List<MapEntry<String, int>> artStatusChartData = [];
 
-  // --- NEW State variables for extra filters and calculations ---
-  List<ContactTracked> _masterContactList = []; // Holds all data from Firestore before final filtering
+  // --- State variables for multi-select filters and calculations ---
+  List<ContactTracked> _masterContactList = [];
+  List<String> _selectedFacilities = [];
   List<String> _availableTrackers = ['All Trackers'];
-  String _selectedTracker = 'All Trackers';
+  List<String> _selectedTrackers = ['All Trackers'];
+  List<String> _availableCallStatuses = ['All Statuses'];
+  List<String> _selectedCallStatuses = ['All Statuses'];
+  // --- REWRITTEN: Three separate costs for detailed reporting ---
   double _totalCallCost = 0.0;
-  final double _costPerSecond = 0.23; // Call cost rate as specified
+  double _outgoingAnsweredCost = 0.0;
+  double _incomingAnsweredCost = 0.0;
+  final double _costPerSecond = 0.25;
 
   @override
   void initState() {
@@ -84,70 +93,80 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 
   @override
   void dispose() {
-    // NEW: Dispose of the controller
-    _logTableController.dispose();
+    for (final controller in _logTableControllers) {
+      controller.dispose();
+    }
+    _clientSummaryScrollController.dispose();
     super.dispose();
   }
 
-  // In _ReportsPageWeb2State class
-
-  /// Populates the tracker dropdown list from the master data.
-// In _ReportsPageWeb2State class
-
-  /// Populates the tracker dropdown list from the master data.
-  void _updateAvailableTrackers() {
+  void _updateAvailableFiltersFromData() {
     if (_masterContactList.isEmpty) {
       setState(() {
         _availableTrackers = ['All Trackers'];
-        _selectedTracker = 'All Trackers';
+        _selectedTrackers = ['All Trackers'];
+        _availableCallStatuses = ['All Statuses'];
+        _selectedCallStatuses = ['All Statuses'];
       });
       return;
     }
 
-    // Use a Set to get unique tracker names from the fetched data
-    final trackers = _masterContactList
-        .map((contact) => contact.trackedBy) // 1. Get an Iterable<String?>
-        .whereType<String>()                 // 2. Filter out nulls AND get a type-safe Iterable<String>
-        .where((name) => name.isNotEmpty)   // 3. Now safely filter out empty strings
-        .toSet();                           // 4. This results in a Set<String>
+    final trackers = _masterContactList.map((c) => c.trackedBy).whereType<String>().where((t) => t.isNotEmpty).toSet();
+    final statuses = _masterContactList.map((c) => c.callStatus).whereType<String>().where((s) => s.isNotEmpty).toSet();
 
     setState(() {
-      // This assignment is now type-safe because 'trackers' is a Set<String>
       _availableTrackers = ['All Trackers', ...trackers.toList()..sort()];
+      _availableCallStatuses = ['All Statuses', ...statuses.toList()..sort()];
 
-      // If the previously selected tracker is no longer in the list after a refresh, reset it.
-      if (!_availableTrackers.contains(_selectedTracker)) {
-        _selectedTracker = 'All Trackers';
-      }
+      _selectedTrackers.retainWhere((t) => _availableTrackers.contains(t));
+      if (_selectedTrackers.isEmpty) _selectedTrackers = ['All Trackers'];
+
+      _selectedCallStatuses.retainWhere((s) => _availableCallStatuses.contains(s));
+      if (_selectedCallStatuses.isEmpty) _selectedCallStatuses = ['All Statuses'];
     });
   }
 
-  /// Applies the selected tracker filter to the master list and recalculates all metrics.
-  // In _ReportsPageWeb2State class
+  // --- REWRITTEN: This function now calculates three separate costs ---
+  void _applyAllFiltersAndRecalculate() {
+    List<ContactTracked> filteredList = List.from(_masterContactList);
 
-  /// Applies the selected tracker filter to the master list and recalculates all metrics.
-  void _applyTrackerAndRecalculate() {
-    List<ContactTracked> filteredList;
-
-    // Filter the master list based on the selected tracker
-    if (_selectedTracker != 'All Trackers') {
-      filteredList = _masterContactList.where((c) => c.trackedBy == _selectedTracker).toList();
-    } else {
-      // If 'All Trackers' is selected, use the whole master list
-      filteredList = List.from(_masterContactList);
+    if (!_selectedTrackers.contains('All Trackers') && _selectedTrackers.isNotEmpty) {
+      filteredList = filteredList.where((c) => _selectedTrackers.contains(c.trackedBy)).toList();
     }
 
-    // Calculate total call cost based on the *final filtered* list
-    int totalDurationInSeconds = filteredList.fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+    if (!_selectedCallStatuses.contains('All Statuses') && _selectedCallStatuses.isNotEmpty) {
+      filteredList = filteredList.where((c) => _selectedCallStatuses.contains(c.callStatus)).toList();
+    }
 
-    // --- CALCULATION UPDATED ---
-    // The cost is now total seconds multiplied by the cost per second.
-    double calculatedCost = totalDurationInSeconds * _costPerSecond;
+    // 1. Total cost for ALL calls
+    int totalDurationInSeconds = filteredList.fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+    double calculatedTotalCost = totalDurationInSeconds * _costPerSecond;
+
+    // 2. Cost for "Answered" calls
+    int outgoingDuration = filteredList
+        .where((c) => c.callStatus?.toLowerCase() == 'answered')
+        .fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+    double calculatedOutgoingCost = outgoingDuration * _costPerSecond;
+
+    // 3. Cost for "Incoming Answered" calls
+    int incomingDuration = filteredList
+        .where((c) => c.callStatus?.toLowerCase() == 'incoming answered')
+        .fold(0, (sum, contact) => sum + (contact.callDuration ?? 0));
+    double calculatedIncomingCost = incomingDuration * _costPerSecond;
 
     setState(() {
-      trackedContacts = filteredList; // This is the list the UI will display
-      _totalCallCost = calculatedCost;
-      _prepareChartData(); // Re-run chart calculations on the final filtered data
+      trackedContacts = filteredList;
+      _totalCallCost = calculatedTotalCost;
+      _outgoingAnsweredCost = calculatedOutgoingCost;
+      _incomingAnsweredCost = calculatedIncomingCost;
+      _prepareChartData();
+      _currentlyExpandedDateIndex = trackedContacts.isNotEmpty ? 0 : -1;
+
+      for (final controller in _logTableControllers) {
+        controller.dispose();
+      }
+      final dateGroups = _groupContactsByDate();
+      _logTableControllers = List.generate(dateGroups.length, (_) => ScrollController());
     });
   }
 
@@ -160,6 +179,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       if (mounted) {
         setState(() {
           _availableFacilities = ['All Facilities', ...facilities];
+          _selectedFacilities = ['All Facilities'];
           _isFilterLoading = false;
         });
       }
@@ -204,7 +224,13 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 
   Future<List<String>> _getFacilitiesForState(String state) async {
     try {
-      final snapshot = await _firestore.collection('Location').doc(state).collection(state).get();
+      final snapshot = await _firestore
+          .collection('Location')
+          .doc(state)
+          .collection(state)
+          .where('category', isEqualTo: 'Facility')
+          .get();
+
       final List<String> facilityNames = [];
       for (final doc in snapshot.docs) {
         final locationName = doc.data()['LocationName'] as String?;
@@ -216,215 +242,18 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       return facilityNames;
     } catch (e) {
       debugPrint("Error fetching facilities for state '$state': $e");
-      _showSnackBar("Error fetching facility list: $e");
+      if (e.toString().contains('INDEX_NOT_FOUND') || e.toString().contains('requires an index')) {
+        _showSnackBar("A database index is required for this query. Please create it in your Firebase console.");
+      } else {
+        _showSnackBar("Error fetching facility list: $e");
+      }
       return [];
     }
   }
 
-  // --- NEW, ROBUST DATA LOADING METHOD BASED ON EXACT PATH ---
-// --- CORRECTED DATA LOADING METHOD ---
-// This version precisely matches your path: .../{facilityName}/{formattedDate}/{user_id}/{user_id}/{uuid}
-// --- NEW ROBUST DATA LOADING METHOD ---
-// This version avoids the "ghost document" problem by first fetching a list of users.
-// --- THE NEW, FAST & SIMPLE DATA LOADING METHOD ---
-// This works because the `_syncPendingRecords` fix creates real, queryable documents.
-
-//   Future<void> _loadReports() async {
-//     if (_selectedFacility == null) {
-//       _showSnackBar("Please select a facility to generate a report.");
-//       return;
-//     }
-//     if (startDate == null || endDate == null) {
-//       _showSnackBar("Please select a valid date range.");
-//       return;
-//     }
-//     if (userState == null) {
-//       _showSnackBar("Cannot load reports: User state is missing.");
-//       return;
-//     }
-//
-//     setState(() {
-//       isLoading = true;
-//       _isInitialState = false;
-//       _errorMessage = null;
-//       trackedContacts.clear();
-//     });
-//
-//     try {
-//       List<String> facilitiesToQuery;
-//       if (_selectedFacility == 'All Facilities') {
-//         facilitiesToQuery = List.from(_availableFacilities)..remove('All Facilities');
-//       } else {
-//         facilitiesToQuery = [_selectedFacility!];
-//       }
-//
-//       List<ContactTracked> fetchedContacts = [];
-//       final DateFormat pathDateFormat = DateFormat('dd-MMM-yyyy');
-//
-//       // Loop 1: Iterate through each selected facility
-//       for (final facility in facilitiesToQuery) {
-//         final String facilityName = facility.trim();
-//
-//         DateTime currentDate = startDate!;
-//         // Loop 2: Iterate through each day in the date range
-//         while (currentDate.isBefore(endDate!.add(const Duration(days: 1)))) {
-//           String formattedDate = pathDateFormat.format(currentDate);
-//
-//           try {
-//             // 1. Get a reference to the collection of USERS for that day
-//             CollectionReference usersCollectionRef = _firestore
-//                 .collection('Reports')
-//                 .doc(userState!)
-//                 .collection('CallTracker')
-//                 .doc(facilityName)
-//                 .collection(formattedDate); // The date is a collection
-//
-//             // 2. Get all REAL documents from that date collection. This will now work!
-//             QuerySnapshot userSnapshot = await usersCollectionRef.get();
-//
-//             // Loop 3: Iterate through each user document found for that day
-//             for (final userDoc in userSnapshot.docs) {
-//               String userId = userDoc.id;
-//
-//               // 3. Get the sub-collection of calls
-//               CollectionReference callsCollectionRef = userDoc.reference.collection(userId);
-//
-//               QuerySnapshot callsSnapshot = await callsCollectionRef.get();
-//               for (var callDoc in callsSnapshot.docs) {
-//                 if (callDoc.exists && callDoc.data() != null) {
-//                   fetchedContacts.add(ContactTracked.fromFirestore(callDoc.data() as Map<String, dynamic>, callDoc.id));
-//                 }
-//               }
-//             }
-//           } catch (e) {
-//             // Safely ignore errors for non-existent paths
-//           }
-//           currentDate = currentDate.add(const Duration(days: 1));
-//         }
-//       }
-//
-//       if (mounted) {
-//         setState(() {
-//           trackedContacts = fetchedContacts;
-//           _prepareChartData();
-//           isLoading = false;
-//         });
-//       }
-//     } catch (e) {
-//       if (mounted) {
-//         setState(() {
-//           isLoading = false;
-//           _errorMessage = "A major error occurred while loading reports: $e";
-//           trackedContacts = [];
-//           _prepareChartData();
-//         });
-//       }
-//     }
-//   }
-
-  // In _ReportsPageWeb2State class
-
-  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
-// In _ReportsPageWeb2State class
-
-  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
-  Future<void> _loadReports1() async {
-    // 1. Validate Filters
-    if (_selectedFacility == null) {
-      _showSnackBar("Please select a facility to generate a report.");
-      return;
-    }
-    if (startDate == null || endDate == null) {
-      _showSnackBar("Please select a valid date range.");
-      return;
-    }
-    if (userState == null) {
-      _showSnackBar("Cannot load reports: Your state is not defined.");
-      return;
-    }
-
-    setState(() {
-      isLoading = true;
-      _isInitialState = false;
-      _errorMessage = null;
-      trackedContacts.clear();
-    });
-
-    try {
-      // --- 2. Build the Firestore Query ---
-
-      // Start with a base query on the flattened 'CallLogs' collection
-      Query query = _firestore.collection('CallLogs');
-
-      // Add print statements to see the exact values being used for filtering
-      print("--- Firestore Query Parameters ---");
-      print("State Filter: '$userState'");
-
-      // Apply required filters
-      query = query
-          .where('state', isEqualTo: userState)
-          .where('dateTracked', isGreaterThanOrEqualTo: startDate)
-          .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
-
-      // Conditionally add the facility filter
-      if (_selectedFacility != 'All Facilities') {
-        print("Facility Filter: '$_selectedFacility'");
-        query = query.where('facilityName', isEqualTo: _selectedFacility);
-      } else {
-        print("Facility Filter: All Facilities (no filter applied)");
-      }
-
-      // Add ordering
-      query = query.orderBy('dateTracked', descending: true);
-      print("----------------------------------");
-
-      // --- 3. Execute the Query ---
-      final QuerySnapshot querySnapshot = await query.get();
-
-      // --- 4. Process the Results ---
-      print("Query executed. Found ${querySnapshot.docs.length} documents.");
-
-      if (querySnapshot.docs.isEmpty && _selectedFacility != 'All Facilities') {
-        _showSnackBar("No call logs found for $_selectedFacility in the selected date range.");
-      } else if (querySnapshot.docs.isEmpty) {
-        _showSnackBar("No call logs found for any facility in this state for the selected date range.");
-      }
-
-      final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
-        return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
-      }).toList();
-
-
-      // --- 5. Update the UI State ---
-      if (mounted) {
-        setState(() {
-          trackedContacts = fetchedContacts;
-          _prepareChartData();
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          // This will now catch and display the "Missing Index" error from Firestore
-          _errorMessage = "A major error occurred while loading reports: $e";
-          trackedContacts = [];
-          _prepareChartData();
-        });
-      }
-      print("Firestore Query Error: $e");
-    }
-  }
-
-  /// Fetches contact logs from the flattened 'CallLogs' collection based on the selected filters.
-// In _ReportsPageWeb2State class
-
-  /// Fetches contact logs from the flattened 'CallLogs' collection and prepares for display.
   Future<void> _loadReports() async {
-    // 1. Validate that all necessary filters are selected.
-    if (_selectedFacility == null) {
-      _showSnackBar("Please select a facility to generate a report.");
+    if (_selectedFacilities.isEmpty) {
+      _showSnackBar("Please select at least one facility to generate a report.");
       return;
     }
     if (startDate == null || endDate == null) {
@@ -436,18 +265,19 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       return;
     }
 
-    // 2. Set the UI to a loading state.
     setState(() {
       isLoading = true;
       _isInitialState = false;
       _errorMessage = null;
-      _masterContactList.clear(); // Clear the master list for a new query
+      _masterContactList.clear();
       trackedContacts.clear();
       _totalCallCost = 0.0;
+      _outgoingAnsweredCost = 0.0;
+      _incomingAnsweredCost = 0.0;
+      _currentlyExpandedDateIndex = -1;
     });
 
     try {
-      // 3. Build the Firestore Query dynamically.
       Query query = _firestore.collection('CallLogs');
 
       query = query
@@ -455,26 +285,30 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
           .where('dateTracked', isGreaterThanOrEqualTo: startDate)
           .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
 
-      if (_selectedFacility != 'All Facilities') {
-        query = query.where('trackerFacilityLocation', isEqualTo: _selectedFacility);
+      if (!_selectedFacilities.contains('All Facilities')) {
+        if (_selectedFacilities.length > 30) {
+          _showSnackBar("Querying for more than 30 facilities at once is not supported. Please narrow your selection.");
+          if (mounted) {
+            setState(() => isLoading = false);
+          }
+          return;
+        }
+        query = query.where('trackerFacilityLocation', whereIn: _selectedFacilities);
       }
 
       query = query.orderBy('dateTracked', descending: true);
 
-      // 4. Execute the Query.
       final QuerySnapshot querySnapshot = await query.get();
 
-      // 5. Process the results.
       final List<ContactTracked> fetchedContacts = querySnapshot.docs.map((doc) {
         return ContactTracked.fromJson(doc.data() as Map<String, dynamic>);
       }).toList();
 
-      // 6. Update the UI State using the new helper methods.
       if (mounted) {
         setState(() {
           _masterContactList = fetchedContacts;
-          _updateAvailableTrackers(); // Populate the tracker dropdown
-          _applyTrackerAndRecalculate(); // Filter by tracker and calculate metrics
+          _updateAvailableFiltersFromData();
+          _applyAllFiltersAndRecalculate();
           isLoading = false;
         });
         if (fetchedContacts.isEmpty) {
@@ -482,7 +316,6 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
         }
       }
     } catch (e) {
-      // 7. Handle any errors during the process.
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -495,14 +328,15 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     }
   }
 
+  // ... (All other methods like _prepareChartData, _showSnackBar, _masking, _exporting, etc., remain the same)
+  // ... (Methods from _promptForPasswordAndReauthenticate to the end of the file remain unchanged)
+
   void _prepareChartData() {
     callStatusChartData = _getCallStatusData();
     callDurationTrendData = _getCallDurationTrendData();
     updateMetricsData = _getUpdateMetricsData();
     artStatusChartData = _getArtStatusData();
   }
-
-  // --- MASKING, EXPORT, AND ALL OTHER HELPER/UI METHODS (REMAIN UNCHANGED) ---
 
   void _showSnackBar(String message) {
     if (!mounted) return;
@@ -512,7 +346,13 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   String _maskClientName(String? name) {
     if (_allCellsGloballyUnlocked || name == null || name.isEmpty) return name ?? 'N/A';
     List<String> parts = name.split(' ');
-    return parts.isNotEmpty && parts[0].isNotEmpty ? '${parts[0][0]}. (Hidden)' : 'Hidden';
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      if (!name.contains(" ") && name.length > 6) {
+        return '...${name.substring(name.length - 4)} (Hidden)';
+      }
+      return '${parts[0][0]}. (Hidden)';
+    }
+    return 'Hidden';
   }
 
   String _maskPhoneNumber(String? phone) {
@@ -636,7 +476,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
           contact.artStatus ?? 'N/A',
           contact.facilityName ?? 'N/A',
           contact.state ?? 'N/A',
-          contact.uniqueID ?? 'N/A',
+          _allCellsGloballyUnlocked ? (contact.uniqueID ?? 'N/A') : _maskClientName(contact.uniqueID),
           contact.datimCode ?? 'N/A',
           contact.dateTracked != null ? DateFormat('yyyy-MM-dd').format(contact.dateTracked!) : 'N/A',
           contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A',
@@ -703,6 +543,10 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       final pw.MemoryImage? callDurationImg = callDurationBytes != null ? pw.MemoryImage(callDurationBytes) : null;
       final pw.MemoryImage? updateMetricsImg = updateMetricsBytes != null ? pw.MemoryImage(updateMetricsBytes) : null;
 
+      final facilityText = _selectedFacilities.contains("All Facilities")
+          ? "All Facilities"
+          : _selectedFacilities.join(", ");
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4.landscape,
@@ -720,7 +564,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
           build: (pw.Context context) => [
             pw.Header(level: 0, text: 'Call Tracking Summary Report'),
             pw.Paragraph(
-              text: 'Report for: $_selectedFacility\n'
+              text: 'Report for: $facilityText\n'
                   'Date Range: ${DateFormat.yMd().format(startDate!)} to ${DateFormat.yMd().format(endDate!)}',
               style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
             ),
@@ -769,6 +613,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     }
   }
 
+  // --- Chart Data Preparation Methods ---
   List<MapEntry<String, int>> _getCallStatusData() {
     Map<String, int> statusCounts = {};
     for (var contact in trackedContacts) {
@@ -832,26 +677,72 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     return statusCounts.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
   }
 
+  // --- UI Helper Methods ---
   String formatDuration(int totalSeconds) {
     if (totalSeconds < 0) return 'N/A';
-    if (totalSeconds == 0) return '0 Seconds';
+    if (totalSeconds == 0) return '0s';
     final int minutes = totalSeconds ~/ 60;
     final int remainingSeconds = totalSeconds % 60;
-    String minuteString = minutes > 0 ? '$minutes minute${minutes > 1 ? 's' : ''}' : '';
-    String secondString = remainingSeconds > 0 ? '$remainingSeconds second${remainingSeconds > 1 ? 's' : ''}' : '';
-    if (minuteString.isNotEmpty && secondString.isNotEmpty) return '$minuteString $secondString';
-    return minuteString.isNotEmpty ? minuteString : secondString;
+    String minuteString = minutes > 0 ? '${minutes} minute(s)' : '';
+    String secondString = remainingSeconds > 0 ? ' ${remainingSeconds} second(s)' : '';
+    return (minuteString + secondString).trim();
   }
+
   Color _getStatusColor(String status) {
     String lowerStatus = status.toLowerCase();
     switch (lowerStatus) {
-      case 'answered': case 'completed': return Colors.green.shade700;
-      case 'missed': case 'missed call': case 'not answered': case 'call failed': case 'call dropped': return Colors.red.shade700;
-      case 'call busy': return Colors.orange.shade700;
-      case 'unknown (no log detail)': case 'n/a': case 'unknown': return Colors.grey.shade600;
-      default: return Colors.blue.shade700;
+      case 'answered':
+      case 'incoming answered':
+      case 'completed':
+        return Colors.green.shade700;
+      case 'outgoing failed/not answered':
+      case 'unknown (no outgoing log detail)':
+      case 'missed':
+      case 'missed call':
+      case 'call failed':
+      case 'call dropped':
+      case 'unknown (no log detail)':
+        return Colors.red.shade700;
+      case 'call busy':
+        return Colors.orange.shade700;
+      default:
+        return Colors.grey.shade600;
     }
   }
+
+  Widget _buildStatusCell(String? status) {
+    if (status == null || status.isEmpty) {
+      return const Text('N/A');
+    }
+
+    final lowerStatus = status.toLowerCase();
+    Color color = _getStatusColor(status);
+    Widget? icon;
+
+    if (lowerStatus.contains('answered')) {
+      icon = Icon(Icons.call_received, color: color, size: 16);
+    } else if (lowerStatus == 'outgoing failed' || lowerStatus == 'not answered' || lowerStatus.contains('missed')) {
+      icon = Icon(Icons.phone_missed, color: color, size: 16);
+    }
+
+    if (icon != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(width: 6),
+          Flexible(child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500))),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+      child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+    );
+  }
+
   Map<String, List<ContactTracked>> _groupContactsByDate() {
     final Map<String, List<ContactTracked>> dailyReports = {};
     final DateFormat dateKeyFormat = DateFormat('yyyy-MM-dd');
@@ -875,6 +766,51 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     });
     return displayMap;
   }
+
+  Map<String, _ClientCallSummary> _generateClientCallSummary() {
+    final Map<String, _ClientCallSummary> summaryMap = {};
+
+    for (var contact in trackedContacts) {
+      final clientId = contact.uniqueID ?? 'Unknown ID';
+      final clientName = contact.name ?? 'Unknown Name';
+      final clientPhone = contact.phoneNumber ?? 'Unknown Phone';
+
+      if (!summaryMap.containsKey(clientId)) {
+        summaryMap[clientId] = _ClientCallSummary(
+          clientId: clientId,
+          clientName: clientName,
+          clientPhoneNumber: clientPhone,
+        );
+      }
+
+      summaryMap[clientId]!.totalCalls += 1;
+
+      final status = contact.callStatus?.toLowerCase() ?? 'unknown';
+      summaryMap[clientId]!.statusCounts[status] =
+          (summaryMap[clientId]!.statusCounts[status] ?? 0) + 1;
+    }
+
+    return summaryMap;
+  }
+
+  String _formatDateWithSuffix(DateTime date) {
+    String day = DateFormat('d').format(date);
+    String suffix = 'th';
+    int dayInt = int.parse(day);
+
+    if (dayInt >= 11 && dayInt <= 13) {
+      suffix = 'th';
+    } else {
+      switch (dayInt % 10) {
+        case 1: suffix = 'st'; break;
+        case 2: suffix = 'nd'; break;
+        case 3: suffix = 'rd'; break;
+        default: suffix = 'th';
+      }
+    }
+    return DateFormat("d'$suffix'-MMMM-y").format(date);
+  }
+
   void _showDateRangePicker() {
     showDialog(
       context: context,
@@ -909,9 +845,90 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     );
   }
 
-  // In _ReportsPageWeb2State class
+  Future<void> _showMultiSelectDialog({
+    required BuildContext context,
+    required String title,
+    required List<String> allOptions,
+    required List<String> selectedOptions,
+    required String allKeyword,
+    required Function(List<String>) onConfirm,
+  }) async {
+    final tempSelected = List<String>.from(selectedOptions);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+          return AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: 350,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: allOptions.length,
+                itemBuilder: (context, index) {
+                  final option = allOptions[index];
+                  final isAllOption = option == allKeyword;
+
+                  return CheckboxListTile(
+                    title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                    value: tempSelected.contains(option),
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        if (value == true) {
+                          if (isAllOption) {
+                            tempSelected.clear();
+                            tempSelected.add(allKeyword);
+                          } else {
+                            tempSelected.remove(allKeyword);
+                            tempSelected.add(option);
+                          }
+                        } else {
+                          tempSelected.remove(option);
+                          if (tempSelected.isEmpty) {
+                            tempSelected.add(allKeyword);
+                          }
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                  onPressed: () {
+                    onConfirm(tempSelected);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply')),
+            ],
+          );
+        });
+      },
+    );
+  }
 
   Widget _buildFilterBar() {
+    String facilityButtonText = _selectedFacilities.contains('All Facilities')
+        ? 'All Facilities'
+        : _selectedFacilities.length == 1
+        ? _selectedFacilities.first
+        : '${_selectedFacilities.length} Facilities';
+
+    String trackerButtonText = _selectedTrackers.contains('All Trackers')
+        ? 'All Trackers'
+        : _selectedTrackers.length == 1
+        ? _selectedTrackers.first
+        : '${_selectedTrackers.length} Trackers';
+
+    String statusButtonText = _selectedCallStatuses.contains('All Statuses')
+        ? 'All Statuses'
+        : _selectedCallStatuses.length == 1
+        ? _selectedCallStatuses.first
+        : '${_selectedCallStatuses.length} Statuses';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
       elevation: 2,
@@ -923,69 +940,75 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 16.0,
           runSpacing: 12.0,
-          alignment: WrapAlignment.center,
+          alignment: WrapAlignment.start,
           children: [
-            // 1. Facility Dropdown
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 220, maxWidth: 600),
-              child: DropdownButtonFormField<String>(
-                value: _selectedFacility,
-                hint: const Text('Select a Facility'),
-                decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15)),
-                items: _availableFacilities.map((String facilityName) {
-                  return DropdownMenuItem<String>(value: facilityName, child: Text(facilityName, overflow: TextOverflow.ellipsis));
-                }).toList(),
-                onChanged: (String? newName) {
-                  if (newName != null && newName != _selectedFacility) {
-                    setState(() {
-                      _selectedFacility = newName;
-                      // Reset sub-filter when primary filter changes
-                      _selectedTracker = 'All Trackers';
-                      _availableTrackers = ['All Trackers'];
-                    });
-                  }
+            _buildFilterChip('Facility', facilityButtonText, Icons.business, () {
+              _showMultiSelectDialog(
+                context: context,
+                title: 'Select Facilities',
+                allOptions: _availableFacilities,
+                selectedOptions: _selectedFacilities,
+                allKeyword: 'All Facilities',
+                onConfirm: (List<String> selected) {
+                  setState(() {
+                    _selectedFacilities = selected;
+                    _selectedTrackers = ['All Trackers'];
+                    _selectedCallStatuses = ['All Statuses'];
+                  });
                 },
-              ),
-            ),
+              );
+            }),
 
-            // 2. NEW: Tracked By Dropdown
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 220, maxWidth: 300),
-              child: DropdownButtonFormField<String>(
-                value: _selectedTracker,
-                hint: const Text('Select Tracker'),
-                // Disable dropdown if there's no data or if it's loading
-                disabledHint: const Text('Apply filter first'),
-                decoration: const InputDecoration(labelText: 'Tracked By', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15)),
-                items: _availableTrackers.map((String trackerName) {
-                  return DropdownMenuItem<String>(value: trackerName, child: Text(trackerName, overflow: TextOverflow.ellipsis));
-                }).toList(),
-                onChanged: (_masterContactList.isEmpty || isLoading)
-                    ? null // Disable if no master data is loaded
-                    : (String? newName) {
-                  setState(() => _selectedTracker = newName ?? 'All Trackers');
-                  _applyTrackerAndRecalculate(); // Re-filter and re-calculate on change
+            _buildFilterChip('Tracked By', trackerButtonText, Icons.person_search, () {
+              _showMultiSelectDialog(
+                context: context,
+                title: 'Select Trackers',
+                allOptions: _availableTrackers,
+                selectedOptions: _selectedTrackers,
+                allKeyword: 'All Trackers',
+                onConfirm: (List<String> selected) {
+                  setState(() => _selectedTrackers = selected);
+                  _applyAllFiltersAndRecalculate();
                 },
-              ),
-            ),
+              );
+            }, disabled: _isInitialState),
 
-            // 3. Date Range Filter
+            _buildFilterChip('Call Status', statusButtonText, Icons.phone_callback, () {
+              _showMultiSelectDialog(
+                context: context,
+                title: 'Select Call Statuses',
+                allOptions: _availableCallStatuses,
+                selectedOptions: _selectedCallStatuses,
+                allKeyword: 'All Statuses',
+                onConfirm: (List<String> selected) {
+                  setState(() => _selectedCallStatuses = selected);
+                  _applyAllFiltersAndRecalculate();
+                },
+              );
+            }, disabled: _isInitialState),
+
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
               label: Text(
-                (startDate != null && endDate != null) ? '${DateFormat.yMd().format(startDate!)} - ${DateFormat.yMd().format(endDate!)}' : 'Select Date Range',
+                (startDate != null && endDate != null)
+                    ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}'
+                    : 'Select Date Range',
                 style: const TextStyle(fontWeight: FontWeight.normal),
               ),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
+              style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
             ),
 
-            // 4. Apply Filter Button
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
               label: const Text('Apply Filter'),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0))),
             ),
           ],
         ),
@@ -993,76 +1016,101 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     );
   }
 
-  // In _ReportsPageWeb2State class
+  Widget _buildFilterChip(String label, String value, IconData icon, VoidCallback onPressed, {bool disabled = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 4),
+        InputChip(
+          avatar: Icon(icon, size: 18),
+          label: Text(value, overflow: TextOverflow.ellipsis),
+          onPressed: disabled ? null : onPressed,
+          showCheckmark: false,
+          side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)),
+          backgroundColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+      ],
+    );
+  }
 
-
-// In _ReportsPageWeb2State class
-
+  // --- REWRITTEN: The summary card now displays three separate costs ---
   Widget _buildSummaryInfoCard() {
-    final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
     final numberFormatter = NumberFormat.compact();
+    final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
     final totalDuration = trackedContacts.fold<int>(0, (sum, item) => sum + (item.callDuration ?? 0));
+
+    final int facilityCount = _selectedFacilities.contains('All Facilities')
+        ? _availableFacilities.length > 0 ? _availableFacilities.length - 1 : 0
+        : _selectedFacilities.length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 24.0),
       elevation: 2.0,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Wrap(
-          alignment: WrapAlignment.spaceAround,
-          spacing: 20.0,
-          runSpacing: 16.0,
+        child: Column(
           children: [
-            _buildInfoTile(
-              // Pass a full Icon widget
-              iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
-              label: 'Total Calls Logged',
-              value: numberFormatter.format(trackedContacts.length),
-            ),
-            _buildInfoTile(
-              // Pass a full Icon widget
-              iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
-              label: 'Total Call Duration',
-              value: formatDuration(totalDuration),
-            ),
-            _buildInfoTile(
-              // NEW: Pass a styled Text widget as the icon
-              iconWidget: Text(
-                '₦',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade800,
+            Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 20.0,
+              runSpacing: 16.0,
+              children: [
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.location_city, color: Colors.teal.shade700, size: 36),
+                  label: 'Selected Facilities',
+                  value: facilityCount.toString(),
+                  subtitle: _selectedFacilities.contains('All Facilities') ? 'All available' : null,
                 ),
-              ),
-              label: 'Estimated Call Cost',
-              value: currencyFormatter.format(_totalCallCost),
-              subtitle: '(at ₦${_costPerSecond}/sec)',
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
+                  label: 'Total Calls Logged',
+                  value: numberFormatter.format(trackedContacts.length),
+                ),
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
+                  label: 'Total Call Duration',
+                  value: formatDuration(totalDuration),
+                ),
+              ],
             ),
+            const Divider(height: 24.0, thickness: 1.0),
+            Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 20.0,
+              runSpacing: 16.0,
+              children: [
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+                  label: 'Estimated Call Cost (All)',
+                  value: currencyFormatter.format(_totalCallCost),
+                  subtitle: '(at ₦${_costPerSecond.toStringAsFixed(2)}/sec)',
+                ),
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                  label: 'Estimated Cost (Outgoing Answered)',
+                  value: currencyFormatter.format(_outgoingAnsweredCost),
+                  subtitle: '(at ₦${_costPerSecond.toStringAsFixed(2)}/sec)',
+                ),
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.lightGreen.shade700)),
+                  label: 'Estimated Cost (Incoming Answered)',
+                  value: currencyFormatter.format(_incomingAnsweredCost),
+                  subtitle: '(at ₦${_costPerSecond.toStringAsFixed(2)}/sec)',
+                ),
+              ],
+            )
           ],
         ),
       ),
     );
   }
 
-
-// Helper for the summary card tiles
-  // In _ReportsPageWeb2State class
-
-// In _ReportsPageWeb2State class
-
-// Helper for the summary card tiles
-  Widget _buildInfoTile({
-    required Widget iconWidget, // UPDATED: Changed from IconData to Widget
-    required String label,
-    required String value,
-    String? subtitle,
-  }) {
+  Widget _buildInfoTile({required Widget iconWidget, required String label, required String value, String? subtitle}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // We no longer need to wrap this in an Icon widget.
-        // We just display the widget that was passed in.
         iconWidget,
         const SizedBox(width: 12),
         Column(
@@ -1072,10 +1120,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
             Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             if (subtitle != null && subtitle.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-              ),
+              Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
             ],
           ],
         ),
@@ -1085,11 +1130,12 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 
   @override
   Widget build(BuildContext context) {
-    // This calculation is now always performed. It will be empty on initial load.
     final Map<String, List<ContactTracked>> dailyGroupedReports = _groupContactsByDate();
+    final dailyGroupedKeys = dailyGroupedReports.keys.toList();
+    final Map<String, _ClientCallSummary> clientSummaryMap = _generateClientCallSummary();
+
     Widget bodyContent;
 
-    // A critical error is the only state that will replace the entire report layout.
     if (_errorMessage != null) {
       bodyContent = Center(
         child: Padding(
@@ -1098,50 +1144,38 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
         ),
       );
     } else {
-      // The main UI structure is now always visible.
-      // Its contents (charts, tables) will be populated or show loading/empty states.
       bodyContent = SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Only show the header text AFTER the first filter is applied.
               if (!_isInitialState)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: Text(
-                    'Displaying reports for: $_selectedFacility\nFrom ${DateFormat.yMd().format(startDate!)} to ${DateFormat.yMd().format(endDate!)}',
+                    'Displaying reports for: ${_selectedFacilities.join(", ")}\nFrom ${_formatDateWithSuffix(startDate!)} to ${_formatDateWithSuffix(endDate!)}',
                     style: Theme.of(context).textTheme.titleSmall,
                     textAlign: TextAlign.center,
                   ),
                 ),
 
-              // NEW: Add the summary card here
-              if (!_isInitialState && !isLoading)
-                _buildSummaryInfoCard(),
+              if (!_isInitialState && !isLoading) _buildSummaryInfoCard(),
 
               Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 16),
-
               Wrap(
                 spacing: 20.0,
                 runSpacing: 20.0,
                 alignment: WrapAlignment.start,
                 children: [
-                  // The cards are always built. Their inner content is determined by the app's state.
                   _buildChartCard(
                     title: 'Call Status Distribution',
                     chartKey: _callStatusChartKey,
-                    // The chart's content is now determined by the loading/data state.
                     chart: isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : SfCircularChart(
-                        annotations: (callStatusChartData.isEmpty && !_isInitialState)
-                            ? const <CircularChartAnnotation>[
-                          CircularChartAnnotation(widget: Text("No data"))
-                        ]
-                            : null,
+                        annotations: (callStatusChartData.isEmpty && !_isInitialState) ? const <CircularChartAnnotation>[CircularChartAnnotation(widget: Text("No data"))] : null,
                         legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
                         series: <CircularSeries>[
                           PieSeries<MapEntry<String, int>, String>(
@@ -1159,11 +1193,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                     chart: isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : SfCircularChart(
-                        annotations: (artStatusChartData.isEmpty && !_isInitialState)
-                            ? const <CircularChartAnnotation>[
-                          CircularChartAnnotation(widget: Text("No data"))
-                        ]
-                            : null,
+                        annotations: (artStatusChartData.isEmpty && !_isInitialState) ? const <CircularChartAnnotation>[CircularChartAnnotation(widget: Text("No data"))] : null,
                         legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
                         series: <CircularSeries>[
                           PieSeries<MapEntry<String, int>, String>(
@@ -1183,9 +1213,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                         ? const Center(child: CircularProgressIndicator())
                         : SfCartesianChart(
                         annotations: (callDurationTrendData.isEmpty && !_isInitialState)
-                            ? const <CartesianChartAnnotation>[
-                          CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')
-                        ]
+                            ? const <CartesianChartAnnotation>[CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')]
                             : null,
                         primaryXAxis: const CategoryAxis(labelRotation: -45, title: AxisTitle(text: 'Date Tracked'), majorGridLines: MajorGridLines(width: 0)),
                         primaryYAxis: NumericAxis(title: const AxisTitle(text: 'Avg. Duration (Seconds)'), numberFormat: NumberFormat.compact()),
@@ -1208,9 +1236,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                         ? const Center(child: CircularProgressIndicator())
                         : SfCartesianChart(
                         annotations: (updateMetricsData.isEmpty && !_isInitialState)
-                            ? const <CartesianChartAnnotation>[
-                          CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')
-                        ]
+                            ? const <CartesianChartAnnotation>[CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')]
                             : null,
                         primaryXAxis: const CategoryAxis(labelRotation: -45, title: AxisTitle(text: 'Month'), majorGridLines: MajorGridLines(width: 0)),
                         primaryYAxis: const NumericAxis(title: AxisTitle(text: 'Number of Updates'), majorTickLines: MajorTickLines(size: 0)),
@@ -1226,123 +1252,34 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
               ),
               const SizedBox(height: 30),
 
-              Text('Detailed Logs', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 10),
-
-              // Conditional display for the detailed logs section
-              if (isLoading)
-                const Card(
-                  elevation: 2,
-                  child: SizedBox(
-                    height: 200,
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text("Loading Detailed Logs...")
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              else if (_isInitialState || dailyGroupedReports.isEmpty)
+              if (!isLoading && clientSummaryMap.isNotEmpty) ...[
                 Card(
+                  clipBehavior: Clip.antiAlias,
                   elevation: 2,
-                  child: Container(
-                    height: 100,
-                    alignment: Alignment.center,
-                    child: Text(
-                      _isInitialState
-                          ? "Apply a filter to view detailed logs."
-                          : "No detailed logs found for the selected criteria.",
-                      style: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic),
-                    ),
-                  ),
-                )
-              else // Data is available, build the table
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: dailyGroupedReports.keys.length,
-                  itemBuilder: (context, index) {
-                    final displayDateKey = dailyGroupedReports.keys.elementAt(index);
-                    final dailyContactList = dailyGroupedReports[displayDateKey]!;
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8.0),
-                      clipBehavior: Clip.antiAlias,
-                      child: ExpansionTile(
-                        title: Text(displayDateKey, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        initiallyExpanded: index == 0,
-                        children: <Widget>[
-                          // The SingleChildScrollView now has a controller
-                          SingleChildScrollView(
-                            controller: _logTableController, // Assign controller
-                            scrollDirection: Axis.horizontal,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: DataTable(
-                                columnSpacing: 15.0,
-                                headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
-                                columns: const [
-                                  DataColumn(label: Text('Client Name')),
-                                  DataColumn(label: Text('Client PhoneNo')),
-                                  DataColumn(label: Text('Client ART Status')),
-                                  DataColumn(label: Text("Client's Facility")),
-                                  DataColumn(label: Text('Client State')),
-                                  DataColumn(label: Text('Client ART ID')),
-                                  DataColumn(label: Text('DatimCode')),
-                                  DataColumn(label: Text('Time Tracking Done')),
-                                  DataColumn(label: Text('Call Status')),
-                                  DataColumn(label: Text('Duration of Call')),
-                                  DataColumn(label: Text('Tracked By')),
-                                  DataColumn(label: Text("Tracker's Designation")),
-                                  DataColumn(label: Text("Tracker's Facility")),
-                                  DataColumn(label: Text("Tracker's Supervisor")),
-                                  DataColumn(label: Text("Tracker's Supervisor Email")),
-                                ],
-                                rows: dailyContactList.map((contact) {
-                                  return DataRow(cells: [
-                                    DataCell(Text(_maskClientName(contact.name))),
-                                    DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
-                                    DataCell(Text(contact.artStatus ?? 'N/A')),
-                                    DataCell(Text(contact.facilityName ?? 'N/A')),
-                                    DataCell(Text(contact.state ?? 'N/A')),
-                                  //  DataCell(Text(contact.uniqueID ?? 'N/A')),
-                                    DataCell(Text(_maskClientName(contact.uniqueID))),
-                                    DataCell(Text(contact.datimCode ?? 'N/A')),
-                                    DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
-                                    DataCell(Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                          color: contact.callStatus != null ? _getStatusColor(contact.callStatus!).withOpacity(0.2) : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(4)),
-                                      child: Text(contact.callStatus ?? 'N/A', style: TextStyle(
-                                          color: contact.callStatus != null ? _getStatusColor(contact.callStatus!) : Colors.black87,
-                                          fontWeight: FontWeight.w500)),
-                                    )),
-                                    DataCell(Text(contact.callDuration != null ? formatDuration(contact.callDuration!) : 'N/A')),
-                                    DataCell(Text(contact.trackedBy ?? 'N/A')),
-                                    DataCell(Text(contact.designation ?? 'N/A')),
-                                    DataCell(Text(contact.trackerFacilityLocation ?? 'N/A')),
-                                    DataCell(Text(contact.supervisorName ?? 'N/A')),
-                                    DataCell(Text(contact.supervisorEmail ?? 'N/A')),
-                                  ]);
-                                }).toList(),
-                              ),
-                            ),
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: ExpansionTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Summary of Calls per Client',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          // NEW: Row for scroll buttons
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                        ),
+                        Visibility(
+                          visible: _isClientSummaryExpanded,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          maintainState: true,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.arrow_back),
                                 tooltip: 'Scroll Left',
                                 onPressed: () {
-                                  _logTableController.animateTo(
-                                    _logTableController.offset - 350, // scroll left
+                                  _clientSummaryScrollController.animateTo(
+                                    _clientSummaryScrollController.offset - 350,
                                     duration: const Duration(milliseconds: 300),
                                     curve: Curves.easeOut,
                                   );
@@ -1352,19 +1289,167 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
                                 icon: const Icon(Icons.arrow_forward),
                                 tooltip: 'Scroll Right',
                                 onPressed: () {
-                                  _logTableController.animateTo(
-                                    _logTableController.offset + 350, // scroll right
+                                  _clientSummaryScrollController.animateTo(
+                                    _clientSummaryScrollController.offset + 350,
                                     duration: const Duration(milliseconds: 300),
                                     curve: Curves.easeOut,
                                   );
                                 },
                               ),
                             ],
-                          )
-                        ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    initiallyExpanded: _isClientSummaryExpanded,
+                    onExpansionChanged: (isExpanded) {
+                      setState(() {
+                        _isClientSummaryExpanded = isExpanded;
+                      });
+                    },
+                    children: [
+                      SingleChildScrollView(
+                        controller: _clientSummaryScrollController,
+                        scrollDirection: Axis.horizontal,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: DataTable(
+                            columnSpacing: 15.0,
+                            headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
+                            columns: const [
+                              DataColumn(label: Text('Client ART ID')),
+                              DataColumn(label: Text('Client Name')),
+                              DataColumn(label: Text('Client Phone')),
+                              DataColumn(label: Text('Total Calls')),
+                              DataColumn(label: Text('Call Status Summary')),
+                            ],
+                            rows: clientSummaryMap.values.map((summary) {
+                              final statusSummary = summary.statusCounts.entries
+                                  .map((e) => '${e.key}: ${e.value}')
+                                  .join(', ');
+
+                              return DataRow(cells: [
+                                DataCell(Text(_maskClientName(summary.clientId))),
+                                DataCell(Text(_maskClientName(summary.clientName))),
+                                DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))),
+                                DataCell(Text(summary.totalCalls.toString())),
+                                DataCell(Text(statusSummary)),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+
+              Text('Detailed Call Logs', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 10),
+
+              if (isLoading)
+                const Card(elevation: 2, child: SizedBox(height: 200, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Loading Detailed Logs...")]))))
+              else if (_isInitialState || dailyGroupedReports.isEmpty)
+                Card(
+                  elevation: 2,
+                  child: Container(
+                    height: 100,
+                    alignment: Alignment.center,
+                    child: Text(
+                      _isInitialState ? "Apply a filter to view detailed logs." : "No detailed logs found for the selected criteria.",
+                      style: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                )
+              else
+                ExpansionPanelList(
+                  expansionCallback: (int index, bool isExpanded) {
+                    setState(() {
+                      _currentlyExpandedDateIndex = _currentlyExpandedDateIndex == index ? -1 : index;
+                    });
+                  },
+                  animationDuration: const Duration(milliseconds: 300),
+                  children: dailyGroupedKeys.map<ExpansionPanel>((String dateKey) {
+                    final index = dailyGroupedKeys.indexOf(dateKey);
+                    final dailyContactList = dailyGroupedReports[dateKey]!;
+                    final bool isExpanded = _currentlyExpandedDateIndex == index;
+
+                    return ExpansionPanel(
+                      isExpanded: isExpanded,
+                      canTapOnHeader: true,
+                      headerBuilder: (BuildContext context, bool isExpanded) {
+                        return ListTile(
+                          title: Row(
+                            children: [
+                              Expanded(child: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+                              Visibility(
+                                visible: isExpanded,
+                                maintainSize: true,
+                                maintainAnimation: true,
+                                maintainState: true,
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.arrow_back),
+                                      tooltip: 'Scroll Left',
+                                      onPressed: () {
+                                        _logTableControllers[index].animateTo(_logTableControllers[index].offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.arrow_forward),
+                                      tooltip: 'Scroll Right',
+                                      onPressed: () {
+                                        _logTableControllers[index].animateTo(_logTableControllers[index].offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      body: SingleChildScrollView(
+                        controller: _logTableControllers[index],
+                        scrollDirection: Axis.horizontal,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: DataTable(
+                            columnSpacing: 15.0,
+                            headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
+                            columns: const [
+                              DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
+                              DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
+                              DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('Call Status')),
+                              DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')), DataColumn(label: Text("Tracker's Designation")),
+                              DataColumn(label: Text("Tracker's Facility")), DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
+                            ],
+                            rows: dailyContactList.map((contact) {
+                              return DataRow(cells: [
+                                DataCell(Text(_maskClientName(contact.name))),
+                                DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
+                                DataCell(Text(contact.artStatus ?? 'N/A')),
+                                DataCell(Text(contact.facilityName ?? 'N/A')),
+                                DataCell(Text(contact.state ?? 'N/A')),
+                                DataCell(Text(_maskClientName(contact.uniqueID))),
+                                DataCell(Text(contact.datimCode ?? 'N/A')),
+                                DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
+                                DataCell(_buildStatusCell(contact.callStatus)),
+                                DataCell(Text(contact.callDuration != null ? formatDuration(contact.callDuration!) : 'N/A')),
+                                DataCell(Text(contact.trackedBy ?? 'N/A')),
+                                DataCell(Text(contact.designation ?? 'N/A')),
+                                DataCell(Text(contact.trackerFacilityLocation ?? 'N/A')),
+                                DataCell(Text(contact.supervisorName ?? 'N/A')),
+                                DataCell(Text(contact.supervisorEmail ?? 'N/A')),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
                       ),
                     );
-                  },
+                  }).toList(),
                 ),
             ],
           ),
@@ -1372,12 +1457,26 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       );
     }
 
+    String appBarTitle;
+    if (_isInitialState) {
+      appBarTitle = 'Call Tracking Reports';
+    } else {
+      appBarTitle = _selectedFacilities.contains("All Facilities")
+          ? 'Report for All Facilities'
+          : _selectedFacilities.length > 2
+          ? 'Report for ${_selectedFacilities.length} Facilities'
+          : 'Report for: ${_selectedFacilities.join(", ")}';
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectedFacility == null ? 'Call Tracking Reports' : 'Report for: $_selectedFacility',style: TextStyle(color: Colors.white,),),
-    backgroundColor: const Color(0xFF722F37),
-    iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          appBarTitle,
+          style: const TextStyle(color: Colors.white),
+          overflow: TextOverflow.ellipsis,
+        ),
+        backgroundColor: const Color(0xFF722F37),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             tooltip: _allCellsGloballyUnlocked ? 'Mask Sensitive Data' : 'Unmask Sensitive Data',
@@ -1390,10 +1489,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
             onPressed: (isLoading || _isFilterLoading) ? null : _showDateRangePicker,
           ),
           if (_isExporting)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)),
-            )
+            const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)))
           else
             PopupMenuButton<String>(
               icon: const Icon(Icons.file_download_outlined),
@@ -1416,12 +1512,11 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
             ),
         ],
       ),
-      drawer: drawer2(context,),
+      drawer: drawer2(context),
       body: Column(
         children: [
           _buildFilterBar(),
-          if (_isFilterLoading)
-            const Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator()),
+          if (_isFilterLoading) const Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator()),
           Expanded(child: bodyContent),
         ],
       ),
@@ -1441,10 +1536,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
             children: [
               Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
-              SizedBox(
-                height: 250,
-                child: chartWithBoundary,
-              ),
+              SizedBox(height: 250, child: chartWithBoundary),
             ],
           ),
         ),
@@ -1465,4 +1557,18 @@ class _UpdateChartData {
   final int addressUpdates;
   final int nextVisitUpdates;
   _UpdateChartData(this.month, this.phoneUpdates, this.addressUpdates, this.nextVisitUpdates);
+}
+
+class _ClientCallSummary {
+  final String clientId;
+  final String clientName;
+  final String clientPhoneNumber;
+  int totalCalls = 0;
+  Map<String, int> statusCounts = {};
+
+  _ClientCallSummary({
+    required this.clientId,
+    required this.clientName,
+    required this.clientPhoneNumber,
+  });
 }

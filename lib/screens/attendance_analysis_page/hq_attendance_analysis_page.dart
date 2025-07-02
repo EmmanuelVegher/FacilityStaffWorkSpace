@@ -24,7 +24,8 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'dart:html' as html;
 
 
-import '../../widgets/drawer2.dart'; // Assuming a generic app drawer
+import '../../widgets/drawer2.dart';
+import '../../widgets/drawer3.dart'; // Assuming a generic app drawer
 
 // (AnimatedNumberText widget remains the same)
 class AnimatedNumberText extends StatelessWidget {
@@ -548,7 +549,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             )
         ],
       ),
-      drawer: drawer2(context),
+      drawer: drawer3(context),
       body: Column(
         children: [
           _buildFilterBar(),
