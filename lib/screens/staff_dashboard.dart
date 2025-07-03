@@ -1938,8 +1938,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  Future<void> _loadBestPlayerDataForRange(
-      DateTime startDate, DateTime endDate) async {
+  Future<void> _loadBestPlayerDataForRange1(DateTime startDate, DateTime endDate) async {
     if (_currentUserState == null || _currentUserLocation == null) {
       print(
           "Current user state or location is not loaded yet for Best Player Chart.");
@@ -2077,6 +2076,193 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     }
   }
 
+  // REWRITTEN TO USE AN EFFICIENT collectionGroup QUERY
+// This method replaces the old, inefficient loop-based fetching.
+  Future<void> _loadBestPlayerDataForRange(DateTime startDate, DateTime endDate) async {
+    // Ensure user's location details are loaded before running the query
+    if (_currentUserState == null || _currentUserLocation == null) {
+      print("Current user state or location is not loaded yet. Aborting best player fetch.");
+      return;
+    }
+
+    setState(() {
+      _isLoadingBestPlayer = true;
+      _firestoreBestPlayerCounts.clear(); // Clear old counts
+      _totalSurveysCountedForBestPlayer = 0; // Reset survey count
+    });
+
+    try {
+      final bestPlayerCounts = <String, int>{};
+      int surveyCount = 0;
+
+      // A single, efficient query to get all relevant survey responses.
+      final surveyResponsesSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('SurveyResponses')
+          .where('State', isEqualTo: _currentUserState)
+          .where('FacilityName', isEqualTo: _currentUserLocation)
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .get();
+
+      print("Found ${surveyResponsesSnapshot.docs.length} survey responses for the facility and date range.");
+
+      // Process the results from the single query
+      for (final surveyDoc in surveyResponsesSnapshot.docs) {
+        surveyCount++; // Increment for each survey document found
+        final surveyDataFull = surveyDoc.data();
+
+        if (surveyDataFull.containsKey('surveyData')) {
+          final surveyDataList = surveyDataFull['surveyData'] as List;
+
+          for (var surveyItem in surveyDataList) {
+            if (surveyItem is Map<String, dynamic> &&
+                surveyItem.containsKey("For the current week, who is the best team player in your facility")) {
+
+              final bestPlayerFieldValue = surveyItem["For the current week, who is the best team player in your facility"];
+              List<dynamic> bestPlayerList = [];
+
+              // The data can be a JSON string or a direct list, handle both
+              if (bestPlayerFieldValue is String) {
+                try {
+                  bestPlayerList = json.decode(bestPlayerFieldValue) as List;
+                } catch (e) {
+                  print("Error decoding JSON string for best player: $e");
+                }
+              } else if (bestPlayerFieldValue is List) {
+                bestPlayerList = bestPlayerFieldValue;
+              }
+
+              if (bestPlayerList.isNotEmpty) {
+                // Only consider the first name in the list as the top vote
+                var firstPlayer = bestPlayerList[0];
+                if (firstPlayer is Map<String, dynamic> && firstPlayer.containsKey('name')) {
+                  final playerName = firstPlayer['name'] as String;
+                  // Aggregate the votes
+                  bestPlayerCounts[playerName] = (bestPlayerCounts[playerName] ?? 0) + 1;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Determine the winner from the aggregated counts
+      String? bestPlayerName;
+      int maxCount = 0;
+      bestPlayerCounts.forEach((playerName, count) {
+        if (count > maxCount) {
+          maxCount = count;
+          bestPlayerName = playerName;
+        }
+      });
+
+      FacilityStaffModel? bestPlayer = bestPlayerName != null ? FacilityStaffModel(name: bestPlayerName) : null;
+
+      // Update the UI state
+      if (mounted) {
+        setState(() {
+          _firestoreBestPlayerCounts = bestPlayerCounts;
+          _bestPlayerOfWeek = bestPlayer;
+          _totalSurveysCountedForBestPlayer = surveyCount;
+          _isLoadingBestPlayer = false;
+        });
+      }
+
+      print("Final Best Player Counts: $bestPlayerCounts");
+
+    } catch (e, stacktrace) {
+      print('Error loading Best Player data with collectionGroup: $e');
+      print(stacktrace);
+      if (mounted) {
+        setState(() {
+          _isLoadingBestPlayer = false;
+        });
+      }
+    }
+  }
+
+
+
+// This corrected stream properly fetches the name from the parent 'Staff' collection.
+  Stream<List<Map<String, dynamic>>> _getCombinedLiveFeedStream() {
+    if (_currentUserState == null || _currentUserLocation == null) {
+      debugPrint("User state or location not available for live feed.");
+      return Stream.value([]);
+    }
+
+    // Stream 1: Get all staff for the current state and location
+    final staffStream = FirebaseFirestore.instance
+        .collection('Staff')
+        .where('state', isEqualTo: _currentUserState)
+        .where('location', isEqualTo: _currentUserLocation)
+        .snapshots();
+
+    // Stream 2: Get all clock-in records for today from the collection group
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final recordsStream = FirebaseFirestore.instance
+        .collectionGroup('Record')
+        .where('timestamp', isGreaterThanOrEqualTo: startOfToday)
+        .snapshots();
+
+    // Combine the two streams to map the data correctly
+    return Rx.combineLatest2(staffStream, recordsStream,
+            (QuerySnapshot staffSnapshot, QuerySnapshot recordsSnapshot) {
+
+          // --- THE FIX IS HERE ---
+          // 1. Create a Map of Staff data for efficient lookups.
+          //    The key is the Staff ID, the value is the Staff's data.
+          final staffDataMap = {
+            for (var doc in staffSnapshot.docs)
+              doc.id: doc.data() as Map<String, dynamic>
+          };
+
+          // 2. Process the records and use the map to get the correct name.
+          final List<Map<String, dynamic>> clockInData = recordsSnapshot.docs
+              .map((recordDoc) {
+            final parentStaffId = recordDoc.reference.parent.parent!.id;
+
+            // Check if the record belongs to a staff member in our facility
+            if (staffDataMap.containsKey(parentStaffId)) {
+              // Get the specific staff member's data from our map
+              final staffData = staffDataMap[parentStaffId]!;
+              final recordData = recordDoc.data() as Map<String, dynamic>;
+
+              // *** THE FIX: Get staff data from the map and concatenate the name ***
+              final fullName = '${staffData['firstName'] ?? ''} ${staffData['lastName'] ?? ''}'.trim();
+
+              final recordTimestamp = (recordData['timestamp'] as Timestamp?)?.toDate() ?? now;
+
+              return {
+                'fullName': fullName.isEmpty ? 'Unknown Staff' : fullName,
+                'date': DateFormat('dd-MMM-yyyy').format(recordTimestamp),
+                'clockIn': recordData['clockIn'] ?? 'N/A',
+                'clockOut': recordData['clockOut'] ?? '--/--',
+              };
+            }
+            return null; // Discard records from other facilities
+          })
+              .whereType<Map<String, dynamic>>() // Remove the null entries
+              .toList();
+
+          // Sort the final list by clock-in time (no changes here)
+          clockInData.sort((a, b) {
+            final timeFormat = DateFormat('hh:mm a');
+            DateTime? timeA, timeB;
+            try { timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM'); } catch (e) { timeA = DateTime(0); }
+            try { timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM'); } catch (e) { timeB = DateTime(0); }
+
+            if (a['clockIn'] == 'N/A') return 1;
+            if (b['clockIn'] == 'N/A') return -1;
+            return timeA.compareTo(timeB);
+          });
+
+          return clockInData;
+        });
+  }
+
+
+// [REPLACE the old _buildFacilityClockInCard with this one]
   Widget _buildFacilityClockInCard(BuildContext context, double cardPaddingFactor, double cardMarginFactor, double fontSizeFactor, double iconSizeFactor, double otherCardHeightFactor) {
     return Container(
       padding: EdgeInsets.all(15 * cardPaddingFactor * otherCardHeightFactor),
@@ -2115,51 +2301,32 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _facilityClockInDataStream(),
+              // Use the new, combined stream here
+              stream: _getCombinedLiveFeedStream(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
+                  // It's helpful to log the error to the console during development
+                  debugPrint("Live Feed Stream Error: ${snapshot.error}");
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
-                List<Map<String, dynamic>> facilityClockInData = snapshot.data ?? [];
-
-                // Sort the list by clock-in time
-                facilityClockInData.sort((a, b) {
-                  final timeFormat = DateFormat('hh:mm a');
-                  DateTime? timeA, timeB;
-                  try {
-                    timeA = timeFormat.parse(a['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-                  } catch (e) {
-                    timeA = DateTime(0); // Fallback in case of parsing error
-                  }
-                  try {
-                    timeB = timeFormat.parse(b['clockIn'] ?? '12:00 AM'); // Default to midnight for 'N/A'
-                  } catch (e) {
-                    timeB = DateTime(0); // Fallback in case of parsing error
-                  }
-
-                  if (a['clockIn'] == 'N/A' && b['clockIn'] == 'N/A') return 0;
-                  if (a['clockIn'] == 'N/A') return 1; // 'N/A' comes last
-                  if (b['clockIn'] == 'N/A') return -1; // 'N/A' comes last
-
-                  return timeA.compareTo(timeB);
-                });
-
-
-                if (facilityClockInData.isEmpty) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(child: Text("No Clock-Ins Today", style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
                 }
+
+                final facilityClockInData = snapshot.data!;
+
                 return SingleChildScrollView(
                   scrollDirection: Axis.vertical,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: facilityClockInData.map((data) => _buildClockInListItem(
-                      data['fullName'] ?? 'Unknown Staff',
-                      data['date'] ?? 'N/A',
-                      data['clockIn'] ?? 'N/A',
-                      data['clockOut'] ?? '--/--', // Ensure clockOut is not null, default to '--/--'
+                      data['fullName']!,
+                      data['date']!,
+                      data['clockIn']!,
+                      data['clockOut']!,
                       fontSizeFactor,
                       cardMarginFactor,
                       cardPaddingFactor,
@@ -2173,7 +2340,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ),
     );
   }
-
 
   Widget _buildClockInListItem(String title, String date, String clockInTime, String clockOutTime, double fontSizeFactor, double cardMarginFactor, double cardPaddingFactor) {
     return Padding(

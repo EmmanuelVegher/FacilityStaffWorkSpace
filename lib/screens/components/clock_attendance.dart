@@ -22,6 +22,7 @@ import '../../team_survey/team_survey.dart';
 import '../../widgets/drawer.dart';
 import '../../widgets/geo_utils.dart';
 import '../../widgets/header_widget.dart';
+import '../leave_request/leave_request.dart';
 import '../login_screen.dart';
 import '../staff_dashboard.dart';
 import 'history_page.dart'; // Import your login screen
@@ -840,7 +841,7 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
         //     Navigator.pushReplacement(
         //       context,
         //       MaterialPageRoute(
-        //         builder: (context) => const PsychologicalMetricsPage(),
+         //     builder: (context) => const PsychologicalMetricsPage(),
         //       ),
         //     );
         //     return;
@@ -912,7 +913,10 @@ class _AttendancePageState extends State<AttendancePage> { // Created State clas
             vertical: sizes.outOfOfficeButtonVerticalPadding),
         child: GestureDetector(
           onTap: () {
-            controller.showBottomSheet3(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LeaveRequestsPage1()),
+            );
           },
           child: Container(
             width: sizes.outOfOfficeButtonWidth,
@@ -1245,6 +1249,13 @@ class ClockAttendanceWebController extends GetxController {
 
   var isCircularProgressBarOn = true.obs;
 
+  // To track the last position that was successfully reverse-geocoded
+  geolocator.Position? _lastGeocodedPosition;
+  // The minimum distance (in meters) the user must move before we fetch a new address
+  final double _minUpdateDistance = 50;
+  // A flag to prevent multiple API calls from running at the same time
+  bool _isGeocodingInProgress = false;
+
   final _clockInStreamController = StreamController<String>.broadcast();
   Stream<String> get clockInStream => _clockInStreamController.stream;
 
@@ -1323,11 +1334,18 @@ class ClockAttendanceWebController extends GetxController {
   locationPkg.Location locationService = locationPkg.Location();
 
 
+  // @override
+  // void onInit() {
+  //   super.onInit();
+  //   _loadInitialData();
+  //   initializeLocationAndGeofence(); // Call initialization here in onInit
+  // }
+
   @override
   void onInit() {
     super.onInit();
-    _loadInitialData();
-    initializeLocationAndGeofence(); // Call initialization here in onInit
+    // A single, clean entry point for all initializations.
+    initializeController();
   }
 
 
@@ -1340,6 +1358,150 @@ class ClockAttendanceWebController extends GetxController {
     _clockOutLocationStreamController.close();
     locationSubscription?.cancel(); // Cancel location stream on close
     super.onClose();
+  }
+
+  Future<void> initializeController() async {
+    isLoading.value = true;
+    // The order is important: User details -> Geofences -> Location -> Attendance
+    await _getUserDetail();
+    await _fetchGeofenceLocations();
+    await _startLocationUpdates(); // This new method starts the location stream
+    await _getAttendanceSummary();
+    isLoading.value = false;
+  }
+
+  Future<void> _startLocationUpdates() async {
+    bool serviceEnabled = await locationService.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await locationService.requestService();
+      if (!serviceEnabled) {
+        location.value = "Location Service Disabled";
+        isGpsEnabled.value = false;
+        return;
+      }
+    }
+    isGpsEnabled.value = true;
+
+    locationPkg.PermissionStatus permission = await locationService.hasPermission();
+    if (permission == locationPkg.PermissionStatus.denied) {
+      permission = await locationService.requestPermission();
+      if (permission != locationPkg.PermissionStatus.granted) {
+        location.value = "Location Permission Denied";
+        return;
+      }
+    }
+
+    // Cancel any existing subscription to avoid memory leaks
+    locationSubscription?.cancel();
+
+    // Listen to location changes
+    locationSubscription = locationService.onLocationChanged
+        .listen((locationPkg.LocationData currentLocation) async {
+      if (currentLocation.latitude == null || currentLocation.longitude == null) {
+        return;
+      }
+
+      // Update reactive variables for real-time coordinate display
+      lati.value = currentLocation.latitude!;
+      longi.value = currentLocation.longitude!;
+      accuracy.value = currentLocation.accuracy ?? 0.0;
+      speed.value = currentLocation.speed ?? 0.0;
+
+      // --- THROTTLING LOGIC ---
+      // Decide if we need to fetch a new address based on distance moved
+      bool shouldUpdateAddress = false;
+      if (_lastGeocodedPosition == null) {
+        shouldUpdateAddress = true;
+      } else {
+        double distance = geolocator.Geolocator.distanceBetween(
+          _lastGeocodedPosition!.latitude,
+          _lastGeocodedPosition!.longitude,
+          currentLocation.latitude!,
+          currentLocation.longitude!,
+        );
+        if (distance > _minUpdateDistance) {
+          shouldUpdateAddress = true;
+        }
+      }
+
+      if (shouldUpdateAddress && !_isGeocodingInProgress) {
+        _isGeocodingInProgress = true;
+
+        // Update the last known position
+        _lastGeocodedPosition = geolocator.Position(
+            latitude: currentLocation.latitude!,
+            longitude: currentLocation.longitude!,
+            timestamp: DateTime.now(),
+            accuracy: currentLocation.accuracy ?? 0,
+            altitude: currentLocation.altitude ?? 0,
+            heading: currentLocation.heading ?? 0,
+            speed: currentLocation.speed ?? 0,
+            speedAccuracy: currentLocation.speedAccuracy ?? 0,
+            altitudeAccuracy: 0,
+            headingAccuracy: 0);
+
+        // Perform the reverse geocoding API call
+        await _reverseGeocodeAndUpdateAddress(
+            currentLocation.latitude!, currentLocation.longitude!);
+
+        _isGeocodingInProgress = false;
+      }
+    }, onError: (e) {
+      dev.log("Location stream error: $e");
+      location.value = "Location stream error";
+    });
+  }
+
+  Future<void> _reverseGeocodeAndUpdateAddress(double latitude, double longitude) async {
+    try {
+      // Set a temporary state to show the user something is happening
+      if (location.value.isEmpty || location.value.contains("Error")) {
+        location.value = "Updating location...";
+      }
+
+      // Use Nominatim (OpenStreetMap) API for reverse geocoding
+      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude&accept-language=en');
+      final response = await http.get(url, headers: {'User-Agent': 'YourAppName/1.0'});
+
+      String newLocationName;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        newLocationName = data['display_name'] ?? "Address not found";
+        administrativeArea.value = _extractStateFromNominatim(data);
+      } else {
+        dev.log('Nominatim API error: ${response.statusCode}, ${response.body}');
+        newLocationName = "Address lookup failed";
+      }
+
+      // Check if the user is inside a predefined geofence (e.g., an office)
+      String geofenceName = await _determineGeofenceLocation(latitude, longitude);
+
+      // Prioritize the geofence name, but fall back to the looked-up address
+      if (geofenceName.isNotEmpty) {
+        location.value = geofenceName;
+        isInsideAnyGeofence.value = true;
+      } else {
+        location.value = newLocationName;
+        isInsideAnyGeofence.value = false;
+      }
+
+    } catch (e) {
+      dev.log("Error in reverse geocoding: $e");
+      if (location.value.isEmpty || location.value.contains("Error") || location.value.contains("Updating")) {
+        location.value = "Location name error";
+      }
+    } finally {
+      isCircularProgressBarOn.value = false;
+    }
+  }
+
+  // Helper function to extract state from Nominatim API response
+  String _extractStateFromNominatim(Map<String, dynamic> data) {
+    if (data['address'] != null) {
+      final address = data['address'];
+      return address['state'] ?? address['region'] ?? address['state_district'] ?? '';
+    }
+    return '';
   }
 
 
@@ -2883,14 +3045,14 @@ class ClockAttendanceWebController extends GetxController {
     }
   }
 
-  // Helper function to extract state from Nominatim response (adjust as needed)
-  String _extractStateFromNominatim(Map<String, dynamic> nominatimResponse) {
-    if (nominatimResponse['address'] != null) {
-      final address = nominatimResponse['address'];
-      return address['state'] ?? address['region'] ?? ''; // Try 'state' first, then 'region'
-    }
-    return '';
-  }
+  // // Helper function to extract state from Nominatim response (adjust as needed)
+  // String _extractStateFromNominatim(Map<String, dynamic> nominatimResponse) {
+  //   if (nominatimResponse['address'] != null) {
+  //     final address = nominatimResponse['address'];
+  //     return address['state'] ?? address['region'] ?? ''; // Try 'state' first, then 'region'
+  //   }
+  //   return '';
+  // }
 
   String _extractState(Map<String, dynamic> data) {
     List<dynamic> addressComponents = data["results"][0]["address_components"];

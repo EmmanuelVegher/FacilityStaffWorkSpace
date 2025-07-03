@@ -105,20 +105,27 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
   }
 
   Future<void> _updateSignatureLinkInFirestore(String? signatureLink) async {
-    if (_userId == null) return; // Ensure userId is available
+    if (_userId == null) {
+      print('Error: User ID is null. Cannot update Firestore.');
+      return;
+    }
 
     try {
+      // Use .set() with SetOptions(merge: true) to create the document if it doesn't exist,
+      // or update it if it does. This is more robust than .update().
       await firestore
           .collection('Staff')
           .doc(_userId)
-          .update({'signatureLink': signatureLink});
-      print('Signature link updated in Firestore successfully!');
+          .set({'signatureLink': signatureLink}, SetOptions(merge: true));
+      print('Signature link saved to Firestore successfully!');
     } catch (e) {
-      print('Error updating signature link in Firestore: $e');
-      // Handle error appropriately, maybe show a snackbar to the user
+      print('Error saving signature link to Firestore: $e');
+      // Optionally show a user-facing error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving signature: $e")),
+      );
     }
   }
-
 
   Future<void> _pickAndUploadSignature() async {
     if (_userId == null) {
@@ -165,74 +172,103 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
       );
       return;
     }
+    // A variable to track the saving state within the dialog
+    bool isSaving = false;
+
     showDialog(
       context: context,
+      barrierDismissible: false, // Prevent closing dialog while saving
       builder: (context) {
-        return AlertDialog(
-          content: SizedBox(
-            height: 300,
-            width: 300, // Added width for web responsiveness
-            child: Column(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey)), // Visual border for signature area
-                    child: Signature(
-                      controller: _signatureController,
-                      backgroundColor: Colors.grey[200]!,
-                    ),
+        // StatefulBuilder allows updating the dialog's content (e.g., showing a loader)
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter dialogSetState) {
+            return AlertDialog(
+              content: SizedBox(
+                height: 300,
+                width: 300,
+                // If saving, show a progress indicator, otherwise show the signature pad
+                child: isSaving
+                    ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text("Saving Signature..."),
+                    ],
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                )
+                    : Column(
                   children: [
-                    TextButton(
-                      onPressed: () => _signatureController.clear(),
-                      child: const Text("Clear"),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+                        child: Signature(
+                          controller: _signatureController,
+                          backgroundColor: Colors.grey[200]!,
+                        ),
+                      ),
                     ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (_signatureController.isNotEmpty) {
-                          final signature = await _signatureController.toPngBytes();
-                          if (signature != null) {
-                            String fileName = 'drawn_signature_${DateTime.now().millisecondsSinceEpoch}.png'; // Unique file name
-                            String? downloadUrl = await _uploadImageToFirebaseStorage(signature, fileName);
-                            if (downloadUrl != null) {
-                              await _updateSignatureLinkInFirestore(downloadUrl);
-                              setState(() {
-                                _signatureLink = downloadUrl;
-                                _currentSignatureBytes = signature; // Optionally update local preview
-                              });
-                              Navigator.pop(context);
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: () => _signatureController.clear(),
+                          child: const Text("Clear"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (_signatureController.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Drawn signature saved successfully!")),
+                                const SnackBar(content: Text("Please draw your signature.")),
                               );
+                              return;
+                            }
+
+                            // Update the dialog's state to show the loader
+                            dialogSetState(() {
+                              isSaving = true;
+                            });
+
+                            final signature = await _signatureController.toPngBytes();
+                            if (signature != null) {
+                              String fileName = 'drawn_signature_${DateTime.now().millisecondsSinceEpoch}.png';
+                              String? downloadUrl = await _uploadImageToFirebaseStorage(signature, fileName);
+
+                              // Pop the dialog regardless of success or failure
+                              Navigator.pop(context);
+
+                              if (downloadUrl != null) {
+                                await _updateSignatureLinkInFirestore(downloadUrl);
+                                setState(() {
+                                  _signatureLink = downloadUrl;
+                                  _currentSignatureBytes = signature;
+                                  _signatureController.clear();
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Drawn signature saved successfully!")),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Failed to save drawn signature.")),
+                                );
+                              }
                             } else {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Failed to save drawn signature.")),
+                                const SnackBar(content: Text("Failed to capture signature.")),
                               );
                             }
-                          } else {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Failed to capture signature.")),
-                            );
-                          }
-                        } else {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Please draw your signature.")),
-                          );
-                        }
-                      },
-                      child: const Text("Save"),
+                          },
+                          child: const Text("Save"),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

@@ -15,6 +15,7 @@ import '../screens/leave_request/leave_request_review_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
+import '../screens/psychological_survey_analysis_page/PsychologicalSurveyAnalysisPage.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
@@ -336,6 +337,31 @@ Widget drawer2(
 
           ListTile(
             leading: Icon(
+              Icons.psychology,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Survey Analysis',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PsychologicalSurveyAnalysisPage()),
+
+              );
+            },
+          ),
+
+
+
+
+          ListTile(
+            leading: Icon(
               Icons.holiday_village,
               size: drawerIconSize,
               color: Colors.blue,
@@ -355,6 +381,8 @@ Widget drawer2(
               );
             },
           ),
+
+
 
 
 

@@ -146,6 +146,30 @@ Widget drawer(
                           )),
                 );
               }),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.book,
+              size: drawerIconSize,
+              color: Colors.purple,
+            ),
+            title: Text(
+              'User Guide',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserGuidePage()),
+              );
+            },
+          ),
           const Divider(
             color: Colors.grey,
             height: 1,
@@ -494,29 +518,7 @@ Widget drawer(
             },
           ),//
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.book,
-              size: drawerIconSize,
-              color: Colors.purple,
-            ),
-            title: Text(
-              'User Guide',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const UserGuidePage()),
-              );
-            },
-          ),
+
 
           const Divider(
             color: Colors.grey,
