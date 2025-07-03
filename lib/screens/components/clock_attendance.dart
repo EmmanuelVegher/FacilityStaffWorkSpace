@@ -1271,6 +1271,7 @@ class ClockAttendanceWebController extends GetxController {
   Stream<String> get clockOutLocationStream =>
       _clockOutLocationStreamController.stream;
 
+  bool _hasInitialLocationBeenFetched = false;
   RxString clockIn = "--/--".obs;
   RxString clockOut = "--/--".obs;
   RxString durationWorked = "".obs;
@@ -1362,12 +1363,169 @@ class ClockAttendanceWebController extends GetxController {
 
   Future<void> initializeController() async {
     isLoading.value = true;
-    // The order is important: User details -> Geofences -> Location -> Attendance
     await _getUserDetail();
     await _fetchGeofenceLocations();
-    await _startLocationUpdates(); // This new method starts the location stream
+    // This new orchestrator method handles permissions, initial fetch, and the stream.
+    await _initializeAndStartLocationServices();
     await _getAttendanceSummary();
     isLoading.value = false;
+  }
+  Future<void> _initializeAndStartLocationServices() async {
+    // A. Check if the device's location service is enabled.
+    bool serviceEnabled = await locationService.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await locationService.requestService();
+      if (!serviceEnabled) {
+        location.value = "Location Service Disabled";
+        isGpsEnabled.value = false;
+        return; // Stop if service is not enabled.
+      }
+    }
+    isGpsEnabled.value = true;
+
+    // B. Check for app permission.
+    locationPkg.PermissionStatus permission = await locationService.hasPermission();
+    if (permission == locationPkg.PermissionStatus.denied) {
+      permission = await locationService.requestPermission();
+      if (permission != locationPkg.PermissionStatus.granted) {
+        location.value = "Location Permission Denied";
+        return; // Stop if permission is denied.
+      }
+    }
+
+    // C. Get the location ONCE for a fast initial UI update.
+    await _getInitialLocation();
+
+    // D. Start the continuous stream for dynamic updates.
+    _startLocationStream();
+  }
+
+  //
+  // METHOD 3: Fetches the location a single time for app startup.
+  // This is crucial for preventing the initial "Location Error".
+  //
+  Future<void> _getInitialLocation() async {
+    // Prevent this from running more than once.
+    if (_hasInitialLocationBeenFetched) return;
+
+    try {
+      location.value = "Fetching initial location...";
+      // Use geolocator for a reliable one-time fetch.
+      geolocator.Position position = await geolocator.Geolocator.getCurrentPosition(
+        desiredAccuracy: geolocator.LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10), // Add a timeout
+      );
+
+      // We got the initial position, now get its address.
+      await _reverseGeocodeAndUpdateAddress(position.latitude, position.longitude);
+      _hasInitialLocationBeenFetched = true;
+
+    } catch (e) {
+      dev.log("Error getting initial location: $e");
+      // Provide a more specific error message for the user.
+      location.value = "Could not get initial location. Please check GPS and permissions.";
+    }
+  }
+
+
+  //
+  // METHOD 4: Starts the continuous stream for ongoing updates.
+  //
+  void _startLocationStream() {
+    locationSubscription?.cancel(); // Cancel any old stream.
+
+    locationSubscription = locationService.onLocationChanged.listen((locationPkg.LocationData currentData) async {
+      if (currentData.latitude == null || currentData.longitude == null) return;
+
+      // Update real-time coordinates on the UI
+      lati.value = currentData.latitude!;
+      longi.value = currentData.longitude!;
+
+      // --- Throttling Logic (from previous step, still important) ---
+      bool shouldUpdateAddress = false;
+      if (_lastGeocodedPosition == null) {
+        shouldUpdateAddress = true;
+      } else {
+        double distance = geolocator.Geolocator.distanceBetween(
+          _lastGeocodedPosition!.latitude,
+          _lastGeocodedPosition!.longitude,
+          currentData.latitude!,
+          currentData.longitude!,
+        );
+        if (distance > _minUpdateDistance) {
+          shouldUpdateAddress = true;
+        }
+      }
+
+      if (shouldUpdateAddress && !_isGeocodingInProgress) {
+        _isGeocodingInProgress = true;
+
+        _lastGeocodedPosition = geolocator.Position(
+            latitude: currentData.latitude!,
+            longitude: currentData.longitude!,
+            timestamp: DateTime.fromMillisecondsSinceEpoch(currentData.time?.toInt() ?? 0),
+            accuracy: currentData.accuracy ?? 0,
+            altitude: currentData.altitude ?? 0,
+            heading: currentData.heading ?? 0,
+            speed: currentData.speed ?? 0,
+            speedAccuracy: currentData.speedAccuracy ?? 0,
+            altitudeAccuracy: 0,
+            headingAccuracy: 0);
+
+        await _reverseGeocodeAndUpdateAddress(currentData.latitude!, currentData.longitude!);
+        _isGeocodingInProgress = false;
+      }
+    }, onError: (e) {
+      dev.log("Location stream error: $e");
+    });
+  }
+
+
+  //
+  // METHOD 5: Handles the actual API call and geofence check.
+  // This is mostly the same but with better logging.
+  //
+  Future<void> _reverseGeocodeAndUpdateAddress(double latitude, double longitude) async {
+    try {
+      // Nominatim requires a User-Agent header. This is a common reason for API failure.
+      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude&accept-language=en');
+      final response = await http.get(url, headers: {'User-Agent': 'com.your.appname/1.0'}); // IMPORTANT: Add User-Agent
+
+      String newLocationName;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        newLocationName = data['display_name'] ?? "Address not found";
+        administrativeArea.value = _extractStateFromNominatim(data);
+      } else {
+        // Log the specific API error.
+        dev.log('API Error: ${response.statusCode}. Body: ${response.body}');
+        newLocationName = "Address lookup failed";
+      }
+
+      String geofenceName = await _determineGeofenceLocation(latitude, longitude);
+
+      if (geofenceName.isNotEmpty) {
+        location.value = geofenceName;
+        isInsideAnyGeofence.value = true;
+      } else {
+        location.value = newLocationName;
+        isInsideAnyGeofence.value = false;
+      }
+    } catch (e) {
+      dev.log("Reverse geocoding exception: $e");
+      location.value = "Location name error";
+    }
+  }
+
+  //
+  // METHOD 6: Helper function (no changes needed here).
+  //
+  String _extractStateFromNominatim(Map<String, dynamic> data) {
+    if (data['address'] != null) {
+      final address = data['address'];
+      return address['state'] ?? address['region'] ?? address['state_district'] ?? '';
+    }
+    return '';
   }
 
   Future<void> _startLocationUpdates() async {
@@ -1452,57 +1610,7 @@ class ClockAttendanceWebController extends GetxController {
     });
   }
 
-  Future<void> _reverseGeocodeAndUpdateAddress(double latitude, double longitude) async {
-    try {
-      // Set a temporary state to show the user something is happening
-      if (location.value.isEmpty || location.value.contains("Error")) {
-        location.value = "Updating location...";
-      }
 
-      // Use Nominatim (OpenStreetMap) API for reverse geocoding
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude&accept-language=en');
-      final response = await http.get(url, headers: {'User-Agent': 'YourAppName/1.0'});
-
-      String newLocationName;
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        newLocationName = data['display_name'] ?? "Address not found";
-        administrativeArea.value = _extractStateFromNominatim(data);
-      } else {
-        dev.log('Nominatim API error: ${response.statusCode}, ${response.body}');
-        newLocationName = "Address lookup failed";
-      }
-
-      // Check if the user is inside a predefined geofence (e.g., an office)
-      String geofenceName = await _determineGeofenceLocation(latitude, longitude);
-
-      // Prioritize the geofence name, but fall back to the looked-up address
-      if (geofenceName.isNotEmpty) {
-        location.value = geofenceName;
-        isInsideAnyGeofence.value = true;
-      } else {
-        location.value = newLocationName;
-        isInsideAnyGeofence.value = false;
-      }
-
-    } catch (e) {
-      dev.log("Error in reverse geocoding: $e");
-      if (location.value.isEmpty || location.value.contains("Error") || location.value.contains("Updating")) {
-        location.value = "Location name error";
-      }
-    } finally {
-      isCircularProgressBarOn.value = false;
-    }
-  }
-
-  // Helper function to extract state from Nominatim API response
-  String _extractStateFromNominatim(Map<String, dynamic> data) {
-    if (data['address'] != null) {
-      final address = data['address'];
-      return address['state'] ?? address['region'] ?? address['state_district'] ?? '';
-    }
-    return '';
-  }
 
 
   Future<void> initializeLocationAndGeofence() async {

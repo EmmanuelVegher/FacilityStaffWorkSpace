@@ -522,9 +522,14 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+              label: Text(
+                '${DateFormat("MMMM d,yyyy").format(_startDate)} - ${DateFormat("MMMM d,yyyy").format(_endDate)}',
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
             ),
+
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField(

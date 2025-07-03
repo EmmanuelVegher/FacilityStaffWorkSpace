@@ -11,48 +11,61 @@ import '../widgets/drawer2.dart';
 import 'activity_monitoring/activity_monitoring_page.dart';
 
 
+// ===================================================================
+// MODELS (Copied from your DailyActivityMonitoringPage for context)
+// ===================================================================
 
-// Bio Model (Assuming this is your BioModel class definition) - Keep your existing BioModel
 class BioModel {
-  String? firstName;
-  String? lastName;
-  String? department;
-  String? state;
-  String? designation;
-  String? location;
-  String? staffCategory;
-  String? emailAddress;
-  String? mobile;
-  String? firebaseAuthId;
+  String? firstName, lastName, department, state, designation, location, staffCategory, emailAddress, mobile, firebaseAuthId;
+  BioModel({this.firstName, this.lastName, this.department, this.state, this.designation, this.location, this.staffCategory, this.emailAddress, this.mobile, this.firebaseAuthId});
+  factory BioModel.fromJson(Map<String, dynamic> json) => BioModel(firstName: json['firstName'], lastName: json['lastName'], department: json['department'], state: json['state'], designation: json['designation'], location: json['location'], staffCategory: json['staffCategory'], emailAddress: json['emailAddress'], mobile: json['mobile'], firebaseAuthId: json['firebaseAuthId']);
+}
 
-  BioModel({
-    this.firstName,
-    this.lastName,
-    this.department,
-    this.state,
-    this.designation,
-    this.location,
-    this.staffCategory,
-    this.emailAddress,
-    this.mobile,
-    this.firebaseAuthId,
-  });
+class ReportEntry {
+  String key, value;
+  String? enteredBy, editedBy, reviewedBy, reviewStatus, supervisorName, supervisorEmail, supervisorApprovalStatus, supervisorFeedBackComment, appAnalysis, reviewerId;
+  List<String>? attachments;
 
-  // Add factory constructor to create BioModel from JSON if needed
-  factory BioModel.fromJson(Map<String, dynamic> json) {
-    return BioModel(
-      firstName: json['firstName'],
-      lastName: json['lastName'],
-      department: json['department'],
-      state: json['state'],
-      designation: json['designation'],
-      location: json['location'],
-      staffCategory: json['staffCategory'],
-      emailAddress: json['emailAddress'],
-      mobile: json['mobile'],
-      firebaseAuthId: json['firebaseAuthId'],
-    );
+  ReportEntry({this.key = "", this.value = "", this.enteredBy, this.editedBy, this.reviewedBy, this.reviewStatus, this.supervisorName, this.supervisorEmail, this.supervisorApprovalStatus, this.supervisorFeedBackComment, this.attachments, this.appAnalysis, this.reviewerId});
+
+  factory ReportEntry.fromMap(Map<String, dynamic> map) => ReportEntry(key: map['key'] ?? '', value: map['value'] ?? '', enteredBy: map['enteredBy'], editedBy: map['editedBy'], reviewedBy: map['reviewedBy'], reviewStatus: map['reviewStatus'], supervisorName: map['supervisorName'], supervisorEmail: map['supervisorEmail'], supervisorApprovalStatus: map['supervisorApprovalStatus'], supervisorFeedBackComment: map['supervisorFeedBackComment'], attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(), appAnalysis: map['appAnalysis'], reviewerId: map['reviewerId']);
+
+  Map<String, dynamic> toMap() => {'key': key, 'value': value, if (enteredBy != null) 'enteredBy': enteredBy, if (editedBy != null) 'editedBy': editedBy, if (reviewedBy != null) 'reviewedBy': reviewedBy, if (reviewStatus != null) 'reviewStatus': reviewStatus, if (supervisorName != null) 'supervisorName': supervisorName, if (supervisorEmail != null) 'supervisorEmail': supervisorEmail, if (supervisorApprovalStatus != null) 'supervisorApprovalStatus': supervisorApprovalStatus, if (supervisorFeedBackComment != null) 'supervisorFeedBackComment': supervisorFeedBackComment, if (attachments != null) 'attachments': attachments, if (appAnalysis != null) 'appAnalysis': appAnalysis, if (reviewerId != null) 'reviewerId': reviewerId};
+
+  ReportEntry copyWith({String? key, String? value, String? enteredBy, String? editedBy, String? reviewedBy, String? reviewStatus, List<String>? attachments, String? appAnalysis, String? reviewerId}) => ReportEntry(key: key ?? this.key, value: value ?? this.value, enteredBy: enteredBy ?? this.enteredBy, editedBy: editedBy ?? this.editedBy, reviewedBy: reviewedBy ?? this.reviewedBy, reviewStatus: reviewStatus ?? this.reviewStatus, attachments: attachments ?? this.attachments, appAnalysis: appAnalysis ?? this.appAnalysis, reviewerId: reviewerId ?? this.reviewerId);
+}
+
+class Report {
+  String? id, reportType, reportingWeek, reportingMonth, reportStatus, reportFeedbackComment, supervisorName, supervisorEmail, supervisorApprovalStatus, supervisorFeedBackComment;
+  DateTime? date;
+  List<String>? attachments;
+  bool? isSynced;
+  Map<String, Map<String, List<ReportEntry>>>? reportEntries;
+  DocumentReference? docRef; // To hold the document reference for easy updates
+
+  Report({this.id, this.date, this.reportType, this.reportingWeek, this.reportingMonth, this.reportStatus, this.attachments, this.reportFeedbackComment, this.supervisorName, this.supervisorEmail, this.supervisorApprovalStatus, this.supervisorFeedBackComment, this.isSynced, this.reportEntries, this.docRef});
+
+  factory Report.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot, SnapshotOptions? options) {
+    final data = snapshot.data();
+    return Report(
+        id: snapshot.id,
+        docRef: snapshot.reference, // Store the reference
+        reportType: data?['reportType'],
+        date: data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
+        reportingWeek: data?['reportingWeek'],
+        reportingMonth: data?['reportingMonth'],
+        reportStatus: data?['reportStatus'],
+        reportFeedbackComment: data?['reportFeedbackComment'],
+        supervisorName: data?['supervisorName'],
+        supervisorEmail: data?['supervisorEmail'],
+        supervisorApprovalStatus: data?['supervisorApprovalStatus'],
+        supervisorFeedBackComment: data?['supervisorFeedBackComment'],
+        attachments: (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+        isSynced: data?['isSynced'],
+        reportEntries: (data?['reportEntries'] as Map<String, dynamic>?)?.map((username, indicatorMap) => MapEntry(username, (indicatorMap as Map<String, dynamic>).map((indicator, entryList) => MapEntry(indicator, (entryList as List<dynamic>).map((entryData) => ReportEntry.fromMap(entryData as Map<String, dynamic>)).toList())))));
   }
+
+  Map<String, dynamic> toFirestore() => {'reportType': reportType, 'date': date, 'reportingWeek': reportingWeek, 'reportingMonth': reportingMonth, 'reportStatus': reportStatus, 'reportFeedbackComment': reportFeedbackComment, 'supervisorName': supervisorName, 'supervisorEmail': supervisorEmail, 'supervisorApprovalStatus': supervisorApprovalStatus, 'supervisorFeedBackComment': supervisorFeedBackComment, 'attachments': attachments, 'isSynced': isSynced, if (reportEntries != null) 'reportEntries': reportEntries!.map((username, indicatorMap) => MapEntry(username, indicatorMap.map((indicator, entryList) => MapEntry(indicator, entryList.map((e) => e.toMap()).toList()))))};
 }
 
 
@@ -81,6 +94,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   List<Map<String, dynamic>> pendingTimesheets = [];
   List<Map<String, dynamic>> pendingTimesheetsFacilitySupervisor = [];
   List<Map<String, dynamic>> pendingTimesheetsCaritasSupervisor = [];
+  List<Report> pendingReviews = []; // List to hold pending reports for review
   bool isLoading = true;
   bool isApproveLoading = false;
   final TextEditingController _rejectReasonController = TextEditingController();
@@ -177,64 +191,46 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
 
 
   Future<void> _fetchPendingApprovals() async {
-    print("_fetchPendingApprovals");
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
     try {
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null || bioData == null) {
-        print("User not logged in or bio data not loaded.");
-        setState(() {
-          isLoading = false;
-        });
+        if (mounted) setState(() => isLoading = false);
         return;
       }
-
       final userEmail = bioData!.emailAddress;
 
-      // Fetch pending leaves
-      final leavesSnapshot = await FirebaseFirestore.instance
-          .collectionGroup('Leave Request')
-          .where('selectedSupervisorEmail', isEqualTo: userEmail)
-          .where('status', isEqualTo: 'Pending')
-          .get();
+      final leavesSnapshot = await FirebaseFirestore.instance.collectionGroup('Leave Request').where('selectedSupervisorEmail', isEqualTo: userEmail).where('status', isEqualTo: 'Pending').get();
+      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance.collectionGroup('TimeSheets').where('caritasSupervisorEmail', isEqualTo: userEmail).where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending').where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved').get();
+      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance.collectionGroup('TimeSheets').where('facilitySupervisorEmail', isEqualTo: userEmail).where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending').get();
 
-      // Fetch pending timesheets for Caritas Supervisor
-      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
-          .collectionGroup('TimeSheets')
-          .where('caritasSupervisorEmail', isEqualTo: userEmail)
-          .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
-          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
-          .get();
+      // ** NEW: Fetch pending reviews using collectionGroup **
+      List<Report> reviews = [];
+      if (selectedFirebaseId != null) {
+        // This query assumes a 'reviewerIds' array on the Report document.
+        final reviewsSnapshot = await FirebaseFirestore.instance
+            .collectionGroup('Reports')
+            .where('reviewerIds', arrayContains: selectedFirebaseId)
+            .where('reportStatus', isEqualTo: 'Pending')
+            .get();
+        reviews = reviewsSnapshot.docs.map((doc) => Report.fromFirestore(doc, null)).toList();
+      }
 
-      // Fetch pending timesheets for Facility Supervisor
-      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
-          .collectionGroup('TimeSheets')
-          .where('facilitySupervisorEmail', isEqualTo: userEmail)
-          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending')
-          .get();
-
-
-      setState(() {
-        pendingLeaves = leavesSnapshot.docs.map((doc) => doc.data()).toList();
-        pendingTimesheetsFacilitySupervisor = facilitySupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-        pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          pendingLeaves = leavesSnapshot.docs.map((doc) => doc.data()).toList();
+          pendingTimesheetsFacilitySupervisor = facilitySupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
+          pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
+          pendingReviews = reviews; // Update state with fetched reviews
+        });
+      }
     } catch (e) {
-      print('Error fetching pending approvals: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching pending approvals: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      setState(() {
-        isLoading = false;
-      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching approvals: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
 
 
   Future<void> _approveLeave(Map<String, dynamic> leave) async {
@@ -653,7 +649,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   }
 
   // Widget for Review List Tab - Integrated from DailyActivityMonitoringPage
-  Widget _buildReviewListTab() {
+  Widget _buildReviewListTab1() {
     return FutureBuilder<List<Report>>(
       future: _fetchReportsForReview(),
       builder: (context, snapshot) {
@@ -799,11 +795,161 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       },
     );
   }
+  // ===================================================================
+  // REVIEW TAB: LOGIC AND WIDGETS
+  // ===================================================================
+
+  Widget _buildReviewListTab() {
+    return pendingReviews.isNotEmpty
+        ? RefreshIndicator(
+      onRefresh: _fetchPendingApprovals,
+      color: wineColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8.0),
+        itemCount: pendingReviews.length,
+        itemBuilder: (context, index) {
+          return _buildReviewCard(context, pendingReviews[index]);
+        },
+      ),
+    )
+        : const Center(child: Text("No reports pending your review."));
+  }
+
+  Widget _buildReviewCard(BuildContext context, Report report) {
+    Map<String, List<Widget>> userEntriesMap = {};
+
+    // Group entries by the user who submitted them
+    report.reportEntries?.forEach((username, indicatorMap) {
+      List<Widget> userEntryWidgets = [];
+      indicatorMap.forEach((indicator, entryList) {
+        var relevantEntries = entryList.where((entry) => entry.reviewerId == selectedFirebaseId && entry.reviewStatus == 'Pending');
+        for (var entry in relevantEntries) {
+          userEntryWidgets.add(_buildIndicatorRowForReview(report, entry, username));
+        }
+      });
+      if (userEntryWidgets.isNotEmpty) {
+        userEntriesMap[username] = userEntryWidgets;
+      }
+    });
+
+    if (userEntriesMap.isEmpty) {
+      return const SizedBox.shrink(); // Don't show card if no entries are pending for this supervisor
+    }
+
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(report.reportType ?? "Review Request", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: wineColor)),
+            const SizedBox(height: 4),
+            Text("Date: ${DateFormat('EEE, MMM d, yyyy').format(report.date!)}", style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic)),
+            const Divider(height: 24),
+            ...userEntriesMap.entries.map((userEntry) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Submitted by: ${userEntry.key}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ...userEntry.value, // The list of indicator rows for this user
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton(onPressed: () => _approveReportForUser(report, userEntry.key), style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Approve All", style: TextStyle(color: Colors.white))),
+                      const SizedBox(width: 8),
+                      ElevatedButton(onPressed: () => _returnReportForUser(report, userEntry.key), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Return All", style: TextStyle(color: Colors.white))),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                ],
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIndicatorRowForReview(Report report, ReportEntry entry, String username) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${entry.key}: ", style: const TextStyle(fontWeight: FontWeight.w600)),
+              Expanded(child: Text(entry.value, style: const TextStyle(fontSize: 15))),
+            ],
+          ),
+          if (entry.attachments != null && entry.attachments!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: SizedBox(
+                height: 60,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: entry.attachments!.length,
+                  itemBuilder: (context, index) {
+                    final attachmentUrl = entry.attachments![index];
+                    return GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenImage(imagePath: attachmentUrl))),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Image.network(attachmentUrl, width: 60, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateReportReviewStatus(Report report, String username, String newStatus) async {
+    if (report.docRef == null) return;
+
+    // Create a deep copy of the reportEntries map to modify it
+    Map<String, dynamic> newReportEntries = report.toFirestore()['reportEntries'];
+
+    if (newReportEntries[username] != null) {
+      (newReportEntries[username] as Map<String, dynamic>).forEach((indicatorKey, entryList) {
+        for (int i = 0; i < (entryList as List).length; i++) {
+          if (entryList[i]['reviewerId'] == selectedFirebaseId) {
+            entryList[i]['reviewStatus'] = newStatus;
+          }
+        }
+      });
+    }
+    await report.docRef!.update({'reportEntries': newReportEntries});
+    await _fetchPendingApprovals(); // Refresh the list
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$username's entries have been updated.")));
+  }
+
+  Future<void> _approveReportForUser(Report report, String username) async {
+    await _updateReportReviewStatus(report, username, 'Approved');
+  }
+
+  Future<void> _returnReportForUser(Report report, String username) async {
+    await _updateReportReviewStatus(report, username, 'Returned');
+  }
+
+  // ===================================================================
+  // LEAVE & TIMESHEET LOGIC (Existing code, slightly refactored)
+  // ===================================================================
+
 
   Future<void> _approveReport(Report report) async {
     Report updatedReport = report;
     updatedReport.reportStatus = 'Approved';
-    await _updateReportReviewStatus(updatedReport);
+    await _updateReportReviewStatus1(updatedReport);
   }
 
   Future<void> _returnReport(Report report) async {
@@ -811,11 +957,11 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     if (feedback != null) {
       Report updatedReport = report;
       updatedReport.reportStatus = 'Rejected'; // or 'Returned' as per your model
-      await _updateReportReviewStatus(updatedReport, feedback: feedback); // Pass feedback to update function
+      await _updateReportReviewStatus1(updatedReport, feedback: feedback); // Pass feedback to update function
     }
   }
 
-  Future<void> _updateReportReviewStatus(Report report, {String? feedback}) async {
+  Future<void> _updateReportReviewStatus1(Report report, {String? feedback}) async {
     if (selectedBioState == null || selectedBioLocation == null) {
       print("BioModel data is incomplete, cannot update report status.");
       return;
