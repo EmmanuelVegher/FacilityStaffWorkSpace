@@ -248,33 +248,6 @@ Widget drawer3(
             },
           ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-          ListTile(
-            leading: Icon(
-              Icons.biotech_outlined,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Viral Load Tracker',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateVlReportTab2()),
-
-              );
-            },
-          ),//
 
           const Divider(
             color: Colors.grey,
@@ -308,6 +281,36 @@ Widget drawer3(
             color: Colors.grey,
             height: 1,
           ),
+
+
+
+          ListTile(
+            leading: Icon(
+              Icons.biotech_outlined,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Viral Load Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateVlReportTab2()),
+
+              );
+            },
+          ),//
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
 
 
           ListTile(

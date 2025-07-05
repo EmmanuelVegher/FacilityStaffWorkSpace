@@ -20,6 +20,7 @@ import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../widgets/drawer2.dart';
+import '../../widgets/drawer3.dart';
 
 // Define separate keys for RepaintBoundary to capture chart images for PDF export.
 final GlobalKey _currentQuarterChartBoundaryKey = GlobalKey();
@@ -1448,7 +1449,7 @@ class _StateVlReportTab2State extends State<StateVlReportTab2> {
 
         ],
       ),
-      drawer: drawer2(context,),
+      drawer: drawer3(context,),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(12.0),
         child: Column(

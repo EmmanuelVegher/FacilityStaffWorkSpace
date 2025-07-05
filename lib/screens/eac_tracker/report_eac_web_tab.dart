@@ -1,224 +1,702 @@
-// REWRITTEN FOR FLUTTER WEB
-// This file is designed for trend analysis of historical EAC reports.
-// It fetches multiple report documents from Firestore and plots them over time.
+// lib/pages/reports/eac_reports_page_web.dart
 
+// FACILITY-LEVEL EAC & CALLS TRACKER REPORTS PAGE - REWRITTEN FOR FLATTENED DATA
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
+import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart' as pwpd;
-
 
 import '../../widgets/drawer.dart'; // Assuming you have a drawer widget
 
-// --- DATA MODELS TO MATCH FIRESTORE STRUCTURE ---
-
-class EacReportModel {
-  final String id; // The document ID, which is the date string "yyyy-MM-dd"
-  final DateTime reportDate;
-  final String trackerName;
-  final int totalUniqueClients;
-  final TatSummary tat;
-  final EacSessionSummary eacSessions;
-  final VlSummary vlSummary;
-
-  EacReportModel({
-    required this.id,
-    required this.reportDate,
-    required this.trackerName,
-    required this.totalUniqueClients,
-    required this.tat,
-    required this.eacSessions,
-    required this.vlSummary,
-  });
-
-  factory EacReportModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    final tatData = data['tat'] as Map<String, dynamic>? ?? {};
-    final eacData = data['eacSessions'] as Map<String, dynamic>? ?? {};
-    final vlData = data['vlSummary'] as Map<String, dynamic>? ?? {};
-
-    DateTime parsedDate;
-    try {
-      parsedDate = DateTime.parse(doc.id);
-    } catch (e) {
-      parsedDate = (data['lastUpdated'] as Timestamp? ?? Timestamp.now()).toDate();
-    }
-
-    return EacReportModel(
-      id: doc.id,
-      reportDate: parsedDate,
-      trackerName: data['trackerName'] as String? ?? 'N/A',
-      totalUniqueClients: data['totalUniqueClients'] as int? ?? 0,
-      tat: TatSummary.fromMap(tatData),
-      eacSessions: EacSessionSummary.fromMap(eacData),
-      vlSummary: VlSummary.fromMap(vlData),
-    );
-  }
-}
-
-class TatSummary {
-  final int lessThan90Days;
-  final int between90and150Days;
-  final int moreThan150Days;
-  TatSummary({this.lessThan90Days = 0, this.between90and150Days = 0, this.moreThan150Days = 0});
-  factory TatSummary.fromMap(Map<String, dynamic> map) => TatSummary(
-    lessThan90Days: map['lessThan90Days'] as int? ?? 0,
-    between90and150Days: map['between90and150Days'] as int? ?? 0,
-    moreThan150Days: map['moreThan150Days'] as int? ?? 0,
-  );
-}
-
-class EacSessionSummary {
-  final int withAtLeast3Sessions;
-  final int without3Sessions;
-  EacSessionSummary({this.withAtLeast3Sessions = 0, this.without3Sessions = 0});
-  factory EacSessionSummary.fromMap(Map<String, dynamic> map) => EacSessionSummary(
-    withAtLeast3Sessions: map['withAtLeast3Sessions'] as int? ?? 0,
-    without3Sessions: map['without3Sessions'] as int? ?? 0,
-  );
-}
-
-class VlSummary {
-  final int withRepeatVl;
-  final int withRepeatVlResult;
-  final int suppressedLessThan1000;
-  final int suppressedLessThan50;
-  final int unsuppressed;
-  VlSummary({this.withRepeatVl = 0, this.withRepeatVlResult = 0, this.suppressedLessThan1000 = 0, this.suppressedLessThan50 = 0, this.unsuppressed = 0});
-  factory VlSummary.fromMap(Map<String, dynamic> map) => VlSummary(
-    withRepeatVl: map['withRepeatVl'] as int? ?? 0,
-    withRepeatVlResult: map['withRepeatVlResult'] as int? ?? 0,
-    suppressedLessThan1000: map['suppressedLessThan1000'] as int? ?? 0,
-    suppressedLessThan50: map['suppressedLessThan50'] as int? ?? 0,
-    unsuppressed: map['unsuppressed'] as int? ?? 0,
-  );
-}
-
-class EacCallLogModel {
+// --- DATA MODEL TO MATCH THE FLATTENED 'EACTrackedLogs' COLLECTION ---
+class EacCallLog {
   final String? clientName;
-  final String? artId;
   final String? phoneNumber;
-  final String? eacSessionType;
-  final DateTime callDateTime;
-  final String? outcome;
-  final int duration;
+  final String? artStatus;
+  final String? facilityName;
+  final String? state;
+  final String? artId; // This is the uniqueID from the mobile app
+  final String? datimCode;
+  final DateTime? dateTracked;
+  final String? trackingOutcome; // Replaces callStatus
+  final int? callDuration;
   final String? trackedBy;
+  final String? designation;
+  final String? trackerFacilityLocation;
+  final String? supervisorName;
+  final String? supervisorEmail;
+  final String? eacSessionType; // Crucial field for EAC reporting
 
-  EacCallLogModel({
+  EacCallLog({
     this.clientName,
-    this.artId,
     this.phoneNumber,
-    this.eacSessionType,
-    required this.callDateTime,
-    this.outcome,
-    required this.duration,
+    this.artStatus,
+    this.facilityName,
+    this.state,
+    this.artId,
+    this.datimCode,
+    this.dateTracked,
+    this.trackingOutcome,
+    this.callDuration,
     this.trackedBy,
+    this.designation,
+    this.trackerFacilityLocation,
+    this.supervisorName,
+    this.supervisorEmail,
+    this.eacSessionType,
   });
 
-  factory EacCallLogModel.fromFirestore(Map<String, dynamic> data) {
-    return EacCallLogModel(
+  factory EacCallLog.fromJson(Map<String, dynamic> data) {
+    return EacCallLog(
       clientName: data['clientName'] as String?,
-      artId: data['artId'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
-      eacSessionType: data['eacSessionType'] as String?,
-      callDateTime: (data['dateTracked'] as Timestamp? ?? Timestamp.now()).toDate(),
-      outcome: data['trackingOutcome'] as String?,
-      duration: data['callDuration'] as int? ?? 0,
+      artStatus: data['artStatus'] as String?,
+      facilityName: data['facilityName'] as String?,
+      state: data['trackerState'] as String?, // Note: Field name from mobile app
+      artId: data['artId'] as String?,
+      datimCode: data['datimCode'] as String?,
+      dateTracked: (data['dateTracked'] as Timestamp?)?.toDate(),
+      trackingOutcome: data['trackingOutcome'] as String?,
+      callDuration: data['callDuration'] as int?,
       trackedBy: data['trackedBy'] as String?,
+      designation: data['designation'] as String?,
+      trackerFacilityLocation: data['trackerFacilityLocation'] as String?,
+      supervisorName: data['supervisorName'] as String?,
+      supervisorEmail: data['supervisorEmail'] as String?,
+      eacSessionType: data['eacSessionType'] as String?,
     );
   }
 }
 
-// NEW: Helper class for Pie Chart data
-class _PieChartData {
-  final String category;
-  final int value;
-  final Color color;
-  _PieChartData(this.category, this.value, this.color);
-}
+// GlobalKeys to capture chart images for PDF export
+final GlobalKey _outcomeChartKey = GlobalKey();
+final GlobalKey _artStatusChartKey = GlobalKey();
+final GlobalKey _sessionTypeChartKey = GlobalKey(); // New chart key
+final GlobalKey _callDurationChartKey = GlobalKey();
 
-// --- MAIN WIDGET ---
 
-class ReportEacWebTab extends StatefulWidget {
-  const ReportEacWebTab({super.key});
+class EacReportsPageWeb extends StatefulWidget {
+  const EacReportsPageWeb({super.key});
 
   @override
-  _ReportEacWebTabState createState() => _ReportEacWebTabState();
+  _EacReportsPageWebState createState() => _EacReportsPageWebState();
 }
 
-class _ReportEacWebTabState extends State<ReportEacWebTab> {
-  bool _isLoading = true;
-  bool _isExporting = false;
-  String? _errorMessage;
-  String? _trackerState;
-  String? _trackerFacilityLocation;
-
-  List<EacReportModel> _allReports = [];
-  List<EacCallLogModel> _allCallLogs = [];
-  EacReportModel? get _latestReport => _allReports.isNotEmpty ? _allReports.last : null;
-
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 90));
-  DateTime _endDate = DateTime.now();
-  // --- New State Variable for PII Masking ---
-  bool _allCellsGloballyUnlocked = false;
-
-  // Services
+class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // NEW: GlobalKeys for capturing charts for PDF
-  final GlobalKey _tatTrendChartKey = GlobalKey();
-  final GlobalKey _eacSessionTrendChartKey = GlobalKey();
-  final GlobalKey _vlSuppressionTrendChartKey = GlobalKey();
+  // --- Core Data & UI State ---
+  List<EacCallLog> _masterLogList = [];
+  List<EacCallLog> _filteredLogList = [];
+  DateTime? startDate;
+  DateTime? endDate;
+  bool isLoading = true;
+  bool _isInitialState = true;
+  String? _errorMessage;
+
+  // --- State variables for masking and exporting ---
+  bool _allCellsGloballyUnlocked = false;
+  bool _isExporting = false;
+
+  // --- UI State for Expandable Sections ---
+  List<ScrollController> _logTableControllers = [];
+  int _currentlyExpandedDateIndex = -1;
+  bool _isClientSummaryExpanded = false;
+  final ScrollController _clientSummaryScrollController = ScrollController();
+
+  // User Bio Details
+  String? currentUserAuthId;
+  String? userFirstName;
+  String? userLastName;
+  String? userLocation;
+
+  // --- Filter State ---
+  List<String> _availableOutcomes = ['All Outcomes'];
+  List<String> _selectedOutcomes = ['All Outcomes'];
+  List<String> _availableSessionTypes = ['All Sessions'];
+  List<String> _selectedSessionTypes = ['All Sessions'];
+
+  // --- Segregated Call Costs ---
+  double _totalCallCost = 0.0;
+  double _outgoingAnsweredCost = 0.0;
+  double _incomingAnsweredCost = 0.0;
+  final double _costPerSecond = 0.25;
+
+  // Chart Data Holders
+  List<MapEntry<String, int>> outcomeChartData = [];
+  List<MapEntry<String, int>> artStatusChartData = [];
+  List<MapEntry<String, int>> sessionTypeChartData = []; // New chart data
+  List<_ChartDataPoint> callDurationTrendData = [];
 
   @override
   void initState() {
     super.initState();
-    _initializeAndFetchData();
+    _initializePage();
   }
 
-  // --- New Helper Methods for PII Masking ---
+  @override
+  void dispose() {
+    for (final controller in _logTableControllers) {
+      controller.dispose();
+    }
+    _clientSummaryScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializePage() async {
+    await _loadCurrentUserBio();
+    if (_errorMessage == null) {
+      final now = DateTime.now();
+      startDate = DateTime(now.year, now.month, now.day - 29); // Default to last 30 days
+      endDate = DateTime(now.year, now.month, now.day);
+      _loadReports();
+    }
+  }
+
+  Future<void> _loadCurrentUserBio() async {
+    setState(() => isLoading = true);
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception("User not logged in.");
+      currentUserAuthId = user.uid;
+
+      final docSnapshot = await _firestore.collection('Staff').doc(currentUserAuthId).get();
+
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final data = docSnapshot.data()!;
+        if(mounted) {
+          setState(() {
+            userFirstName = data['firstName'] as String?;
+            userLastName = data['lastName'] as String?;
+            userLocation = data['location'] as String?;
+          });
+        }
+      } else {
+        throw Exception("User bio data not found in Firestore 'Staff' collection.");
+      }
+    } catch (e) {
+      if (mounted) setState(() => _errorMessage = "Error loading user details: $e");
+    } finally {
+      if(mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _loadReports() async {
+    if (userLocation == null) {
+      _showSnackBar("Cannot load reports: User facility location is missing.");
+      return;
+    }
+    if (startDate == null || endDate == null) {
+      _showSnackBar("Please select a date range.");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      _isInitialState = false;
+      _errorMessage = null;
+      _masterLogList.clear();
+      _filteredLogList.clear();
+    });
+
+    try {
+      // *** THE CORE CHANGE: QUERYING THE FLATTENED EAC LOGS COLLECTION ***
+      final QuerySnapshot querySnapshot = await _firestore
+          .collection('EacCallLogs') // IMPORTANT: Query the correct collection
+          .where('trackerFacilityLocation', isEqualTo: userLocation)
+          .where('dateTracked', isGreaterThanOrEqualTo: startDate)
+          .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)))
+          .orderBy('dateTracked', descending: true)
+          .get();
+
+
+      final List<EacCallLog> fetchedLogs = querySnapshot.docs.map((doc) {
+        return EacCallLog.fromJson(doc.data() as Map<String, dynamic>);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _masterLogList = fetchedLogs;
+          _updateAvailableFiltersFromData();
+          _applyAllFiltersAndRecalculate();
+        });
+        if (fetchedLogs.isEmpty) {
+          _showSnackBar("No EAC call logs found for the selected period.");
+        }
+      }
+    } catch (e) {
+      print("Error loading EAC reports: $e");
+      if (mounted) setState(() => _errorMessage = "Error loading EAC reports: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  void _updateAvailableFiltersFromData() {
+    // Populate Call Outcomes filter
+    final outcomes = _masterLogList.map((c) => c.trackingOutcome).whereType<String>().where((s) => s.isNotEmpty).toSet();
+    _availableOutcomes = ['All Outcomes', ...outcomes.toList()..sort()];
+    _selectedOutcomes = ['All Outcomes'];
+
+    // Populate EAC Session Types filter
+    final sessionTypes = _masterLogList.map((c) => c.eacSessionType).whereType<String>().where((s) => s.isNotEmpty).toSet();
+    _availableSessionTypes = ['All Sessions', ...sessionTypes.toList()..sort()];
+    _selectedSessionTypes = ['All Sessions'];
+  }
+
+  void _applyAllFiltersAndRecalculate() {
+    List<EacCallLog> currentlyFiltered = List.from(_masterLogList);
+
+    // Filter by outcome
+    if (!_selectedOutcomes.contains('All Outcomes')) {
+      currentlyFiltered = currentlyFiltered.where((c) => _selectedOutcomes.contains(c.trackingOutcome)).toList();
+    }
+
+    // Filter by session type
+    if (!_selectedSessionTypes.contains('All Sessions')) {
+      currentlyFiltered = currentlyFiltered.where((c) => _selectedSessionTypes.contains(c.eacSessionType)).toList();
+    }
+
+
+    int totalDuration = currentlyFiltered.fold(0, (sum, c) => sum + (c.callDuration ?? 0));
+    int outgoingDuration = currentlyFiltered.where((c) => c.trackingOutcome?.toLowerCase() == 'answered').fold(0, (sum, c) => sum + (c.callDuration ?? 0));
+    int incomingDuration = currentlyFiltered.where((c) => c.trackingOutcome?.toLowerCase() == 'incoming answered').fold(0, (sum, c) => sum + (c.callDuration ?? 0));
+
+    setState(() {
+      _filteredLogList = currentlyFiltered;
+      _totalCallCost = totalDuration * _costPerSecond;
+      _outgoingAnsweredCost = outgoingDuration * _costPerSecond;
+      _incomingAnsweredCost = incomingDuration * _costPerSecond;
+
+      _prepareChartData();
+
+      for (final controller in _logTableControllers) {
+        controller.dispose();
+      }
+      final dateGroups = _groupLogsByDate();
+      _logTableControllers = List.generate(dateGroups.length, (_) => ScrollController());
+      _currentlyExpandedDateIndex = _filteredLogList.isNotEmpty ? 0 : -1;
+    });
+  }
+
+  void _prepareChartData() {
+    outcomeChartData = _getOutcomeData();
+    artStatusChartData = _getArtStatusData();
+    sessionTypeChartData = _getSessionTypeData();
+    callDurationTrendData = _getCallDurationTrendData();
+  }
+
+  // --- UI BUILDER METHODS ---
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bodyContent;
+
+    if (isLoading) {
+      bodyContent = const Center(child: CircularProgressIndicator());
+    } else if (_errorMessage != null) {
+      bodyContent = Center(child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+      ));
+    } else {
+      bodyContent = _buildDashboardContent();
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('EAC Reports for ${userLocation ?? "Your Facility"}', style: const TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF722F37),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: _buildAppBarActions(),
+      ),
+      drawer: drawer(context),
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(child: bodyContent),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    return [
+      IconButton(
+        tooltip: _allCellsGloballyUnlocked ? 'Mask Sensitive Data' : 'Unmask Sensitive Data',
+        icon: Icon(_allCellsGloballyUnlocked ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+        onPressed: (isLoading) ? null : _toggleGlobalUnmask,
+      ),
+      if (_isExporting)
+        const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)),
+        )
+      else
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.file_download_outlined),
+          tooltip: "Export Options",
+          onSelected: (value) async {
+            if (value == 'csv') await _exportToCSV();
+            else if (value == 'pdf') await _exportToPDF();
+          },
+          enabled: !isLoading && !_isInitialState && _filteredLogList.isNotEmpty,
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'csv', child: ListTile(leading: Icon(Icons.grid_on_outlined, color: Colors.green), title: Text('Export CSV'))),
+            const PopupMenuItem(value: 'pdf', child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined, color: Colors.red), title: Text('Export PDF (Charts)'))),
+          ],
+        ),
+    ];
+  }
+
+  Widget _buildFilterBar() {
+    String outcomeButtonText = _selectedOutcomes.contains('All Outcomes')
+        ? 'All Outcomes'
+        : _selectedOutcomes.length == 1
+        ? _selectedOutcomes.first
+        : '${_selectedOutcomes.length} Outcomes';
+
+    String sessionButtonText = _selectedSessionTypes.contains('All Sessions')
+        ? 'All Sessions'
+        : _selectedSessionTypes.length == 1
+        ? _selectedSessionTypes.first
+        : '${_selectedSessionTypes.length} Sessions';
+
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16.0,
+          runSpacing: 12.0,
+          alignment: WrapAlignment.start,
+          children: [
+            // NEW Filter for Session Type
+            _buildFilterChip("EAC Session Type", sessionButtonText, Icons.repeat_one, () {
+              _showMultiSelectDialog(
+                context: context,
+                title: 'Select EAC Session Types',
+                allOptions: _availableSessionTypes,
+                selectedOptions: _selectedSessionTypes,
+                allKeyword: 'All Sessions',
+                onConfirm: (results) {
+                  setState(() => _selectedSessionTypes = results);
+                  _applyAllFiltersAndRecalculate();
+                },
+              );
+            }, disabled: _availableSessionTypes.length <= 1 || isLoading),
+
+            _buildFilterChip("Call Outcome", outcomeButtonText, Icons.phone_callback, () {
+              _showMultiSelectDialog(
+                context: context,
+                title: 'Select Call Outcomes',
+                allOptions: _availableOutcomes,
+                selectedOptions: _selectedOutcomes,
+                allKeyword: 'All Outcomes',
+                onConfirm: (results) {
+                  setState(() => _selectedOutcomes = results);
+                  _applyAllFiltersAndRecalculate();
+                },
+              );
+            }, disabled: _availableOutcomes.length <= 1 || isLoading),
+
+            OutlinedButton.icon(
+              onPressed: isLoading ? null : _showDateRangePicker,
+              icon: const Icon(Icons.date_range_outlined),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+            ),
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.filter_list),
+              label: const Text('Apply Filter'),
+              onPressed: isLoading ? null : _loadReports,
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardContent() {
+    if (_isInitialState && !isLoading) {
+      return Center(child: Text("Apply a filter to view EAC reports.", style: TextStyle(color: Colors.grey.shade700)));
+    }
+    if (_filteredLogList.isEmpty && !isLoading) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text("No EAC call logs found for the selected criteria.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
+      ));
+    }
+
+    final Map<String, List<EacCallLog>> dailyGroupedReports = _groupLogsByDate();
+    final Map<String, _ClientCallSummary> clientSummaryMap = _generateClientCallSummary();
+    final dailyGroupedKeys = dailyGroupedReports.keys.toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSummaryInfoCard(),
+          const SizedBox(height: 24),
+          Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          _buildChartSection(),
+          const SizedBox(height: 30),
+          if (clientSummaryMap.isNotEmpty) ...[
+            _buildClientSummarySection(clientSummaryMap),
+            const SizedBox(height: 30),
+          ],
+          Text('Detailed EAC Logs', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 10),
+          _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryInfoCard() {
+    final numberFormatter = NumberFormat.compact();
+    final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
+    final totalDuration = _filteredLogList.fold<int>(0, (sum, item) => sum + (item.callDuration ?? 0));
+    final uniqueClients = _filteredLogList.map((log) => log.artId).toSet().length;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 24.0),
+      elevation: 2.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 20.0,
+              runSpacing: 16.0,
+              children: [
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.group, color: Colors.teal.shade700, size: 36),
+                  label: 'Unique Clients Contacted',
+                  value: numberFormatter.format(uniqueClients),
+                ),
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
+                  label: 'Total EAC Calls Logged',
+                  value: numberFormatter.format(_filteredLogList.length),
+                ),
+                _buildInfoTile(
+                  iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
+                  label: 'Total Call Duration',
+                  value: formatDuration(totalDuration),
+                ),
+              ],
+            ),
+            const Divider(height: 24.0, thickness: 1.0),
+            Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 20.0,
+              runSpacing: 16.0,
+              children: [
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+                  label: 'Estimated Call Cost (All)',
+                  value: currencyFormatter.format(_totalCallCost),
+                ),
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                  label: 'Cost (Outgoing Answered)',
+                  value: currencyFormatter.format(_outgoingAnsweredCost),
+                ),
+                _buildInfoTile(
+                  iconWidget: Text('₦', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.lightGreen.shade700)),
+                  label: 'Cost (Incoming Answered)',
+                  value: currencyFormatter.format(_incomingAnsweredCost),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text('(at ₦${_costPerSecond.toStringAsFixed(2)}/sec)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartSection() {
+    return Wrap(
+      spacing: 20.0,
+      runSpacing: 20.0,
+      alignment: WrapAlignment.start,
+      children: [
+        _buildChartCard(title: 'Call Outcome Distribution', chartKey: _outcomeChartKey, chart: SfCircularChart(
+            annotations: (outcomeChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
+            legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
+            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: outcomeChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
+
+        // NEW EAC Session Chart
+        _buildChartCard(title: 'EAC Session Distribution', chartKey: _sessionTypeChartKey, chart: SfCircularChart(
+            annotations: (sessionTypeChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
+            legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
+            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: sessionTypeChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
+
+        _buildChartCard(title: 'ART Status Distribution', chartKey: _artStatusChartKey, chart: SfCircularChart(
+            annotations: (artStatusChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
+            legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
+            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: artStatusChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
+
+        _buildChartCard(isWide: true, title: 'Average Call Duration Trend (Daily)', chartKey: _callDurationChartKey, chart: SfCartesianChart(
+            annotations: (callDurationTrendData.isEmpty) ? [const CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')] : null,
+            primaryXAxis: const CategoryAxis(labelRotation: -45, title: AxisTitle(text: 'Date Tracked')),
+            primaryYAxis: NumericAxis(title: const AxisTitle(text: 'Avg. Duration (s)'), numberFormat: NumberFormat.compact()),
+            tooltipBehavior: TooltipBehavior(enable: true),
+            series: <CartesianSeries>[LineSeries<_ChartDataPoint, String>(dataSource: callDurationTrendData, xValueMapper: (data, _) => DateFormat('MMM d').format(DateFormat('yyyy-MM-dd').parse(data.x)), yValueMapper: (data, _) => data.y, name: 'Avg Duration', markerSettings: const MarkerSettings(isVisible: true))])),
+      ],
+    );
+  }
+
+  Widget _buildDetailedLogSection(List<String> dailyGroupedKeys, Map<String, List<EacCallLog>> dailyGroupedReports) {
+    if (dailyGroupedKeys.isEmpty && !_isInitialState) {
+      return const Card(child: SizedBox(height: 100, child: Center(child: Text("No detailed logs match the current filters."))));
+    }
+    return ExpansionPanelList(
+      expansionCallback: (int index, bool isExpanded) {
+        setState(() {
+          _currentlyExpandedDateIndex = _currentlyExpandedDateIndex == index ? -1 : index;
+        });
+      },
+      animationDuration: const Duration(milliseconds: 300),
+      children: dailyGroupedKeys.map<ExpansionPanel>((String dateKey) {
+        final index = dailyGroupedKeys.indexOf(dateKey);
+        final dailyLogList = dailyGroupedReports[dateKey]!;
+        final bool isExpanded = _currentlyExpandedDateIndex == index;
+
+        return ExpansionPanel(
+          isExpanded: isExpanded,
+          canTapOnHeader: true,
+          headerBuilder: (BuildContext context, bool isExpanded) {
+            return ListTile(
+              title: Row(
+                children: [
+                  Expanded(child: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Visibility(
+                    visible: isExpanded,
+                    maintainSize: true, maintainAnimation: true, maintainState: true,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          tooltip: 'Scroll Left',
+                          onPressed: () => _logTableControllers[index].animateTo(_logTableControllers[index].offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          tooltip: 'Scroll Right',
+                          onPressed: () => _logTableControllers[index].animateTo(_logTableControllers[index].offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+          body: SingleChildScrollView(
+            controller: _logTableControllers[index],
+            scrollDirection: Axis.horizontal,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
+                  DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
+                  DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('EAC Session')),
+                  DataColumn(label: Text('Call Outcome')), DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')),
+                  DataColumn(label: Text("Tracker's Designation")), DataColumn(label: Text("Tracker's Facility")),
+                  DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
+                ],
+                rows: dailyLogList.map((log) {
+                  return DataRow(cells: [
+                    DataCell(Text(_maskClientName(log.clientName))),
+                    DataCell(Text(_maskPhoneNumber(log.phoneNumber))),
+                    DataCell(Text(log.artStatus ?? 'N/A')),
+                    DataCell(Text(log.facilityName ?? 'N/A')),
+                    DataCell(Text(log.state ?? 'N/A')),
+                    DataCell(Text(_maskClientName(log.artId))),
+                    DataCell(Text(log.datimCode ?? 'N/A')),
+                    DataCell(Text(log.dateTracked != null ? DateFormat('HH:mm').format(log.dateTracked!) : 'N/A')),
+                    DataCell(Text(log.eacSessionType ?? 'N/A')),
+                    DataCell(_buildStatusCell(log.trackingOutcome)),
+                    DataCell(Text(formatDuration(log.callDuration ?? 0))),
+                    DataCell(Text(log.trackedBy ?? 'N/A')),
+                    DataCell(Text(log.designation ?? 'N/A')),
+                    DataCell(Text(log.trackerFacilityLocation ?? 'N/A')),
+                    DataCell(Text(log.supervisorName ?? 'N/A')),
+                    DataCell(Text(log.supervisorEmail ?? 'N/A')),
+                  ]);
+                }).toList(),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // --- HELPER METHODS (Mostly copied from Facility Tracker, adapted for EacCallLog) ---
+
+  // ... (All helper methods from here on are adapted from the facility tracker page)
+  // ... (_showSnackBar, _maskClientName, _maskPhoneNumber, _promptForPasswordAndReauthenticate, _toggleGlobalUnmask)
+  // ... (_exportToCSV, _exportToPDF, _buildPdfChart, _captureChartPng, _triggerDownload)
+  // ... (_getCallDurationTrendData, _getArtStatusData, formatDuration, _getStatusColor, _buildStatusCell)
+  // ... (_groupLogsByDate, _generateClientCallSummary, _formatDateWithSuffix, _showDateRangePicker)
+  // ... (_showMultiSelectDialog, _buildFilterChip, _buildInfoTile, _buildChartCard, _buildClientSummarySection)
+  // ... (The class definitions for _ChartDataPoint and _ClientCallSummary also remain)
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20)));
+  }
+
   String _maskClientName(String? name) {
     if (_allCellsGloballyUnlocked || name == null || name.isEmpty) return name ?? 'N/A';
     List<String> parts = name.split(' ');
-    return parts.isNotEmpty && parts[0].isNotEmpty ? '${parts[0][0]}. (Hidden)' : 'Hidden';
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      if (!name.contains(" ") && name.length > 6) {
+        return '...${name.substring(name.length - 4)} (Hidden)';
+      }
+      return '${parts[0][0]}. (Hidden)';
+    }
+    return 'Hidden';
   }
 
   String _maskPhoneNumber(String? phone) {
     if (_allCellsGloballyUnlocked || phone == null || phone.isEmpty) return phone ?? 'N/A';
-    return phone.length > 4 ? '...${phone.substring(phone.length - 4)}' : '****';
-  }
-
-  Future<void> _toggleGlobalUnmask() async {
-    if (_allCellsGloballyUnlocked) {
-      if (mounted) setState(() => _allCellsGloballyUnlocked = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sensitive data re-masked.')));
-    } else {
-      final bool isAuthenticated = await _promptForPasswordAndReauthenticate();
-      if (isAuthenticated) {
-        if (mounted) setState(() => _allCellsGloballyUnlocked = true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sensitive data has been unmasked.')));
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Authentication failed. Data remains masked.')));
-      }
-    }
+    return phone.length > 4 ? '...${phone.substring(phone.length - 4)}' : phone.replaceAll(RegExp(r'.'), '*');
   }
 
   Future<bool> _promptForPasswordAndReauthenticate() async {
     final passwordController = TextEditingController();
-    final user = _firebaseAuth.currentUser;
+    final user = _auth.currentUser;
+
     if (user == null || user.email == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not signed in or email is not available.")));
+      _showSnackBar("Cannot authenticate: User or user email is not available.");
       return false;
     }
 
@@ -226,239 +704,184 @@ class _ReportEacWebTabState extends State<ReportEacWebTab> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Authentication Required'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Please enter your password to unmask sensitive data."),
-              const SizedBox(height: 10),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder()),
+        bool isAuthenticating = false;
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Authentication Required'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Please enter your password to unmask sensitive data."),
+                const SizedBox(height: 10),
+                if (isAuthenticating)
+                  const Padding(padding: EdgeInsets.all(8.0), child: Center(child: CircularProgressIndicator()))
+                else
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder()),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: isAuthenticating ? null : () async {
+                  if (passwordController.text.isEmpty) { _showSnackBar("Password cannot be empty."); return; }
+                  setState(() => isAuthenticating = true);
+                  try {
+                    final credential = EmailAuthProvider.credential(email: user.email!, password: passwordController.text.trim());
+                    await user.reauthenticateWithCredential(credential);
+                    Navigator.pop(context, true); // Success
+                  } catch (e) {
+                    _showSnackBar('Authentication Error. Please try again.');
+                    Navigator.pop(context, false); // Failure
+                  }
+                },
+                child: const Text('Confirm & Unmask'),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(
-              child: const Text('Confirm & Unmask'),
-              onPressed: () async {
-                if (passwordController.text.trim().isEmpty) return;
-                try {
-                  final credential = EmailAuthProvider.credential(email: user.email!, password: passwordController.text.trim());
-                  await user.reauthenticateWithCredential(credential);
-                  Navigator.pop(context, true); // Success
-                } catch (e) {
-                  Navigator.pop(context, false); // Failure
-                }
-              },
-            ),
-          ],
         );
       },
     );
     return confirmed ?? false;
   }
 
-  Future<void> _initializeAndFetchData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      await _loadFirebaseUserDetails();
-      if (_trackerState != null && _trackerFacilityLocation != null) {
-        await _fetchEacReports();
-      } else {
-        throw Exception("User's State or Facility is not configured.");
-      }
-    } catch (e, stack) {
-      debugPrint("Error initializing EAC report: $e\n$stack");
-      setState(() => _errorMessage = "Failed to load report data: $e");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _loadFirebaseUserDetails() async {
-    final user = _firebaseAuth.currentUser;
-    if (user == null) throw Exception("User not logged in.");
-
-    final docSnapshot = await _firestore.collection('Staff').doc(user.uid).get();
-    if (docSnapshot.exists && docSnapshot.data() != null) {
-      final data = docSnapshot.data()!;
-      setState(() {
-        _trackerState = data['state'] as String?;
-        _trackerFacilityLocation = data['location'] as String?;
-      });
+  Future<void> _toggleGlobalUnmask() async {
+    if (_allCellsGloballyUnlocked) {
+      if (mounted) setState(() => _allCellsGloballyUnlocked = false);
+      _showSnackBar('All sensitive data re-masked.');
     } else {
-      throw Exception("User profile not found in 'Staff' collection.");
-    }
-  }
-
-  Future<void> _fetchEacReports() async {
-    if (_trackerState == null || _trackerFacilityLocation == null) return;
-
-    if (mounted) setState(() => _isLoading = true);
-
-    final reportsCollection = _firestore
-        .collection('EAC_Reports')
-        .doc(_trackerState!)
-        .collection(_trackerFacilityLocation!);
-
-    final querySnapshot = await reportsCollection
-        .where(FieldPath.documentId, isGreaterThanOrEqualTo: DateFormat('yyyy-MM-dd').format(_startDate))
-        .where(FieldPath.documentId, isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(_endDate))
-        .orderBy(FieldPath.documentId)
-        .get();
-
-    final fetchedReports = querySnapshot.docs.map((doc) => EacReportModel.fromFirestore(doc)).toList();
-
-    List<EacCallLogModel> fetchedCallLogs = [];
-    if(fetchedReports.isNotEmpty) {
-      final futures = fetchedReports.map((report) {
-        return reportsCollection.doc(report.id).collection('callLogs').get();
-      }).toList();
-
-      final logSnapshots = await Future.wait(futures);
-      for(final logSnapshot in logSnapshots) {
-        for(final doc in logSnapshot.docs) {
-          fetchedCallLogs.add(EacCallLogModel.fromFirestore(doc.data()));
-        }
+      final bool isAuthenticated = await _promptForPasswordAndReauthenticate();
+      if (isAuthenticated) {
+        if (mounted) setState(() => _allCellsGloballyUnlocked = true);
+        _showSnackBar('All sensitive data has been unmasked.');
+      } else if (mounted) {
+        _showSnackBar('Authentication failed. Data remains masked.');
       }
     }
-    if (mounted) {
-      setState(() {
-        _allReports = fetchedReports;
-        _allCallLogs = fetchedCallLogs..sort((a, b) => b.callDateTime.compareTo(a.callDateTime));
-        _isLoading = false;
-      });
-    }
   }
 
-  void _showDateRangePicker() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Date Range'),
-        content: SizedBox(
-          width: 350,
-          height: 350,
-          child: SfDateRangePicker(
-            selectionMode: DateRangePickerSelectionMode.range,
-            initialSelectedRange: PickerDateRange(_startDate, _endDate),
-            maxDate: DateTime.now(),
-            showActionButtons: true,
-            onSubmit: (Object? value) {
-              if (value is PickerDateRange) {
-                if (mounted) {
-                  setState(() {
-                    _startDate = value.startDate ?? _startDate;
-                    _endDate = value.endDate ?? value.startDate ?? _endDate;
-                  });
-                }
-                Navigator.pop(context);
-                _fetchEacReports();
-              }
-            },
-            onCancel: () => Navigator.pop(context),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- EXPORT FUNCTIONS ---
-
-  Future<void> _exportToCsv() async {
-    if (_allReports.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No data to export.")));
-      return;
-    }
+  Future<void> _exportToCSV() async {
+    if (_isExporting) return;
     setState(() => _isExporting = true);
-    await Future.delayed(const Duration(milliseconds: 100)); // Allow UI to update
 
-    List<List<dynamic>> rows = [
-      ['EAC Report Summary Export'],
-      ['Facility', _trackerFacilityLocation],
-      ['Date Range', '${DateFormat.yMd().format(_startDate)} - ${DateFormat.yMd().format(_endDate)}'],
-      [],
-      [
-        'Report Date', 'Total Clients', 'TAT <90d', 'TAT 90-150d', 'TAT >150d',
-        'Sessions >=3', 'Sessions <3', 'Repeat VL', 'Repeat VL w/ Result',
-        'Unsuppressed', 'Suppressed <1k', 'Suppressed <50',
-      ],
-      ..._allReports.map((r) => [
-        DateFormat('yyyy-MM-dd').format(r.reportDate),
-        r.totalUniqueClients, r.tat.lessThan90Days, r.tat.between90and150Days, r.tat.moreThan150Days,
-        r.eacSessions.withAtLeast3Sessions, r.eacSessions.without3Sessions,
-        r.vlSummary.withRepeatVl, r.vlSummary.withRepeatVlResult, r.vlSummary.unsuppressed,
-        r.vlSummary.suppressedLessThan1000, r.vlSummary.suppressedLessThan50,
-      ])
-    ];
-
-    String csvData = const ListToCsvConverter().convert(rows);
-    _triggerDownload(utf8.encode(csvData), 'eac_trend_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv', 'text/csv');
-    setState(() => _isExporting = false);
-  }
-
-  Future<void> _exportToPdf() async {
-    if (_allReports.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No chart data to export.")));
-      return;
+    bool proceed = _allCellsGloballyUnlocked;
+    if (!proceed) {
+      proceed = await _promptForPasswordAndReauthenticate();
+      if (!proceed) { _showSnackBar('Authentication failed. Export will contain masked data.'); }
     }
-    setState(() => _isExporting = true);
 
     try {
-      final tatChartBytes = await _captureChartPng(_tatTrendChartKey);
-      final eacChartBytes = await _captureChartPng(_eacSessionTrendChartKey);
-      final vlChartBytes = await _captureChartPng(_vlSuppressionTrendChartKey);
+      List<List<dynamic>> rows = [
+        [
+          'Client Name', 'Client PhoneNo', 'Client ART Status', "Client's Facility",
+          'Client State', 'Client ART ID', 'DatimCode', 'Date Tracked', 'Time Tracked',
+          'EAC Session', 'Call Outcome', 'Duration of Call (s)', 'Tracked By', "Tracker's Designation",
+          "Tracker's Facility", "Tracker's Supervisor", "Tracker's Supervisor Email"
+        ]
+      ];
+      for (var log in _filteredLogList) {
+        rows.add([
+          _allCellsGloballyUnlocked ? (log.clientName ?? 'N/A') : _maskClientName(log.clientName),
+          _allCellsGloballyUnlocked ? (log.phoneNumber ?? 'N/A') : _maskPhoneNumber(log.phoneNumber),
+          log.artStatus ?? 'N/A',
+          log.facilityName ?? 'N/A',
+          log.state ?? 'N/A',
+          log.artId ?? 'N/A',
+          log.datimCode ?? 'N/A',
+          log.dateTracked != null ? DateFormat('yyyy-MM-dd').format(log.dateTracked!) : 'N/A',
+          log.dateTracked != null ? DateFormat('HH:mm').format(log.dateTracked!) : 'N/A',
+          log.eacSessionType ?? 'N/A',
+          log.trackingOutcome ?? 'N/A',
+          log.callDuration ?? 0,
+          log.trackedBy ?? 'N/A',
+          log.designation ?? 'N/A',
+          log.trackerFacilityLocation ?? 'N/A',
+          log.supervisorName ?? 'N/A',
+          log.supervisorEmail ?? 'N/A',
+        ]);
+      }
 
-      final pdf = pw.Document();
-      pdf.addPage(pw.MultiPage(
-        pageFormat: pwpd.PdfPageFormat.a4.landscape,
-        header: (context) => pw.Header(text: "EAC Trend Analysis Report"),
-        build: (context) => [
-          pw.Text("Facility: $_trackerFacilityLocation", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text("Date Range: ${DateFormat.yMd().format(_startDate)} to ${DateFormat.yMd().format(_endDate)}"),
-          pw.Divider(),
-          pw.SizedBox(height: 20),
-          if (tatChartBytes != null) ..._buildPdfChartSection("Repeat VL Turn-Around Time (TAT) Trend", tatChartBytes),
-          if (eacChartBytes != null) ..._buildPdfChartSection("EAC Session Completion Trend", eacChartBytes),
-          if (vlChartBytes != null) ..._buildPdfChartSection("Repeat Viral Load Suppression Trend", vlChartBytes),
-        ],
-      ));
-
-      final pdfBytes = await pdf.save();
-      _triggerDownload(pdfBytes, 'eac_charts_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf', 'application/pdf');
-
-    } catch(e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
+      String csvData = const ListToCsvConverter().convert(rows);
+      final bytes = utf8.encode(csvData);
+      _triggerDownload(bytes, 'eac_call_log_report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv', 'text/csv');
+    } catch (e) {
+      _showSnackBar('Error exporting CSV: $e');
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
-  List<pw.Widget> _buildPdfChartSection(String title, Uint8List imageBytes) {
-    return [
-      pw.Text(title, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-      pw.SizedBox(height: 10),
-      pw.Image(pw.MemoryImage(imageBytes), fit: pw.BoxFit.contain, height: 250),
-      pw.SizedBox(height: 30),
-    ];
+  Future<void> _exportToPDF() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    try {
+      final pdf = pw.Document();
+      final Uint8List? outcomeBytes = await _captureChartPng(_outcomeChartKey);
+      final Uint8List? artStatusBytes = await _captureChartPng(_artStatusChartKey);
+      final Uint8List? sessionTypeBytes = await _captureChartPng(_sessionTypeChartKey);
+      final Uint8List? callDurationBytes = await _captureChartPng(_callDurationChartKey);
+
+      final pw.MemoryImage? outcomeImg = outcomeBytes != null ? pw.MemoryImage(outcomeBytes) : null;
+      final pw.MemoryImage? artStatusImg = artStatusBytes != null ? pw.MemoryImage(artStatusBytes) : null;
+      final pw.MemoryImage? sessionTypeImg = sessionTypeBytes != null ? pw.MemoryImage(sessionTypeBytes) : null;
+      final pw.MemoryImage? callDurationImg = callDurationBytes != null ? pw.MemoryImage(callDurationBytes) : null;
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(30),
+          header: (pw.Context context) => pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('EAC Call Tracking Report - ${DateFormat.yMMMMd().format(DateTime.now())}',
+                style: pw.Theme.of(context).defaultTextStyle.copyWith(color: PdfColors.grey)),
+          ),
+          build: (pw.Context context) => [
+            pw.Header(level: 0, text: 'EAC Call Tracking Summary Report'),
+            pw.Paragraph(
+              text: 'Report for: ${userFirstName ?? ''} ${userLastName ?? ''} at ${userLocation ?? 'N/A'}\n'
+                  'Date Range: ${DateFormat.yMd().format(startDate!)} to ${DateFormat.yMd().format(endDate!)}',
+              style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Wrap(
+                spacing: 20, runSpacing: 20, alignment: pw.WrapAlignment.spaceEvenly,
+                children: [
+                  if (outcomeImg != null) _buildPdfChart('Call Outcome Distribution', outcomeImg),
+                  if (sessionTypeImg != null) _buildPdfChart('EAC Session Distribution', sessionTypeImg),
+                  if (artStatusImg != null) _buildPdfChart('ART Status Distribution', artStatusImg),
+                  if (callDurationImg != null) _buildPdfChart('Average Call Duration Trend', callDurationImg),
+                ]
+            ),
+          ],
+        ),
+      );
+
+      final Uint8List pdfBytes = await pdf.save();
+      _triggerDownload(pdfBytes, 'eac_call_charts_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf', 'application/pdf');
+    } catch (e) {
+      _showSnackBar('Error exporting PDF: $e');
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  pw.Widget _buildPdfChart(String title, pw.MemoryImage image) {
+    return pw.Container(width: 350, child: pw.Column(children: [pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)), pw.SizedBox(height: 5), pw.Image(image, fit: pw.BoxFit.contain, height: 200)]));
   }
 
   Future<Uint8List?> _captureChartPng(GlobalKey key) async {
     try {
       if (key.currentContext == null) return null;
       RenderRepaintBoundary boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      ui.Image image = await boundary.toImage(pixelRatio: 2.5);
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
-      debugPrint("Error capturing chart: $e");
+      _showSnackBar('Error capturing chart image: $e');
       return null;
     }
   }
@@ -466,421 +889,273 @@ class _ReportEacWebTabState extends State<ReportEacWebTab> {
   void _triggerDownload(List<int> bytes, String filename, String mimeType) {
     final blob = html.Blob([bytes], mimeType);
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
+    final anchor = html.document.createElement('a') as html.AnchorElement..href = url..style.display = 'none'..download = filename;
     html.document.body!.children.add(anchor);
     anchor.click();
     html.document.body!.children.remove(anchor);
     html.Url.revokeObjectUrl(url);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("EAC Trend Analysis",style: TextStyle(color: Colors.white,),),
-        backgroundColor: const Color(0xFF722F37),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-          icon: Icon(_allCellsGloballyUnlocked ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-          tooltip: _allCellsGloballyUnlocked ? 'Mask All Data' : 'Unmask All Data',
-          onPressed: _toggleGlobalUnmask,
-        ),
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
-            icon: const Icon(Icons.date_range),
-            label: Text('${DateFormat.yMd().format(_startDate)} - ${DateFormat.yMd().format(_endDate)}'),
-            onPressed: _showDateRangePicker,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            tooltip: "Refresh Data",
-            onPressed: _initializeAndFetchData,
-          ),
-          if (_isExporting)
-            const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)))
-          else
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.download_outlined, color: Colors.white),
-              tooltip: "Download Options",
-              onSelected: (value) {
-                if(value == 'csv') _exportToCsv();
-                if(value == 'pdf') _exportToPdf();
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'csv', child: ListTile(leading: Icon(Icons.table_chart_outlined), title: Text("Export Data (CSV)"))),
-                const PopupMenuItem(value: 'pdf', child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text("Export Charts (PDF)"))),
-              ],
-            )
-        ],
-      ),
-      drawer: drawer(context),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16)))
-          : _allReports.isEmpty
-          ? const Center(child: Text("No EAC reports found for the selected date range.", style: TextStyle(fontSize: 16)))
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildKpiSection(),
-            const SizedBox(height: 24),
-            _buildTrendChart(
-              key: _tatTrendChartKey,
-              title: 'Repeat VL Turn-Around Time (TAT) Trend',
-              series: [
-                _createLineSeries(name: '≤ 3 Months', color: Colors.green, yValueMapper: (r, _) => r.tat.lessThan90Days.toDouble()),
-                _createLineSeries(name: '3-5 Months', color: Colors.orange, yValueMapper: (r, _) => r.tat.between90and150Days.toDouble()),
-                _createLineSeries(name: '> 5 Months', color: Colors.red, yValueMapper: (r, _) => r.tat.moreThan150Days.toDouble()),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildTrendChart(
-              key: _eacSessionTrendChartKey,
-              title: 'EAC Session Completion Trend',
-              series: [
-                _createLineSeries(name: '≥ 3 Sessions', color: Colors.blue, yValueMapper: (r, _) => r.eacSessions.withAtLeast3Sessions.toDouble()),
-                _createLineSeries(name: '< 3 Sessions', color: Colors.purple, yValueMapper: (r, _) => r.eacSessions.without3Sessions.toDouble()),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildTrendChart(
-                key: _vlSuppressionTrendChartKey,
-                title: 'Repeat Viral Load Suppression Trend',
-                series: [
-                  _createLineSeries(name: 'Unsuppressed (≥1k)', color: Colors.red, yValueMapper: (r, _) => r.vlSummary.unsuppressed.toDouble()),
-                  _createLineSeries(name: 'Suppressed (<1k)', color: Colors.green, yValueMapper: (r, _) => r.vlSummary.suppressedLessThan1000.toDouble()),
-                  _createLineSeries(name: 'Suppressed (<50)', color: Colors.teal, yValueMapper: (r, _) => r.vlSummary.suppressedLessThan50.toDouble()),
-                ],
-                subtitle: 'Of clients with a repeat VL result'
-            ),
-            const SizedBox(height: 24),
-            Text("Raw Report Data", style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            _buildDataTable(),
-            const SizedBox(height: 24),
-            Text("Recent Call Logs", style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            // WITH THIS:
-            _buildCallLogSection(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- WIDGET BUILDER METHODS ---
-  Widget _buildKpiSection() {
-    final report = _latestReport;
-    if (report == null) return const SizedBox.shrink();
-
-    // --- Data for Pie Charts ---
-
-    // 1. TAT Data
-    final tatData = [
-      _PieChartData('≤ 3m', report.tat.lessThan90Days, Colors.green),
-      _PieChartData('3-5m', report.tat.between90and150Days, Colors.orange),
-      _PieChartData('> 5m', report.tat.moreThan150Days, Colors.red),
-    ];
-
-    // 2. Session Data
-    final sessionData = [
-      _PieChartData('≥ 3 Sessions', report.eacSessions.withAtLeast3Sessions, Colors.blue),
-      _PieChartData('< 3 Sessions', report.eacSessions.without3Sessions, Colors.purple),
-    ];
-
-    // NEW: 3. VL Suppression Data (Calculated to prevent double-counting)
-    final int suppressed50to999 = report.vlSummary.suppressedLessThan1000 - report.vlSummary.suppressedLessThan50;
-    final vlSuppressionData = [
-      _PieChartData('Unsuppressed (≥1k)', report.vlSummary.unsuppressed, Colors.red.shade600),
-      _PieChartData('Suppressed (50-999)', suppressed50to999 < 0 ? 0 : suppressed50to999, Colors.orangeAccent.shade400),
-      _PieChartData('Suppressed (<50)', report.vlSummary.suppressedLessThan50, Colors.teal.shade500),
-    ];
-
-    // Create a list of pie chart widgets to display
-    final List<Widget> pieCharts = [];
-    if (tatData.any((d) => d.value > 0)) {
-      pieCharts.add(_buildPieChartCard("Latest TAT Distribution", tatData));
+  List<MapEntry<String, int>> _getOutcomeData() {
+    Map<String, int> statusCounts = {};
+    for (var log in _filteredLogList) {
+      String status = log.trackingOutcome?.trim() ?? 'N/A';
+      if (status.isEmpty) status = 'N/A';
+      statusCounts[status] = (statusCounts[status] ?? 0) + 1;
     }
-    if (sessionData.any((d) => d.value > 0)) {
-      pieCharts.add(_buildPieChartCard("Latest Session Completion", sessionData));
-    }
-    // NEW: Add the VL suppression chart to the list
-    if (vlSuppressionData.any((d) => d.value > 0)) {
-      pieCharts.add(_buildPieChartCard("Repeat VL Suppression Status", vlSuppressionData));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Latest Report Snapshot (${DateFormat.yMMMMd().format(report.reportDate)})", style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        // --- Section for KPI Cards ---
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: [
-            _buildKpiCard('Total Clients on EAC', report.totalUniqueClients.toString()),
-            _buildKpiCard('Repeat VL w/ Result', report.vlSummary.withRepeatVlResult.toString(), color: Colors.blue.shade700),
-            _buildKpiCard('Unsuppressed (≥1k)', report.vlSummary.unsuppressed.toString(), color: Colors.red.shade700),
-            _buildKpiCard('Suppressed (<50)', report.vlSummary.suppressedLessThan50.toString(), color: Colors.green.shade800),
-          ],
-        ),
-
-        // --- Section for Pie Charts in a GridView ---
-        if (pieCharts.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: pieCharts.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 350,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 300 / 300,
-            ),
-            itemBuilder: (context, index) {
-              return pieCharts[index];
-            },
-          ),
-        ]
-      ],
-    );
-  }
-
-  Widget _buildPieChartCard(String title, List<_PieChartData> data) {
-    return Card(
-      elevation: 2,
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        width: 300,
-        height: 250,
-        child: Column(
-          children: [
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            Expanded(
-              child: SfCircularChart(
-                legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
-                series: <CircularSeries<_PieChartData, String>>[
-                  PieSeries<_PieChartData, String>(
-                    dataSource: data.where((d) => d.value > 0).toList(),
-                    xValueMapper: (d, _) => d.category,
-                    yValueMapper: (d, _) => d.value,
-                    pointColorMapper: (d, _) => d.color,
-                    dataLabelMapper: (d, _) => d.value.toString(),
-                    dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside),
-                  )
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKpiCard(String title, String value, {Color? color}) {
-    return Card(
-      elevation: 2,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        width: 220,
-        height: 100,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color ?? Colors.black)),
-            const SizedBox(height: 4),
-            Text(title, style: TextStyle(fontSize: 15, color: Colors.grey.shade700)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTrendChart({required Key key, required String title, String? subtitle, required List<CartesianSeries<EacReportModel, DateTime>> series}) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            if (subtitle != null) Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 20),
-            RepaintBoundary(
-              key: key,
-              child: Container(
-                color: Colors.white, // Important for clean capture
-                padding: const EdgeInsets.only(top: 8, right: 8),
-                height: 300,
-                child: SfCartesianChart(
-                  primaryXAxis: DateTimeAxis(
-                    edgeLabelPlacement: EdgeLabelPlacement.shift,
-                    dateFormat: DateFormat.MMMd(),
-                    intervalType: DateTimeIntervalType.auto,
-                  ),
-                  primaryYAxis: NumericAxis(
-                    minimum: 0,
-                    majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5]),
-                  ),
-                  legend: Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
-                  tooltipBehavior: TooltipBehavior(enable: true, header: '', canShowMarker: false),
-                  series: series,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  LineSeries<EacReportModel, DateTime> _createLineSeries({
-    required String name,
-    required Color color,
-    required num Function(EacReportModel, int) yValueMapper,
-  }) {
-    // Check if there are few data points to make markers more visible
-    final bool isSparseData = _allReports.length <= 2;
-
-    return LineSeries<EacReportModel, DateTime>(
-      dataSource: _allReports,
-      xValueMapper: (EacReportModel report, _) => report.reportDate,
-      yValueMapper: yValueMapper,
-      name: name,
-      color: color,
-      // MODIFIED: Markers are now larger and more prominent for sparse data
-      markerSettings: MarkerSettings(
-        isVisible: true,
-        height: isSparseData ? 8 : 4,
-        width: isSparseData ? 8 : 4,
-        shape: DataMarkerType.circle,
-        borderWidth: isSparseData ? 2 : 1,
-        borderColor: color,
-      ),
-    );
+    return statusCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
   }
 
 
-  Widget _buildDataTable() {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: MaterialStateColor.resolveWith((states) => Colors.blueGrey.shade50),
-          sortAscending: true,
-          sortColumnIndex: 0,
-          columns: const [
-            DataColumn(label: Text('Date'), numeric: true),
-            DataColumn(label: Text('Clients'), numeric: true),
-            DataColumn(label: Text('TAT <3m'), numeric: true),
-            DataColumn(label: Text('TAT 3-5m'), numeric: true),
-            DataColumn(label: Text('TAT >5m'), numeric: true),
-            DataColumn(label: Text('Repeat VL'), numeric: true),
-            DataColumn(label: Text('VL w/ Result'), numeric: true),
-            DataColumn(label: Text('Unsupp.'), numeric: true),
-            DataColumn(label: Text('Supp. <1k'), numeric: true),
-            DataColumn(label: Text('Supp. <50'), numeric: true),
-          ],
-          rows: _allReports.map((report) => DataRow(
-              cells: [
-                DataCell(Text(DateFormat('yyyy-MM-dd').format(report.reportDate))),
-                DataCell(Text(report.totalUniqueClients.toString())),
-                DataCell(Text(report.tat.lessThan90Days.toString())),
-                DataCell(Text(report.tat.between90and150Days.toString())),
-                DataCell(Text(report.tat.moreThan150Days.toString())),
-                DataCell(Text(report.vlSummary.withRepeatVl.toString())),
-                DataCell(Text(report.vlSummary.withRepeatVlResult.toString())),
-                DataCell(Text(report.vlSummary.unsuppressed.toString())),
-                DataCell(Text(report.vlSummary.suppressedLessThan1000.toString())),
-                DataCell(Text(report.vlSummary.suppressedLessThan50.toString())),
-              ]
-          )).toList(),
-        ),
-      ),
-    );
-  }
-
-  // NEW: Helper to group logs by date
-  Map<String, List<EacCallLogModel>> _groupCallLogsByDate() {
-    final Map<String, List<EacCallLogModel>> dailyLogs = {};
+  List<_ChartDataPoint> _getCallDurationTrendData() {
+    Map<String, List<int>> dailyDurations = {};
     final DateFormat dateKeyFormat = DateFormat('yyyy-MM-dd');
-
-    for (var log in _allCallLogs) {
-      final dateKey = dateKeyFormat.format(log.callDateTime);
-      dailyLogs.putIfAbsent(dateKey, () => []).add(log);
+    for (var log in _filteredLogList) {
+      if (log.dateTracked != null && log.callDuration != null && log.callDuration! > 0) {
+        String dateKey = dateKeyFormat.format(log.dateTracked!);
+        dailyDurations.putIfAbsent(dateKey, () => []).add(log.callDuration!);
+      }
     }
-    return dailyLogs;
+    List<_ChartDataPoint> chartData = [];
+    dailyDurations.forEach((date, durations) {
+      double averageDuration = durations.reduce((a, b) => a + b) / durations.length;
+      chartData.add(_ChartDataPoint(date, averageDuration));
+    });
+    chartData.sort((a, b) => a.x.compareTo(b.x));
+    return chartData;
   }
 
-  // REPLACEMENT for _buildCallLogTable
-  Widget _buildCallLogSection() {
-    if (_allCallLogs.isEmpty) {
-      return const Center(child: Padding(padding: EdgeInsets.all(20.0), child: Text('No call logs found in this date range.')));
+  // NEW Data prep for Session Type Chart
+  List<MapEntry<String, int>> _getSessionTypeData() {
+    Map<String, int> sessionCounts = {};
+    for (var log in _filteredLogList) {
+      String session = log.eacSessionType?.trim() ?? 'Unknown';
+      if (session.isEmpty) session = 'Unknown';
+      sessionCounts[session] = (sessionCounts[session] ?? 0) + 1;
     }
+    return sessionCounts.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  }
 
-    final groupedLogs = _groupCallLogsByDate();
-    final sortedDates = groupedLogs.keys.toList()..sort((a,b) => b.compareTo(a)); // Sort descending
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("EAC Call Tracking Logs", style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: sortedDates.length,
-          itemBuilder: (context, index) {
-            final dateKey = sortedDates[index];
-            final dailyLogs = groupedLogs[dateKey]!;
-            final displayDate = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.parse(dateKey));
+  List<MapEntry<String, int>> _getArtStatusData() {
+    Map<String, int> statusCounts = {};
+    for (var log in _filteredLogList) {
+      String status = log.artStatus?.trim() ?? 'Unknown';
+      if (status.isEmpty) status = 'Unknown';
+      statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+    }
+    return statusCounts.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  }
 
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              child: ExpansionTile(
-                key: PageStorageKey<String>(dateKey),
-                title: Text('$displayDate (${dailyLogs.length} calls)', style: const TextStyle(fontWeight: FontWeight.w600)),
-                initiallyExpanded: index == 0, // Expand the most recent day by default
-                children: dailyLogs.map((log) {
-                  final isAnswered = log.outcome?.toLowerCase() == 'answered';
-                  return ListTile(
-                    leading: Icon(
-                      isAnswered ? Icons.call_received : Icons.call_missed_outgoing,
-                      color: isAnswered ? Colors.green : Colors.red,
-                      size: 28,
-                    ),
-                    title: Text(_maskClientName(log.clientName), style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Phone: ${_maskPhoneNumber(log.phoneNumber)} | ART ID: ${log.artId ?? 'N/A'}'),
-                        if(log.eacSessionType != null)
-                          Text('EAC Session: ${log.eacSessionType}'),
-                        Text('Status: ${log.outcome ?? 'N/A'} | Duration: ${log.duration}s'),
-                        if (log.trackedBy != null)
-                          Text('Tracker: ${log.trackedBy}', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey)),
-                      ],
-                    ),
-                    isThreeLine: true,
-                  );
+  String formatDuration(int totalSeconds) {
+    if (totalSeconds < 0) return 'N/A';
+    if (totalSeconds == 0) return '0s';
+    final int hours = totalSeconds ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
+    final int remainingSeconds = totalSeconds % 60;
+    List<String> parts = [];
+    if (hours > 0) parts.add('${hours}h');
+    if (minutes > 0) parts.add('${minutes}m');
+    if (remainingSeconds > 0 || parts.isEmpty) parts.add('${remainingSeconds}s');
+    return parts.join(' ');
+  }
+
+  Color _getStatusColor(String status) {
+    String lowerStatus = status.toLowerCase();
+    switch (lowerStatus) {
+      case 'answered':
+      case 'incoming answered':
+      case 'completed':
+        return Colors.green.shade700;
+      case 'outgoing failed/not answered':
+      case 'unknown (no outgoing log detail)':
+      case 'missed incoming':
+      case 'rejected incoming':
+        return Colors.red.shade700;
+      case 'call busy':
+        return Colors.orange.shade700;
+      default:
+        return Colors.grey.shade600;
+    }
+  }
+
+  Widget _buildStatusCell(String? status) {
+    if (status == null || status.isEmpty) {
+      return const Text('N/A');
+    }
+    final lowerStatus = status.toLowerCase();
+    Color color = _getStatusColor(status);
+    Widget? icon;
+    if (lowerStatus.contains('answered')) icon = Icon(Icons.call_received, color: color, size: 16);
+    else if (lowerStatus.contains('failed') || lowerStatus.contains('missed')) icon = Icon(Icons.phone_missed, color: color, size: 16);
+    if (icon != null) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(width: 6), Flexible(child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)))]);
+    }
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)));
+  }
+
+  Map<String, List<EacCallLog>> _groupLogsByDate() {
+    final Map<String, List<EacCallLog>> dailyReports = {};
+    final DateFormat dateKeyFormat = DateFormat('yyyy-MM-dd');
+    final DateFormat displayFormat = DateFormat('EEEE, MMMM d, yyyy');
+    for (var log in _filteredLogList) {
+      final dateKey = log.dateTracked != null ? dateKeyFormat.format(log.dateTracked!) : 'Unknown Date';
+      dailyReports.putIfAbsent(dateKey, () => []).add(log);
+    }
+    final sortedKeys = dailyReports.keys.toList()..sort((a, b) {
+      if (a == 'Unknown Date') return 1; if (b == 'Unknown Date') return -1; return b.compareTo(a);
+    });
+    return { for (var k in sortedKeys) (k == 'Unknown Date' ? 'Unknown Date' : displayFormat.format(dateKeyFormat.parse(k))) : dailyReports[k]! };
+  }
+
+  Map<String, _ClientCallSummary> _generateClientCallSummary() {
+    final Map<String, _ClientCallSummary> summaryMap = {};
+    for (var log in _filteredLogList) {
+      final clientId = log.artId ?? 'Unknown ID';
+      final clientName = log.clientName ?? 'Unknown Name';
+      final clientPhone = log.phoneNumber ?? 'Unknown Phone';
+      if (!summaryMap.containsKey(clientId)) {
+        summaryMap[clientId] = _ClientCallSummary(clientId: clientId, clientName: clientName, clientPhoneNumber: clientPhone);
+      }
+      summaryMap[clientId]!.totalCalls += 1;
+      final status = log.trackingOutcome?.toLowerCase() ?? 'unknown';
+      summaryMap[clientId]!.statusCounts[status] = (summaryMap[clientId]!.statusCounts[status] ?? 0) + 1;
+    }
+    return summaryMap;
+  }
+
+  String _formatDateWithSuffix(DateTime date) {
+    String day = DateFormat('d').format(date);
+    String suffix = 'th'; int dayInt = int.parse(day);
+    if (dayInt >= 11 && dayInt <= 13) { suffix = 'th'; } else {
+      switch (dayInt % 10) { case 1: suffix = 'st'; break; case 2: suffix = 'nd'; break; case 3: suffix = 'rd'; break; default: suffix = 'th'; }
+    }
+    return DateFormat("d'$suffix'-MMMM-y").format(date);
+  }
+
+  void _showDateRangePicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Date Range'),
+        content: SizedBox(width: 400, height: 450,
+          child: SfDateRangePicker(
+            selectionMode: DateRangePickerSelectionMode.range,
+            initialSelectedRange: (startDate != null && endDate != null) ? PickerDateRange(startDate!, endDate!) : null,
+            showActionButtons: true,
+            onSubmit: (Object? value) {
+              Navigator.pop(context);
+              if (value is PickerDateRange && value.startDate != null) {
+                setState(() { startDate = value.startDate; endDate = value.endDate ?? value.startDate; });
+              }
+            },
+            onCancel: () => Navigator.pop(context),
+          ),),),);
+  }
+
+  Future<void> _showMultiSelectDialog({ required BuildContext context, required String title, required List<String> allOptions, required List<String> selectedOptions, required String allKeyword, required Function(List<String>) onConfirm, }) async {
+    final tempSelected = List<String>.from(selectedOptions);
+    await showDialog(context: context, builder: (ctx) {
+      return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+        return AlertDialog(title: Text(title),
+          content: SizedBox(width: 350,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: allOptions.length,
+              itemBuilder: (context, index) {
+                final option = allOptions[index];
+                final isAllOption = option == allKeyword;
+                return CheckboxListTile(
+                  title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                  value: tempSelected.contains(option),
+                  onChanged: (bool? value) {
+                    setStateDialog(() {
+                      if (value == true) {
+                        if (isAllOption) { tempSelected.clear(); tempSelected.add(allKeyword); }
+                        else { tempSelected.remove(allKeyword); tempSelected.add(option); }
+                      } else {
+                        tempSelected.remove(option);
+                        if (tempSelected.isEmpty && allOptions.contains(allKeyword)) { tempSelected.add(allKeyword); }
+                      }
+                    });
+                  },
+                );},),),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () { onConfirm(tempSelected); Navigator.pop(context); }, child: const Text('Apply')),
+          ],);});},);
+  }
+
+  Widget _buildFilterChip(String label, String value, IconData icon, VoidCallback onPressed, {bool disabled = false}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 4),
+      InputChip(avatar: Icon(icon, size: 18), label: Text(value, overflow: TextOverflow.ellipsis), onPressed: disabled ? null : onPressed, showCheckmark: false, side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.7)), backgroundColor: Colors.transparent, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),),
+    ],);
+  }
+
+  Widget _buildInfoTile({required Widget iconWidget, required String label, required String value, String? subtitle}) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      iconWidget,
+      const SizedBox(width: 12),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        if (subtitle != null && subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600))],
+      ],),
+    ],);
+  }
+
+  Widget _buildChartCard({required String title, required Widget chart, GlobalKey? chartKey, bool isWide = false}) {
+    Widget chartWithBoundary = RepaintBoundary(key: chartKey, child: Container(color: Colors.white, child: chart));
+    return ConstrainedBox(constraints: BoxConstraints(maxWidth: isWide ? 600 : 400, minWidth: 350),
+      child: Card(elevation: 2.0, child: Padding(padding: const EdgeInsets.all(12.0),
+        child: Column(children: [Text(title, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 10), SizedBox(height: 250, child: chartWithBoundary)],),),),);
+  }
+
+  Widget _buildClientSummarySection(Map<String, _ClientCallSummary> clientSummaryMap) {
+    return Card(clipBehavior: Clip.antiAlias, elevation: 2, margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: ExpansionTile(
+        title: Row(children: [
+          Expanded(child: Text('Summary of Calls per Client', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+          Visibility(visible: _isClientSummaryExpanded, maintainSize: true, maintainAnimation: true, maintainState: true,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Scroll Left', onPressed: () => _clientSummaryScrollController.animateTo(_clientSummaryScrollController.offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
+              IconButton(icon: const Icon(Icons.arrow_forward), tooltip: 'Scroll Right', onPressed: () => _clientSummaryScrollController.animateTo(_clientSummaryScrollController.offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
+            ],),),
+        ],),
+        initiallyExpanded: _isClientSummaryExpanded,
+        onExpansionChanged: (isExpanded) => setState(() => _isClientSummaryExpanded = isExpanded),
+        children: [
+          SingleChildScrollView(controller: _clientSummaryScrollController, scrollDirection: Axis.horizontal,
+            child: Padding(padding: const EdgeInsets.all(8.0),
+              child: DataTable(columnSpacing: 15.0, headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
+                columns: const [DataColumn(label: Text('Client ART ID')), DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client Phone')), DataColumn(label: Text('Total Calls')), DataColumn(label: Text('Call Outcome Summary'))],
+                rows: clientSummaryMap.values.map((summary) {
+                  final statusSummary = summary.statusCounts.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+                  return DataRow(cells: [DataCell(Text(_maskClientName(summary.clientId))), DataCell(Text(_maskClientName(summary.clientName))), DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))), DataCell(Text(summary.totalCalls.toString())), DataCell(Text(statusSummary))]);
                 }).toList(),
-              ),
-            );
-          },
-        ),
-      ],
-    );
+              ),),),],),);
   }
+}
+
+// Helper classes for chart data points and client summaries
+class _ChartDataPoint {
+  final String x;
+  final double y;
+  _ChartDataPoint(this.x, this.y);
+}
+
+class _ClientCallSummary {
+  final String clientId;
+  final String clientName;
+  final String clientPhoneNumber;
+  int totalCalls = 0;
+  Map<String, int> statusCounts = {};
+
+  _ClientCallSummary({
+    required this.clientId,
+    required this.clientName,
+    required this.clientPhoneNumber,
+  });
 }

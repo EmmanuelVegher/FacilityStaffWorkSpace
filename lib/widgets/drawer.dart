@@ -411,7 +411,7 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => ReportEacWebTab()),
+                    builder: (context) => const EacReportsPageWeb()),
               );
             },
           ),
