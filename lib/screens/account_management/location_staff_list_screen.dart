@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_email_sender/flutter_email_sender.dart';
 import '../../models/staff.dart';
-import '../../models/staff_model.dart';
 import 'user_form_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LocationStaffListScreen extends StatefulWidget {
   final String stateName;
@@ -23,6 +25,7 @@ class LocationStaffListScreen extends StatefulWidget {
 class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isSendingEmail = false;
 
   @override
   void initState() {
@@ -40,23 +43,332 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
     super.dispose();
   }
 
-  void _showDeleteConfirmation(BuildContext context, Staff staff) {
+  // --- NEW METHOD TO FIND USERS AND LAUNCH EMAIL ---
+  Future<void> _launchEmailForNonUsers() async {
+    setState(() => _isSendingEmail = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Finding users with zero attendance...')));
+
+    try {
+      // 1. Get all staff in the current view
+      final staffSnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('state', isEqualTo: widget.stateName)
+          .where('staffCategory', isEqualTo: widget.staffCategory)
+          .get();
+
+      final List<Staff> allStaff = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+      List<String> recipientEmails = [];
+
+      // 2. For each staff member, check their attendance count
+      for (final staff in allStaff) {
+        final recordCountSnapshot = await FirebaseFirestore.instance
+            .collection('Staff')
+            .doc(staff.id)
+            .collection('Record')
+            .limit(1) // We only need to know if it's > 0, so limit(1) is efficient
+            .get();
+
+        if (recordCountSnapshot.docs.isEmpty) {
+          // If they have 0 records, add their email to the list
+          if (staff.emailAddress.isNotEmpty) {
+            recipientEmails.add(staff.emailAddress);
+          }
+        }
+      }
+
+      if (recipientEmails.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Great! Everyone in this category has attendance records.'), backgroundColor: Colors.green));
+        setState(() => _isSendingEmail = false);
+        return;
+      }
+
+      // 3. Prepare and launch the email
+      final String subject = 'Important: Action Required for Service Delivery Workspace App';
+
+      // Refined email body
+      final String body = '''
+Dear Team,
+
+This is a friendly reminder regarding the use of the Service Delivery Workspace App for attendance tracking. We've noticed that some accounts have not yet recorded any clock-ins.
+
+**Action Required:**
+Please ensure you clock in and out daily using the app. This is crucial for accurate attendance and timesheet records.
+
+**Important Notes:**
+- **Sync Your Data:** If you are already using the app, please remember to sync your records regularly to ensure they are updated on the server. If you have already done so, please disregard this message.
+- **Clock-Out is Essential:** You must clock-out at the end of each workday. The system calculates hours worked based on clock-in and clock-out times. A missing clock-out will result in zero (0) hours worked for that day's timesheet.
+
+For a detailed guide on using the app, please refer to the User Guide available within the app itself. If you encounter any issues or have questions, please reach out to your designated support contact.
+
+Thank you,
+The Service Delivery Workspace Team
+''';
+
+      final String bccRecipients = recipientEmails.join(',');
+
+      final Uri emailLaunchUri = Uri(
+        scheme: 'mailto',
+        queryParameters: {
+          'subject': subject,
+          'body': body,
+          'bcc': bccRecipients,
+        },
+      );
+
+      if (await canLaunchUrl(emailLaunchUri)) {
+        await launchUrl(emailLaunchUri);
+      } else {
+        throw 'Could not launch email client.';
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
+    } finally {
+      setState(() => _isSendingEmail = false);
+    }
+  }
+
+
+  /// --- NEW: "Copy & Go" Dialog ---
+  void _showEmailDialog(List<String> recipients, String subject, String body) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: Text('Are you sure you want to delete the account for ${staff.fullName}?'),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(ctx).pop()),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-            onPressed: () {
-              FirebaseFirestore.instance.collection('Staff').doc(staff.id).delete();
-              Navigator.of(ctx).pop();
-            },
+        title: const Text('Compose Reminder Email'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('The following users have zero attendance records:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(recipients.join(', ')),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copy All Emails (for BCC)'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: recipients.join(',')));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emails copied to clipboard!')));
+                },
+              ),
+              const Divider(height: 30),
+              const Text('Email Content:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SelectableText("Subject: $subject"),
+              const SizedBox(height: 8),
+              SelectableText(body),
+            ],
           ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Done'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          // --- NEW: Add an "Open Email App" button as a fallback ---
+          FilledButton(
+            child: const Text('Try to Open Email App'),
+            onPressed: () async {
+              final Email email = Email(
+                body: body,
+                subject: subject,
+                bcc: recipients,
+                isHTML: false,
+              );
+              try {
+                await FlutterEmailSender.send(email);
+              } catch (error) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open email client. Please copy the details manually.')));
+              }
+            },
+          )
         ],
+      ),
+    );
+  }
+
+  /// --- UPDATED: This method now calls the dialog ---
+  Future<void> _processReminderEmail() async {
+    setState(() => _isSendingEmail = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Finding users with zero attendance...')));
+
+    try {
+      final staffSnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('state', isEqualTo: widget.stateName)
+          .where('staffCategory', isEqualTo: widget.staffCategory)
+          .get();
+
+      final List<Staff> allStaff = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+      List<String> recipientEmails = [];
+
+      for (final staff in allStaff) {
+        final recordCountSnapshot = await FirebaseFirestore.instance
+            .collection('Staff').doc(staff.id).collection('Record').limit(1).get();
+
+        if (recordCountSnapshot.docs.isEmpty && staff.emailAddress.isNotEmpty) {
+          recipientEmails.add(staff.emailAddress);
+        }
+      }
+
+      if (recipientEmails.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Great! Everyone in this category has attendance records.'), backgroundColor: Colors.green));
+        setState(() => _isSendingEmail = false);
+        return;
+      }
+
+      final String subject = 'Important: Action Required for Service Delivery Workspace App';
+      final String body = '''Dear Team,
+
+This is a friendly reminder regarding the use of the Service Delivery Workspace App for attendance tracking. We've noticed that some accounts have not yet recorded any clock-ins.
+
+**Action Required:**
+Please ensure you clock in and out daily using the app. This is crucial for accurate attendance and timesheet records.
+
+**Important Notes:**
+- **Sync Your Data:** If you are already using the app, please remember to sync your records regularly. If you have done so, please disregard this message.
+- **Clock-Out is Essential:** You must clock-out at the end of each workday. A missing clock-out will result in zero (0) hours worked for that day's timesheet.
+
+For a detailed guide, please refer to the User Guide within the app. If you have questions, please reach out for support.
+
+Thank you,
+The Service Delivery Workspace Team
+''';
+
+      // Show the new dialog instead of trying to launch mailto directly
+      _showEmailDialog(recipientEmails, subject, body);
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
+    } finally {
+      setState(() => _isSendingEmail = false);
+    }
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Text(
+          widget.staffCategory,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.red.shade600,
+              Colors.black87,
+              Colors.white,
+              Colors.yellow.shade600,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('Staff')
+                      .where('state', isEqualTo: widget.stateName)
+                      .where('staffCategory', isEqualTo: widget.staffCategory)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: Colors.white));
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return Center(child: Text('No staff found for ${widget.staffCategory} in ${widget.stateName}.', style: const TextStyle(color: Colors.white)));
+                    }
+
+                    List<Staff> allStaff = snapshot.data!.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+
+                    if (_searchQuery.isNotEmpty) {
+                      allStaff = allStaff.where((staff) =>
+                      staff.fullName.toLowerCase().contains(_searchQuery) ||
+                          staff.emailAddress.toLowerCase().contains(_searchQuery) ||
+                          staff.location.toLowerCase().contains(_searchQuery)).toList();
+                    }
+                    if (allStaff.isEmpty) {
+                      return const Center(child: Text('No users match your search.', style: TextStyle(color: Colors.white)));
+                    }
+
+                    final groupedStaff = _groupStaffByLocation(allStaff);
+                    final locations = groupedStaff.keys.toList()..sort();
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: locations.length,
+                      itemBuilder: (context, index) {
+                        final location = locations[index];
+                        final staffInLocation = groupedStaff[location]!;
+                        return _LocationExpansionTile(
+                          location: location,
+                          staffInLocation: staffInLocation,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isSendingEmail ? null : _processReminderEmail, // <-- Calls the new method
+        backgroundColor: _isSendingEmail ? Colors.grey : Colors.blue.shade700,
+        icon: _isSendingEmail
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Icon(Icons.email_outlined, color: Colors.white),
+        label: const Text('Remind Non-Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(color: Colors.grey.shade800),
+        decoration: InputDecoration(
+          hintText: 'Search by Name, Email, Location...',
+          hintStyle: TextStyle(color: Colors.grey.shade600),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.9),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(icon: Icon(Icons.clear, color: Colors.grey.shade600), onPressed: () => _searchController.clear())
+              : null,
+        ),
       ),
     );
   }
@@ -72,109 +384,163 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
     }
     return grouped;
   }
+}
+
+// Reusable "glassmorphism" ExpansionTile (No changes needed here)
+class _LocationExpansionTile extends StatelessWidget {
+  final String location;
+  final List<Staff> staffInLocation;
+
+  const _LocationExpansionTile({required this.location, required this.staffInLocation});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.staffCategory),
-        centerTitle: true,
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.white.withOpacity(0.85),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Colors.white.withOpacity(0.5)),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.grey.shade200, Colors.white],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        title: Text(
+          '$location (${staffInLocation.length})',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800, fontSize: 18),
         ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Search by Name, Email, Location...',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(icon: const Icon(Icons.clear), onPressed: () => _searchController.clear())
-                      : null,
-                ),
+        iconColor: Colors.red.shade700,
+        collapsedIconColor: Colors.grey.shade700,
+        children: staffInLocation.map((staff) => _StaffListTile(staff: staff)).toList(),
+      ),
+    );
+  }
+}
+
+// --- NEW: Converted to a StatefulWidget to manage its own state ---
+class _StaffListTile extends StatefulWidget {
+  final Staff staff;
+  const _StaffListTile({required this.staff});
+
+  @override
+  State<_StaffListTile> createState() => _StaffListTileState();
+}
+
+class _StaffListTileState extends State<_StaffListTile> {
+  int? _attendanceCount; // Nullable to represent loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAttendanceCount();
+  }
+
+  Future<void> _fetchAttendanceCount() async {
+    // Prevents errors if the widget is disposed before the async operation completes
+    if (!mounted) return;
+    try {
+      // Efficiently get the count of documents in the subcollection
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(widget.staff.id)
+          .collection('Record')
+          .count()
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _attendanceCount = snapshot.count;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _attendanceCount = 0; // Default to 0 on error
+        });
+      }
+    }
+  }
+
+  void _showDeleteConfirmation(BuildContext context, Staff staff) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Deletion'),
+        content: Text('Are you sure you want to delete the account for ${staff.fullName}? This cannot be undone.'),
+        actions: [
+          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(ctx).pop()),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('DELETE'),
+            onPressed: () {
+              FirebaseFirestore.instance.collection('Staff').doc(staff.id).delete();
+              Navigator.of(ctx).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Helper function to build subtitle text lines to avoid repetition
+    Widget buildSubtitleLine(String label, String value) {
+      return Text(
+        '$label: ${value.isNotEmpty ? value : "N/A"}',
+        style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Material(
+        color: Colors.grey.shade50.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+        child: ListTile(
+          leading: CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.grey.shade300,
+            backgroundImage: widget.staff.photoUrl.isNotEmpty ? NetworkImage(widget.staff.photoUrl) : null,
+            child: widget.staff.photoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 30) : null,
+          ),
+          title: Text(widget.staff.fullName, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade900)),
+          // --- NEW: Rebuilt subtitle with more information ---
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              buildSubtitleLine('Sex', widget.staff.gender),
+              buildSubtitleLine('Email Address', widget.staff.emailAddress),
+              buildSubtitleLine('Phone Number', widget.staff.mobile),
+              buildSubtitleLine('Department', widget.staff.department),
+              buildSubtitleLine('Designation', widget.staff.designation),
+              buildSubtitleLine('Name of Supervisor', widget.staff.supervisor),
+              buildSubtitleLine("Supervisor's Email Address", widget.staff.supervisorEmail),
+              if (_attendanceCount == null)
+                Text('Attendance: Loading...', style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic, fontSize: 12))
+              else
+                Text('Attendance: $_attendanceCount records', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.edit_outlined, color: Colors.blue.shade700),
+                tooltip: 'Edit User',
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => UserFormScreen(staff: widget.staff),
+                )),
               ),
-            ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('Staff')
-                    .where('state', isEqualTo: widget.stateId)
-                    .where('staffCategory', isEqualTo: widget.staffCategory)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(child: Text('No staff found for ${widget.staffCategory} in ${widget.stateName}.'));
-                  }
-
-                  List<Staff> allStaff = snapshot.data!.docs.map((doc) => Staff.fromFirestore(doc)).toList();
-
-                  if (_searchQuery.isNotEmpty) {
-                    allStaff = allStaff.where((staff) =>
-                    staff.fullName.toLowerCase().contains(_searchQuery) ||
-                        staff.emailAddress.toLowerCase().contains(_searchQuery) ||
-                        staff.location.toLowerCase().contains(_searchQuery)).toList();
-                  }
-                  if(allStaff.isEmpty) return const Center(child: Text('No users match your search.'));
-
-                  final groupedStaff = _groupStaffByLocation(allStaff);
-                  final locations = groupedStaff.keys.toList()..sort();
-
-                  return ListView.builder(
-                    itemCount: locations.length,
-                    itemBuilder: (context, index) {
-                      final location = locations[index];
-                      final staffInLocation = groupedStaff[location]!;
-
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        child: ExpansionTile(
-                          title: Text('$location (${staffInLocation.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          children: staffInLocation.map((staff) => ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: staff.photoUrl.isNotEmpty ? NetworkImage(staff.photoUrl) : null,
-                            ),
-                            title: Text(staff.fullName, style: const TextStyle(fontWeight: FontWeight.w500)),
-                            subtitle: Text('Email: ${staff.emailAddress}\nSupervisor: ${staff.supervisor}'),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.edit, color: Theme.of(context).primaryColor),
-                                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                                    builder: (_) => UserFormScreen(staff: staff),
-                                  )),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                  onPressed: () => _showDeleteConfirmation(context, staff),
-                                ),
-                              ],
-                            ),
-                          )).toList(),
-                        ),
-                      );
-                    },
-                  );
-                },
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: 'Delete User',
+                onPressed: () => _showDeleteConfirmation(context, widget.staff),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,30 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
-import '../../models/staff.dart';
-import '../../models/staff_model.dart';
-import '../../utils/my_input_field.dart';
 
-// Helper class to manage dropdown data more effectively
-class DropdownItem {
-  final String id;
-  final String name;
-  DropdownItem({required this.id, required this.name});
-}
+import '../../models/staff.dart'; // Ensure this path is correct
 
 class UserFormScreen extends StatefulWidget {
   final Staff? staff;
-  final String? initialStateId;
-  final String? initialStateName;
 
   const UserFormScreen({
     super.key,
     this.staff,
-    this.initialStateId,
-    this.initialStateName,
   });
 
   @override
@@ -33,56 +20,47 @@ class UserFormScreen extends StatefulWidget {
 
 class _UserFormScreenState extends State<UserFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
   bool get _isEditMode => widget.staff != null;
 
-  // Controllers
+  // --- STATE MANAGEMENT ---
+
+  // Controllers for text fields
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _mobileNumberController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _supervisorNameController = TextEditingController();
+  final _supervisorEmailController = TextEditingController();
 
-  // State variables for form fields and dropdowns
-  bool _isLoading = false;
-  String _errorMessage = '';
+  // State for UI and data
+  bool _isLoading = false; // For the save button's spinner
+  bool _isInitializing = true; // For the initial page load spinner
+  Uint8List? _profileImageBytes;
+  String? _existingPhotoUrl;
 
-  String? _selectedCategoryId;
-  String? _selectedCategoryName;
-  String? _selectedProjectId;
-  String? _selectedProjectName;
+  // State for dropdown selections (holds IDs or direct values)
+  String? _selectedCategory;
+  String? _selectedProject;
   String? _selectedStateId;
-  String? _selectedStateName;
   String? _selectedLocationId;
-  String? _selectedLocationName;
-  String? _selectedDepartmentId;
   String? _selectedDepartmentName;
-  String? _selectedDesignationId;
   String? _selectedDesignationName;
   String? _selectedSupervisorId;
-  String? _selectedSupervisorName;
-  String? _selectedSupervisorEmailId;
-  String? _selectedSupervisorEmailName;
+  String? _selectedSupervisorEmail;
   String? _selectedGender;
   String? _selectedMaritalStatus;
-  String? _selectedRoleId;
-  String? _selectedRoleName;
+  String? _selectedRole;
 
-  bool _termsAgreed = true;
-  Uint8List? _profileImageBytes;
-  String? _existingImageUrl;
-  bool _isPasswordObscured = true;
-
-  // Lists to hold fetched dropdown data
-  List<DropdownItem> _categories = [];
-  List<DropdownItem> _projects = [];
-  List<DropdownItem> _states = [];
-  List<DropdownItem> _locations = [];
-  List<DropdownItem> _departments = [];
-  List<DropdownItem> _designations = [];
-  List<DropdownItem> _supervisors = [];
-  List<DropdownItem> _supervisorEmails = [];
-  List<DropdownItem> _roles = [];
+  // State to hold the pre-fetched lists of items for our dropdowns
+  List<String> _staffCategoryOptions = [];
+  List<String> _projectOptions = [];
+  List<DropdownMenuItem<String>> _statesList = [];
+  List<DropdownMenuItem<String>> _locationsList = [];
+  List<DropdownMenuItem<String>> _departmentsList = [];
+  List<DropdownMenuItem<String>> _designationsList = [];
+  List<DropdownMenuItem<String>> _supervisorsList = [];
+  List<DropdownMenuItem<String>> _supervisorEmailsList = [];
 
   final List<String> _genderOptions = ['Male', 'Female'];
   final List<String> _maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
@@ -91,315 +69,652 @@ class _UserFormScreenState extends State<UserFormScreen> {
   void initState() {
     super.initState();
     if (_isEditMode) {
-      final staff = widget.staff!;
-      _firstNameController.text = staff.firstName;
-      _lastNameController.text = staff.lastName;
-      _emailController.text = staff.emailAddress;
-      _mobileNumberController.text = staff.mobile;
-      _selectedCategoryName = staff.staffCategory;
-      _selectedProjectName = staff.project;
-      _selectedStateId = staff.stateId;
-      _selectedStateName = staff.state;
-      _selectedLocationId = staff.location; // Assuming location name is stored as ID here
-      _selectedLocationName = staff.location;
-      _selectedDepartmentId = staff.department;
-      _selectedDepartmentName = staff.department;
-      _selectedDesignationId = staff.designation;
-      _selectedDesignationName = staff.designation;
-      _selectedSupervisorId = staff.supervisor;
-      _selectedSupervisorName = staff.supervisor;
-      _selectedSupervisorEmailId = staff.supervisorEmail;
-      _selectedSupervisorEmailName = staff.supervisorEmail;
-      _selectedGender = staff.gender;
-      _selectedMaritalStatus = staff.maritalStatus;
-      _selectedRoleName = staff.role;
-      _existingImageUrl = staff.photoUrl;
-
-      _loadInitialData();
+      _initializeEditForm();
     } else {
-      _selectedStateId = widget.initialStateId;
-      _selectedStateName = widget.initialStateName;
-      _termsAgreed = false;
-      _loadInitialData();
+      // This form is for editing only, but if it were for creating,
+      // we would load the top-level lists here.
+      _isInitializing = false;
     }
   }
 
-  Future<void> _loadInitialData() async {
-    final fetchedCategories = await _fetchCollection('StaffCategory', nameField: 'name');
-    final fetchedProjects = await _fetchCollection('Project', nameField: 'name');
+  /// The main function to pre-fetch all data and set initial values for Edit Mode.
+// In _UserFormScreenState class
+
+  /// The main function to pre-fetch all data and set initial values for Edit Mode.
+  Future<void> _initializeEditForm() async {
+    final staff = widget.staff!;
+
+    // 1. Populate simple fields immediately
+    _firstNameController.text = staff.firstName;
+    _lastNameController.text = staff.lastName;
+    _emailController.text = staff.emailAddress;
+    _mobileNumberController.text = staff.mobile;
+    _existingPhotoUrl = staff.photoUrl;
+    _selectedGender = staff.gender;
+    _selectedMaritalStatus = staff.maritalStatus;
+    _selectedCategory = staff.staffCategory;
+    _selectedProject = staff.project;
+    _selectedRole = staff.role;
+    _selectedDepartmentName = staff.department;
+    _selectedDesignationName = staff.designation;
+
+    // 2. Fetch all top-level (non-dependent) dropdown lists
+    _staffCategoryOptions = await _fetchStringList('StaffCategory', 'name');
+    _projectOptions = await _fetchStringList('Project', 'name');
+    _departmentsList = await _fetchDepartments();
+    _designationsList = await _fetchDesignations();
+
+    // 3. Begin the sequential "waterfall" lookup and fetch for dependent dropdowns
+    if (_selectedCategory != null) {
+      _statesList = await _fetchStatesBasedOnCategory();
+      final foundStateId = await _reverseLookupId('Location', 'name', staff.state);
+      if (foundStateId != null) {
+        _selectedStateId = foundStateId;
+        _locationsList = await _fetchLocations();
+        final foundLocationId = await _reverseLookupId('Location/$_selectedStateId/$_selectedStateId', 'LocationName', staff.location);
+        if (foundLocationId != null) {
+          _selectedLocationId = foundLocationId;
+        }
+      }
+    }
+
+    // 4. Handle supervisor (which depends on state and department)
+    if (staff.supervisor.isNotEmpty && _selectedDepartmentName != null) {
+      // First, fetch all possible supervisors (from state and HQ if applicable)
+      _supervisorsList = await _fetchSupervisors();
+
+      // --- NEW LOGIC TO FIND THE CORRECT SUPERVISOR ID ---
+      String? supervisorToFind;
+      // Check if the supervisor is in the state-level list
+      final stateSupDoc = _selectedStateId != null ? await _firestore.collection("Supervisors").doc(_selectedStateId).collection(_selectedStateId!).doc(staff.supervisor).get() : null;
+      if (stateSupDoc?.exists ?? false) {
+        // It's a regular state supervisor
+        supervisorToFind = staff.supervisor;
+      } else {
+        // It might be an HQ supervisor, check that list
+        final hqStateQuery = await _firestore.collection("Location").where("name", isEqualTo: "Federal Capital Territory").limit(1).get();
+        if (hqStateQuery.docs.isNotEmpty) {
+          final hqStateId = hqStateQuery.docs.first.id;
+          final hqSupDoc = await _firestore.collection("Supervisors").doc(hqStateId).collection(hqStateId).doc(staff.supervisor).get();
+          if (hqSupDoc.exists) {
+            // It's an HQ supervisor, create the composite ID
+            supervisorToFind = "${staff.supervisor}|$hqStateId";
+          }
+        }
+      }
+
+      if (supervisorToFind != null) {
+        _selectedSupervisorId = supervisorToFind;
+        _supervisorEmailsList = await _fetchSupervisorEmails();
+        _selectedSupervisorEmail = staff.supervisorEmail;
+      } else {
+        // The supervisor was manually entered
+        _supervisorNameController.text = staff.supervisor;
+        _supervisorEmailController.text = staff.supervisorEmail;
+      }
+    }
+
+    // 5. All data is ready. Stop the main loading spinner and build the form.
     if (mounted) {
       setState(() {
-        _categories = fetchedCategories;
-        _projects = fetchedProjects;
+        _isInitializing = false;
       });
-      if (_isEditMode) {
-        _resolveInitialIdsForEditMode();
-        _loadDependentDataForEditMode();
+    }
+  }
+
+  /// Helper to find a document's ID from its human-readable name field.
+  Future<String?> _reverseLookupId(String collectionPath, String field, String value) async {
+    if (value.isEmpty) return null;
+    try {
+      final snapshot = await _firestore.collection(collectionPath).where(field, isEqualTo: value).limit(1).get();
+      return snapshot.docs.isNotEmpty ? snapshot.docs.first.id : null;
+    } catch (e) { return null; }
+  }
+
+  // --- DATA FETCHING METHODS ---
+  Future<List<String>> _fetchStringList(String collection, String field) async {
+    try {
+      final snapshot = await _firestore.collection(collection).get();
+      return snapshot.docs.map((doc) => doc[field] as String).toList();
+    } catch (e) { return []; }
+  }
+
+  Future<List<DropdownMenuItem<String>>> _fetchStatesBasedOnCategory() async {
+    if (_selectedCategory == null) return [];
+    try {
+      Query query = _firestore.collection("Location");
+      if (_selectedCategory == "Facility Staff" || _selectedCategory == "State Office Staff" || _selectedCategory == "Facility Supervisor") {
+        query = query.where('name', isNotEqualTo: "Federal Capital Territory");
+      } else if (_selectedCategory == "HQ Staff") {
+        query = query.where('name', isEqualTo: "Federal Capital Territory");
       }
-    }
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc['name'] as String? ?? ''))).toList();
+    } catch (e) { return []; }
   }
 
-  void _resolveInitialIdsForEditMode() {
-    if (_categories.isNotEmpty && _selectedCategoryName != null) {
-      _selectedCategoryId = _categories.firstWhere((c) => c.name == _selectedCategoryName, orElse: () => DropdownItem(id: '', name: '')).id;
-    }
-    if (_projects.isNotEmpty && _selectedProjectName != null) {
-      _selectedProjectId = _projects.firstWhere((p) => p.name == _selectedProjectName, orElse: () => DropdownItem(id: '', name: '')).id;
-    }
-    if (_selectedRoleName != null) {
-      _roles = _getRoleOptions(_selectedCategoryName);
-      _selectedRoleId = _roles.firstWhere((r) => r.name == _selectedRoleName, orElse: () => DropdownItem(id: '', name: '')).id;
-    }
+  Future<List<DropdownMenuItem<String>>> _fetchLocations() async {
+    if (_selectedStateId == null || _selectedCategory == null) return [];
+    try {
+      String cat = (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor") ? "Facility" : (_selectedCategory == "State Office Staff" ? "State Office" : "HQ");
+      final snapshot = await _firestore.collection("Location").doc(_selectedStateId).collection(_selectedStateId!).where("category", isEqualTo: cat).get();
+      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc['LocationName'] as String? ?? ''))).toList();
+    } catch (e) { return []; }
   }
 
-  Future<void> _loadDependentDataForEditMode() async {
-    if (_selectedCategoryName == null) return;
-    final fetchedStates = await _fetchStatesBasedOnCategory(_selectedCategoryName!);
-    if (mounted) setState(() => _states = fetchedStates);
-
-    if (_selectedStateId != null) {
-      final fetchedLocations = await _fetchLocationsForState(_selectedStateId!, _selectedCategoryName!);
-      if (mounted) setState(() => _locations = fetchedLocations);
-    }
-    // Continue for other fields...
+  Future<List<DropdownMenuItem<String>>> _fetchDepartments() async {
+    if (_selectedCategory == null) return [];
+    try {
+      final snapshot = await _firestore.collection("Designation").get();
+      List<String> allowedForFacility = ["Care and Treatment", "Preventions", "Admin", "Laboratory", "Strategic Information", "Pharmacy and Logistics", "Orphan and Vulnerable Children (OVC)"];
+      return snapshot.docs
+          .where((doc) => _selectedCategory != "Facility Staff" && _selectedCategory != "Facility Supervisor" || allowedForFacility.contains(doc.id))
+          .map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc.id)))
+          .toList();
+    } catch (e) { return []; }
   }
 
-  @override
-  void dispose() {
-    _firstNameController.dispose(); _lastNameController.dispose(); _emailController.dispose();
-    _mobileNumberController.dispose(); _passwordController.dispose();
-    super.dispose();
+  Future<List<DropdownMenuItem<String>>> _fetchDesignations() async {
+    if (_selectedDepartmentName == null) return [];
+    try {
+      String designationCategory = (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor") ? "Facility Staff" : "Office Staff";
+      final snapshot = await _firestore.collection("Designation").doc(_selectedDepartmentName).collection(_selectedDepartmentName!).where("category", isEqualTo: designationCategory).get();
+      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc.id))).toList();
+    } catch (e) { return []; }
   }
 
-  Future<void> _saveForm() async {
-    if (!_formKey.currentState!.validate()) { setState(() => _errorMessage = "Please fix the errors above."); return; }
-    if (!_termsAgreed && !_isEditMode) { setState(() => _errorMessage = 'You must agree to the Terms and Conditions.'); return; }
-    if (!_isEditMode && _passwordController.text.trim().length < 6) { setState(() => _errorMessage = 'For new users, password must be at least 6 characters.'); return; }
-    setState(() { _isLoading = true; _errorMessage = ''; });
+// In _UserFormScreenState class
+
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisors() async {
+    if (_selectedDepartmentName == null) return [];
+    if (_selectedStateId == null && _selectedCategory != 'HQ Staff') return [];
 
     try {
-      String? imageUrl = _existingImageUrl;
-      if (_profileImageBytes != null) {
-        String fileName = 'profile_images/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final ref = firebase_storage.FirebaseStorage.instance.ref().child(fileName);
-        await ref.putData(_profileImageBytes!);
-        imageUrl = await ref.getDownloadURL();
+      final Set<DropdownMenuItem<String>> allSupervisors = {};
+
+      if (_selectedStateId != null) {
+        final stateSupervisorsSnapshot = await _firestore
+            .collection("Supervisors")
+            .doc(_selectedStateId)
+            .collection(_selectedStateId!)
+            .where("department", isEqualTo: _selectedDepartmentName)
+            .get();
+
+        for (var doc in stateSupervisorsSnapshot.docs) {
+          allSupervisors.add(DropdownMenuItem<String>(
+            value: doc.id,
+            child: Text(doc.id),
+          ));
+        }
       }
 
-      final dataToSave = Staff(
-        id: _isEditMode ? widget.staff!.id : '',
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        emailAddress: _emailController.text.trim(),
-        mobile: _mobileNumberController.text.trim(),
-        staffCategory: _selectedCategoryName ?? '',
-        project: _selectedProjectName ?? '',
-        state: _selectedStateName ?? '',
-        stateId: _selectedStateId ?? '',
-        location: _selectedLocationName ?? '',
-        department: _selectedDepartmentName ?? '',
-        designation: _selectedDesignationName ?? '',
-        supervisor: _selectedSupervisorName ?? '',
-        supervisorEmail: _selectedSupervisorEmailName ?? '',
-        role: _selectedRoleName ?? '',
-        gender: _selectedGender ?? '',
-        maritalStatus: _selectedMaritalStatus ?? '',
-        photoUrl: imageUrl ?? '',
-      ).toMap();
+      if (_selectedCategory == "State Office Staff") {
+        final hqStateQuery = await _firestore
+            .collection("Location")
+            .where("name", isEqualTo: "Federal Capital Territory")
+            .limit(1)
+            .get();
 
-      if (_isEditMode) {
-        await FirebaseFirestore.instance.collection('Staff').doc(widget.staff!.id).update(dataToSave);
-      } else {
-        final cred = await _auth.createUserWithEmailAndPassword(email: _emailController.text.trim(), password: _passwordController.text.trim());
-        await FirebaseFirestore.instance.collection('Staff').doc(cred.user!.uid).set(dataToSave);
+        if (hqStateQuery.docs.isNotEmpty) {
+          final hqStateId = hqStateQuery.docs.first.id;
+          final hqSupervisorsSnapshot = await _firestore
+              .collection("Supervisors")
+              .doc(hqStateId)
+              .collection(hqStateId)
+              .where("department", isEqualTo: _selectedDepartmentName)
+              .get();
+
+          for (var doc in hqSupervisorsSnapshot.docs) {
+            allSupervisors.add(DropdownMenuItem<String>(
+              value: "${doc.id}|$hqStateId",
+              child: Text("${doc.id} (HQ)"),
+            ));
+          }
+        }
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User data saved successfully!'), backgroundColor: Colors.green));
-        Navigator.of(context).pop();
-      }
-    } on FirebaseAuthException catch (e) { setState(() => _errorMessage = e.message ?? 'Authentication failed.');
-    } catch (e) { setState(() => _errorMessage = 'An error occurred: $e');
-    } finally { if (mounted) setState(() => _isLoading = false); }
+      final sortedList = allSupervisors.toList()
+        ..sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
+
+      return sortedList;
+
+    } catch (e) { return []; }
   }
+
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisorEmails() async {
+    if (_selectedSupervisorId == null || _selectedDepartmentName == null) return [];
+
+    try {
+      String supervisorIdToQuery;
+      String stateIdToQuery;
+
+      if (_selectedSupervisorId!.contains('|')) {
+        final parts = _selectedSupervisorId!.split('|');
+        supervisorIdToQuery = parts[0];
+        stateIdToQuery = parts[1];
+      } else {
+        supervisorIdToQuery = _selectedSupervisorId!;
+        stateIdToQuery = _selectedStateId!;
+      }
+
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(stateIdToQuery)
+          .collection(stateIdToQuery)
+          .doc(supervisorIdToQuery)
+          .get();
+
+      if (!snapshot.exists) return [];
+      final email = snapshot.data()?['email'] as String?;
+      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
+    } catch (e) { return []; }
+  }
+  // --- ACTIONS ---
 
   Future<void> _pickProfileImage() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-    if (result != null && result.files.isNotEmpty) setState(() => _profileImageBytes = result.files.first.bytes);
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _profileImageBytes = result.files.first.bytes);
+    }
   }
 
-  Future<List<DropdownItem>> _fetchCollection(String collectionName, {String nameField = 'name'}) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance.collection(collectionName).get();
-      return snapshot.docs.map((doc) => DropdownItem(id: doc.id, name: doc.data()[nameField] ?? doc.id)).toList();
-    } catch (e) { return []; }
-  }
+// In _UserFormScreenState class
 
-  Future<List<DropdownItem>> _fetchStatesBasedOnCategory(String categoryName) async {
+  Future<void> _saveForm() async {
+    if (!_formKey.currentState!.validate()) {
+      _showResultDialog(title: 'Validation Error', content: "Please fix the errors above.");
+      return;
+    }
+    setState(() => _isLoading = true);
+
     try {
-      Query q = FirebaseFirestore.instance.collection("Location");
-      if (categoryName == "Facility Staff" || categoryName == "State Office Staff" || categoryName == "Facility Supervisor") {
-        q = q.where('name', isNotEqualTo: "Federal Capital Territory");
-      } else {
-        q = q.where('name', isEqualTo: "Federal Capital Territory");
+      String? finalPhotoUrl = _existingPhotoUrl;
+      if (_profileImageBytes != null) {
+        String userId = widget.staff!.id;
+        final ref = firebase_storage.FirebaseStorage.instance.ref().child('profile_pics/$userId/profile.jpg');
+        await ref.putData(_profileImageBytes!);
+        finalPhotoUrl = await ref.getDownloadURL();
       }
-      final snapshot = await q.get();
-      return snapshot.docs.map((doc) => DropdownItem(id: doc.id, name: doc['name'] ?? '')).toList();
-    } catch (e) { return []; }
+
+      String finalStateName = '';
+      if (_selectedStateId != null) {
+        final doc = await _firestore.collection('Location').doc(_selectedStateId).get();
+        finalStateName = doc.data()?['name'] as String? ?? '';
+      }
+      String finalLocationName = '';
+      if (_selectedStateId != null && _selectedLocationId != null) {
+        final doc = await _firestore.collection('Location').doc(_selectedStateId).collection(_selectedStateId!).doc(_selectedLocationId).get();
+        finalLocationName = doc.data()?['LocationName'] as String? ?? '';
+      }
+
+      final dataToSave = {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'mobile': _mobileNumberController.text.trim(),
+        'staffCategory': _selectedCategory ?? '',
+        'project': _selectedProject ?? '',
+        'state': finalStateName,
+        'location': finalLocationName,
+        'department': _selectedDepartmentName ?? '',
+        'designation': _selectedDesignationName ?? '',
+        // --- NEW LOGIC FOR SAVING SUPERVISOR NAME ---
+        'supervisor': (_selectedSupervisorId?.contains('|') ?? false)
+            ? _selectedSupervisorId!.split('|')[0]
+            : (_selectedSupervisorId ?? _supervisorNameController.text.trim()),
+        'supervisorEmail': _selectedSupervisorEmail ?? _supervisorEmailController.text.trim(),
+        'role': _selectedRole ?? '',
+        'gender': _selectedGender ?? '',
+        'maritalStatus': _selectedMaritalStatus ?? '',
+        'photoUrl': finalPhotoUrl ?? '',
+        'lastUpdateDate': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('Staff').doc(widget.staff!.id).update(dataToSave);
+
+      await _showResultDialog(
+          title: 'Success',
+          content: 'User profile has been updated successfully.',
+          onOkPressed: () => Navigator.of(context).pop()
+      );
+
+    } catch (e) {
+      await _showResultDialog(title: 'Error', content: 'An unexpected error occurred: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  Future<List<DropdownItem>> _fetchLocationsForState(String stateId, String categoryName) async {
-    try {
-      Query q = FirebaseFirestore.instance.collection('Location').doc(stateId).collection(stateId);
-      if (categoryName == "Facility Staff") q = q.where("category", isEqualTo: "Facility");
-      else if (categoryName == "State Office Staff") q = q.where("category", isEqualTo: "State Office");
-      else q = q.where("category", isEqualTo: "HQ");
-      final snapshot = await q.get();
-      return snapshot.docs.map((doc) => DropdownItem(id: doc.id, name: doc['LocationName'] ?? '')).toList();
-    } catch (e) { return []; }
+
+  Future<void> _showResultDialog({required String title, required String content, VoidCallback? onOkPressed}) async {
+    if (!mounted) return;
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(child: Text(content)),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onOkPressed?.call();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  List<DropdownItem> _getRoleOptions(String? categoryName) {
-    if (categoryName == 'Facility Supervisor') return [DropdownItem(id: 'Facility Supervisor', name: 'Facility Supervisor')];
-    if (categoryName == 'Facility Staff') return [DropdownItem(id: 'User', name: 'User')];
-    if (categoryName == 'State Office Staff') return [DropdownItem(id: 'State Office Staff', name: 'State Office Staff')];
-    if (categoryName == 'HQ Staff') return [DropdownItem(id: 'HQ Staff', name: 'HQ Staff')];
+  List<String> _getRoleOptions(String? staffCategory) {
+    if (staffCategory == 'Facility Supervisor') return ['Facility Supervisor'];
+    if (staffCategory == 'Facility Staff') return ['User'];
+    if (staffCategory == 'State Office Staff') return ['State Office Staff'];
+    if (staffCategory == 'HQ Staff') return ['HQ Staff'];
     return [];
   }
+
+  // --- UI BUILD METHODS ---
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditMode ? 'Edit User Profile' : 'Create New User')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 700),
-            child: Card(
-              elevation: 8, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_isEditMode ? 'Update User Details' : 'Create a New Account', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 24),
-                      GestureDetector(onTap: _pickProfileImage, child: CircleAvatar(radius: 60, backgroundColor: Colors.grey.shade200, backgroundImage: _profileImageBytes != null ? MemoryImage(_profileImageBytes!) : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty ? NetworkImage(_existingImageUrl!) : null) as ImageProvider?, child: _profileImageBytes == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty) ? const Icon(Icons.camera_alt, size: 40) : null)),
-                      const SizedBox(height: 24),
-
-                      // All fields are now wrapped in MyInputField for consistent styling
-                      MyInputField(title: "First Name", hint: "", widget: TextFormField(controller: _firstNameController, decoration: const InputDecoration(labelText: "Enter first name"), validator: (v) => v!.isEmpty ? 'Required' : null)),
-                      const SizedBox(height: 16),
-                      MyInputField(title: "Last Name", hint: "", widget: TextFormField(controller: _lastNameController, decoration: const InputDecoration(labelText: "Enter last name"), validator: (v) => v!.isEmpty ? 'Required' : null)),
-                      const SizedBox(height: 16),
-                      MyInputField(title: "Email Address", hint: "", widget: TextFormField(controller: _emailController, enabled: !_isEditMode, decoration: const InputDecoration(labelText: "Enter email"), keyboardType: TextInputType.emailAddress, validator: (v) => v!.isEmpty || !v.contains('@') ? 'Invalid email' : null)),
-                      const SizedBox(height: 16),
-                      MyInputField(title: "Mobile Number", hint: "", widget: TextFormField(controller: _mobileNumberController, decoration: const InputDecoration(labelText: "Enter mobile number"), keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'Required' : null)),
-                      const SizedBox(height: 16),
-                      if (!_isEditMode) ...[
-                        MyInputField(title: "Password", hint: "", widget: TextFormField(controller: _passwordController, obscureText: _isPasswordObscured, decoration: InputDecoration(labelText: "Enter password", suffixIcon: IconButton(icon: Icon(_isPasswordObscured ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured))), validator: (v) => v!.length < 6 ? 'Min 6 characters' : null)),
-                        const SizedBox(height: 16),
-                      ],
-                      MyInputField(title: "Sex", hint: "", widget: DropdownButtonFormField<String>(value: _selectedGender, items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(), onChanged: (v) => setState(() => _selectedGender = v), decoration: const InputDecoration(labelText: "Select Sex"))),
-                      const SizedBox(height: 16),
-                      MyInputField(title: "Marital Status", hint: "", widget: DropdownButtonFormField<String>(value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v), decoration: const InputDecoration(labelText: "Select Marital Status"))),
-                      const SizedBox(height: 16),
-
-                      // --- CORRECTED AND DEFENSIVE DROPDOWNS ---
-                      MyInputField(title: "Staff Category", hint: "", widget: DropdownButtonFormField<String>(
-                          value: _categories.any((i) => i.id == _selectedCategoryId) ? _selectedCategoryId : null,
-                          items: _categories.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-                          decoration: InputDecoration(labelText: _categories.isEmpty ? "Loading..." : "Select Staff Category"),
-                          onChanged: (value) async {
-                            if(value == null) return;
-                            final selected = _categories.firstWhere((c) => c.id == value);
-                            setState(() {
-                              _selectedCategoryId = value; _selectedCategoryName = selected.name;
-                              _selectedStateId = _selectedStateName = _selectedLocationId = _selectedLocationName = _selectedRoleName = _selectedRoleId = null;
-                              _states = _locations = _roles = [];
-                            });
-                            final newStates = await _fetchStatesBasedOnCategory(selected.name);
-                            final newRoles = _getRoleOptions(selected.name);
-                            if(mounted) setState(() { _states = newStates; _roles = newRoles; });
-                          })),
-                      const SizedBox(height: 16),
-
-                      if (_selectedCategoryName != null) ...[
-                        MyInputField(title: "State", hint: "", widget: DropdownButtonFormField<String>(
-                            value: _states.any((i) => i.id == _selectedStateId) ? _selectedStateId : null,
-                            items: _states.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-                            decoration: InputDecoration(labelText: _states.isEmpty && _isEditMode ? "Loading..." : "Select State"),
-                            onChanged: (value) async {
-                              if(value == null) return;
-                              final selected = _states.firstWhere((s) => s.id == value);
-                              setState(() {
-                                _selectedStateId = value; _selectedStateName = selected.name;
-                                _selectedLocationId = _selectedLocationName = null; _locations = [];
-                              });
-                              final newLocs = await _fetchLocationsForState(value, _selectedCategoryName!);
-                              if(mounted) setState(() => _locations = newLocs);
-                            })),
-                        const SizedBox(height: 16),
-                      ],
-                      if (_selectedStateId != null) ...[
-                        MyInputField(title: "Location", hint: "", widget: DropdownButtonFormField<String>(
-                            value: _locations.any((i) => i.id == _selectedLocationId) ? _selectedLocationId : null,
-                            items: _locations.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-                            decoration: InputDecoration(labelText: _locations.isEmpty && _isEditMode ? "Loading..." : "Select Location"),
-                            onChanged: (value) async {
-                              if(value == null) return;
-                              final selected = _locations.firstWhere((l) => l.id == value);
-                              setState(() { _selectedLocationId = value; _selectedLocationName = selected.name; });
-                            })),
-                        const SizedBox(height: 16),
-                      ],
-
-                      MyInputField(title: "Project", hint: "", widget: DropdownButtonFormField<String>(
-                          value: _projects.any((i) => i.id == _selectedProjectId) ? _selectedProjectId : null,
-                          items: _projects.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-                          decoration: InputDecoration(labelText: _projects.isEmpty ? "Loading..." : "Select Project"),
-                          onChanged: (value) {
-                            if(value == null) return;
-                            final selected = _projects.firstWhere((p) => p.id == value);
-                            setState(() { _selectedProjectId = value; _selectedProjectName = selected.name; });
-                          })),
-                      const SizedBox(height: 16),
-
-                      if (_selectedCategoryName != null) ...[
-                        MyInputField(title: "Role", hint: "", widget: DropdownButtonFormField<String>(
-                            value: _roles.any((i) => i.id == _selectedRoleId) ? _selectedRoleId : null,
-                            items: _roles.map((r) => DropdownMenuItem(value: r.id, child: Text(r.name))).toList(),
-                            onChanged: (v) {
-                              if(v == null) return;
-                              final selected = _roles.firstWhere((r) => r.id == v);
-                              setState(() { _selectedRoleId = v; _selectedRoleName = selected.name; });
-                            },
-                            decoration: const InputDecoration(labelText: "Select Role"))),
-                        const SizedBox(height: 16),
-                      ],
-
-                      if (!_isEditMode) ...[
-                        CheckboxListTile(title: const Text("I agree to the Terms and Conditions"), value: _termsAgreed, onChanged: (val) => setState(() => _termsAgreed = val ?? false), controlAffinity: ListTileControlAffinity.leading),
-                        const SizedBox(height: 16),
-                      ],
-                      if (_errorMessage.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 16.0), child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
-
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _saveForm,
-                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : Text(_isEditMode ? 'Save Changes' : 'Create User Account', style: const TextStyle(fontSize: 16)),
+        appBar: AppBar(
+          title: Text(_isEditMode ? 'Edit Staff Profile' : 'Create Staff'),
+          backgroundColor: Colors.red.shade700,
+          foregroundColor: Colors.white,
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.red.shade600, Colors.black87, Colors.white, Colors.yellow.shade600],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: _isInitializing
+              ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4))
+              : Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth > 760;
+                  final containerWidth = isDesktop ? 800.0 : constraints.maxWidth;
+                  return Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 8,
+                    child: Container(
+                      width: containerWidth,
+                      padding: const EdgeInsets.all(32),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_isEditMode ? 'Update Details for\n${widget.staff!.fullName}' : 'New Account', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                            const SizedBox(height: 24),
+                            GestureDetector(
+                              onTap: _pickProfileImage,
+                              child: CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Colors.grey.shade200,
+                                backgroundImage: _profileImageBytes != null
+                                    ? MemoryImage(_profileImageBytes!)
+                                    : (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty
+                                    ? NetworkImage(_existingPhotoUrl!) : null) as ImageProvider?,
+                                child: _profileImageBytes == null && (_existingPhotoUrl == null || _existingPhotoUrl!.isEmpty)
+                                    ? Icon(Icons.camera_alt, size: 40, color: Colors.grey.shade700)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            if (isDesktop) _buildDesktopLayout() else _buildMobileLayout(),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _saveForm,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                  padding: const EdgeInsets.symmetric(vertical: 18),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text(
+                                  'Save Changes',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
+        ));
+  }
+
+  Widget _buildDesktopLayout() {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildStyledTextField(controller: _firstNameController, label: "First Name", icon: Icons.person)),
+            const SizedBox(width: 20),
+            Expanded(child: _buildStyledTextField(controller: _lastNameController, label: "Last Name", icon: Icons.person)),
+          ],
         ),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildStyledTextField(controller: _emailController, label: "Email Address", icon: Icons.email, enabled: false)),
+            const SizedBox(width: 20),
+            Expanded(child: _buildStyledTextField(controller: _mobileNumberController, label: "Mobile Number", icon: Icons.phone_android, keyboardType: TextInputType.number)),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildStyledDropdown(label: "Gender", value: _selectedGender, items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(), onChanged: (v) => setState(() => _selectedGender = v))),
+            const SizedBox(width: 20),
+            Expanded(child: _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v))),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildDependentFields(),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildStyledTextField(controller: _firstNameController, label: "First Name", icon: Icons.person),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _lastNameController, label: "Last Name", icon: Icons.person),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _emailController, label: "Email Address", icon: Icons.email, enabled: false),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _mobileNumberController, label: "Mobile Number", icon: Icons.phone_android, keyboardType: TextInputType.number),
+        const SizedBox(height: 20),
+        _buildStyledDropdown(label: "Gender", value: _selectedGender, items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(), onChanged: (v) => setState(() => _selectedGender = v)),
+        const SizedBox(height: 20),
+        _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v)),
+        const SizedBox(height: 20),
+        _buildDependentFields(),
+      ],
+    );
+  }
+
+  Widget _buildDependentFields() {
+    return Column(
+      children: [
+        _buildStyledDropdown<String>(
+          label: "Staff Category", value: _selectedCategory,
+          items: _staffCategoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+          onChanged: (value) async {
+            setState(() {
+              _selectedCategory = value; _selectedRole = null; _selectedStateId = null; _selectedLocationId = null;
+              _selectedDepartmentName = null; _selectedDesignationName = null;
+              _selectedSupervisorId = null; _selectedSupervisorEmail = null;
+              _statesList = []; _locationsList = []; _departmentsList = [];
+              _designationsList = []; _supervisorsList = []; _supervisorEmailsList = [];
+            });
+            _statesList = await _fetchStatesBasedOnCategory();
+            if (mounted) setState(() {});
+          },
+        ),
+        const SizedBox(height: 20),
+        _buildStyledDropdown<String>(
+          label: "Project", value: _selectedProject,
+          items: _projectOptions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+          onChanged: (value) => setState(() => _selectedProject = value),
+        ),
+        if (_selectedCategory != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "State", value: _selectedStateId, items: _statesList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedStateId = value;
+                _selectedLocationId = null; _selectedDepartmentName = null; _selectedDesignationName = null;
+                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
+                _locationsList = []; _departmentsList = []; _designationsList = [];
+                _supervisorsList = []; _supervisorEmailsList = [];
+              });
+              _locationsList = await _fetchLocations();
+              if(mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedStateId != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Location", value: _selectedLocationId, items: _locationsList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedLocationId = value;
+                _selectedDepartmentName = null; _selectedDesignationName = null;
+                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
+                _departmentsList = []; _designationsList = [];
+                _supervisorsList = []; _supervisorEmailsList = [];
+              });
+              _departmentsList = await _fetchDepartments();
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedLocationId != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Department", value: _selectedDepartmentName, items: _departmentsList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedDepartmentName = value;
+                _selectedDesignationName = null; _selectedSupervisorId = null; _selectedSupervisorEmail = null;
+                _designationsList = []; _supervisorsList = []; _supervisorEmailsList = [];
+              });
+              _designationsList = await _fetchDesignations();
+              if(mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedDepartmentName != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Designation", value: _selectedDesignationName, items: _designationsList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedDesignationName = value;
+                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
+                _supervisorsList = []; _supervisorEmailsList = [];
+              });
+              _supervisorsList = await _fetchSupervisors();
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedDesignationName != null && _selectedCategory != 'Facility Supervisor') ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Supervisor Name", value: _selectedSupervisorId, items: _supervisorsList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedSupervisorId = value;
+                _selectedSupervisorEmail = null;
+                _supervisorEmailsList = [];
+              });
+              _supervisorEmailsList = await _fetchSupervisorEmails();
+              if(mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedSupervisorId != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Supervisor Email", value: _selectedSupervisorEmail, items: _supervisorEmailsList,
+            onChanged: (value) => setState(() => _selectedSupervisorEmail = value),
+          ),
+        ],
+        if (_selectedCategory == 'Facility Supervisor') ...[
+          const SizedBox(height: 20),
+          _buildStyledTextField(controller: _supervisorNameController, label: 'Supervisor Name (Manual)', icon: Icons.person_search, validator: (v) => null),
+          const SizedBox(height: 20),
+          _buildStyledTextField(controller: _supervisorEmailController, label: 'Supervisor Email (Manual)', icon: Icons.alternate_email, keyboardType: TextInputType.emailAddress, validator: (v) => null),
+        ],
+        if (_selectedCategory != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Role", value: _selectedRole,
+            items: _getRoleOptions(_selectedCategory).map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
+            onChanged: (value) => setState(() => _selectedRole = value),
+          ),
+        ]
+      ],
+    );
+  }
+
+  Widget _buildStyledTextField({required TextEditingController controller, required String label, required IconData icon, bool enabled = true, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      validator: validator ?? (value) => (value == null || value.isEmpty) ? 'This field is required' : null,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        filled: true,
+        fillColor: enabled ? Colors.grey.shade100 : Colors.grey.shade200,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
       ),
+    );
+  }
+
+  Widget _buildStyledDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required void Function(T?)? onChanged, String? hint}) {
+    final bool isValueInItems = value != null && items.any((item) => item.value == value);
+    return DropdownButtonFormField<T>(
+      value: isValueInItems ? value : null,
+      items: items,
+      onChanged: onChanged,
+      validator: (val) => val == null ? 'Please select an option' : null,
+      decoration: InputDecoration(
+        labelText: label, hintText: hint, filled: true, fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
+      ),
+      isExpanded: true,
     );
   }
 }

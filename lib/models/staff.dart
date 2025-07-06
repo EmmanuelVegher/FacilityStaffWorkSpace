@@ -19,6 +19,8 @@ class Staff {
   final String gender;
   final String maritalStatus;
   final String photoUrl;
+  final bool disabled; // <-- ADD THIS
+
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -41,6 +43,7 @@ class Staff {
     this.gender = '',
     this.maritalStatus = '',
     this.photoUrl = '',
+    this.disabled = false,
   });
 
   factory Staff.fromFirestore(DocumentSnapshot doc) {
@@ -64,6 +67,7 @@ class Staff {
       gender: data['gender'] ?? '',
       maritalStatus: data['maritalStatus'] ?? '',
       photoUrl: data['photoUrl'] ?? '',
+      disabled: data['disabled'] ?? false, // <-- ADD THIS
     );
   }
 

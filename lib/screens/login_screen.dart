@@ -1,3 +1,4 @@
+import 'package:attendanceappmailtool/screens/registration_page_2.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'forgot_password_page.dart';
@@ -208,7 +209,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 TextButton(
                                   onPressed: () => Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const RegistrationPageWeb()),
+                                    MaterialPageRoute(builder: (_) => const RegistrationPageWeb2()),
                                   ),
                                   child: const Text('Register here', style: TextStyle(color: Colors.redAccent)),
                                 ),

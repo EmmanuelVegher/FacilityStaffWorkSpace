@@ -16,6 +16,7 @@ import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/psychological_survey_analysis_page/PsychologicalSurveyAnalysisPage.dart';
+import '../screens/supervisor/supervisor_task_summary_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
@@ -187,6 +188,27 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.pending,
+                size: drawerIconSize, color: Colors.red),
+            title: Text(
+              'Task Management Summary',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SupervisorTaskSummaryPage()),
               );
             },
           ),

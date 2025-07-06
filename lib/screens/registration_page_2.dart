@@ -11,14 +11,14 @@ import '../utils/my_input_field.dart';
 import 'login_screen.dart';
 
 
-class RegistrationPageWeb extends StatefulWidget {
-  const RegistrationPageWeb({super.key});
+class RegistrationPageWeb2 extends StatefulWidget {
+  const RegistrationPageWeb2({super.key});
 
   @override
-  _RegistrationPageWebState createState() => _RegistrationPageWebState();
+  _RegistrationPageWeb2State createState() => _RegistrationPageWeb2State();
 }
 
-class _RegistrationPageWebState extends State<RegistrationPageWeb> {
+class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
   final _formKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
@@ -161,7 +161,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
     }
   }
 
-  Future<List<DropdownMenuItem<String>>> _fetchSupervisors() async {
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisors1() async {
     if (stateName == null || departmentName == null) return [];
     try {
       final snapshot = await _firestore.collection("Supervisors").doc(stateName).collection(stateName!).where("department", isEqualTo: departmentName).get();
@@ -177,14 +177,113 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
     }
   }
 
-  Future<List<DropdownMenuItem<String>>> _fetchSupervisorEmails() async {
-    if (stateName == null || departmentName == null || supervisorName == null) return [];
+  // In _RegistrationPageWeb2State class
+
+// In _RegistrationPageWeb2State class
+
+// In _RegistrationPageWeb2State class
+
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisors() async {
+    if (departmentName == null) return [];
+    if (stateName == null && _selectedCategory != 'HQ Staff') return [];
+
     try {
-      final snapshot = await _firestore.collection("Supervisors").doc(stateName).collection(stateName!).where("department", isEqualTo: departmentName).where(FieldPath.documentId, isEqualTo: supervisorName).get();
-      if(snapshot.docs.isEmpty) return [];
-      final email = snapshot.docs.first.data()['email'] as String?;
-      if (email == null) return [];
-      return [ DropdownMenuItem(value: email, child: Text(email)) ];
+      final Set<DropdownMenuItem<String>> allSupervisors = {};
+
+      // Query 1: Fetch supervisors from the selected state
+      if (stateName != null) {
+        final stateSupervisorsSnapshot = await _firestore
+            .collection("Supervisors")
+            .doc(stateName)
+            .collection(stateName!)
+            .where("department", isEqualTo: departmentName)
+            .get();
+
+        for (var doc in stateSupervisorsSnapshot.docs) {
+          // For state supervisors, the value is just their name (ID)
+          allSupervisors.add(DropdownMenuItem<String>(
+            value: doc.id,
+            child: Text(doc.id),
+          ));
+        }
+      }
+
+      // Query 2: If category is "State Office Staff", also fetch HQ supervisors
+      if (_selectedCategory == "State Office Staff") {
+        final hqStateQuery = await _firestore
+            .collection("Location")
+            .where("name", isEqualTo: "Federal Capital Territory")
+            .limit(1)
+            .get();
+
+        if (hqStateQuery.docs.isNotEmpty) {
+          final hqStateId = hqStateQuery.docs.first.id;
+
+          final hqSupervisorsSnapshot = await _firestore
+              .collection("Supervisors")
+              .doc(hqStateId)
+              .collection(hqStateId)
+              .where("department", isEqualTo: departmentName)
+              .get();
+
+          for (var doc in hqSupervisorsSnapshot.docs) {
+            // --- KEY CHANGE HERE ---
+            // The value now contains the name AND the HQ state ID, separated by a pipe
+            allSupervisors.add(DropdownMenuItem<String>(
+              value: "${doc.id}|$hqStateId",
+              child: Text("${doc.id} (HQ)"),
+            ));
+          }
+        }
+      }
+
+      final sortedList = allSupervisors.toList()
+        ..sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
+
+      return sortedList;
+
+    } catch (e) {
+      debugPrint('Error fetching combined supervisors: $e');
+      return [];
+    }
+  }
+
+// In _RegistrationPageWeb2State class
+
+  Future<List<DropdownMenuItem<String>>> _fetchSupervisorEmails() async {
+    // Guard clause: ensure we have a supervisor selected
+    if (supervisorName == null || departmentName == null) return [];
+
+    try {
+      String supervisorIdToQuery;
+      String stateIdToQuery;
+
+      // --- KEY CHANGE HERE: Check for the composite value ---
+      if (supervisorName!.contains('|')) {
+        // This is an HQ supervisor, e.g., "John Doe|HQ_STATE_ID"
+        final parts = supervisorName!.split('|');
+        supervisorIdToQuery = parts[0]; // "John Doe"
+        stateIdToQuery = parts[1];      // "HQ_STATE_ID"
+      } else {
+        // This is a regular state supervisor
+        supervisorIdToQuery = supervisorName!;
+        stateIdToQuery = stateName!; // Use the main stateName variable
+      }
+
+      // Now, perform the query with the correctly identified IDs
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(stateIdToQuery)
+          .collection(stateIdToQuery)
+          .doc(supervisorIdToQuery)
+          .get();
+
+      if (!snapshot.exists) return [];
+
+      final email = snapshot.data()?['email'] as String?;
+
+      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
+
     } catch (e) {
       debugPrint('Error fetching supervisor email: $e');
       return [];
@@ -192,11 +291,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
   }
 
   // Add this new helper method inside the _RegistrationPageWebState class
-  Future<void> _showResultDialog({
-    required String title,
-    required String content,
-    VoidCallback? onOkPressed,
-  }) async {
+  Future<void> _showResultDialog({required String title, required String content, VoidCallback? onOkPressed,}) async {
     // Ensure we are on the right context if the widget is no longer mounted
     if (!mounted) return;
 
@@ -298,7 +393,9 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
         'location': finalLocationName,
         'department': departmentName ?? '',
         'designation': designation ?? '',
-        'supervisor': supervisorName ?? _supervisorNameController.text.trim(),
+        'supervisor': (supervisorName?.contains('|') ?? false)
+            ? supervisorName!.split('|')[0] // Get only the name part
+            : (supervisorName ?? _supervisorNameController.text.trim()),
         'supervisorEmail': supervisorEmail ?? _supervisorEmailController.text.trim(),
         'role': _selectedRole ?? '',
         'gender': _selectedGender ?? '',
