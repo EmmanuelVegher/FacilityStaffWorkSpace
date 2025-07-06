@@ -5,6 +5,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
+import '../screens/account_management/my_state_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
@@ -480,6 +481,21 @@ Widget drawer2(
               );
             },
           ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: const Icon(Icons.manage_accounts),
+            title: const Text('Account Management'),
+            onTap: () {
+              Navigator.of(context).pop(); // Close the drawer
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const MyStateScreen(),
+              ));
+            },
+          ),
+
 
           const Divider(
             color: Colors.grey,
