@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
+import '../screens/attendance_analysis_page/state_attendance_analysis_page.dart';
 import '../screens/call_tracker/call_tracker_page.dart';
 import '../screens/call_tracker/report_page.dart';
 import '../screens/components/clock_attendance.dart';
@@ -187,6 +188,26 @@ Widget drawer(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const ClockAttendanceWeb()),
+              );
+            },
+          ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.timer,
+                size: drawerIconSize, color: Colors.orangeAccent),
+            title: Text(
+              'Attendance Analysis',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FacilityAttendanceAnalysisPage()),
               );
             },
           ),

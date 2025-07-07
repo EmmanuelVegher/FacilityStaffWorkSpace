@@ -198,8 +198,8 @@ Widget drawer2(
             height: 1,
           ),
           ListTile(
-            leading: Icon(Icons.pending,
-                size: drawerIconSize, color: Colors.red),
+            leading: Icon(Icons.task,
+                size: drawerIconSize, color: Colors.orange),
             title: Text(
               'Task Management Summary',
               style: TextStyle(
@@ -378,6 +378,10 @@ Widget drawer2(
 
               );
             },
+          ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
           ),
 
 
