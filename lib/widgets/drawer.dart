@@ -6,7 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
-import '../screens/attendance_analysis_page/state_attendance_analysis_page.dart';
+import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
 import '../screens/call_tracker/call_tracker_page.dart';
 import '../screens/call_tracker/report_page.dart';
 import '../screens/components/clock_attendance.dart';

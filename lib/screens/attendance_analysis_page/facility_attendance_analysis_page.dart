@@ -21,6 +21,7 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
+import '../../widgets/drawer.dart';
 import '../../widgets/drawer2.dart'; // Your custom drawer widget
 
 // --- DATA MODELS (Shared with state-level page) ---
@@ -377,7 +378,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
             )
         ],
       ),
-      drawer: drawer2(context),
+      drawer: drawer(context),
       body: Column(
         children: [
           _buildFilterBar(),
