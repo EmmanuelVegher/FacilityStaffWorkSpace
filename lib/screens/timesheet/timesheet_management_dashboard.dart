@@ -13,8 +13,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../widgets/drawer2.dart'; // Assuming you have a state-level drawer
 
-// --- DATA MODELS TO MATCH FIRESTORE STRUCTURE ---
-
+// --- DATA MODELS (No changes needed) ---
 class TimesheetEntry {
   final String date;
   final String durationWorked;
@@ -153,11 +152,12 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   // --- Filter & User Context ---
   String? _userState;
   List<String> _availableFacilities = [];
-  String? _selectedFacilityName;
+  List<String> _selectedFacilities = [];
   late int _selectedYear;
   late int _selectedMonth;
   List<TimesheetModel> _staffListForFilter = [];
-  String? _selectedStaffId;
+  // MODIFIED: From single ID to a list of IDs for multi-select
+  List<String> _selectedStaffIds = [];
 
   // --- Data Lists & Metrics ---
   List<TimesheetModel> _allTimesheetsMaster = [];
@@ -185,7 +185,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       final facilityNames = await _getFacilitiesForState(userState);
       if (mounted) {
         setState(() {
-          _availableFacilities = ['All Facilities', ...facilityNames];
+          _availableFacilities = facilityNames;
           _isFilterLoading = false;
         });
       }
@@ -208,8 +208,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   }
 
   Future<void> _loadTimesheets() async {
-    if (_selectedFacilityName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a facility.")));
+    if (_selectedFacilities.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one facility.")));
       return;
     }
     setState(() {
@@ -217,53 +217,56 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       _errorMessage = null;
       _allTimesheetsMaster = [];
       _staffListForFilter = [];
-      _selectedStaffId = null;
+      // MODIFIED: Clear the list of selected staff IDs
+      _selectedStaffIds.clear();
     });
 
     try {
       if (_userState == null) throw Exception("User State is not defined.");
 
-      Query staffQuery = _firestore.collection('Staff').where('state', isEqualTo: _userState);
-      if (_selectedFacilityName != 'All Facilities') {
-        staffQuery = staffQuery.where('location', isEqualTo: _selectedFacilityName);
-      }
-
-      final staffSnapshot = await staffQuery.get();
-      final staffIds = staffSnapshot.docs.map((doc) => doc.id).toList();
-
-      if (staffIds.isEmpty) {
-        setState(() => _isLoading = false);
-        _applyFiltersAndCalculateMetrics(0);
-        return;
-      }
-
       int expectedCount = 0;
-      final facilityStaffQuery = staffQuery.where('staffCategory', isEqualTo: 'Facility Staff');
-      final facilityStaffSnapshot = await facilityStaffQuery.get();
-      expectedCount = facilityStaffSnapshot.docs.length;
+      Query expectedStaffQuery = _firestore
+          .collection('Staff')
+          .where('state', isEqualTo: _userState)
+          .where('staffCategory', isEqualTo: 'Facility Staff');
+      if (!_selectedFacilities.contains('All Facilities')) {
+        expectedStaffQuery = expectedStaffQuery.where('location', whereIn: _selectedFacilities);
+      }
+      final expectedStaffSnapshot = await expectedStaffQuery.get();
+      expectedCount = expectedStaffSnapshot.docs.length;
+
+      Query timesheetQuery = _firestore.collectionGroup('TimeSheets')
+          .where('state', isEqualTo: _userState);
+      if (!_selectedFacilities.contains('All Facilities')) {
+        timesheetQuery = timesheetQuery.where('location', whereIn: _selectedFacilities);
+      }
+      final timesheetSnapshot = await timesheetQuery.get();
 
       final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
       final timesheetDocId = '${monthName}_$_selectedYear';
 
-      final futures = staffIds.map((staffId) {
-        return _firestore.collection('Staff').doc(staffId).collection('TimeSheets').doc(timesheetDocId).get();
-      }).toList();
-
-      final results = await Future.wait(futures);
-
       final List<TimesheetModel> fetchedTimesheets = [];
-      for (final doc in results) {
-        if (doc.exists && doc.data() != null) {
-          fetchedTimesheets.add(TimesheetModel.fromMap(doc.data()!, doc.id));
+      for (final doc in timesheetSnapshot.docs) {
+        if (doc.id == timesheetDocId) {
+          final data = doc.data() as Map<String, dynamic>;
+          final staffId = data['staffId'] as String? ?? doc.reference.parent.parent!.id;
+          fetchedTimesheets.add(TimesheetModel.fromMap(data, staffId));
         }
       }
-      _allTimesheetsMaster = fetchedTimesheets..sort((a,b) => a.staffName.compareTo(b.staffName));
+
+      _allTimesheetsMaster = fetchedTimesheets..sort((a, b) => a.staffName.compareTo(b.staffName));
       _staffListForFilter = List.from(_allTimesheetsMaster);
       _applyFiltersAndCalculateMetrics(expectedCount);
 
     } catch (e, stack) {
       debugPrint('Error loading timesheets: $e\n$stack');
-      if (mounted) setState(() => _errorMessage = 'Failed to load timesheets: $e');
+      if (mounted) {
+        if (e is FirebaseException && e.code == 'failed-precondition') {
+          _errorMessage = 'Firestore Index Required: Please check your debug console for a link to create the necessary index.';
+        } else {
+          _errorMessage = 'Failed to load timesheets: $e';
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -272,27 +275,41 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   void _applyFiltersAndCalculateMetrics([int? expectedCount]) {
     List<TimesheetModel> filteredList = _allTimesheetsMaster;
 
-    if (_selectedStaffId != null) {
-      filteredList = _allTimesheetsMaster.where((ts) => ts.staffId == _selectedStaffId).toList();
+    // MODIFIED: Filter by the list of selected staff IDs
+    if (_selectedStaffIds.isNotEmpty) {
+      final selectionSet = _selectedStaffIds.toSet();
+      filteredList = _allTimesheetsMaster.where((ts) => selectionSet.contains(ts.staffId)).toList();
     }
 
     final newMetrics = TimesheetMetrics();
     newMetrics.totalExpected = expectedCount ?? _metrics.totalExpected;
-    newMetrics.totalSubmitted = filteredList.length;
+    newMetrics.totalSubmitted = _allTimesheetsMaster.length; // Total submitted is based on master list
 
-    for (final timesheet in filteredList) {
+    // Metrics for pending/approved should be based on the currently displayed list
+    int displayedFullyApproved = 0;
+    int displayedPendingCaritas = 0;
+    int displayedPendingFacility = 0;
+
+    for (final timesheet in filteredList) { // Iterate over the potentially smaller, staff-filtered list
       if (timesheet.facilitySupervisorSignatureStatus == 'Approved' && timesheet.caritasSupervisorSignatureStatus == 'Approved') {
-        newMetrics.fullyApproved++;
+        displayedFullyApproved++;
       } else if (timesheet.facilitySupervisorSignatureStatus == 'Approved' && timesheet.caritasSupervisorSignatureStatus == 'Pending') {
-        newMetrics.pendingCaritasApproval++;
+        displayedPendingCaritas++;
       } else if (timesheet.facilitySupervisorSignatureStatus == 'Pending') {
-        newMetrics.pendingFacilityApproval++;
+        displayedPendingFacility++;
       }
-      newMetrics.totalHoursLogged += timesheet.totalHours;
+      newMetrics.totalHoursLogged += timesheet.totalHours; // This can be for the selection
     }
 
+    // Update metrics based on the filtered view
+    newMetrics.fullyApproved = displayedFullyApproved;
+    newMetrics.pendingCaritasApproval = displayedPendingCaritas;
+    newMetrics.pendingFacilityApproval = displayedPendingFacility;
+
     if (newMetrics.totalExpected > 0) {
-      newMetrics.percentFullyApproved = (newMetrics.fullyApproved / newMetrics.totalExpected) * 100;
+      // Calculate percentage based on the master list's fully approved count
+      final masterFullyApproved = _allTimesheetsMaster.where((ts) => ts.facilitySupervisorSignatureStatus == 'Approved' && ts.caritasSupervisorSignatureStatus == 'Approved').length;
+      newMetrics.percentFullyApproved = (masterFullyApproved / newMetrics.totalExpected) * 100;
     }
 
     setState(() {
@@ -362,13 +379,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
           alignment: WrapAlignment.center,
           children: [
             if (_isFilterLoading) const Text("Loading filters...") else ...[
-              DropdownButtonFormField<String>(
-                value: _selectedFacilityName,
-                hint: const Text('Select Facility'),
-                decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 600)),
-                items: _availableFacilities.map((name) => DropdownMenuItem(value: name, child: Text(name))).toList(),
-                onChanged: (value) => setState(() => _selectedFacilityName = value),
-              ),
+              _buildMultiSelectFacilityDropdown(),
               DropdownButtonFormField<int>(
                 value: _selectedMonth,
                 decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 150)),
@@ -381,19 +392,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
                 items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
                 onChanged: (value) => setState(() => _selectedYear = value!),
               ),
-              DropdownButtonFormField<String>(
-                value: _selectedStaffId,
-                hint: const Text('All Staff'),
-                decoration: const InputDecoration(labelText: 'Staff Member', border: OutlineInputBorder(), constraints: BoxConstraints(maxWidth: 250)),
-                items: [
-                  const DropdownMenuItem<String>(value: null, child: Text('All Staff')),
-                  ..._staffListForFilter.map((ts) => DropdownMenuItem(value: ts.staffId, child: Text(ts.staffName, overflow: TextOverflow.ellipsis)))
-                ],
-                onChanged: _allTimesheetsMaster.isEmpty ? null : (value) => setState(() {
-                  _selectedStaffId = value;
-                  _applyFiltersAndCalculateMetrics();
-                }),
-              ),
+              // NEW: Multi-select dropdown for staff members
+              _buildMultiSelectStaffDropdown(),
             ],
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
@@ -407,6 +407,249 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     );
   }
 
+  // ... (_buildMultiSelectFacilityDropdown and _showMultiSelectFacilityDialog methods are unchanged)
+  Widget _buildMultiSelectFacilityDropdown() {
+    String getButtonText() {
+      if (_selectedFacilities.isEmpty) {
+        return 'Select Facility';
+      } else if (_selectedFacilities.contains('All Facilities') || _selectedFacilities.length == _availableFacilities.length) {
+        return 'All Facilities';
+      } else if (_selectedFacilities.length == 1) {
+        return _selectedFacilities.first;
+      } else {
+        return '${_selectedFacilities.length} Facilities Selected';
+      }
+    }
+
+    return InkWell(
+      onTap: _showMultiSelectFacilityDialog,
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Facility',
+          border: OutlineInputBorder(),
+          constraints: BoxConstraints(maxWidth: 300),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Expanded(
+              child: Text(getButtonText(), overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMultiSelectFacilityDialog() async {
+    List<String> tempSelected = List.from(_selectedFacilities);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isAllSelected = tempSelected.length == _availableFacilities.length;
+
+            return AlertDialog(
+              title: const Text('Select Facilities'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CheckboxListTile(
+                      title: const Text('All Facilities'),
+                      value: isAllSelected,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          if (value == true) {
+                            tempSelected = List.from(_availableFacilities);
+                            tempSelected.add('All Facilities'); // Add a flag
+                          } else {
+                            tempSelected.clear();
+                          }
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _availableFacilities.length,
+                        itemBuilder: (context, index) {
+                          final facility = _availableFacilities[index];
+                          return CheckboxListTile(
+                            title: Text(facility),
+                            value: tempSelected.contains(facility),
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  tempSelected.add(facility);
+                                } else {
+                                  tempSelected.remove(facility);
+                                  tempSelected.remove('All Facilities');
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('CANCEL'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    setState(() {
+                      _selectedFacilities = tempSelected;
+                      if (_selectedFacilities.length == _availableFacilities.length && !_selectedFacilities.contains('All Facilities')) {
+                        _selectedFacilities.add('All Facilities');
+                      }
+                    });
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // NEW: Widget to build the multi-select staff dropdown button
+  Widget _buildMultiSelectStaffDropdown() {
+    String getButtonText() {
+      if (_selectedStaffIds.isEmpty) {
+        return 'All Staff';
+      } else if (_selectedStaffIds.length == 1) {
+        // Find the name of the single selected staff
+        final staffMember = _staffListForFilter.firstWhere((s) => s.staffId == _selectedStaffIds.first, orElse: () => TimesheetModel.fromMap({}, ''));
+        return staffMember.staffName;
+      } else {
+        return '${_selectedStaffIds.length} Staff Selected';
+      }
+    }
+
+    return InkWell(
+      // Disable tap if no staff have been loaded yet
+      onTap: _staffListForFilter.isEmpty ? null : _showMultiSelectStaffDialog,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Staff Member',
+          border: const OutlineInputBorder(),
+          constraints: const BoxConstraints(maxWidth: 250),
+          // Change background color to indicate disabled state
+          filled: _staffListForFilter.isEmpty,
+          fillColor: Colors.grey.shade200,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Expanded(
+              child: Text(getButtonText(), overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Method to show the multi-select dialog for staff
+  void _showMultiSelectStaffDialog() async {
+    List<String> tempSelectedIds = List.from(_selectedStaffIds);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            bool isAllSelected = tempSelectedIds.length == _staffListForFilter.length;
+
+            return AlertDialog(
+              title: const Text('Select Staff'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CheckboxListTile(
+                      title: const Text('All Staff'),
+                      value: isAllSelected,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          if (value == true) {
+                            tempSelectedIds = _staffListForFilter.map((s) => s.staffId).toList();
+                          } else {
+                            tempSelectedIds.clear();
+                          }
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _staffListForFilter.length,
+                        itemBuilder: (context, index) {
+                          final staff = _staffListForFilter[index];
+                          return CheckboxListTile(
+                            title: Text(staff.staffName),
+                            value: tempSelectedIds.contains(staff.staffId),
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  tempSelectedIds.add(staff.staffId);
+                                } else {
+                                  tempSelectedIds.remove(staff.staffId);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('CANCEL'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    // Check if all are selected, if so, just clear the list
+                    if (tempSelectedIds.length == _staffListForFilter.length) {
+                      _selectedStaffIds.clear();
+                    } else {
+                      _selectedStaffIds = tempSelectedIds;
+                    }
+                    // Apply the filter client-side immediately
+                    _applyFiltersAndCalculateMetrics();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ... (The rest of the code: _buildMetricsDashboard, _buildKpiCard, _buildTimesheetList, etc. is unchanged)
+  // ... (Paste the rest of your unchanged code from the previous correct answer here)
   Widget _buildMetricsDashboard() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -453,8 +696,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   Widget _buildTimesheetList() {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
       itemCount: _displayedTimesheets.length,
       itemBuilder: (context, index) {
         final timesheet = _displayedTimesheets[index];
@@ -478,7 +719,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
                 IconButton(
                   icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
                   tooltip: "Download PDF",
-                  onPressed: () => _downloadSinglePdf(timesheet),
+                  // MODIFIED: The function now only needs the staffId to perform a fresh fetch.
+                  onPressed: () => _downloadSinglePdf(timesheet.staffId),
                 )
               ],
             ),
@@ -488,6 +730,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       },
     );
   }
+
 
   Widget _buildStatusChip(String facilityStatus, String caritasStatus) {
     String text; Color color;
@@ -559,9 +802,47 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   }
 
   // --- PDF DOWNLOAD LOGIC ---
+  // NEW: Helper function to fetch a single, specific timesheet from Firestore.
+  Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collectionGroup('TimeSheets')
+          .where('staffId', isEqualTo: staffId)
+          .get();
 
-  Future<void> _downloadSinglePdf(TimesheetModel timesheet) async {
+      // Filter in-app since we can't query by subcollection document ID directly
+      final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
+
+      if (docs.isNotEmpty) {
+        final doc = docs.first;
+        return TimesheetModel.fromMap(doc.data(), doc.data()['staffId'] ?? staffId);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching single timesheet for PDF: $e");
+      return null;
+    }
+  }
+
+  Future<void> _downloadSinglePdf(String staffId) async {
     setState(() => _isExporting = true);
+
+    final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
+    final timesheetDocId = '${monthName}_$_selectedYear';
+
+    print("timesheetDocId===$timesheetDocId");
+
+    // Fetch the latest data from Firestore right now.
+    final timesheet = await _fetchTimesheetFromFirestore(staffId, timesheetDocId);
+
+    if (timesheet == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not find the latest timesheet for ${staffId} to download.')),
+      );
+      setState(() => _isExporting = false);
+      return;
+    }
+
     final pdf = pw.Document();
     final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
     final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
@@ -577,25 +858,97 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     setState(() => _isExporting = false);
   }
 
+  // MODIFIED: Rewritten to fetch all relevant data on-demand.
   Future<void> _downloadBulkPdf() async {
     setState(() => _isExporting = true);
-    final pdf = pw.Document();
-    final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
-    final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
-    final ttf = pw.Font.ttf(font);
-    final ttfBold = pw.Font.ttf(boldFont);
 
-    final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
+    try {
+      // --- Step 1: Build the collection group query based on current filters ---
+      Query timesheetQuery = _firestore
+          .collectionGroup('TimeSheets')
+          .where('state', isEqualTo: _userState);
 
-    for(final timesheet in _displayedTimesheets) {
-      pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
+      if (!_selectedFacilities.contains('All Facilities')) {
+        timesheetQuery = timesheetQuery.where('location', whereIn: _selectedFacilities);
+      }
+
+      final timesheetSnapshot = await timesheetQuery.get();
+
+      // --- Step 2: Filter the results to match the month/year and selected staff ---
+      final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
+      final timesheetDocId = '${monthName}_$_selectedYear';
+      final staffIdFilterSet = _selectedStaffIds.toSet();
+
+      final List<TimesheetModel> timesheetsToPrint = [];
+      for (final doc in timesheetSnapshot.docs) {
+        // Filter 1: Check if it's the correct month/year document
+        if (doc.id == timesheetDocId) {
+          // --- THIS IS THE FIX ---
+          final data = doc.data();
+          // Safely check if data is a Map and not null
+          if (data is Map<String, dynamic>) {
+            final staffId = data['staffId'] as String?;
+            if (staffId == null) continue; // Skip if no staff ID in the document
+
+            // Filter 2: If a staff filter is active, check if this staff member is selected
+            if (staffIdFilterSet.isNotEmpty && !staffIdFilterSet.contains(staffId)) {
+              continue; // Skip if not in the selected staff list
+            }
+
+            timesheetsToPrint.add(TimesheetModel.fromMap(data, staffId));
+          }
+          // --- END OF FIX ---
+        }
+      }
+
+      if (timesheetsToPrint.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No matching timesheets found to generate a bulk PDF.')),
+        );
+        setState(() => _isExporting = false);
+        return;
+      }
+
+      // Sort the results for a consistent PDF order
+      timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
+
+      // --- Step 3: Generate the PDF document ---
+      final pdf = pw.Document();
+      final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+      final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+      final ttf = pw.Font.ttf(font);
+      final ttfBold = pw.Font.ttf(boldFont);
+      final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
+
+      for(final timesheet in timesheetsToPrint) {
+        pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
+      }
+
+      // --- Step 4: Save and trigger download ---
+      final pdfBytes = await pdf.save();
+      String facilityName = 'Selection';
+      if (_selectedFacilities.contains('All Facilities') || _selectedFacilities.length == _availableFacilities.length) {
+        facilityName = 'All_Facilities';
+      } else if (_selectedFacilities.length == 1) {
+        facilityName = _selectedFacilities.first.replaceAll(' ', '_');
+      } else {
+        facilityName = 'Multiple_Facilities';
+      }
+
+      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${facilityName}_${_selectedMonth}_${_selectedYear}.pdf');
+
+    } catch (e, stack) {
+      debugPrint("Error generating bulk PDF: $e\n$stack");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred while generating the bulk PDF: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
     }
-
-    final pdfBytes = await pdf.save();
-    final facilityName = _selectedFacilityName?.replaceAll(' ','_') ?? "All";
-    _triggerDownload(pdfBytes, 'Bulk_Timesheets_${facilityName}_${_selectedMonth}_${_selectedYear}.pdf');
-    setState(() => _isExporting = false);
   }
+
 
   Future<Uint8List?> _networkImageToByte(String? imageUrl) async {
     if (imageUrl == null || imageUrl.isEmpty) return null;
@@ -622,9 +975,12 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   }
 
   Future<pw.Page> _createSingleTimesheetPage(TimesheetModel timesheet, pw.ImageProvider logoImage, pw.Font ttf, pw.Font ttfBold) async {
+    // This function remains the same, as it correctly processes a TimesheetModel
+    // regardless of where it came from (app state or fresh fetch).
     final monthName = DateFormat('MMMM, yyyy').format(DateTime(_selectedYear, _selectedMonth));
-    final startDate = DateTime(_selectedYear, _selectedMonth - 1, 20);
-    final endDate = DateTime(_selectedYear, _selectedMonth, 19);
+    final startDate = DateTime(_selectedYear, _selectedMonth - 1, 21);
+    final endDate = DateTime(_selectedYear, _selectedMonth, 20);
+    // ... rest of the function is identical ...
     final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
 
     final tableHeaders = ['Project Name', ...daysInRange.map((date) => DateFormat('dd').format(date)), 'Total Hours', '%'];
@@ -666,8 +1022,10 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
 
     outOfOfficeDailyHours.forEach((category, hours) {
       final total = hours.reduce((a, b) => a + b);
-      final percent = maxHours > 0 ? (total / maxHours * 100) : 0;
-      allRows.add([category, ...hours.map((h) => h.round().toString()), total.round().toString(), '${percent.round()}%']);
+      if (total > 0) {
+        final percent = maxHours > 0 ? (total / maxHours * 100) : 0;
+        allRows.add([category, ...hours.map((h) => h.round().toString()), total.round().toString(), '${percent.round()}%']);
+      }
     });
 
     final staffSigBytes = await _networkImageToByte(timesheet.staffSignature);
@@ -775,6 +1133,25 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   }
 
   pw.Widget _buildPdfSignatureColumn(String title, String name, Uint8List? imageBytes, String? date) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+        pw.SizedBox(height: 2),
+        pw.Text(name.toUpperCase(), style: const pw.TextStyle(fontSize: 8)),
+        pw.SizedBox(height: 2),
+        pw.Container(
+            height: 35, width: 100,
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
+            child: imageBytes != null ? pw.Image(pw.MemoryImage(imageBytes)) : pw.Center(child: pw.Text('Signature', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)))
+        ),
+        pw.SizedBox(height: 2),
+        pw.Text("Date: ${date ?? 'N/A'}", style: const pw.TextStyle(fontSize: 8)),
+      ],
+    );
+  }
+
+  pw.Widget _buildPdfSignatureColumn1(String title, String name, Uint8List? imageBytes, String? date) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
