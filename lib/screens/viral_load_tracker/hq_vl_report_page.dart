@@ -1,13 +1,12 @@
-// lib/pages/reports/facility_vl_tracking_page.dart
+// lib/pages/reports/vl_tracking_page_web.dart
 
-// FACILITY-CENTRIC VIRAL LOAD (VL) TRACKING REPORTS PAGE
+// VIRAL LOAD (VL) TRACKING REPORTS PAGE
 import 'dart:async';
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
@@ -15,13 +14,25 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
 
 import '../../widgets/drawer2.dart';
+import '../../widgets/drawer3.dart';
 
 // --- DATA MODELS ---
+
 class VlCallLog {
-  final String? artId, callStatus, clientName, firebaseAuthId, phoneNumberCalled;
-  final String? trackedBy, trackerDesignation, trackerFacility, trackerState, uuid;
-  final DateTime? callDateTime, syncedAt;
-  final int? callDurationInSeconds, vlEligibleRecordId;
+  final String? artId;
+  final DateTime? callDateTime;
+  final int? callDurationInSeconds;
+  final String? callStatus;
+  final String? clientName;
+  final String? firebaseAuthId;
+  final String? phoneNumberCalled;
+  final DateTime? syncedAt;
+  final String? trackedBy;
+  final String? trackerDesignation;
+  final String? trackerFacility;
+  final String? trackerState;
+  final String? uuid;
+  final int? vlEligibleRecordId;
 
   VlCallLog({
     this.artId, this.callDateTime, this.callDurationInSeconds, this.callStatus,
@@ -51,9 +62,14 @@ class VlCallLog {
 }
 
 class VlReportSummary {
-  final double percentageResultsReceived, percentageSamplesCollected;
-  final int refillsDueInQuarter, resultsReturned, samplesCollected;
-  final int suppressed, unsuppressed, totalEligibleClientsInFilter;
+  final double percentageResultsReceived;
+  final double percentageSamplesCollected;
+  final int refillsDueInQuarter;
+  final int resultsReturned;
+  final int samplesCollected;
+  final int suppressed;
+  final int unsuppressed;
+  final int totalEligibleClientsInFilter;
 
   VlReportSummary({
     required this.percentageResultsReceived, required this.percentageSamplesCollected,
@@ -78,15 +94,14 @@ class VlReportSummary {
 // --- GlobalKeys for chart export ---
 final GlobalKey _callOutcomesChartKey = GlobalKey();
 
-class StateVlTrackingPageWeb extends StatefulWidget {
-  const StateVlTrackingPageWeb({super.key});
+class VlTrackingPageWeb extends StatefulWidget {
+  const VlTrackingPageWeb({super.key});
   @override
-  _StateVlTrackingPageWebState createState() => _StateVlTrackingPageWebState();
+  _VlTrackingPageWebState createState() => _VlTrackingPageWebState();
 }
 
-class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
+class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   List<VlCallLog> _masterLogList = [];
   List<VlReportSummary> _summaries = [];
@@ -94,12 +109,15 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   bool isLoading = false, _isInitialState = true, _isFilterLoading = true, _isFacilitiesLoading = false;
   String? _errorMessage, _summaryErrorMessage;
   bool _isExporting = false;
+
   List<ScrollController> _logTableControllers = [];
   int _currentlyExpandedDateIndex = -1;
+  final ScrollController _clientSummaryScrollController = ScrollController();
 
   // --- Filter State ---
-  String? _currentUserState;
+  List<String> _availableStates = ['All States'];
   List<String> _availableFacilities = ['All Facilities'];
+  List<String> _selectedStates = ['All States'];
   List<String> _selectedFacilities = ['All Facilities'];
   List<String> _availableQuarters = [];
   String? _selectedQuarter;
@@ -113,57 +131,31 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     final now = DateTime.now();
     startDate = DateTime(now.year, now.month, 1);
     endDate = DateTime(now.year, now.month, now.day);
-    _initializePage();
+    _initializeFilters();
   }
 
   @override
   void dispose() {
     for (final controller in _logTableControllers) { controller.dispose(); }
+    _clientSummaryScrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _initializePage() async {
+  void _initializeFilters() {
     setState(() => _isFilterLoading = true);
-    await _loadCurrentUserBio();
-    if (_currentUserState != null) {
-      await _loadFacilitiesForState(_currentUserState!);
-    }
+    _loadAvailableStates();
     _generateQuarterList();
     if (mounted) setState(() => _isFilterLoading = false);
   }
 
-  Future<void> _loadCurrentUserBio() async {
+  Future<void> _loadAvailableStates() async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception("User not logged in.");
-      final docSnapshot = await _firestore.collection('Staff').doc(user.uid).get();
-
-      if(docSnapshot.exists && mounted) {
-        final state = docSnapshot.data()?['state'] as String?;
-        if (state == null || state.isEmpty) {
-          throw Exception("Your user profile is missing a 'state' field.");
-        }
-        setState(() => _currentUserState = state);
-      } else {
-        throw Exception("Your user profile was not found in the 'Staff' collection.");
-      }
+      final snapshot = await _firestore.collection('Location').get();
+      final states = snapshot.docs.map((doc) => doc.id).toList()..sort();
+      if (mounted) setState(() => _availableStates.addAll(states));
     } catch (e, s) {
-      debugPrint("Error loading user bio: $e\n$s");
-      if(mounted) setState(() => _errorMessage = "Could not load user profile: $e");
-    }
-  }
-
-  Future<void> _loadFacilitiesForState(String state) async {
-    setState(() => _isFacilitiesLoading = true);
-    try {
-      final snapshot = await _firestore.collection('Location').doc(state).collection(state).get();
-      final facilities = snapshot.docs.map((doc) => doc['LocationName'] as String).where((name) => name.isNotEmpty).toList()..sort();
-      if (mounted) setState(() => _availableFacilities.addAll(facilities));
-    } catch (e, s) {
-      debugPrint("Error fetching facilities for $state: $e\n$s");
-      if(mounted) _showSnackBar("Error fetching facility list for $state.");
-    } finally {
-      if (mounted) setState(() => _isFacilitiesLoading = false);
+      debugPrint("Error loading states: $e\n$s");
+      if (mounted) setState(() => _errorMessage = "Error loading states: $e");
     }
   }
 
@@ -182,22 +174,52 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   void _generateQuarterList() {
     List<String> quarters = [];
     DateTime date = DateTime.now();
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++) { // Generate for the last 2 years
       quarters.add(_getQuarterString(date));
       date = DateTime(date.year, date.month - 3, 1);
     }
     setState(() {
-      _availableQuarters = quarters.toSet().toList();
+      _availableQuarters = quarters.toSet().toList(); // Remove duplicates
       _selectedQuarter = _availableQuarters.first;
     });
   }
 
-  Future<void> _loadReports() async {
-    if (_currentUserState == null) {
-      _showSnackBar("Cannot load reports: Your state is not defined in your profile.");
+  Future<void> _onStatesChanged(List<String> newStates) async {
+    setState(() {
+      _selectedStates = newStates;
+      _isFacilitiesLoading = true;
+      _availableFacilities = ['All Facilities'];
+      _selectedFacilities = ['All Facilities'];
+    });
+
+    if (newStates.contains('All States')) {
+      setState(() => _isFacilitiesLoading = false);
       return;
     }
-    if (_selectedQuarter == null) {
+
+    try {
+      List<String> facilities = [];
+      List<Future<QuerySnapshot>> facilityFutures = [];
+      for (String state in newStates) {
+        facilityFutures.add(_firestore.collection('Location').doc(state).collection(state).get());
+      }
+      final List<QuerySnapshot> results = await Future.wait(facilityFutures);
+      for(var snapshot in results) {
+        facilities.addAll(snapshot.docs.map((doc) => doc['LocationName'] as String).where((name) => name.isNotEmpty));
+      }
+      if (mounted) {
+        setState(() => _availableFacilities.addAll(facilities.toSet().toList()..sort()));
+      }
+    } catch (e, s) {
+      debugPrint("Error fetching facilities: $e\n$s");
+      _showSnackBar("Error fetching facility lists.");
+    } finally {
+      if (mounted) setState(() => _isFacilitiesLoading = false);
+    }
+  }
+
+  Future<void> _loadReports() async {
+    if(_selectedQuarter == null) {
       _showSnackBar("Please select a quarter to generate a report.");
       return;
     }
@@ -226,40 +248,72 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   Future<void> _fetchCallLogs() async {
-    Query query = _firestore.collection('VlCallLogs')
-        .where('trackerState', isEqualTo: _currentUserState)
+    final List<String> statesToQuery = _selectedStates.contains('All States') ? [] : _selectedStates;
+    final List<String> facilitiesToQuery = _selectedFacilities.contains('All Facilities') ? [] : _selectedFacilities;
+
+    Query baseQuery = _firestore.collection('VlCallLogs')
         .where('callDateTime', isGreaterThanOrEqualTo: startDate)
         .where('callDateTime', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
 
-    if (!_selectedFacilities.contains('All Facilities')) {
-      if (_selectedFacilities.length > 30) {
-        _showSnackBar("Log query limited to first 30 facilities due to system limits.");
-        query = query.where('trackerFacility', whereIn: _selectedFacilities.take(30).toList());
-      } else {
-        query = query.where('trackerFacility', whereIn: _selectedFacilities);
+    List<Future<QuerySnapshot>> futures = [];
+
+    if (statesToQuery.isNotEmpty && facilitiesToQuery.isNotEmpty) {
+      for (final state in statesToQuery) {
+        futures.add(baseQuery.where('trackerState', isEqualTo: state).where('trackerFacility', whereIn: facilitiesToQuery).get());
       }
+    } else {
+      Query singleQuery = baseQuery;
+      if (statesToQuery.isNotEmpty) singleQuery = singleQuery.where('trackerState', whereIn: statesToQuery);
+      if (facilitiesToQuery.isNotEmpty) singleQuery = singleQuery.where('trackerFacility', whereIn: facilitiesToQuery);
+      futures.add(singleQuery.get());
     }
 
-    final querySnapshot = await query.orderBy('callDateTime', descending: true).get();
-    if(mounted) {
-      _masterLogList = querySnapshot.docs.map((doc) => VlCallLog.fromJson(doc.data() as Map<String, dynamic>)).toList();
+    final List<QuerySnapshot> results = await Future.wait(futures);
+    final List<VlCallLog> allLogs = [];
+    for (final snapshot in results) {
+      allLogs.addAll(snapshot.docs.map((doc) => VlCallLog.fromJson(doc.data() as Map<String, dynamic>)));
+    }
+
+    if (mounted) {
+      _masterLogList = allLogs;
+      _masterLogList.sort((a, b) => (b.callDateTime ?? DateTime(0)).compareTo(a.callDateTime ?? DateTime(0)));
     }
   }
 
   Future<void> _fetchSummaries() async {
-    final List<String> facilitiesToQuery = _selectedFacilities.contains('All Facilities')
-        ? _availableFacilities.where((f) => f != 'All Facilities').toList()
+    final statesToQuery = _selectedStates.contains('All States')
+        ? _availableStates.where((s) => s != 'All States').toList()
+        : _selectedStates;
+
+    if (statesToQuery.isEmpty) {
+      if (mounted) setState(() => _summaries = []);
+      return;
+    }
+
+    List<String> facilitiesToQuery = _selectedFacilities.contains('All Facilities')
+        ? [] // An empty list means query all facilities within the state(s)
         : _selectedFacilities;
 
-    if (facilitiesToQuery.isEmpty) {
+    // If 'All Facilities' is chosen, we must fetch them first to build the paths
+    if (facilitiesToQuery.isEmpty && !_selectedStates.contains('All States')) {
+      List<Future<QuerySnapshot>> facilityFutures = [];
+      for (String state in statesToQuery) {
+        facilityFutures.add(_firestore.collection('Location').doc(state).collection(state).get());
+      }
+      final List<QuerySnapshot> results = await Future.wait(facilityFutures);
+      facilitiesToQuery.addAll(results.expand((s) => s.docs.map((d) => d['LocationName'] as String)));
+    } else if (_selectedStates.contains('All States')) {
+      _summaryErrorMessage = "National-level summary is not supported. Please select a specific state.";
       if (mounted) setState(() => _summaries = []);
       return;
     }
 
     List<Future<DocumentSnapshot>> summaryFutures = [];
-    for (String facility in facilitiesToQuery) {
-      final path = 'VlReportSummaries/$_currentUserState/$facility/$_selectedQuarter';
-      summaryFutures.add(_firestore.doc(path).get());
+    for (String state in statesToQuery) {
+      for (String facility in facilitiesToQuery) {
+        final path = 'VlReportSummaries/$state/$facility/$_selectedQuarter';
+        summaryFutures.add(_firestore.doc(path).get());
+      }
     }
 
     try {
@@ -328,9 +382,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   @override
   Widget build(BuildContext context) {
     Widget bodyContent;
-    if (_isFilterLoading) {
-      bodyContent = const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Loading User Profile...")],));
-    } else if (isLoading) {
+    if (isLoading) {
       bodyContent = const Center(child: CircularProgressIndicator());
     } else if (_errorMessage != null) {
       bodyContent = Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)));
@@ -338,9 +390,11 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
       bodyContent = _buildDashboardContent();
     }
 
-    String appBarTitle = 'Facility VL Reports';
-    if(_currentUserState != null) {
-      appBarTitle = 'VL Reports for $_currentUserState';
+    String appBarTitle = 'Viral Load Tracking';
+    if(!_isInitialState) {
+      if (_selectedStates.contains("All States")) appBarTitle = 'National VL Report';
+      else if (_selectedStates.length == 1) appBarTitle = 'VL Report for ${_selectedStates.first}';
+      else appBarTitle = 'VL Report for ${_selectedStates.length} States';
     }
 
     return Scaffold(
@@ -350,7 +404,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
       ),
-      drawer: drawer2(context),
+      drawer: drawer3(context),
       body: Column(
         children: [
           _buildFilterBar(),
@@ -378,25 +432,35 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   Widget _buildFilterBar() {
-    if (_isFilterLoading || _currentUserState == null) return const SizedBox.shrink();
-
+    String stateButtonText = _selectedStates.contains('All States') ? 'All States' : _selectedStates.length == 1 ? _selectedStates.first : '${_selectedStates.length} States';
     String facilityButtonText = _selectedFacilities.contains('All Facilities') ? 'All Facilities' : _selectedFacilities.length == 1 ? _selectedFacilities.first : '${_selectedFacilities.length} Facilities';
+    bool isAllStatesSelected = _selectedStates.contains('All States');
 
     return Card(
       margin: const EdgeInsets.all(8.0), elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Wrap(
+        child: _isFilterLoading
+            ? const Center(child: Text("Loading filters..."))
+            : Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 16.0, runSpacing: 12.0, alignment: WrapAlignment.start,
           children: [
+            _buildFilterChip("State", stateButtonText, Icons.map_outlined, () {
+              _showMultiSelectDialog(
+                context: context, title: 'Select States', allOptions: _availableStates,
+                selectedOptions: _selectedStates, allKeyword: 'All States',
+                onConfirm: (results) => _onStatesChanged(results),
+              );
+            }),
+
             _buildFilterChip("Facility", facilityButtonText, Icons.business_center, () {
               _showMultiSelectDialog(
                 context: context, title: 'Select Facilities', allOptions: _availableFacilities,
                 selectedOptions: _selectedFacilities, allKeyword: 'All Facilities',
                 onConfirm: (results) => setState(() => _selectedFacilities = results),
               );
-            }, disabled: _isFacilitiesLoading),
+            }, disabled: isAllStatesSelected || _isFacilitiesLoading),
 
             SizedBox(
               width: 200,
@@ -430,7 +494,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
 
   Widget _buildDashboardContent() {
     if (_isInitialState && !isLoading) {
-      return Center(child: Text("Select facilities and apply filters to view VL reports.", style: TextStyle(color: Colors.grey.shade700)));
+      return Center(child: Text("Select filters and apply to view VL reports.", style: TextStyle(color: Colors.grey.shade700)));
     }
     if (_masterLogList.isEmpty && _summaries.isEmpty && !isLoading) {
       return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("No VL data found for the selected criteria.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700))));
@@ -468,6 +532,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     }
     if (_summaries.isEmpty) return const SizedBox.shrink();
 
+    // Aggregate data from all fetched summaries
     final int totalEligible = _summaries.fold(0, (p, s) => p + s.totalEligibleClientsInFilter);
     final int totalSamples = _summaries.fold(0, (p, s) => p + s.samplesCollected);
     final int totalResults = _summaries.fold(0, (p, s) => p + s.resultsReturned);
@@ -485,7 +550,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
           children: [
             Text('Aggregated VL Summary for $_selectedQuarter', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800)),
             const SizedBox(height: 4),
-            Text('For ${_selectedFacilities.contains("All Facilities") ? "All Facilities" : "${_selectedFacilities.length} Facilitie(s)"} in $_currentUserState', style: TextStyle(color: Colors.blueGrey.shade600)),
+            Text('For ${_selectedFacilities.contains("All Facilities") ? "All Facilities" : "${_selectedFacilities.length} Facilitie(s)"} in ${_selectedStates.length == 1 ? _selectedStates.first : "${_selectedStates.length} States"}', style: TextStyle(color: Colors.blueGrey.shade600)),
             const Divider(height: 24),
             Wrap(
               spacing: 20.0, runSpacing: 20.0, alignment: WrapAlignment.spaceAround,
@@ -546,20 +611,26 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     setState(() => _isExporting = true);
     try {
       List<List<dynamic>> rows = [];
+      // Summary Header
       rows.add(['VIRAL LOAD REPORT SUMMARY']);
-      rows.add(['Quarter:', _selectedQuarter, 'Facilities:', _selectedFacilities.join(", ")]);
-      rows.add([]);
+      rows.add(['Quarter:', _selectedQuarter, 'States:', _selectedStates.join(", "), 'Facilities:', _selectedFacilities.join(", ")]);
+      rows.add([]); // Blank row
       rows.add(['Metric', 'Value']);
       final int totalEligible = _summaries.fold(0, (p, s) => p + s.totalEligibleClientsInFilter);
+      final int totalSamples = _summaries.fold(0, (p, s) => p + s.samplesCollected);
       rows.add(['Total Eligible Clients', totalEligible]);
-      rows.add([]);
+      rows.add(['Samples Collected', totalSamples]);
+      // ... add more summary rows as needed ...
+      rows.add([]); // Blank row
+
+      // Call Log Header
       rows.add(['DETAILED CALL LOGS']);
       rows.add(['Call Status', 'Client Name', 'ART ID', 'Phone No', 'Facility', 'State', 'Date', 'Time', 'Duration(s)', 'Tracked By']);
       for (var log in _masterLogList) {
         rows.add([log.callStatus, log.clientName, log.artId, log.phoneNumberCalled, log.trackerFacility, log.trackerState, log.callDateTime != null ? DateFormat('yyyy-MM-dd').format(log.callDateTime!) : '', log.callDateTime != null ? DateFormat('HH:mm').format(log.callDateTime!) : '', log.callDurationInSeconds, log.trackedBy]);
       }
       String csvData = const ListToCsvConverter().convert(rows);
-      _triggerDownload(utf8.encode(csvData), 'facility_vl_tracking_report.csv', 'text/csv');
+      _triggerDownload(utf8.encode(csvData), 'vl_tracking_report.csv', 'text/csv');
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }

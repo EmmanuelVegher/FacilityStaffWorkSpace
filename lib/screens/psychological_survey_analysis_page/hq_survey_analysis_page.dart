@@ -1,32 +1,21 @@
-// A DEDICATED PAGE FOR PSYCHOLOGICAL SURVEY ANALYSIS (PER-FACILITY BREAKDOWN)
-//
-// FEATURES:
-// - Aggregates and displays survey analysis on a PER-FACILITY basis.
-// - Uses ExpansionTiles to create a clean, organized, and comparable view.
-// - "Best Team Player" scores are scoped to each individual facility.
-// - Retains high-performance collectionGroup queries and robust filtering.
-// - Uses vertical column charts for clear "Team Player" visualization.
-//
-// FULL AND COMPLETE CODE - CREATED BY GEMINI
+// lib/pages/reports/state_survey_analysis_page.dart
 
+// A STATE-LEVEL PAGE FOR PSYCHOLOGICAL SURVEY ANALYSIS (PER-FACILITY BREAKDOWN)
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
-import '../../widgets/drawer2.dart'; // Assuming a shared drawer widget
+import '../../widgets/drawer2.dart';
+import '../../widgets/drawer3.dart';
 
 // --- DATA MODELS & HELPERS ---
-
-// A class to hold the aggregated analysis for a single facility.
 class SurveyAnalysisData {
   int totalSurveys = 0;
   Map<String, Map<String, int>> questionAggregates = {};
   List<TeamPlayerScore> teamPlayerScores = [];
-
   SurveyAnalysisData.empty();
 }
 
@@ -43,7 +32,6 @@ class ChartData {
   ChartData(this.category, this.value, this.color);
 }
 
-// AnimatedNumberText can be reused from your other pages for a nice effect
 class AnimatedNumberText extends StatelessWidget {
   final num value;
   final TextStyle? style;
@@ -65,27 +53,25 @@ class AnimatedNumberText extends StatelessWidget {
 }
 
 // --- MAIN WIDGET ---
-
-class PsychologicalSurveyAnalysisPage extends StatefulWidget {
-  const PsychologicalSurveyAnalysisPage({super.key});
-
+class StateSurveyAnalysisPage extends StatefulWidget {
+  const StateSurveyAnalysisPage({super.key});
   @override
-  _PsychologicalSurveyAnalysisPageState createState() => _PsychologicalSurveyAnalysisPageState();
+  _StateSurveyAnalysisPageState createState() => _StateSurveyAnalysisPageState();
 }
 
-class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAnalysisPage> {
-  // --- Services & State ---
+class _StateSurveyAnalysisPageState extends State<StateSurveyAnalysisPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isLoading = false;
   String? _errorMessage;
-  String? _userState;
   bool _hasLoadedData = false;
+  bool _isFilterLoading = true;
 
   // --- Filter State ---
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
+  List<String> _availableStates = [];
+  List<String> _selectedStates = ['All States'];
   List<String> _availableFacilities = [];
   List<String> _selectedFacilities = [];
 
@@ -101,7 +87,6 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
   static const Q_MATERIALS = 'Do you have the needed materials to do your job?';
   static const Q_TEAM_PLAYER = 'For the current week, who is the best team player in your facility';
 
-
   @override
   void initState() {
     super.initState();
@@ -110,43 +95,66 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
   }
 
   Future<void> _initializeFilters() async {
+    setState(() => _isFilterLoading = true);
     try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception("User not logged in.");
-      final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
+      final facilitiesSnapshot = await _firestore.collection('Facilities').get();
       if (!mounted) return;
 
+      final states = facilitiesSnapshot.docs
+          .map((doc) => (doc.data())['state'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList()..sort();
+
       setState(() {
-        _userState = staffDoc.data()?['state'] as String?;
+        _availableStates = ['All States', ...states];
+        _isFilterLoading = false;
       });
-
-      if (_userState != null) {
-        final facilitiesSnapshot = await _firestore.collection('Facilities').where('state', isEqualTo: _userState).get();
-        final facilities = facilitiesSnapshot.docs
-            .map((doc) => doc.data()['LocationName'] as String?)
-            .whereType<String>()
-            .toList()..sort();
-
-        if (mounted) {
-          setState(() {
-            _availableFacilities = facilities;
-            _selectedFacilities = List.from(facilities);
-          });
-        }
-      }
     } catch (e) {
       if (mounted) setState(() => _errorMessage = "Error initializing filters: $e");
     }
   }
 
+  Future<void> _onStatesChanged(List<String> newStates) async {
+    setState(() {
+      _selectedStates = newStates;
+      _isLoading = true;
+      _availableFacilities.clear();
+      _selectedFacilities.clear();
+    });
 
-  Future<void> _loadSurveyData() async {
-    if (_userState == null) {
-      setState(() => _errorMessage = "Could not determine user's state.");
+    if (newStates.contains('All States') || newStates.isEmpty) {
+      setState(() => _isLoading = false);
       return;
     }
-    if (_selectedFacilities.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one facility.")));
+
+    try {
+      Query query = _firestore.collection('Facilities').where('state', whereIn: newStates);
+      final snapshot = await query.get();
+
+      // --- THIS IS THE CORRECTED LINE ---
+      final facilities = snapshot.docs
+          .map((doc) => (doc.data() as Map<String, dynamic>)['LocationName'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList()..sort();
+
+      if(mounted) {
+        setState(() {
+          _availableFacilities = facilities;
+          _selectedFacilities = List.from(facilities);
+        });
+      }
+    } catch (e) {
+      if(mounted) setState(() => _errorMessage = "Error fetching facilities: $e");
+    } finally {
+      if(mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadSurveyData() async {
+    if (_selectedStates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state.")));
       return;
     }
 
@@ -158,16 +166,21 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
 
     try {
       Query<Map<String, dynamic>> query = _firestore.collectionGroup('SurveyResponses')
-          .where('State', isEqualTo: _userState)
           .where('date', isGreaterThanOrEqualTo: _startDate)
           .where('date', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)));
 
-      if (_selectedFacilities.length <= 30) {
-        query = query.where('FacilityName', whereIn: _selectedFacilities);
+      if (!_selectedStates.contains('All States')) {
+        query = query.where('State', whereIn: _selectedStates);
+      }
+
+      if (!_selectedStates.contains('All States') && _selectedFacilities.isNotEmpty) {
+        if (_selectedFacilities.length <= 30) {
+          query = query.where('FacilityName', whereIn: _selectedFacilities);
+        }
       }
 
       final snapshot = await query.get();
-      final docs = _selectedFacilities.length > 30
+      final docs = (_selectedFacilities.isNotEmpty && _selectedFacilities.length > 30)
           ? snapshot.docs.where((doc) => _selectedFacilities.contains(doc.data()['FacilityName'])).toList()
           : snapshot.docs;
 
@@ -244,7 +257,6 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
     });
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -277,7 +289,7 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
           const SizedBox(width: 10),
         ],
       ),
-      drawer: drawer2(context),
+      drawer: drawer3(context),
       body: Column(
         children: [
           _buildFilterBar(),
@@ -298,15 +310,15 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
     );
   }
 
-  // --- WIDGET BUILDERS ---
-
   Widget _buildFilterBar() {
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Wrap(
+        child: _isFilterLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Wrap(
           spacing: 16,
           runSpacing: 12,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -317,25 +329,34 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
               icon: const Icon(Icons.date_range_outlined),
               label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
             ),
-            if (_availableFacilities.isNotEmpty)
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: MultiSelectDialogField(
+                items: _availableStates.map((s) => MultiSelectItem<String>(s, s)).toList(),
+                initialValue: _selectedStates,
+                title: const Text("Select States"),
+                buttonIcon: const Icon(Icons.map_outlined, color: Colors.teal),
+                buttonText: Text(
+                  "States (${_selectedStates.contains('All States') ? 'All' : _selectedStates.length})",
+                  style: TextStyle(color: Colors.teal[800], fontSize: 16),
+                ),
+                onConfirm: (results) => _onStatesChanged(results.cast<String>()),
+                chipDisplay: MultiSelectChipDisplay.none(),
+                decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), borderRadius: const BorderRadius.all(Radius.circular(8)), border: Border.all(color: Colors.teal, width: 1)),
+              ),
+            ),
+            if (!_selectedStates.contains('All States') && _availableFacilities.isNotEmpty)
               Container(
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: const BoxConstraints(maxWidth: 300),
                 child: MultiSelectDialogField(
                   items: _availableFacilities.map((f) => MultiSelectItem<String>(f, f)).toList(),
                   initialValue: _selectedFacilities,
                   title: const Text("Select Facilities"),
                   buttonIcon: const Icon(Icons.location_city, color: Colors.teal),
-                  buttonText: Text(
-                    "Facilities (${_selectedFacilities.length})",
-                    style: TextStyle(color: Colors.teal[800], fontSize: 16),
-                  ),
+                  buttonText: Text("Facilities (${_selectedFacilities.length})", style: TextStyle(color: Colors.teal[800], fontSize: 16)),
                   onConfirm: (results) => setState(() => _selectedFacilities = results.cast<String>()),
                   chipDisplay: MultiSelectChipDisplay.none(),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.1),
-                    borderRadius: const BorderRadius.all(Radius.circular(8)),
-                    border: Border.all(color: Colors.teal, width: 1),
-                  ),
+                  decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), borderRadius: const BorderRadius.all(Radius.circular(8)), border: Border.all(color: Colors.teal, width: 1)),
                 ),
               ),
             ElevatedButton.icon(
@@ -354,9 +375,7 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
     if (_totalSurveysAllFacilities == 0) {
       return const Center(child: Text("No survey data found for the selected criteria."));
     }
-
     final sortedFacilityNames = _facilityAnalysisData.keys.toList()..sort();
-
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
@@ -364,10 +383,7 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
         children: [
           _buildKpiSection(),
           const SizedBox(height: 24),
-          Text(
-              "Per-Facility Analysis Breakdown",
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
-          ),
+          Text("Per-Facility Analysis Breakdown", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
           const Divider(thickness: 1),
           const SizedBox(height: 8),
           ListView.builder(
@@ -385,20 +401,12 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
                 child: ExpansionTile(
                   backgroundColor: Colors.white,
                   collapsedBackgroundColor: Colors.grey.shade50,
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.teal.shade100,
-                    child: Text(facilityData.totalSurveys.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-                  ),
-                  title: Text(
-                    facilityName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                  leading: CircleAvatar(backgroundColor: Colors.teal.shade100, child: Text(facilityData.totalSurveys.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal))),
+                  title: Text(facilityName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   subtitle: const Text("Tap to view detailed analysis"),
                   childrenPadding: const EdgeInsets.all(16),
                   expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFacilityAnalysisDetails(facilityData),
-                  ],
+                  children: [_buildFacilityAnalysisDetails(facilityData)],
                 ),
               );
             },
@@ -412,37 +420,26 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildAnalysisSection(
-          title: "Team Spirit",
-          children: [
-            _buildYesNoPieChart(Q_COLLABORATION, ['Good', 'Lacking'], data.questionAggregates),
-            _buildYesNoPieChart(Q_SUPPORT, ['Supported', 'Unsupported'], data.questionAggregates),
-          ],
-        ),
+        _buildAnalysisSection(title: "Team Spirit", children: [
+          _buildYesNoPieChart(Q_COLLABORATION, ['Good', 'Lacking'], data.questionAggregates),
+          _buildYesNoPieChart(Q_SUPPORT, ['Supported', 'Unsupported'], data.questionAggregates),
+        ]),
         const SizedBox(height: 24),
-        _buildAnalysisSection(
-          title: "Attitude to Work & Environment",
-          children: [
-            _buildYesNoPieChart(Q_CHALLENGE, ['Challenged', 'Unchallenged'], data.questionAggregates),
-            _buildYesNoPieChart(Q_MATERIALS, ['Equipped', 'Unequipped'], data.questionAggregates),
-          ],
-        ),
+        _buildAnalysisSection(title: "Attitude to Work & Environment", children: [
+          _buildYesNoPieChart(Q_CHALLENGE, ['Challenged', 'Unchallenged'], data.questionAggregates),
+          _buildYesNoPieChart(Q_MATERIALS, ['Equipped', 'Unequipped'], data.questionAggregates),
+        ]),
         const SizedBox(height: 24),
-        _buildAnalysisSection(
-          title: "Team Player Recognition",
-          children: [
-            _buildTeamPlayerChart(data.teamPlayerScores),
-          ],
-        ),
+        _buildAnalysisSection(title: "Team Player Recognition", children: [
+          _buildTeamPlayerChart(data.teamPlayerScores),
+        ]),
       ],
     );
   }
 
   Widget _buildKpiSection() {
     return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      alignment: WrapAlignment.center,
+      spacing: 16, runSpacing: 16, alignment: WrapAlignment.center,
       children: [
         _buildKpiCard("Total Surveys Submitted", _totalSurveysAllFacilities, Icons.poll_outlined, Colors.blue.shade700),
         _buildKpiCard("Facilities Responding", _facilityAnalysisData.keys.length, Icons.location_city, Colors.green.shade700),
@@ -452,18 +449,15 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
 
   Widget _buildKpiCard(String title, num value, IconData icon, Color color) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        padding: const EdgeInsets.all(16),
-        width: 280,
+        padding: const EdgeInsets.all(16), width: 280,
         child: Row(
           children: [
             CircleAvatar(radius: 24, backgroundColor: color.withOpacity(0.1), child: Icon(icon, size: 28, color: color)),
             const SizedBox(width: 16),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedNumberText(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
                 Text(title, style: TextStyle(color: Colors.grey.shade700)),
@@ -482,12 +476,7 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
         Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.teal)),
         const Divider(color: Colors.teal, thickness: 1.5),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          alignment: WrapAlignment.spaceEvenly,
-          children: children,
-        )
+        Wrap(spacing: 16, runSpacing: 16, alignment: WrapAlignment.spaceEvenly, children: children)
       ],
     );
   }
@@ -497,13 +486,9 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
     final yesCount = data['Yes']!;
     final noCount = data['No']!;
     final total = yesCount + noCount;
-
     if (total == 0) return _buildChartCard(title: question, child: const Center(child: Text("No data for this question.")));
 
-    final chartData = [
-      ChartData(labels[0], yesCount, Colors.green.shade400),
-      ChartData(labels[1], noCount, Colors.red.shade400),
-    ];
+    final chartData = [ChartData(labels[0], yesCount, Colors.green.shade400), ChartData(labels[1], noCount, Colors.red.shade400)];
 
     return _buildChartCard(
       title: question,
@@ -527,39 +512,23 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
   Widget _buildTeamPlayerChart(List<TeamPlayerScore> teamPlayerScores) {
     const chartTitle = "Top Team Players (Points-Based)";
     if (teamPlayerScores.isEmpty) {
-      return _buildChartCard(
-        title: chartTitle,
-        child: const Center(child: Text("No team player data submitted for this facility.")),
-      );
+      return _buildChartCard(title: chartTitle, child: const Center(child: Text("No team player data submitted for this facility.")));
     }
     return _buildChartCard(
       title: chartTitle,
       child: SfCartesianChart(
-        primaryXAxis: CategoryAxis(
-          labelRotation: -45,
-          labelIntersectAction: AxisLabelIntersectAction.rotate45,
-          majorGridLines: const MajorGridLines(width: 0),
-        ),
-        primaryYAxis: NumericAxis(
-          title: AxisTitle(text: "Points Score"),
-          majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5]),
-          isVisible: true,
-        ),
+        primaryXAxis: CategoryAxis(labelRotation: -45, labelIntersectAction: AxisLabelIntersectAction.rotate45, majorGridLines: const MajorGridLines(width: 0)),
+        primaryYAxis: NumericAxis(title: AxisTitle(text: "Points Score"), majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5]), isVisible: true),
         tooltipBehavior: _tooltipBehavior,
         series: <CartesianSeries>[
-          // Switched to ColumnSeries for vertical bars
           ColumnSeries<TeamPlayerScore, String>(
-            dataSource: teamPlayerScores.take(10).toList(), // Show top 10
+            dataSource: teamPlayerScores.take(10).toList(),
             xValueMapper: (d, _) => d.name,
             yValueMapper: (d, _) => d.score,
             name: "Score",
             color: Colors.amber.shade700,
             borderRadius: const BorderRadius.all(Radius.circular(5)),
-            // Data labels are now on top of the columns
-            dataLabelSettings: const DataLabelSettings(
-                isVisible: true,
-                labelAlignment: ChartDataLabelAlignment.top
-            ),
+            dataLabelSettings: const DataLabelSettings(isVisible: true, labelAlignment: ChartDataLabelAlignment.top),
           )
         ],
       ),
@@ -568,21 +537,13 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
 
   Widget _buildChartCard({required String title, required Widget child}) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        padding: const EdgeInsets.all(16),
-        width: 500, // Constrain width for better layout in Wrap
-        height: 400,
+        padding: const EdgeInsets.all(16), width: 500, height: 400,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 16),
             Expanded(child: child),
           ],
@@ -596,9 +557,7 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Select Date Range'),
-        content: SizedBox(
-          width: 350,
-          height: 350,
+        content: SizedBox(width: 350, height: 350,
           child: SfDateRangePicker(
             selectionMode: DateRangePickerSelectionMode.range,
             initialSelectedRange: PickerDateRange(_startDate, _endDate),

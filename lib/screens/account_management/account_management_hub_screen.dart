@@ -4,6 +4,7 @@ import 'package:attendanceappmailtool/screens/account_management/state_dashboard
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../widgets/drawer3.dart';
 import '../registration_page.dart';
 import '../supervisor/supervisor_hub_screen.dart';
 
@@ -24,6 +25,7 @@ class AccountManagementHubScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
+      drawer: drawer3(context),
       body: Container(
         width: double.infinity,
         height: double.infinity,

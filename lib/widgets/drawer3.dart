@@ -20,10 +20,12 @@ import '../screens/leave_request/hq_leave_request_management_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
+import '../screens/psychological_survey_analysis_page/hq_survey_analysis_page.dart';
 import '../screens/timesheet/hq_timesheet_review_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
 import '../screens/upload_signature3.dart';
+import '../screens/viral_load_tracker/hq_vl_report_page.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
@@ -197,32 +199,6 @@ Widget drawer3(
           //   },
           // ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-          ListTile(
-            leading: Icon(
-              Icons.task,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Create Activity',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const CreateActivityPage()),
-
-              );
-            },
-          ),
 
           const Divider(
             color: Colors.grey,
@@ -294,7 +270,7 @@ Widget drawer3(
               color: Colors.blue,
             ),
             title: Text(
-              'Viral Load Tracker',
+              'Central Viral Load Tracking Report',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -303,7 +279,7 @@ Widget drawer3(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const StateVlReportTab2()),
+                    builder: (context) => const VlTrackingPageWeb()),
 
               );
             },
@@ -365,6 +341,79 @@ Widget drawer3(
           ),
 
 
+
+
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: const Icon(Icons.manage_accounts),
+            title: Text(
+              'Account Management',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.of(context).pop(); // Close the drawer
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const AccountManagementHubScreen(),
+              ));
+            },
+          ), const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.task,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Create Task Management Indicators',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CreateActivityPage()),
+
+              );
+            },
+          ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.psychology,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Survey Analysis',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateSurveyAnalysisPage()),
+
+              );
+            },
+          ),
 
 
 
@@ -438,21 +487,6 @@ Widget drawer3(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfilePage2()),
               );
-            },
-          ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: const Text('Account Management'),
-            onTap: () {
-              Navigator.of(context).pop(); // Close the drawer
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const AccountManagementHubScreen(),
-              ));
             },
           ),
 

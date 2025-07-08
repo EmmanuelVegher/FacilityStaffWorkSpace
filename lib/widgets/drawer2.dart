@@ -269,33 +269,7 @@ Widget drawer2(
             },
           ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
 
-
-          ListTile(
-            leading: Icon(
-              Icons.biotech_outlined,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Viral Load Tracking Report',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateVlReportTab2()),
-
-              );
-            },
-          ),//
 
           const Divider(
             color: Colors.grey,
@@ -333,6 +307,34 @@ Widget drawer2(
 
           ListTile(
             leading: Icon(
+              Icons.biotech_outlined,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Viral Load Tracking Report',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateVlTrackingPageWeb()),
+
+              );
+            },
+          ),//
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          ListTile(
+            leading: Icon(
               Icons.lock_clock,
               size: drawerIconSize,
               color: Colors.blue,
@@ -348,6 +350,34 @@ Widget drawer2(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const TimesheetReviewPage()),
+
+              );
+            },
+          ),
+
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.holiday_village,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'View Leave Requests',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateLeaveRequestManagementPage()),
 
               );
             },
@@ -384,29 +414,19 @@ Widget drawer2(
             color: Colors.grey,
             height: 1,
           ),
-
           ListTile(
-            leading: Icon(
-              Icons.holiday_village,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
+            leading: const Icon(Icons.manage_accounts),
             title: Text(
-              'View Leave Requests',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+              'Account Management',
+              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
             ),
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateLeaveRequestManagementPage()),
-
-              );
+              Navigator.of(context).pop(); // Close the drawer
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const MyStateScreen(),
+              ));
             },
           ),
-
 
 
 
@@ -483,20 +503,7 @@ Widget drawer2(
               );
             },
           ),
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: const Text('Account Management'),
-            onTap: () {
-              Navigator.of(context).pop(); // Close the drawer
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const MyStateScreen(),
-              ));
-            },
-          ),
+
 
 
           const Divider(

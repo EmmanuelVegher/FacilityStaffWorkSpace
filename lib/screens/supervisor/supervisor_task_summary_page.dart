@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
 // Make sure to import your Report and BioModel classes
 // Adjust the path as per your project structure
+import '../../widgets/drawer2.dart';
 import '../activity_monitoring/activity_monitoring_page.dart';
 
 
@@ -257,12 +258,13 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
           ],
         ),
       ),
+      drawer: drawer2(context),
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.red.shade600, Colors.black87, Colors.white, Colors.yellow.shade600],
+            colors: [Colors.red.shade600, Colors.black87, Colors.yellow.shade600],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

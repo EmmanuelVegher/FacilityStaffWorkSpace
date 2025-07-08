@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../widgets/drawer2.dart';
+
 class MyStateScreen extends StatefulWidget {
   const MyStateScreen({super.key});
 
@@ -185,6 +187,7 @@ class _MyStateScreenState extends State<MyStateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
+      drawer: drawer2(context),
       body: Container(
         width: double.infinity,
         height: double.infinity,

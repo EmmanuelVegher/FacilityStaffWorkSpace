@@ -387,31 +387,7 @@ Widget drawer(
               );
             },
           ),
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
 
-          ListTile(
-            leading: Icon(
-              Icons.biotech_outlined,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Viral Load Tracker',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const ReportVlTab()),
-              );
-            },
-          ),
           Divider(
             color: Colors.grey,
             height: 1,
@@ -433,6 +409,32 @@ Widget drawer(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const EacReportsPageWeb()),
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.biotech_outlined,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Viral Load Tracker',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const UserFacilityVlTrackingPageWeb()),
               );
             },
           ),
