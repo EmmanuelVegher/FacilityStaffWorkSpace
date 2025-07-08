@@ -79,6 +79,107 @@ class EacCallLog {
   }
 }
 
+// --- NEW: DATA MODELS FOR EacSummaries COLLECTION ---
+class EacSessionsSummary {
+  final int withAtLeast3Sessions;
+  final int without3Sessions;
+  EacSessionsSummary({required this.withAtLeast3Sessions, required this.without3Sessions});
+  factory EacSessionsSummary.fromJson(Map<String, dynamic> data) {
+    return EacSessionsSummary(
+      withAtLeast3Sessions: data['withAtLeast3Sessions'] as int? ?? 0,
+      without3Sessions: data['without3Sessions'] as int? ?? 0,
+    );
+  }
+}
+
+class TatSummary {
+  final int lessThan90Days;
+  final int between90and150Days;
+  final int moreThan150Days;
+  TatSummary({required this.lessThan90Days, required this.between90and150Days, required this.moreThan150Days});
+  factory TatSummary.fromJson(Map<String, dynamic> data) {
+    return TatSummary(
+      lessThan90Days: data['lessThan90Days'] as int? ?? 0,
+      between90and150Days: data['between90and150Days'] as int? ?? 0,
+      moreThan150Days: data['moreThan150Days'] as int? ?? 0,
+    );
+  }
+}
+
+class VlSummary {
+  final int suppressedLessThan50;
+  final int suppressedLessThan1000;
+  final int unsuppressed;
+  final int withRepeatVl;
+  final int switchReviewCount;
+  VlSummary({
+    required this.suppressedLessThan50,
+    required this.suppressedLessThan1000,
+    required this.unsuppressed,
+    required this.withRepeatVl,
+    required this.switchReviewCount,
+  });
+  factory VlSummary.fromJson(Map<String, dynamic> data) {
+    return VlSummary(
+      suppressedLessThan50: data['suppressedLessThan50'] as int? ?? 0,
+      suppressedLessThan1000: data['suppressedLessThan1000'] as int? ?? 0,
+      unsuppressed: data['unsuppressed'] as int? ?? 0,
+      withRepeatVl: data['withRepeatVl'] as int? ?? 0,
+      switchReviewCount: data['switchReviewCount'] as int? ?? 0,
+    );
+  }
+}
+
+class EacSummary {
+  final String reportId;
+  final String facility;
+  final DateTime reportDate;
+  final int totalUniqueClients;
+  final String trackerName;
+  final EacSessionsSummary eacSessions;
+  final TatSummary tat;
+  final VlSummary vlSummary;
+
+  EacSummary({
+    required this.reportId,
+    required this.facility,
+    required this.reportDate,
+    required this.totalUniqueClients,
+    required this.trackerName,
+    required this.eacSessions,
+    required this.tat,
+    required this.vlSummary,
+  });
+
+  factory EacSummary.fromJson(Map<String, dynamic> data) {
+    DateTime parsedDate;
+    try {
+      // Handles both Timestamp and String date formats
+      if (data['reportDate'] is Timestamp) {
+        parsedDate = (data['reportDate'] as Timestamp).toDate();
+      } else if (data['reportDate'] is String) {
+        parsedDate = DateFormat('yyyy-MM-dd').parse(data['reportDate']);
+      } else {
+        parsedDate = DateTime.now(); // Fallback
+      }
+    } catch (e) {
+      parsedDate = DateTime.now(); // Fallback on parsing error
+    }
+
+    return EacSummary(
+      reportId: data['reportId'] as String? ?? 'N/A',
+      facility: data['facility'] as String? ?? 'N/A',
+      reportDate: parsedDate,
+      totalUniqueClients: data['totalUniqueClients'] as int? ?? 0,
+      trackerName: data['trackerName'] as String? ?? 'N/A',
+      eacSessions: EacSessionsSummary.fromJson(data['eacSessions'] as Map<String, dynamic>? ?? {}),
+      tat: TatSummary.fromJson(data['tat'] as Map<String, dynamic>? ?? {}),
+      vlSummary: VlSummary.fromJson(data['vlSummary'] as Map<String, dynamic>? ?? {}),
+    );
+  }
+}
+// --- END NEW DATA MODELS ---
+
 // GlobalKeys to capture chart images for PDF export
 final GlobalKey _outcomeChartKey = GlobalKey();
 final GlobalKey _artStatusChartKey = GlobalKey();
@@ -105,6 +206,12 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   bool isLoading = true;
   bool _isInitialState = true;
   String? _errorMessage;
+
+  // --- NEW: State for EAC Summary Analysis ---
+  List<EacSummary> _eacSummaries = [];
+  String? _summaryErrorMessage;
+  bool _isAnalysisExpanded = true;
+  // --- END NEW ---
 
   // --- State variables for masking and exporting ---
   bool _allCellsGloballyUnlocked = false;
@@ -161,7 +268,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
       final now = DateTime.now();
       startDate = DateTime(now.year, now.month, now.day - 29); // Default to last 30 days
       endDate = DateTime(now.year, now.month, now.day);
-      _loadReports();
+      await _loadReports();
     }
   }
 
@@ -212,45 +319,96 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     });
 
     try {
-      // *** THE CORE CHANGE: QUERYING THE FLATTENED EAC LOGS COLLECTION ***
-      final QuerySnapshot querySnapshot = await _firestore
-          .collection('EacCallLogs') // IMPORTANT: Query the correct collection
-          .where('trackerFacilityLocation', isEqualTo: userLocation)
-          .where('dateTracked', isGreaterThanOrEqualTo: startDate)
-          .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)))
-          .orderBy('dateTracked', descending: true)
-          .get();
-
-
-      final List<EacCallLog> fetchedLogs = querySnapshot.docs.map((doc) {
-        return EacCallLog.fromJson(doc.data() as Map<String, dynamic>);
-      }).toList();
+      // --- MODIFIED: Load both reports and summaries in parallel ---
+      await Future.wait([
+        _fetchCallLogs(),
+        _loadEacSummaries(),
+      ]);
+      // --- END MODIFIED ---
 
       if (mounted) {
         setState(() {
-          _masterLogList = fetchedLogs;
           _updateAvailableFiltersFromData();
           _applyAllFiltersAndRecalculate();
         });
-        if (fetchedLogs.isEmpty) {
+        if (_masterLogList.isEmpty) {
           _showSnackBar("No EAC call logs found for the selected period.");
         }
       }
     } catch (e) {
-      print("Error loading EAC reports: $e");
-      if (mounted) setState(() => _errorMessage = "Error loading EAC reports: $e");
+      print("Error loading reports: $e");
+      if (mounted) setState(() => _errorMessage = "Error loading reports: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
+  // --- MODIFIED: Extracted log fetching to its own method ---
+  Future<void> _fetchCallLogs() async {
+    final QuerySnapshot querySnapshot = await _firestore
+        .collection('EacCallLogs')
+        .where('trackerFacilityLocation', isEqualTo: userLocation)
+        .where('dateTracked', isGreaterThanOrEqualTo: startDate)
+        .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)))
+        .orderBy('dateTracked', descending: true)
+        .get();
+
+    final List<EacCallLog> fetchedLogs = querySnapshot.docs.map((doc) {
+      return EacCallLog.fromJson(doc.data() as Map<String, dynamic>);
+    }).toList();
+
+    if (mounted) {
+      _masterLogList = fetchedLogs;
+    }
+  }
+
+  // --- NEW: Load data from the EacSummaries collection ---
+  Future<void> _loadEacSummaries() async {
+    if (userLocation == null || userLocation!.isEmpty) {
+      return; // No location to filter by
+    }
+
+    setState(() {
+      _summaryErrorMessage = null;
+    });
+
+    try {
+      // Format location for query: "Facility Name" -> "Facility_Name"
+      final locationPrefix = userLocation!.replaceAll(' ', '_');
+
+      // Query for documents where the ID starts with the location prefix
+      final querySnapshot = await _firestore
+          .collection('EacSummaries')
+          .where(FieldPath.documentId, isGreaterThanOrEqualTo: locationPrefix)
+          .where(FieldPath.documentId, isLessThan: '$locationPrefix\uf8ff')
+          .orderBy(FieldPath.documentId, descending: true) // Get the latest summary first
+          .limit(5) // Get the last 5 summaries for this facility
+          .get();
+
+      final List<EacSummary> fetchedSummaries = querySnapshot.docs.map((doc) {
+        return EacSummary.fromJson(doc.data());
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _eacSummaries = fetchedSummaries;
+        });
+      }
+    } catch (e) {
+      print("Error loading EAC Summaries: $e");
+      if (mounted) {
+        setState(() => _summaryErrorMessage = "Could not load EAC analysis summary: $e");
+      }
+    }
+  }
+
+  // --- END NEW ---
+
   void _updateAvailableFiltersFromData() {
-    // Populate Call Outcomes filter
     final outcomes = _masterLogList.map((c) => c.trackingOutcome).whereType<String>().where((s) => s.isNotEmpty).toSet();
     _availableOutcomes = ['All Outcomes', ...outcomes.toList()..sort()];
     _selectedOutcomes = ['All Outcomes'];
 
-    // Populate EAC Session Types filter
     final sessionTypes = _masterLogList.map((c) => c.eacSessionType).whereType<String>().where((s) => s.isNotEmpty).toSet();
     _availableSessionTypes = ['All Sessions', ...sessionTypes.toList()..sort()];
     _selectedSessionTypes = ['All Sessions'];
@@ -259,16 +417,13 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   void _applyAllFiltersAndRecalculate() {
     List<EacCallLog> currentlyFiltered = List.from(_masterLogList);
 
-    // Filter by outcome
     if (!_selectedOutcomes.contains('All Outcomes')) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedOutcomes.contains(c.trackingOutcome)).toList();
     }
 
-    // Filter by session type
     if (!_selectedSessionTypes.contains('All Sessions')) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedSessionTypes.contains(c.eacSessionType)).toList();
     }
-
 
     int totalDuration = currentlyFiltered.fold(0, (sum, c) => sum + (c.callDuration ?? 0));
     int outgoingDuration = currentlyFiltered.where((c) => c.trackingOutcome?.toLowerCase() == 'answered').fold(0, (sum, c) => sum + (c.callDuration ?? 0));
@@ -385,7 +540,6 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
           runSpacing: 12.0,
           alignment: WrapAlignment.start,
           children: [
-            // NEW Filter for Session Type
             _buildFilterChip("EAC Session Type", sessionButtonText, Icons.repeat_one, () {
               _showMultiSelectDialog(
                 context: context,
@@ -437,10 +591,10 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     if (_isInitialState && !isLoading) {
       return Center(child: Text("Apply a filter to view EAC reports.", style: TextStyle(color: Colors.grey.shade700)));
     }
-    if (_filteredLogList.isEmpty && !isLoading) {
+    if (_filteredLogList.isEmpty && _eacSummaries.isEmpty && !isLoading) {
       return Center(child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text("No EAC call logs found for the selected criteria.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
+        child: Text("No EAC data found for the selected criteria.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
       ));
     }
 
@@ -455,7 +609,13 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
         children: [
           _buildSummaryInfoCard(),
           const SizedBox(height: 24),
-          Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+          // --- NEW: Analysis Section ---
+          if (_eacSummaries.isNotEmpty || _summaryErrorMessage != null) ...[
+            _buildEacAnalysisSection(),
+            const SizedBox(height: 24),
+          ],
+          // --- END NEW ---
+          Text('Call Log Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
           _buildChartSection(),
           const SizedBox(height: 30),
@@ -471,6 +631,126 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     );
   }
 
+  // --- NEW: EAC Analysis Summary Widget ---
+  Widget _buildEacAnalysisSection() {
+    if (_summaryErrorMessage != null) {
+      return Card(
+        color: Colors.red.shade50,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text("Could not load analysis summary: $_summaryErrorMessage", style: TextStyle(color: Colors.red.shade800)),
+        ),
+      );
+    }
+    if (_eacSummaries.isEmpty) {
+      return const SizedBox.shrink(); // Don't show anything if no summaries are loaded
+    }
+
+    final latestSummary = _eacSummaries.first; // We sorted by date, so the first is the latest
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 2,
+      child: ExpansionTile(
+        key: const ValueKey('eac-analysis-tile'), // Add key to maintain state
+        initiallyExpanded: _isAnalysisExpanded,
+        onExpansionChanged: (isExpanded) => setState(() => _isAnalysisExpanded = isExpanded),
+        backgroundColor: Colors.blueGrey.shade50.withOpacity(0.5),
+        collapsedBackgroundColor: Colors.blueGrey.shade50.withOpacity(0.5),
+        title: Text(
+          'Latest Programmatic EAC Analysis',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800),
+        ),
+        subtitle: Text(
+          'Summary from ${DateFormat.yMMMMd().format(latestSummary.reportDate)} by ${latestSummary.trackerName}',
+          style: TextStyle(color: Colors.blueGrey.shade600),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Wrap(
+              spacing: 40.0,
+              runSpacing: 24.0,
+              children: [
+                _buildAnalysisCategory(
+                  title: 'EAC Session Adherence',
+                  icon: Icons.checklist_rtl_outlined,
+                  iconColor: Colors.teal,
+                  metrics: {
+                    'Total Unique Clients on EAC': latestSummary.totalUniqueClients.toString(),
+                    'Completed 3+ Sessions': latestSummary.eacSessions.withAtLeast3Sessions.toString(),
+                    'Incomplete (< 3 Sessions)': latestSummary.eacSessions.without3Sessions.toString(),
+                  },
+                ),
+                _buildAnalysisCategory(
+                  title: 'Viral Load (VL) Summary',
+                  icon: Icons.science_outlined,
+                  iconColor: Colors.deepPurple,
+                  metrics: {
+                    'Suppressed (< 50 c/ml)': latestSummary.vlSummary.suppressedLessThan50.toString(),
+                    'Suppressed (< 1000 c/ml)': latestSummary.vlSummary.suppressedLessThan1000.toString(),
+                    'Unsuppressed (≥ 1000 c/ml)': latestSummary.vlSummary.unsuppressed.toString(),
+                    'Clients with Repeat VL': latestSummary.vlSummary.withRepeatVl.toString(),
+                    'Clients for Switch Review': latestSummary.vlSummary.switchReviewCount.toString(),
+                  },
+                ),
+                _buildAnalysisCategory(
+                  title: 'Turn-Around Time (TAT) for VL',
+                  icon: Icons.hourglass_top_outlined,
+                  iconColor: Colors.amber.shade800,
+                  metrics: {
+                    'Less than 90 Days': latestSummary.tat.lessThan90Days.toString(),
+                    '90 - 150 Days': latestSummary.tat.between90and150Days.toString(),
+                    'More than 150 Days': latestSummary.tat.moreThan150Days.toString(),
+                  },
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisCategory({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Map<String, String> metrics
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 300),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: iconColor),
+              const SizedBox(width: 8),
+              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const Divider(height: 12),
+          ...metrics.entries.map((entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 6.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(entry.key, style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  entry.value,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+  // --- END NEW ---
+
   Widget _buildSummaryInfoCard() {
     final numberFormatter = NumberFormat.compact();
     final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
@@ -478,7 +758,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     final uniqueClients = _filteredLogList.map((log) => log.artId).toSet().length;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 24.0),
+      margin: const EdgeInsets.only(bottom: 0), // Modified margin
       elevation: 2.0,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -493,11 +773,13 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
                   iconWidget: Icon(Icons.group, color: Colors.teal.shade700, size: 36),
                   label: 'Unique Clients Contacted',
                   value: numberFormatter.format(uniqueClients),
+                  subtitle: 'in selected period',
                 ),
                 _buildInfoTile(
                   iconWidget: Icon(Icons.call, color: Colors.blue.shade700, size: 36),
                   label: 'Total EAC Calls Logged',
                   value: numberFormatter.format(_filteredLogList.length),
+                  subtitle: 'in selected period',
                 ),
                 _buildInfoTile(
                   iconWidget: Icon(Icons.timer_outlined, color: Colors.purple.shade700, size: 36),
@@ -550,7 +832,6 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
             series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: outcomeChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
 
-        // NEW EAC Session Chart
         _buildChartCard(title: 'EAC Session Distribution', chartKey: _sessionTypeChartKey, chart: SfCircularChart(
             annotations: (sessionTypeChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
             legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
@@ -572,7 +853,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   }
 
   Widget _buildDetailedLogSection(List<String> dailyGroupedKeys, Map<String, List<EacCallLog>> dailyGroupedReports) {
-    if (dailyGroupedKeys.isEmpty && !_isInitialState) {
+    if (dailyGroupedKeys.isEmpty) { // Simplified check
       return const Card(child: SizedBox(height: 100, child: Center(child: Text("No detailed logs match the current filters."))));
     }
     return ExpansionPanelList(
@@ -925,7 +1206,6 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     return chartData;
   }
 
-  // NEW Data prep for Session Type Chart
   List<MapEntry<String, int>> _getSessionTypeData() {
     Map<String, int> sessionCounts = {};
     for (var log in _filteredLogList) {
@@ -1053,38 +1333,74 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
           ),),),);
   }
 
-  Future<void> _showMultiSelectDialog({ required BuildContext context, required String title, required List<String> allOptions, required List<String> selectedOptions, required String allKeyword, required Function(List<String>) onConfirm, }) async {
+  Future<void> _showMultiSelectDialog({
+    required BuildContext context,
+    required String title,
+    required List<String> allOptions,
+    required List<String> selectedOptions,
+    required String allKeyword,
+    required Function(List<String>) onConfirm,
+  }) async {
     final tempSelected = List<String>.from(selectedOptions);
-    await showDialog(context: context, builder: (ctx) {
-      return StatefulBuilder(builder: (dialogContext, setStateDialog) {
-        return AlertDialog(title: Text(title),
-          content: SizedBox(width: 350,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: allOptions.length,
-              itemBuilder: (context, index) {
-                final option = allOptions[index];
-                final isAllOption = option == allKeyword;
-                return CheckboxListTile(
-                  title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                  value: tempSelected.contains(option),
-                  onChanged: (bool? value) {
-                    setStateDialog(() {
-                      if (value == true) {
-                        if (isAllOption) { tempSelected.clear(); tempSelected.add(allKeyword); }
-                        else { tempSelected.remove(allKeyword); tempSelected.add(option); }
-                      } else {
-                        tempSelected.remove(option);
-                        if (tempSelected.isEmpty && allOptions.contains(allKeyword)) { tempSelected.add(allKeyword); }
-                      }
-                    });
+    await showDialog(
+      context: context,
+      builder: (ctx) { // This is the dialog's outer context
+        return StatefulBuilder(
+          builder: (dialogContext, setStateDialog) { // This is the inner context we'll use
+            return AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: 350,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: allOptions.length,
+                  itemBuilder: (context, index) {
+                    final option = allOptions[index];
+                    final isAllOption = option == allKeyword;
+                    return CheckboxListTile(
+                      title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                      value: tempSelected.contains(option),
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          if (value == true) {
+                            if (isAllOption) {
+                              tempSelected.clear();
+                              tempSelected.add(allKeyword);
+                            } else {
+                              tempSelected.remove(allKeyword);
+                              tempSelected.add(option);
+                            }
+                          } else {
+                            tempSelected.remove(option);
+                            if (tempSelected.isEmpty && allOptions.contains(allKeyword)) {
+                              tempSelected.add(allKeyword);
+                            }
+                          }
+                        });
+                      },
+                    );
                   },
-                );},),),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () { onConfirm(tempSelected); Navigator.pop(context); }, child: const Text('Apply')),
-          ],);});},);
+                ),
+              ),
+              actions: [
+                // --- FIX --- Use the dialog's context to pop
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+                // --- FIX --- Use the dialog's context to pop
+                ElevatedButton(
+                  onPressed: () {
+                    onConfirm(tempSelected);
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
+
 
   Widget _buildFilterChip(String label, String value, IconData icon, VoidCallback onPressed, {bool disabled = false}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

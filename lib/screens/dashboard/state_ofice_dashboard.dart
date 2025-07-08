@@ -15,6 +15,7 @@ import '../../widgets/drawer2.dart';
 // Note: Ensure this path is correct for your project structure
 import '../attendance_analysis_page/attendance_analysis_page.dart';
 import '../attendance_analysis_page/hq_attendance_analysis_page.dart';
+import '../leave_request/state_leave_request_page.dart';
 import '../timesheet/timesheet_management_dashboard.dart';
 
 // --- ENUMS & MODELS ---
@@ -792,7 +793,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                       backgroundColor: Colors.grey.shade300,
                       valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
                     ),
-                    const Spacer(),
+                   // const Spacer(),
                     Align(
                       alignment: Alignment.bottomRight,
                       child: TextButton(
@@ -922,6 +923,23 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ),
               );
             },
+          ),
+        ),
+
+        // --- NEW "View Details" BUTTON ADDED HERE ---
+       // const Spacer(), // Pushes the button to the bottom
+        Align(
+          alignment: Alignment.bottomRight,
+          child: TextButton(
+            onPressed: () {
+              // Ensure you have a 'state_leave_request_management_page.dart' file
+              // and import it at the top of this dashboard file.
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StateLeaveRequestManagementPage()),
+              );
+            },
+            child: const Text('View Details'),
           ),
         ),
       ],

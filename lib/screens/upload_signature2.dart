@@ -5,9 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
-// Ensure Firebase Core is imported
-
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UploadSignaturePage2 extends StatefulWidget {
   const UploadSignaturePage2({super.key});
@@ -22,104 +20,104 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
     penStrokeWidth: 3,
   );
   Uint8List? _currentSignatureBytes;
-  String? _signatureLink; // To store the link from Firebase Storage
+  String? _signatureLink;
   final ImagePicker _picker = ImagePicker();
-  FirebaseStorage storage = FirebaseStorage.instance; // Firebase Storage instance
-  FirebaseFirestore firestore = FirebaseFirestore.instance; // Firestore instance
-  final FirebaseAuth auth = FirebaseAuth.instance; // Firebase Auth instance
-  String? _userId; // To store the fetched userId
-  static const Color wineColor = Color(0xFF722F37); // Deep wine color
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  String? _userId;
+
+  // State variable to control the visibility of the progress indicator
+  bool _isLoading = false;
+
+  static const Color wineColor = Color(0xFF722F37);
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
+    colors: [wineColor, Color(0xFFB34A5A)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-
   @override
   void initState() {
     super.initState();
-    _fetchUserId(); // Fetch user ID on initialization
+    _fetchUserId();
+  }
+
+  @override
+  void dispose() {
+    _signatureController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchUserId() async {
-    User? user = auth.currentUser;
+    User? user = _auth.currentUser;
     if (user != null) {
       setState(() {
         _userId = user.uid;
       });
-      _loadSignatureLink(); // Load signature link after getting userId
+      _loadSignatureLink();
     } else {
-      // Handle case where user is not logged in
-      // For example, navigate to login page or show an error message
       print("User not logged in.");
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("User not logged in. Please log in to continue.")),
         );
-        // Optionally navigate to login page:
-        // Navigator.pushReplacementNamed(context, '/login');
       });
     }
   }
 
-
   Future<void> _loadSignatureLink() async {
-    if (_userId == null) return; // Ensure userId is available
-
+    if (_userId == null) return;
     try {
-      DocumentSnapshot<Map<String, dynamic>> staffDoc = await firestore
+      DocumentSnapshot<Map<String, dynamic>> staffDoc = await _firestore
           .collection('Staff')
           .doc(_userId)
           .get();
 
-      if (staffDoc.exists) {
+      if (staffDoc.exists && mounted) {
         setState(() {
           _signatureLink = staffDoc.data()?['signatureLink'];
         });
       }
     } catch (e) {
       print("Error loading signature link: $e");
-      // Handle error appropriately, maybe show a snackbar to the user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error loading signature: $e")),
+        );
+      }
     }
   }
 
   Future<String?> _uploadImageToFirebaseStorage(Uint8List? imageBytes, String imageName) async {
-    if (imageBytes == null) return null;
-    if (_userId == null) return null; // Ensure userId is available
-
+    if (imageBytes == null || _userId == null) return null;
     try {
-      final Reference storageRef = storage.ref().child('signatures/$_userId/$imageName'); // Include userId in path
-      // Upload raw data.
-      SettableMetadata metadata = SettableMetadata(contentType: 'image/png'); // Adjust content type if needed
+      final Reference storageRef = _storage.ref().child('signatures/$_userId/$imageName');
+      SettableMetadata metadata = SettableMetadata(contentType: 'image/png');
       UploadTask uploadTask = storageRef.putData(imageBytes, metadata);
-
       TaskSnapshot snapshot = await uploadTask;
-      String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
+      return await snapshot.ref.getDownloadURL();
     } catch (e) {
       print('Error uploading signature to Firebase Storage: $e');
-      // Handle error appropriately, maybe show a snackbar to the user
       return null;
     }
   }
 
   Future<void> _updateSignatureLinkInFirestore(String? signatureLink) async {
-    if (_userId == null) return; // Ensure userId is available
-
+    if (_userId == null) return;
     try {
-      await firestore
+      await _firestore
           .collection('Staff')
           .doc(_userId)
           .update({'signatureLink': signatureLink});
       print('Signature link updated in Firestore successfully!');
     } catch (e) {
       print('Error updating signature link in Firestore: $e');
-      // Handle error appropriately, maybe show a snackbar to the user
+      rethrow; // Rethrow to be caught in the calling function
     }
   }
 
-
+  // Handles picking an image from the gallery and uploading it
   Future<void> _pickAndUploadSignature() async {
     if (_userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,18 +125,22 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       );
       return;
     }
+
+    setState(() => _isLoading = true); // Show progress indicator
+
     try {
       final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         Uint8List imageBytes = await pickedFile.readAsBytes();
-        String fileName = 'signature_${DateTime.now().millisecondsSinceEpoch}.png'; // Unique file name
+        String fileName = 'signature_${DateTime.now().millisecondsSinceEpoch}.png';
         String? downloadUrl = await _uploadImageToFirebaseStorage(imageBytes, fileName);
 
         if (downloadUrl != null) {
           await _updateSignatureLinkInFirestore(downloadUrl);
+          if (!mounted) return;
           setState(() {
             _signatureLink = downloadUrl;
-            _currentSignatureBytes = imageBytes; // Optionally update local preview
+            _currentSignatureBytes = imageBytes;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Signature uploaded and saved successfully!")),
@@ -151,12 +153,65 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       }
     } catch (e) {
       print("Error picking and uploading signature: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error picking and uploading signature.")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("An error occurred during upload.")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false); // Hide progress indicator
+      }
     }
   }
 
+  // Handles saving the signature drawn on the signature pad
+  Future<void> _saveDrawnSignature() async {
+    if (_signatureController.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please draw your signature first.")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true); // Show progress indicator
+
+    try {
+      final signatureBytes = await _signatureController.toPngBytes();
+      if (signatureBytes != null) {
+        String fileName = 'drawn_signature_${DateTime.now().millisecondsSinceEpoch}.png';
+        String? downloadUrl = await _uploadImageToFirebaseStorage(signatureBytes, fileName);
+
+        if (downloadUrl != null) {
+          await _updateSignatureLinkInFirestore(downloadUrl);
+          if (!mounted) return;
+          setState(() {
+            _signatureLink = downloadUrl;
+            _currentSignatureBytes = signatureBytes;
+          });
+          _signatureController.clear();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Drawn signature saved successfully!")),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to save drawn signature.")),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error saving drawn signature: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("An error occurred while saving.")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false); // Hide progress indicator
+      }
+    }
+  }
 
   void _showSignaturePad() {
     if (_userId == null) {
@@ -169,70 +224,30 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          title: const Text("Draw Signature"),
           content: SizedBox(
             height: 300,
-            width: 300, // Added width for web responsiveness
-            child: Column(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey)), // Visual border for signature area
-                    child: Signature(
-                      controller: _signatureController,
-                      backgroundColor: Colors.grey[200]!,
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    TextButton(
-                      onPressed: () => _signatureController.clear(),
-                      child: const Text("Clear"),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (_signatureController.isNotEmpty) {
-                          final signature = await _signatureController.toPngBytes();
-                          if (signature != null) {
-                            String fileName = 'drawn_signature_${DateTime.now().millisecondsSinceEpoch}.png'; // Unique file name
-                            String? downloadUrl = await _uploadImageToFirebaseStorage(signature, fileName);
-                            if (downloadUrl != null) {
-                              await _updateSignatureLinkInFirestore(downloadUrl);
-                              setState(() {
-                                _signatureLink = downloadUrl;
-                                _currentSignatureBytes = signature; // Optionally update local preview
-                              });
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Drawn signature saved successfully!")),
-                              );
-                            } else {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Failed to save drawn signature.")),
-                              );
-                            }
-                          } else {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Failed to capture signature.")),
-                            );
-                          }
-                        } else {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Please draw your signature.")),
-                          );
-                        }
-                      },
-                      child: const Text("Save"),
-                    ),
-                  ],
-                ),
-              ],
+            width: 300,
+            child: Signature(
+              controller: _signatureController,
+              backgroundColor: Colors.grey[200]!,
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => _signatureController.clear(),
+              child: const Text("Clear"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // First, pop the dialog
+                Navigator.of(context).pop();
+                // Then, start the saving process which shows the indicator
+                _saveDrawnSignature();
+              },
+              child: const Text("Save"),
+            ),
+          ],
         );
       },
     );
@@ -241,114 +256,107 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer2(context,), // You might need to adjust drawer for web if IsarService is removed
+      drawer: drawer2(context),
       appBar: AppBar(
         title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
         ),
-
       ),
-      body: _userId == null
-          ? const Center(child: CircularProgressIndicator()) // Show loading indicator until userId is fetched
-          : Center( // Center the content for better web layout
-        child: ConstrainedBox( // Limit width for larger screens on web
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GestureDetector(
-                  onTap: () => _signatureLink == null ? _showSignaturePad() : null, // Only show signature pad if no signature yet
-                  child: Container(
-                    height: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.5 : 300, // Responsive height
-                    width: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.5 : 300, // Responsive width
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: _signatureLink != null
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network( // Use Image.network to display from Firebase Storage
-                        _signatureLink!,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                        : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.upload_file,
-                          size: MediaQuery.of(context).size.width * 0.15,
-                          color: Colors.grey.shade600,
+      body: Stack( // Use a Stack to overlay the progress indicator
+        children: [
+          // Main content
+          _userId == null
+              ? const Center(child: CircularProgressIndicator())
+              : Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    GestureDetector(
+                      onTap: _showSignaturePad,
+                      child: Container(
+                        height: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.5 : 300,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.grey.shade300),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Tap to Upload or Draw Signature",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.bold,
+                        child: _signatureLink != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(19),
+                          child: Image.network(
+                            _signatureLink!,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return const Center(child: CircularProgressIndicator());
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(child: Icon(Icons.error, color: Colors.red));
+                            },
                           ),
-                          textAlign: TextAlign.center,
+                        )
+                            : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.draw,
+                              size: MediaQuery.of(context).size.width * 0.15,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Tap to Draw or Upload Signature",
+                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _showSignaturePad,
+                          icon: const Icon(Icons.create),
+                          label: const Text("Draw Signature"),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _pickAndUploadSignature,
+                          icon: const Icon(Icons.upload_file, color: Colors.white),
+                          label: const Text("Upload Signature", style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.brown,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () => _showSignaturePad(),
-                      icon: const Icon(Icons.create),
-                      label: const Text("Draw Signature"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () => _pickAndUploadSignature(),
-                      icon: const Icon(Icons.upload_file, color: Colors.white),
-                      label: const Text(
-                        "Upload Signature",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.brown,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                // Removed the "Save Signature" button as it's now saved automatically on upload/draw
-              ],
+              ),
             ),
           ),
-        ),
+          // Loading overlay
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+        ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _signatureController.dispose();
-    super.dispose();
   }
 }

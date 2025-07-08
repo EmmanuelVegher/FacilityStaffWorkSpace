@@ -918,8 +918,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       return;
     }
     final pdf = pw.Document();
-    final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
-    final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+    final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
+    final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
     final ttf = pw.Font.ttf(font);
     final ttfBold = pw.Font.ttf(boldFont);
     final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
@@ -972,8 +972,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
 
       final pdf = pw.Document();
-      final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
-      final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+      final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
+      final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
       final ttf = pw.Font.ttf(font);
       final ttfBold = pw.Font.ttf(boldFont);
       final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());

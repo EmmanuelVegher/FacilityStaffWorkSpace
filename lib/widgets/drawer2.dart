@@ -13,6 +13,7 @@ import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
 import '../screens/leave_request/leave_request_review_page.dart';
+import '../screens/leave_request/state_leave_request_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
@@ -318,7 +319,7 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const StateEacHistoricalReportTab()),
+                    builder: (context) => const StateEacReportsPageWeb()),
 
               );
             },
@@ -384,9 +385,6 @@ Widget drawer2(
             height: 1,
           ),
 
-
-
-
           ListTile(
             leading: Icon(
               Icons.holiday_village,
@@ -403,7 +401,7 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const LeaveRequestReviewPage()),
+                    builder: (context) => const StateLeaveRequestManagementPage()),
 
               );
             },

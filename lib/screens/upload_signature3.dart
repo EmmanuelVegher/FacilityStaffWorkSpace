@@ -7,16 +7,16 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../widgets/drawer.dart';
+import '../widgets/drawer3.dart';
 
-class UploadSignaturePage extends StatefulWidget {
-  const UploadSignaturePage({super.key});
+class UploadSignaturePage3 extends StatefulWidget {
+  const UploadSignaturePage3({super.key});
 
   @override
-  _UploadSignaturePageState createState() => _UploadSignaturePageState();
+  _UploadSignaturePage3State createState() => _UploadSignaturePage3State();
 }
 
-class _UploadSignaturePageState extends State<UploadSignaturePage> {
+class _UploadSignaturePage3State extends State<UploadSignaturePage3> {
   final SignatureController _signatureController = SignatureController(
     penColor: Colors.black,
     penStrokeWidth: 3,
@@ -255,10 +255,11 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer(context),
+      drawer: drawer3(context),
       appBar: AppBar(
         title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),

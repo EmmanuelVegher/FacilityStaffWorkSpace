@@ -16,12 +16,14 @@ import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/hq_eac_report.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
+import '../screens/leave_request/hq_leave_request_management_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/timesheet/hq_timesheet_review_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
+import '../screens/upload_signature3.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
@@ -272,7 +274,7 @@ Widget drawer3(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const HQEacHistoricalReport()),
+                    builder: (context) => const HqEacReportsPageWeb()),
 
               );
             },
@@ -335,6 +337,34 @@ Widget drawer3(
               );
             },
           ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.holiday_village,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'View Leave Requests',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const LeaveRequestManagementPage()),
+
+              );
+            },
+          ),
+
+
 
 
 
@@ -382,7 +412,7 @@ Widget drawer3(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const UploadSignaturePage2(
+                    builder: (context) => const UploadSignaturePage3(
 
                     )),
               );

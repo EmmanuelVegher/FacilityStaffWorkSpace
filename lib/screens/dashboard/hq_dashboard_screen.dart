@@ -10,7 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
-import '../../widgets/drawer3.dart'; // Assuming a generic app drawer
+import '../../widgets/drawer3.dart';
+import '../leave_request/hq_leave_request_management_page.dart';
+import '../timesheet/hq_timesheet_review_page.dart';
+import '../timesheet/timesheet_management_dashboard.dart'; // Assuming a generic app drawer
 
 // --- WIDGETS AND MODELS (ADAPTED FROM STATE-LEVEL DASHBOARD) ---
 
@@ -783,11 +786,21 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                         backgroundColor: Colors.grey.shade300,
                         valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
                       ),
-                      const Spacer(),
+                     // const Spacer(),
                       Align(
                         alignment: Alignment.bottomRight,
-                        child: TextButton(onPressed: () { /* TODO: Navigate to details page */ }, child: const Text('View Details')),
-                      )
+                        child: TextButton(
+                          onPressed: () {
+                            // Ensure you have a 'state_leave_request_management_page.dart' file
+                            // and import it at the top of this dashboard file.
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const TimesheetReviewPageHq()),
+                            );
+                          },
+                          child: const Text('View Details'),
+                        ),
+                      ),
                     ],
                   );
                 },
@@ -851,6 +864,23 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                     },
                   );
                 },
+              ),
+            ),
+
+            // --- NEW "View Details" BUTTON ADDED HERE ---
+           // const Spacer(), // Pushes the button to the bottom
+            Align(
+              alignment: Alignment.bottomRight,
+              child: TextButton(
+                onPressed: () {
+                  // Ensure you have a 'state_leave_request_management_page.dart' file
+                  // and import it at the top of this dashboard file.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LeaveRequestManagementPage()),
+                  );
+                },
+                child: const Text('View Details'),
               ),
             ),
           ],
