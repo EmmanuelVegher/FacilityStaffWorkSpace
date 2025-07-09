@@ -111,7 +111,8 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    startDate = DateTime(now.year, now.month, 1);
+    // Change the start date to 6 days before today.
+    startDate = DateTime(now.year, now.month, now.day - 6);
     endDate = DateTime(now.year, now.month, now.day);
     _initializePage();
   }
@@ -123,15 +124,52 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   Future<void> _initializePage() async {
-    setState(() => _isFilterLoading = true);
-    await _loadCurrentUserBio();
-    if (_currentUserState != null) {
-      await _loadFacilitiesForState(_currentUserState!);
-    }
-    _generateQuarterList();
-    if (mounted) setState(() => _isFilterLoading = false);
-  }
+    // Set the main loading flags at the start of the process.
+    setState(() {
+      isLoading = true;
+      _isFilterLoading = true;
+    });
 
+    try {
+      // Set up synchronous filter options first.
+      _generateQuarterList();
+
+      // Load user's profile to get their state.
+      await _loadCurrentUserBio();
+
+      // If the user's state was found, load the facilities for that state.
+      if (mounted && _currentUserState != null) {
+        await _loadFacilitiesForState(_currentUserState!);
+      } else if (mounted) {
+        // If the user's state couldn't be loaded, stop the loading process.
+        // The error message will have been set in _loadCurrentUserBio.
+        setState(() {
+          isLoading = false;
+          _isFilterLoading = false;
+        });
+        return;
+      }
+
+      // The filter UI is now ready.
+      if (mounted) setState(() => _isFilterLoading = false);
+
+      // Finally, automatically load the reports with default filters.
+      // The _loadReports() method will set `isLoading` to false upon completion.
+      if (mounted) {
+        await _loadReports();
+      }
+
+    } catch (e, s) {
+      debugPrint("Error during initial page load: $e\n$s");
+      if (mounted) {
+        setState(() {
+          _errorMessage = "An error occurred during page initialization: $e";
+          isLoading = false;
+          _isFilterLoading = false;
+        });
+      }
+    }
+  }
   Future<void> _loadCurrentUserBio() async {
     try {
       final user = _auth.currentUser;

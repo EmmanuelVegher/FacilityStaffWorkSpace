@@ -110,21 +110,35 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   }
 
   Future<void> _initializeStateFilter() async {
+    // This method now handles the complete initial setup and data load.
     setState(() => isLoading = true);
     try {
       final snapshot = await _firestore.collection('Location').get();
       final states = snapshot.docs.map((doc) => doc.id).where((id) => id.isNotEmpty).toList();
+
+      if (!mounted) return;
+
+      // Set the default state filter.
+      setState(() {
+        _availableStates = ['All States', ...states..sort()];
+        _selectedStates = ['All States'];
+      });
+
+      // After setting the default filters, immediately load the corresponding reports.
+      // _loadReports() has its own `try/catch/finally` and will manage the `isLoading` state.
+      await _loadReports();
+
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _availableStates = ['All States', ...states..sort()];
-          _selectedStates = ['All States'];
+          _errorMessage = "Error during initial page load: $e";
+          // Ensure loading is turned off if the initial state fetch fails.
+          isLoading = false;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _errorMessage = "Error initializing state filter: $e");
-    } finally {
-      if (mounted) setState(() => isLoading = false);
     }
+    // The `finally` block is removed from this method. The `finally` block within
+    // the called `_loadReports()` will handle setting `isLoading` to false upon completion.
   }
 
 

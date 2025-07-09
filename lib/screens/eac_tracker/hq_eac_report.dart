@@ -167,17 +167,37 @@ class _HqEacReportsPageWebState extends State<HqEacReportsPageWeb> {
   }
 
   Future<void> _initializeFilters() async {
-    setState(() => _isFilterLoading = true);
+    // Use the main `isLoading` flag for a unified initial page load experience.
+    setState(() => isLoading = true);
     try {
+      // Step 1: Fetch the list of available states for the filter.
       final snapshot = await _firestore.collection('Location').get();
       final states = snapshot.docs.map((doc) => doc.id).toList()..sort();
-      if (mounted) setState(() => _availableStates.addAll(states));
+
+      if (!mounted) return;
+
+      // Step 2: Update the state with the fetched filter options.
+      setState(() {
+        _availableStates.addAll(states);
+        _isFilterLoading = false; // The filter bar UI is now ready.
+      });
+
+      // Step 3: Automatically call _loadReports to fetch data with the default settings.
+      // This method will manage its own state and set `isLoading` to false upon completion.
+      await _loadReports();
+
     } catch (e, s) {
-      debugPrint("Error loading states: $e\n$s");
-      if (mounted) setState(() => _errorMessage = "Error loading states: $e");
-    } finally {
-      if (mounted) setState(() => _isFilterLoading = false);
+      debugPrint("Error during initial page load: $e\n$s");
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error during initial page load: $e";
+          isLoading = false; // Ensure loading is turned off on error.
+          _isFilterLoading = false;
+        });
+      }
     }
+    // The `finally` block is no longer needed here because the `_loadReports`
+    // method will handle turning off the `isLoading` state.
   }
 
   Future<void> _onStatesChanged(List<String> newStates) async {

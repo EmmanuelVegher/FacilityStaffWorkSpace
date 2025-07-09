@@ -171,23 +171,47 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
   }
 
   Future<void> _initializeFilters() async {
-    setState(() => _isFilterLoading = true);
-    await _loadCurrentUserBio();
+    // Set the main loading flags for the entire initial page load sequence.
+    setState(() {
+      isLoading = true;
+      _isFilterLoading = true;
+    });
 
-    if (userState != null) {
-      final facilities = await _getFacilitiesForState(userState!);
-      if (mounted) {
+    try {
+      // Load the current user's profile to get their state.
+      await _loadCurrentUserBio();
+
+      if (mounted && userState != null) {
+        // If the state was found, load the facilities for that state.
+        final facilities = await _getFacilitiesForState(userState!);
+        if (mounted) {
+          setState(() {
+            _availableFacilities = ['All Facilities', ...facilities];
+            _selectedFacilities = ['All Facilities']; // Default selection
+            _isFilterLoading = false; // The filter bar UI is now ready.
+          });
+
+          // Now, automatically load the reports with default filters.
+          // _loadReports() will handle setting isLoading to false upon completion.
+          await _loadReports();
+        }
+      } else if (mounted) {
+        // If the user's state couldn't be loaded, stop the loading process.
+        // The error message would have been set in _loadCurrentUserBio.
         setState(() {
-          _availableFacilities = ['All Facilities', ...facilities];
-          _selectedFacilities = ['All Facilities'];
+          isLoading = false;
           _isFilterLoading = false;
+          _errorMessage ??= "Could not determine your state from your profile. Cannot load facilities.";
         });
       }
-    } else {
+    } catch (e) {
+      // Catch any other unexpected errors from the initialization process.
+      debugPrint("Error during page initialization: $e");
       if (mounted) {
         setState(() {
+          _errorMessage = "An error occurred during page initialization: $e";
+          isLoading = false;
           _isFilterLoading = false;
-          _errorMessage = "Could not determine your state from your profile. Cannot load facilities.";
         });
       }
     }

@@ -129,7 +129,8 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    startDate = DateTime(now.year, now.month, 1);
+    // Set the start date to 6 days ago (for a total of 7 days including today)
+    startDate = DateTime(now.year, now.month, now.day - 6);
     endDate = DateTime(now.year, now.month, now.day);
     _initializeFilters();
   }
@@ -141,22 +142,54 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
     super.dispose();
   }
 
-  void _initializeFilters() {
+  void _initializeFilters1() {
     setState(() => _isFilterLoading = true);
     _loadAvailableStates();
     _generateQuarterList();
     if (mounted) setState(() => _isFilterLoading = false);
   }
 
-  Future<void> _loadAvailableStates() async {
+  Future<void> _initializeFilters() async {
+    // Use the main isLoading flag for the entire initial load sequence.
+    setState(() {
+      isLoading = true;
+      _isFilterLoading = true;
+    });
+
+    // Generate quarters synchronously (this sets the default _selectedQuarter)
+    _generateQuarterList();
+
     try {
-      final snapshot = await _firestore.collection('Location').get();
-      final states = snapshot.docs.map((doc) => doc.id).toList()..sort();
-      if (mounted) setState(() => _availableStates.addAll(states));
-    } catch (e, s) {
-      debugPrint("Error loading states: $e\n$s");
-      if (mounted) setState(() => _errorMessage = "Error loading states: $e");
+      // Wait for states to load asynchronously
+      await _loadAvailableStates();
+
+      if (!mounted) return;
+
+      // Filters are ready, update the filter bar UI state
+      setState(() => _isFilterLoading = false);
+
+      // Automatically load reports with default settings (Last 7 days, current quarter, All States)
+      // _loadReports() will handle setting isLoading = false when finished.
+      await _loadReports();
+
+    } catch (e) {
+      // Catch errors from _loadAvailableStates or _loadReports
+      debugPrint("Error during initial page load: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error during initial page load: $e";
+          isLoading = false;
+          _isFilterLoading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _loadAvailableStates() async {
+    // Errors thrown here will now be caught in _initializeFilters
+    final snapshot = await _firestore.collection('Location').get();
+    final states = snapshot.docs.map((doc) => doc.id).toList()..sort();
+    if (mounted) setState(() => _availableStates.addAll(states));
   }
 
   String _getQuarterString(DateTime date) {
