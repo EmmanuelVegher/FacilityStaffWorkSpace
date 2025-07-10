@@ -4,14 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widgets/drawer2.dart';
 
-class ForgotPasswordPage2 extends StatefulWidget {
-  const ForgotPasswordPage2({super.key});
+class ForgotPasswordPage3 extends StatefulWidget {
+  const ForgotPasswordPage3({super.key});
 
   @override
-  _ForgotPasswordPage2State createState() => _ForgotPasswordPage2State();
+  _ForgotPasswordPage3State createState() => _ForgotPasswordPage3State();
 }
 
-class _ForgotPasswordPage2State extends State<ForgotPasswordPage2> with SingleTickerProviderStateMixin {
+class _ForgotPasswordPage3State extends State<ForgotPasswordPage3> with SingleTickerProviderStateMixin {
   final _auth = FirebaseAuth.instance;
   final _emailController = TextEditingController();
   bool _isLoading = false;
@@ -73,7 +73,7 @@ class _ForgotPasswordPage2State extends State<ForgotPasswordPage2> with SingleTi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer2(context,),
+      drawer: drawer3(context,),
       appBar: AppBar(
         title: const Text('Forgot Password', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white

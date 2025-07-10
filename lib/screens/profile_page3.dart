@@ -24,16 +24,16 @@ import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:firebase_auth/firebase_auth.dart';
 
 
-class ProfilePage2 extends StatefulWidget {
-  const ProfilePage2({super.key});
+class ProfilePage3 extends StatefulWidget {
+  const ProfilePage3({super.key});
 
   @override
   State<StatefulWidget> createState() {
-    return _ProfilePage2State();
+    return _ProfilePage3State();
   }
 }
 
-class _ProfilePage2State extends State<ProfilePage2> {
+class _ProfilePage3State extends State<ProfilePage3> {
 
   final double _drawerIconSize = 24;
   final double _drawerFontSize = 17;

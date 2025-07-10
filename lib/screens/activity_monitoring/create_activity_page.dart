@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/button.dart';
 import '../../widgets/drawer2.dart';
+import '../../widgets/drawer3.dart';
 
 class CreateActivityPage extends StatefulWidget {
   const CreateActivityPage({super.key, this.thematicReportToEdit, this.otherReportToEdit});
@@ -257,7 +258,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer2(context),
+      drawer: drawer3(context),
       appBar: AppBar(
         title: Text(_isEditThematicMode || _isEditOtherMode ? 'Edit Activity' : 'Create Activity'),
       ),

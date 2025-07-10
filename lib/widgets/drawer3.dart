@@ -5,6 +5,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
+import '../forgot_password3.dart';
 import '../screens/account_management/account_management_hub_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
@@ -20,6 +21,7 @@ import '../screens/leave_request/hq_leave_request_management_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
+import '../screens/profile_page3.dart';
 import '../screens/psychological_survey_analysis_page/hq_survey_analysis_page.dart';
 import '../screens/timesheet/hq_timesheet_review_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
@@ -344,6 +346,7 @@ Widget drawer3(
 
 
 
+
           const Divider(
             color: Colors.grey,
             height: 1,
@@ -436,7 +439,7 @@ Widget drawer3(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ForgotPasswordPage2()),
+                MaterialPageRoute(builder: (context) => const ForgotPasswordPage3()),
               );
             },
           ),
@@ -485,7 +488,7 @@ Widget drawer3(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfilePage2()),
+                MaterialPageRoute(builder: (context) => const ProfilePage3()),
               );
             },
           ),
