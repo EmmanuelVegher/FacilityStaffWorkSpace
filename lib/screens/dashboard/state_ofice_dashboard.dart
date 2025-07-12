@@ -95,6 +95,7 @@ class DashboardScreen extends StatefulWidget {
 class DashboardScreenState extends State<DashboardScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final StreamController<String> _timeStreamController = StreamController.broadcast();
 
   String? _currentUserState;
   Stream<DashboardData>? _dashboardStream;
@@ -114,9 +115,12 @@ class DashboardScreenState extends State<DashboardScreen> {
     _selectedTimesheetYear = now.year;
     _dateRangeController.add(DateTimeRange(start: DateTime(now.year, now.month, now.day), end: DateTime(now.year, now.month, now.day)));
     _initializeStreams();
-    _liveTime = DateFormat('hh:mm:ss a').format(DateTime.now());
+
+    // MODIFIED: This timer now sends data to the stream instead of calling setState.
     _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
-      if(mounted) setState(() => _liveTime = DateFormat('hh:mm:ss a').format(DateTime.now()));
+      if (mounted && !_timeStreamController.isClosed) {
+        _timeStreamController.add(DateFormat('hh:mm:ss a').format(DateTime.now()));
+      }
     });
   }
 
@@ -125,6 +129,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     _filterController.close();
     _dateRangeController.close();
     _timesheetStreamController.close();
+    _timeStreamController.close();
     _timer.cancel();
     super.dispose();
   }
@@ -280,7 +285,19 @@ class DashboardScreenState extends State<DashboardScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
-            child: Center(child: Text(_liveTime, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white))),
+            // MODIFIED: Wrap the clock Text in a StreamBuilder to prevent global rebuilds.
+            child: Center(
+              child: StreamBuilder<String>(
+                stream: _timeStreamController.stream,
+                initialData: DateFormat('hh:mm:ss a').format(DateTime.now()), // Show initial time
+                builder: (context, snapshot) {
+                  return Text(
+                    snapshot.data ?? '',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  );
+                },
+              ),
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -339,7 +356,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
         children: [
-          _buildSummaryGrid(data, isLargeScreen: screenWidth > 600),
+          _buildSummaryGrid(data,),
           const SizedBox(height: 20),
           GridView.count(
             crossAxisCount: crossAxisCount,
@@ -388,17 +405,68 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSummaryGrid(DashboardData data, {bool isLargeScreen = false}) {
+  Widget _buildSummaryGrid1(DashboardData data, {bool isLargeScreen = false}) {
     return GridView.count(
       crossAxisCount: 1, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: isLargeScreen ? 3.0 : 1.8,
+      childAspectRatio: isLargeScreen ? 2.0 : 0.8,
       children: [
         _buildCard(title: 'Today\'s Attendance Overview', child: _buildAttendanceChart(data, isLargeScreen: isLargeScreen)),
       ],
     );
   }
 
+  Widget _buildSummaryGrid(DashboardData data) {
+    // 1. Get the current screen width to make responsive decisions.
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // 2. Define breakpoints and corresponding aspect ratios for different screen sizes.
+    //    An aspect ratio > 1.0 means the widget is wider than it is tall.
+    //    An aspect ratio < 1.0 means the widget is taller than it is wide.
+    double childAspectRatio;
+
+    if (screenWidth < 600) {
+      // Mobile: The card needs to be much taller to accommodate the vertical column layout.
+      childAspectRatio = 0.9;
+    } else if (screenWidth < 900) {
+      // Tablet (Portrait): Give it more space than mobile, but still tall.
+      childAspectRatio = 1.3;
+    } else if (screenWidth < 1200) {
+      // Tablet (Landscape) / Small Laptop: Can start being wider.
+      childAspectRatio = 1.9;
+    } else if (screenWidth < 1600) {
+      // Standard Desktop: The card can be quite wide.
+      childAspectRatio = 2.3;
+    } else {
+      // Large Desktop Screens: Make it even wider.
+      childAspectRatio = 2.7;
+    }
+
+    // 3. Return the GridView using the dynamically calculated aspect ratio.
+    return GridView.count(
+      crossAxisCount: 1,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      // Use the calculated aspect ratio here.
+      childAspectRatio: childAspectRatio,
+      children: [
+        _buildCard(
+          title: 'Today\'s Attendance Overview',
+          // The 'isLargeScreen' parameter is no longer passed, as the child
+          // widget now handles its own internal responsive layout.
+          child: _buildAttendanceChart(data),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAttendanceChart(DashboardData data, {bool isLargeScreen = false}) {
+    // --- START: RESPONSIVENESS FIX ---
+    // Get the screen width to determine the layout
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Define a breakpoint for mobile layout. You can adjust this value.
+    final bool isMobile = screenWidth < 750;
+    // --- END: RESPONSIVENESS FIX ---
+
     final today = DateTime.now();
     final todaysRecords = data.attendanceRecords.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(today)).toList();
     AttendanceRecord? championRecord;
@@ -419,6 +487,51 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     final chartData = [ ChartData('On Time', onTimeCount, Colors.green.shade400), ChartData('Absent', absentCount, Colors.orange.shade400), ChartData('Late', lateCount, Colors.red.shade400)];
 
+    // Main content widgets that will be arranged responsively
+    final genderBreakdownWidget = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('Gender Breakdown', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const SizedBox(height: 12),
+        Text('Male: $malePresent / ${data.staffList.where((s) => s.gender == 'Male').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text('Female: $femalePresent / ${data.staffList.where((s) => s.gender == 'Female').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    );
+
+    final doughnutChartWidget = SfCircularChart(
+      tooltipBehavior: TooltipBehavior(enable: true, format: 'point.x: point.y'),
+      series: <CircularSeries<ChartData, String>>[
+        DoughnutSeries<ChartData, String>(
+          dataSource: chartData.where((d) => d.value > 0).toList(),
+          xValueMapper: (data, _) => data.category,
+          yValueMapper: (data, _) => data.value,
+          pointColorMapper: (data, _) => data.color,
+          // --- START: LABEL VISIBILITY FIX ---
+          dataLabelSettings: const DataLabelSettings(
+            isVisible: true,
+            labelPosition: ChartDataLabelPosition.outside,
+            // This forces the labels to always be drawn, preventing them from disappearing.
+            labelIntersectAction: LabelIntersectAction.none,
+          ),
+          // --- END: LABEL VISIBILITY FIX ---
+          innerRadius: '70%',
+        )
+      ],
+      annotations: <CircularChartAnnotation>[
+        CircularChartAnnotation(
+          widget: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text("${presentIds.length}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Text("Clocked In /\n${data.staffList.length} Staff", textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ],
+    );
+
     return Column(
       children: [
         Align(
@@ -430,51 +543,26 @@ class DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         Expanded(
-          child: Row(
+          // --- START: RESPONSIVENESS FIX ---
+          // Use a different layout for mobile vs. desktop
+          child: isMobile
+              ? Column( // On mobile, stack everything vertically
             children: [
-              if (isLargeScreen) Expanded(flex: 4, child: _buildPunctualityChampion(championInfo, championRecord)),
-              Expanded(
-                flex: isLargeScreen ? 4 : 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Gender Breakdown', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
-                    const SizedBox(height: 20),
-                    Text('Male: $malePresent / ${data.staffList.where((s) => s.gender == 'Male').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text('Female: $femalePresent / ${data.staffList.where((s) => s.gender == 'Female').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              Expanded(
-                flex: isLargeScreen ? 3 : 2,
-                child: SfCircularChart(
-                  tooltipBehavior: TooltipBehavior(enable: true, format: 'point.x: point.y'),
-                  series: <CircularSeries<ChartData, String>>[
-                    DoughnutSeries<ChartData, String>(
-                      dataSource: chartData.where((d) => d.value > 0).toList(),
-                      xValueMapper: (data, _) => data.category,
-                      yValueMapper: (data, _) => data.value,
-                      pointColorMapper: (data, _) => data.color,
-                      dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside),
-                      innerRadius: '70%',
-                    )
-                  ],
-                  annotations: <CircularChartAnnotation>[
-                    CircularChartAnnotation(
-                      widget: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("${presentIds.length}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text("Clocked In /\n${data.staffList.length} Staff", textAlign: TextAlign.center),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: doughnutChartWidget),
+              const SizedBox(height: 24),
+              genderBreakdownWidget,
+              const SizedBox(height: 24),
+              _buildPunctualityChampion(championInfo, championRecord),
+            ],
+          )
+              : Row( // On desktop, use the horizontal layout
+            children: [
+              Expanded(flex: 4, child: _buildPunctualityChampion(championInfo, championRecord)),
+              Expanded(flex: 4, child: genderBreakdownWidget),
+              Expanded(flex: 3, child: doughnutChartWidget),
             ],
           ),
+          // --- END: RESPONSIVENESS FIX ---
         ),
       ],
     );
