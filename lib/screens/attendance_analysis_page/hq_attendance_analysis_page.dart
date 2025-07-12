@@ -233,10 +233,12 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     return allDocs;
   }
 
-  // Step 1: Load the list of all available states.
+
+// Step 1: Update the initialization method
   Future<void> _initializeStateFilter() async {
+    // This now only turns the loader ON. It will be turned OFF by the last function in the chain.
+    setState(() => _isLoading = true);
     try {
-      // Fetch all documents from 'Facilities' to extract the unique state names.
       final facilitiesSnapshot = await _firestore.collection('Facilities').get();
       final Set<String> states = {};
       for (final doc in facilitiesSnapshot.docs) {
@@ -245,14 +247,57 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
           states.add(state);
         }
       }
+
+      final sortedStates = states.toList()..sort();
+
       if (mounted) {
         setState(() {
-          _availableStates = states.toList()..sort();
+          _availableStates = sortedStates;
+          _selectedStates = List.from(sortedStates);
         });
+
+        await _updateFacilityAndDesignationFilters();
+        if (!mounted) return;
+
+        setState(() {
+          _selectedFacilities = List.from(_availableFacilities);
+          _selectedDesignations = List.from(_availableDesignations);
+        });
+
+        await _updateStaffFilter();
+        if (!mounted) return;
+
+        // The final call will be responsible for turning off the loader.
+        await _loadDashboardData();
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = "Error initializing state filter: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error initializing filters and loading data: $e";
+          _isLoading = false; // Turn off loader on error
+        });
+      }
     }
+    // REMOVED the finally block here to prevent premature deactivation of the loader.
+  }
+
+  Widget _buildLoadingOverlay() {
+    return Container(
+      color: Colors.black.withOpacity(0.6),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              "Please wait...",
+              style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Step 2: When states are selected, update the dependent filters.
@@ -341,32 +386,43 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   }
 
   // Step 4: When facilities or designations change, update the staff filter.
+  // **REWRITTEN to fix "more than one 'whereIn'" Firestore error.**
   Future<void> _updateStaffFilter() async {
     if (_selectedStates.isEmpty) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // **FIXED**: Explicitly type baseQuery as Query<> to allow reassignment.
-      Query<Map<String, dynamic>> baseQuery = _firestore.collection('Staff');
+      // Step A: Query by state first, as it's the top-level filter.
+      // This uses our one and only allowed 'whereIn' clause for this query.
+      final staffDocs = await _fetchWithChunkedIn(
+        _firestore.collection('Staff'),
+        'state',
+        _selectedStates,
+      );
 
-      // Apply designation filter at the query level if possible (efficient)
-      if (_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30) {
-        baseQuery = baseQuery.where('designation', whereIn: _selectedDesignations);
-      }
-
-      final staffDocs = await _fetchWithChunkedIn(baseQuery, 'state', _selectedStates);
-
+      // Step B: Map the raw documents to our StaffInfo model.
       var staffList = staffDocs.map((doc) => StaffInfo(
           id: doc.id,
           name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
-          location: doc.data()['location'] ?? '',
-          designation: doc.data()['designation'] ?? ''
+          location: doc.data()['location'] ?? 'N/A',
+          designation: doc.data()['designation'] ?? 'N/A'
       )).toList();
 
-      // Apply facility filter client-side
+      // Step C: Apply the other filters (designation, facility) client-side.
+      // This is less efficient than a server-side filter but is necessary
+      // to work around Firestore's limitations.
+
+      // Client-side filter for designations.
+      if (_selectedDesignations.isNotEmpty) {
+        final designationSet = _selectedDesignations.toSet();
+        staffList.retainWhere((staff) => designationSet.contains(staff.designation));
+      }
+
+      // Client-side filter for facilities.
       if (_selectedFacilities.isNotEmpty) {
-        staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
+        final facilitySet = _selectedFacilities.toSet();
+        staffList.retainWhere((staff) => facilitySet.contains(staff.location));
       }
 
       staffList.sort((a, b) => a.name.compareTo(b.name));
@@ -374,12 +430,13 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       if(mounted){
         setState(() {
           _availableStaff = staffList;
-          // Ensure selected staff are still valid after filtering
+          // Ensure any previously selected staff are still valid after filtering.
           final availableStaffIds = _availableStaff.map((s) => s.id).toSet();
           _selectedStaffIds.retainWhere((id) => availableStaffIds.contains(id));
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint("Error updating staff filter: $e\n$stack");
       if(mounted) setState(() => _errorMessage = "Error updating staff filter: $e");
     } finally {
       if(mounted) setState(() => _isLoading = false);
@@ -389,97 +446,83 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
   // --- DATA LOADING & PROCESSING ---
 
+  // Step 2: Update the main data loading function
   Future<void> _loadDashboardData() async {
     if (_selectedStates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state to load data.")));
       return;
     }
+    // This just ensures the loader is ON if called by the button.
     setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      // Build the primary query for staff based on all filters
       List<StaffInfo> staffToQuery;
 
       if (_selectedStaffIds.isNotEmpty) {
-        // If specific staff are selected, they are our target list
         staffToQuery = _availableStaff.where((s) => _selectedStaffIds.contains(s.id)).toList();
       } else {
-        // Otherwise, use all available staff based on the current State/Facility/Designation filters
-        await _updateStaffFilter(); // Refresh the available staff list just in case
+        await _updateStaffFilter();
         staffToQuery = List<StaffInfo>.from(_availableStaff);
       }
 
       if (staffToQuery.isEmpty) {
+        // If there's no staff, process empty data, which will turn off the loader.
         _processAndAggregateData([], []);
-        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
       final filteredStaffIds = staffToQuery.map((s) => s.id).toSet();
       final staffInfoMap = {for (var s in staffToQuery) s.id: s};
 
-      // The collectionGroup query is efficient as it scans all records across the app.
-      // We will filter them client-side based on the staff we identified.
       final recordsSnapshot = await _firestore.collectionGroup('Record')
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
           .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
           .get();
 
       List<AttendanceRecord> allRecords = [];
-
       for (final recordDoc in recordsSnapshot.docs) {
         final staffId = recordDoc.reference.parent.parent!.id;
-
         if (filteredStaffIds.contains(staffId)) {
           final staffInfo = staffInfoMap[staffId]!;
           final data = recordDoc.data();
-          final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
-
-          GeoPoint? clockInPoint;
-          if (data['clockInLatitude'] != null && data['clockInLongitude'] != null) {
-            clockInPoint = GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble());
-          }
-
-          GeoPoint? clockOutPoint;
-          if (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) {
-            clockOutPoint = GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble());
-          }
-
           allRecords.add(
               AttendanceRecord(
+                // ... (rest of the record creation is the same)
                   staffId: staffId,
                   staffName: staffInfo.name,
                   assignedFacility: staffInfo.location,
-                  date: recordTimestamp,
+                  date: (data['timestamp'] as Timestamp).toDate(),
                   hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
-                  clockInLocation: clockInPoint,
-                  clockOutLocation: clockOutPoint
+                  clockInLocation: (data['clockInLatitude'] != null && data['clockInLongitude'] != null) ? GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble()) : null,
+                  clockOutLocation: (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) ? GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble()) : null
               )
           );
         }
       }
 
       final dateRange = List.generate(_endDate.difference(_startDate).inDays + 1, (i) => _startDate.add(Duration(days: i)));
+      // This function will now turn off the loader.
       _processAndAggregateData(allRecords, dateRange);
 
     } catch (e, stack) {
       debugPrint("Error loading dashboard data: $e\n$stack");
       if (mounted) {
-        setState(() => _errorMessage = "An error occurred while loading data. Please check Firestore indexes. Error: $e");
+        setState(() {
+          _errorMessage = "An error occurred while loading data. Please check Firestore indexes. Error: $e";
+          _isLoading = false; // Turn off loader on error
+        });
       }
-    } finally {
-      if(mounted) setState(() => _isLoading = false);
     }
+    // REMOVED the finally block here.
   }
 
+
   void _processAndAggregateData(List<AttendanceRecord> records, List<DateTime> dateRange) {
-    // This method now dynamically determines staff info from the records themselves,
-    // as the full staff list might be very large.
     final facilityData = <String, AggregatedSummary>{};
     final designationData = <String, AggregatedSummary>{};
     final facilityStaffData = <String, Map<String, AggregatedSummary>>{};
 
-    // Create a map of staff details from the records for processing
+    // ... (rest of the processing logic is the same)
     final staffDetailsFromRecords = <String, StaffInfo>{};
     for(final record in records) {
       if (!staffDetailsFromRecords.containsKey(record.staffId)) {
@@ -505,10 +548,12 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] = (facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] ?? 0) + record.hoursWorked;
     }
 
+
     _generateMapMarkers(records);
     _findOutliers(records);
 
     if(mounted){
+      // This setState call now updates the data AND turns off the loading indicator simultaneously.
       setState(() {
         _allRecords = records;
         _facilitySummaries = facilityData;
@@ -516,6 +561,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
         _facilityStaffSummaries = facilityStaffData;
         _dateRangeForTables = dateRange;
         _totalHoursAll = records.fold(0.0, (sum, r) => sum + r.hoursWorked);
+        _isLoading = false; // <<< THIS IS THE KEY CHANGE
       });
     }
   }
@@ -557,11 +603,8 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             child: Stack(
               children: [
                 _buildDashboardBody(),
-                if (_isLoading)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  ),
+                // MODIFIED: Use the new, more descriptive loading overlay
+                if (_isLoading) _buildLoadingOverlay(),
                 if (_errorMessage != null)
                   Container(
                     color: Colors.black.withOpacity(0.5),
@@ -814,10 +857,12 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
                 ),
               ),
             ),
-          _buildLocationMapCard(),
+
           if (hasLoadedData) ...[
             const SizedBox(height: 24),
             _buildKpiSection(),
+            const SizedBox(height: 24),
+            _buildLocationMapCard(),
             const SizedBox(height: 24),
             _buildOutlierAnalysisSection(),
             const SizedBox(height: 24),

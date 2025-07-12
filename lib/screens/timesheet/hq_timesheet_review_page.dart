@@ -166,22 +166,37 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   }
 
   Future<void> _initializeFilters() async {
-    setState(() => _isFilterLoading = true);
+    // Use the main loading indicator for the entire startup process.
+    setState(() => _isLoading = true);
     try {
       final snapshot = await _firestore.collection('Location').get();
       final states = snapshot.docs.map((doc) => doc.id).where((id) => id.isNotEmpty).toList();
+
       if (mounted) {
+        // 1. Set the available states and the default selection.
         setState(() {
           _availableStates = ['All States', ...states..sort()];
           _selectedStates = ['All States'];
-          _isFilterLoading = false;
         });
+
+        // 2. Await the population of the dependent facility filter.
         await _onStateSelectionChange(_selectedStates);
+
+        if (!mounted) return;
+
+        // 3. With filters now initialized with defaults, load the timesheet data.
+        await _loadTimesheets();
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = "Error initializing filters: $e");
+      if (mounted) setState(() => _errorMessage = "Error initializing page: $e");
     } finally {
-      if (mounted) setState(() => _isFilterLoading = false);
+      // 4. Turn off the main loading indicator when all startup tasks are complete.
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isFilterLoading = false; // Also ensure the filter-specific loader is off.
+        });
+      }
     }
   }
 

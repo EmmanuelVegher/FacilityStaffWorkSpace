@@ -115,6 +115,7 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   }
 
   // MODIFIED: Fetches the user's state and then populates filters for that state.
+  // MODIFIED: Fetches the user's state, populates filters, and now also triggers the initial data load.
   Future<void> _initializeUserStateAndFilters() async {
     setState(() => _isFilterLoading = true);
     try {
@@ -130,6 +131,12 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
 
       _userState = userState;
       await _loadFacilitiesForState(userState);
+
+      // --- ADDED THIS LINE ---
+      // After successfully initializing the state and filters,
+      // automatically load the leave requests for the default date range.
+      await _loadLeaveRequests();
+      // -----------------------
 
     } catch (e) {
       if (mounted) setState(() => _errorMessage = "Error initializing page: $e");

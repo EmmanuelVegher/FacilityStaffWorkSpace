@@ -130,8 +130,13 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
         if (mounted) {
           setState(() {
             _availableFacilities = facilities;
+            // By default, select all available facilities
             _selectedFacilities = List.from(facilities);
           });
+
+          // --- ADDED THIS LINE ---
+          // After successfully setting the default filters, automatically load the data.
+          await _loadSurveyData();
         }
       }
     } catch (e) {

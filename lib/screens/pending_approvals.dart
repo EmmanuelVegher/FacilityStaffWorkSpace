@@ -194,20 +194,60 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     setState(() => isLoading = true);
     try {
       User? user = FirebaseAuth.instance.currentUser;
-      if (user == null || bioData == null) {
+      // Ensure user and bioData (with email) are available before proceeding.
+      if (user == null || bioData == null || bioData!.emailAddress == null) {
         if (mounted) setState(() => isLoading = false);
         return;
       }
-      final userEmail = bioData!.emailAddress;
 
-      final leavesSnapshot = await FirebaseFirestore.instance.collectionGroup('Leave Request').where('selectedSupervisorEmail', isEqualTo: userEmail).where('status', isEqualTo: 'Pending').get();
-      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance.collectionGroup('TimeSheets').where('caritasSupervisorEmail', isEqualTo: userEmail).where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending').where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved').get();
-      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance.collectionGroup('TimeSheets').where('facilitySupervisorEmail', isEqualTo: userEmail).where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending').get();
+      // Convert the current user's email to lowercase for a case-insensitive comparison.
+      final userEmailLower = bioData!.emailAddress!.toLowerCase();
 
-      // ** NEW: Fetch pending reviews using collectionGroup **
+      // --- MODIFIED QUERIES ---
+
+      // 1. Fetch pending leaves and then filter by email in the app.
+      // NOTE: This is less efficient as it might read more documents than necessary.
+      // For optimal performance, consider storing a lowercase version of the email in Firestore.
+      final leavesSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('Leave Request')
+          .where('status', isEqualTo: 'Pending')
+          .get();
+
+      final filteredLeavesDocs = leavesSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['selectedSupervisorEmail'] as String?;
+        // Compare emails in lowercase.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+      // 2. Fetch pending timesheets for CARITAS Supervisors and filter by email.
+      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('TimeSheets')
+          .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
+          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
+          .get();
+
+      final filteredCaritasTimesheetsDocs = caritasSupervisorTimesheetsSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['caritasSupervisorEmail'] as String?;
+        // Compare emails in lowercase.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+      // 3. Fetch pending timesheets for Facility Supervisors and filter by email.
+      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('TimeSheets')
+          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending')
+          .get();
+
+      final filteredFacilityTimesheetsDocs = facilitySupervisorTimesheetsSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['facilitySupervisorEmail'] as String?;
+        // Compare emails in lowercase.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+
+      // Fetch pending reviews (This query logic remains the same as it uses ID, not email)
       List<Report> reviews = [];
       if (selectedFirebaseId != null) {
-        // This query assumes a 'reviewerIds' array on the Report document.
         final reviewsSnapshot = await FirebaseFirestore.instance
             .collectionGroup('Reports')
             .where('reviewerIds', arrayContains: selectedFirebaseId)
@@ -218,14 +258,18 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
 
       if (mounted) {
         setState(() {
-          pendingLeaves = leavesSnapshot.docs.map((doc) => doc.data()).toList();
-          pendingTimesheetsFacilitySupervisor = facilitySupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-          pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-          pendingReviews = reviews; // Update state with fetched reviews
+          // Use the new, filtered lists of documents.
+          pendingLeaves = filteredLeavesDocs.map((doc) => doc.data()).toList();
+          pendingTimesheetsFacilitySupervisor = filteredFacilityTimesheetsDocs.map((doc) => doc.data()).toList();
+          pendingTimesheetsCaritasSupervisor = filteredCaritasTimesheetsDocs.map((doc) => doc.data()).toList();
+          pendingReviews = reviews;
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching approvals: $e'), backgroundColor: Colors.red));
+      if(mounted) {
+        print('Error fetching approvals: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching approvals: $e'), backgroundColor: Colors.red));
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

@@ -95,6 +95,7 @@ class _StateSurveyAnalysisPageState extends State<StateSurveyAnalysisPage> {
   }
 
   Future<void> _initializeFilters() async {
+    // 1. Indicate that the filter UI is being prepared.
     setState(() => _isFilterLoading = true);
     try {
       final facilitiesSnapshot = await _firestore.collection('Facilities').get();
@@ -106,12 +107,24 @@ class _StateSurveyAnalysisPageState extends State<StateSurveyAnalysisPage> {
           .toSet()
           .toList()..sort();
 
+      // 2. The filter UI is now ready with available states.
+      // The default selection is already set to ['All States'].
       setState(() {
         _availableStates = ['All States', ...states];
-        _isFilterLoading = false;
+        _isFilterLoading = false; // The filter bar can now be built.
       });
+
+      // 3. With filters initialized, automatically trigger the data load.
+      // _loadSurveyData will handle its own main loading indicator (_isLoading).
+      await _loadSurveyData();
+
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = "Error initializing filters: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error initializing page: $e";
+          _isFilterLoading = false; // Ensure filter loader is off on error.
+        });
+      }
     }
   }
 

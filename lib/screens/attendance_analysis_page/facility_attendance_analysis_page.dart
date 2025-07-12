@@ -156,8 +156,9 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
     super.dispose();
   }
 
-  /// Fetches the user's assigned facility and initializes filters.
+  /// Fetches the user's assigned facility, initializes filters, and then loads the dashboard data.
   Future<void> _initializePage() async {
+    // Start the loading indicator for the entire initialization process.
     setState(() => _isLoading = true);
     try {
       final user = _firebaseAuth.currentUser;
@@ -173,10 +174,19 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
         throw Exception("Your assigned facility name is invalid.");
       }
 
+      // 1. Await the initialization of filters for the user's facility.
       await _initializeFilters();
+
+      // 2. If filter initialization was successful, automatically load the dashboard data.
+      // By default, it will load for all staff/designations in the facility.
+      if (_errorMessage == null) {
+        await _loadDashboardData();
+      }
+
     } catch (e) {
       if (mounted) setState(() => _errorMessage = "Initialization Failed: $e");
     } finally {
+      // 3. Stop the loading indicator after all startup tasks are complete.
       if (mounted) setState(() => _isLoading = false);
     }
   }

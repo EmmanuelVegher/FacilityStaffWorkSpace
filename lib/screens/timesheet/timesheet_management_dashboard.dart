@@ -181,17 +181,29 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
       final userState = staffDoc.data()?['state'] as String?;
       if (userState == null || userState.isEmpty) throw Exception("State not found in profile.");
+
       _userState = userState;
       final facilityNames = await _getFacilitiesForState(userState);
+
       if (mounted) {
+        // Update state with available facilities for the filter dropdown
         setState(() {
           _availableFacilities = facilityNames;
-          _isFilterLoading = false;
+          // Pre-select "All Facilities" by default so the initial load can proceed.
+          // This ensures the guard clause in _loadTimesheets() passes.
+          if (_availableFacilities.isNotEmpty) {
+            _selectedFacilities = List.from(_availableFacilities)..add('All Facilities');
+          }
         });
+
+        // --- ADDED THIS CALL ---
+        // With the default filters now set, trigger the initial data load.
+        await _loadTimesheets();
       }
     } catch (e) {
       if(mounted) setState(() => _errorMessage = "Failed to load filters: $e");
     } finally {
+      // The filter loading indicator will now turn off after the initial data is also loaded.
       if(mounted) setState(() => _isFilterLoading = false);
     }
   }

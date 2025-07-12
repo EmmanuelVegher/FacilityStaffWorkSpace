@@ -226,7 +226,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         setState(() {
           _userState = staffDoc.data()?['state'] as String?;
         });
+
         if(_userState != null) {
+          // Fetch available facilities and their details
           final facilitiesSnapshot = await _firestore
               .collection('Facilities')
               .where('state', isEqualTo: _userState)
@@ -260,13 +262,27 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           }
           facilities.sort();
 
+          // Fetch available designations
           final designations = await _getUniqueFieldValues('designation');
+
           if(mounted) {
+            // Set the available options and default selections
             setState(() {
               _availableFacilities = facilities;
               _facilityDetails = facilityDetailsMap;
               _availableDesignations = designations;
+
+              // By default, select all facilities and designations for the initial load
+              _selectedFacilities = List.from(_availableFacilities);
+              _selectedDesignations = List.from(_availableDesignations);
             });
+
+            // --- ADDED THIS LOGIC ---
+            // After setting default filters, update the staff list based on them.
+            await _updateStaffFilter();
+            // Now, automatically load the dashboard data with these default selections.
+            await _loadDashboardData();
+            // ------------------------
           }
         }
       }
@@ -274,6 +290,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       if(mounted) setState(() => _errorMessage = "Error initializing filters: $e");
     }
   }
+
 
   Future<List<String>> _getUniqueFieldValues(String field) async {
     if(_userState == null) return [];
@@ -711,10 +728,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 ),
               ),
             ),
-          _buildLocationMapCard(),
+
           if (hasLoadedData) ...[
             const SizedBox(height: 24),
             _buildKpiSection(),
+            const SizedBox(height: 24),
+            _buildLocationMapCard(),
             const SizedBox(height: 24),
             _buildOutlierAnalysisSection(),
             const SizedBox(height: 24),
