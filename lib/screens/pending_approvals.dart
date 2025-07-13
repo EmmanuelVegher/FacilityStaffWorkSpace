@@ -138,7 +138,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     });
   }
 
-  Future<void> _loadBioDataFromFirebase() async {
+  Future<void> _loadBioDataFromFirebase1() async {
     setState(() {
       isLoading = true; // Start loading
     });
@@ -190,7 +190,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   }
 
 
-  Future<void> _fetchPendingApprovals() async {
+  Future<void> _fetchPendingApprovals1() async {
     setState(() => isLoading = true);
     try {
       User? user = FirebaseAuth.instance.currentUser;
@@ -259,6 +259,140 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       if (mounted) {
         setState(() {
           // Use the new, filtered lists of documents.
+          pendingLeaves = filteredLeavesDocs.map((doc) => doc.data()).toList();
+          pendingTimesheetsFacilitySupervisor = filteredFacilityTimesheetsDocs.map((doc) => doc.data()).toList();
+          pendingTimesheetsCaritasSupervisor = filteredCaritasTimesheetsDocs.map((doc) => doc.data()).toList();
+          pendingReviews = reviews;
+        });
+      }
+    } catch (e) {
+      if(mounted) {
+        print('Error fetching approvals: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching approvals: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _loadBioDataFromFirebase() async {
+    setState(() {
+      isLoading = true; // Start loading
+    });
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Query by the unique Firebase Auth ID (UID) instead of email.
+        // This is the most reliable way to link an authenticated user to their profile
+        // and avoids any case-sensitivity issues with email addresses.
+        QuerySnapshot staffQuery = await FirebaseFirestore.instance
+            .collection('Staff')
+            .where('id', isEqualTo: user.uid) // Use the user's UID for the query
+            .get();
+
+        if (staffQuery.docs.isNotEmpty) {
+          var staffData = staffQuery.docs.first.data() as Map<String, dynamic>?;
+          if (staffData != null) {
+            bioData = BioModel.fromJson(staffData);
+            // Now, we correctly load the bio data, including the email as it is stored in Firestore.
+            setState(() {
+              selectedBioFirstName = bioData!.firstName;
+              selectedBioLastName = bioData!.lastName;
+              selectedBioDepartment = bioData!.department;
+              selectedBioState = bioData!.state;
+              selectedBioDesignation = bioData!.designation;
+              selectedBioLocation = bioData!.location;
+              selectedBioStaffCategory = bioData!.staffCategory;
+              selectedBioEmail = bioData!.emailAddress; // This might be "User.Name@email.com"
+              selectedBioPhone = bioData!.mobile;
+              selectedFirebaseId = bioData!.firebaseAuthId;
+            });
+          } else {
+            print("Staff data is null in Firestore document");
+          }
+        } else {
+          print("No staff document found for auth UID: ${user.uid}");
+        }
+      } else {
+        print("No user logged in.");
+      }
+    } catch (e) {
+      print("Error loading bio data from Firebase: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() {
+        isLoading = false; // End loading
+      });
+    }
+  }
+
+  Future<void> _fetchPendingApprovals() async {
+    setState(() => isLoading = true);
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      // Ensure user and bioData (with email) are available before proceeding.
+      if (user == null || bioData == null || bioData!.emailAddress == null) {
+        if (mounted) setState(() => isLoading = false);
+        return;
+      }
+
+      // Get the supervisor's email from the loaded bioData and convert it to lowercase
+      // for a case-insensitive comparison.
+      final userEmailLower = bioData!.emailAddress!.toLowerCase();
+
+      // --- Fetch and Filter Pending Leaves ---
+      final leavesSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('Leave Request')
+          .where('status', isEqualTo: 'Pending')
+          .get();
+
+      final filteredLeavesDocs = leavesSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['selectedSupervisorEmail'] as String?;
+        // Compare both emails in lowercase to ensure a match.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+      // --- Fetch and Filter Pending Timesheets (CARITAS Supervisor) ---
+      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('TimeSheets')
+          .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
+          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
+          .get();
+
+      final filteredCaritasTimesheetsDocs = caritasSupervisorTimesheetsSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['caritasSupervisorEmail'] as String?;
+        // Compare both emails in lowercase.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+      // --- Fetch and Filter Pending Timesheets (Facility Supervisor) ---
+      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('TimeSheets')
+          .where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending')
+          .get();
+
+      final filteredFacilityTimesheetsDocs = facilitySupervisorTimesheetsSnapshot.docs.where((doc) {
+        final supervisorEmail = doc.data()['facilitySupervisorEmail'] as String?;
+        // Compare both emails in lowercase.
+        return supervisorEmail?.toLowerCase() == userEmailLower;
+      }).toList();
+
+
+      // Fetch pending reviews (This logic remains the same as it uses ID, not email)
+      List<Report> reviews = [];
+      if (selectedFirebaseId != null) {
+        final reviewsSnapshot = await FirebaseFirestore.instance
+            .collectionGroup('Reports')
+            .where('reviewerIds', arrayContains: selectedFirebaseId)
+            .where('reportStatus', isEqualTo: 'Pending')
+            .get();
+        reviews = reviewsSnapshot.docs.map((doc) => Report.fromFirestore(doc, null)).toList();
+      }
+
+      if (mounted) {
+        setState(() {
           pendingLeaves = filteredLeavesDocs.map((doc) => doc.data()).toList();
           pendingTimesheetsFacilitySupervisor = filteredFacilityTimesheetsDocs.map((doc) => doc.data()).toList();
           pendingTimesheetsCaritasSupervisor = filteredCaritasTimesheetsDocs.map((doc) => doc.data()).toList();
