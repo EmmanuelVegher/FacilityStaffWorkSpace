@@ -5,6 +5,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
+import '../features/payroll/ui/payroll_review_page.dart';
+import '../features/payroll/ui/salary_management_page.dart';
 import '../forgot_password3.dart';
 import '../screens/account_management/account_management_hub_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
