@@ -443,6 +443,36 @@ Widget drawer3(
             },
           ),
 
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          //  if (isAdmin)
+          ExpansionTile( // Group payroll features together
+            leading: Icon(Icons.monetization_on),
+            title: Text("Payroll & Payments"),
+            children: [
+              ListTile(
+                leading: Icon(Icons.price_change),
+                title: const Text('Manage Salaries'),
+                onTap: () {
+                  Navigator.pop(context); // Close the drawer
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryManagementPage()));
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.payments),
+                title: const Text('Payroll Workflow'),
+                onTap: () {
+                  Navigator.pop(context); // Close the drawer
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const PayrollReviewPage()));
+                },
+              ),
+            ],
+          ),
+
 
 
           const Divider(
