@@ -19,6 +19,7 @@ import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
 import '../screens/leave_request/hq_leave_request_management_page.dart';
 import '../screens/login_screen.dart';
+import '../screens/payment/payment_module_page.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/profile_page3.dart';
@@ -311,6 +312,35 @@ Widget drawer3(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const TimesheetReviewPageHq()),
+
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+
+          ListTile(
+            leading: Icon(
+              Icons.payment,
+              size: drawerIconSize,
+              color: Colors.orange,
+            ),
+            title: Text(
+              'Payment Module',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PaymentModulePage()),
 
               );
             },

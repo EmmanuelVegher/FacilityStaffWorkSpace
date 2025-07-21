@@ -11,19 +11,26 @@ import '../features/payroll/ui/salary_management_page.dart';
 import '../screens/account_management/my_state_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
+import '../screens/attendance_analysis_page/facility_supervisor_analysis_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
+import '../screens/dashboard/facility_supervisor_dashboard.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
+import '../screens/forgot_password4.dart';
 import '../screens/leave_request/leave_request_review_page.dart';
 import '../screens/leave_request/state_leave_request_page.dart';
 import '../screens/login_screen.dart';
+import '../screens/pending_approval_facility_supervisor.dart';
 import '../screens/pending_approvals.dart';
+import '../screens/profile4.dart';
 import '../screens/profile_page2.dart';
 import '../screens/psychological_survey_analysis_page/PsychologicalSurveyAnalysisPage.dart';
+import '../screens/psychological_survey_analysis_page/facility_supervisor_survey_page.dart';
 import '../screens/supervisor/supervisor_task_summary_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
+import '../screens/upload_signature4.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
@@ -31,7 +38,7 @@ import 'app_button.dart';
 
 
 
-Widget drawer2(
+Widget drawer4(
     BuildContext context,
 
     ) {
@@ -147,7 +154,7 @@ Widget drawer2(
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const DashboardScreen(
+                      builder: (context) => const FacilitySupervisorDashboard(
 
                       )),
                 );
@@ -170,7 +177,7 @@ Widget drawer2(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AttendanceAnalysisPage()),
+                MaterialPageRoute(builder: (context) => const FacilitySupervisorAttendanceAnalysisPage()),
               );
             },
           ),
@@ -192,229 +199,16 @@ Widget drawer2(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
-              );
-            },
-          ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: Icon(Icons.task,
-                size: drawerIconSize, color: Colors.orange),
-            title: Text(
-              'Task Management Summary',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SupervisorTaskSummaryPage()),
-              );
-            },
-          ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-          // ListTile(
-          //   leading: Icon(
-          //     Icons.task,
-          //     size: drawerIconSize,
-          //     color: Colors.blue,
-          //   ),
-          //   title: Text(
-          //     'Create Activity',
-          //     style: TextStyle(
-          //         fontSize: drawerFontSize,
-          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
-          //   ),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //           builder: (context) => const CreateActivityPage()),
-          //
-          //     );
-          //   },
-          // ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-          ListTile(
-            leading: Icon(
-              Icons.phone,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Call Tracking Report',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const ReportsPageWeb2()),
-
+                MaterialPageRoute(builder: (context) => const PendingFacilitySupervisorApprovalsPage()),
               );
             },
           ),
 
 
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
 
 
-          ListTile(
-            leading: Icon(
-              Icons.art_track,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'EAC Tracking Report',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateEacReportsPageWeb()),
 
-              );
-            },
-          ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-          ListTile(
-            leading: Icon(
-              Icons.biotech_outlined,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Viral Load Tracking Report',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateVlTrackingPageWeb()),
-
-              );
-            },
-          ),//
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-          ListTile(
-            leading: Icon(
-              Icons.lock_clock,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'View Timesheets',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const TimesheetReviewPage()),
-
-              );
-            },
-          ),
-
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-        //  if (isAdmin)
-            ExpansionTile( // Group payroll features together
-              leading: Icon(Icons.monetization_on),
-              title: Text("Payroll & Payments"),
-              children: [
-                ListTile(
-                  leading: Icon(Icons.price_change),
-                  title: const Text('Manage Salaries'),
-                  onTap: () {
-                    Navigator.pop(context); // Close the drawer
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryManagementPage()));
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.payments),
-                  title: const Text('Payroll Workflow'),
-                  onTap: () {
-                    Navigator.pop(context); // Close the drawer
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const PayrollReviewPage()));
-                  },
-                ),
-              ],
-            ),
-
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-          ListTile(
-            leading: Icon(
-              Icons.holiday_village,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'View Leave Requests',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateLeaveRequestManagementPage()),
-
-              );
-            },
-          ),
 
           const Divider(
             color: Colors.grey,
@@ -438,29 +232,11 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const PsychologicalSurveyAnalysisPage()),
+                    builder: (context) => const FacilitySupervisorPsychologicalSurveyAnalysisPage()),
 
               );
             },
           ),
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-          ListTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: Text(
-              'Account Management',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
-            ),
-            onTap: () {
-              Navigator.of(context).pop(); // Close the drawer
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const MyStateScreen(),
-              ));
-            },
-          ),
-
 
 
 
@@ -483,7 +259,7 @@ Widget drawer2(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ForgotPasswordPage2()),
+                MaterialPageRoute(builder: (context) => const ForgotPasswordPage4()),
               );
             },
           ),
@@ -508,7 +284,7 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const UploadSignaturePage2(
+                    builder: (context) => const UploadSignaturePage4(
 
                     )),
               );
@@ -532,7 +308,7 @@ Widget drawer2(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfilePage2()),
+                MaterialPageRoute(builder: (context) => const ProfilePage4()),
               );
             },
           ),

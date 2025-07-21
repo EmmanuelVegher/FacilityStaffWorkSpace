@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'dashboard/facility_supervisor_dashboard.dart';
 import 'dashboard/hq_dashboard_screen.dart';
 import 'dashboard/state_ofice_dashboard.dart';
 
@@ -35,7 +36,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
             context,
             MaterialPageRoute(
               builder: (context) =>
-              role == 'User' ? const UserDashboardPage() : role == 'State Office Staff' ? const DashboardScreen() :const HQDashboardScreen(),
+              role == 'User' ? const UserDashboardPage() : role == 'State Office Staff' ? const DashboardScreen() : role == 'Facility Supervisor' ? const FacilitySupervisorDashboard() :const HQDashboardScreen(),
             ),
           );
         }
