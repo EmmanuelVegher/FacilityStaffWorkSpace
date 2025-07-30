@@ -23,6 +23,8 @@ import '../screens/leave_request/hq_leave_request_management_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/payment/payment_module_page.dart';
 import '../screens/pending_approvals.dart';
+import '../screens/performance_impact_dashboad/attendance_adoption_report_page.dart';
+import '../screens/performance_impact_dashboad/performance_impact_dashboad.dart';
 import '../screens/profile_page2.dart';
 import '../screens/profile_page3.dart';
 import '../screens/psychological_survey_analysis_page/hq_survey_analysis_page.dart';
@@ -440,6 +442,34 @@ Widget drawer3(
                 context,
                 MaterialPageRoute(
                     builder: (context) => const StateSurveyAnalysisPage()),
+
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.psychology,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Performance Impact',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateLevelEngagementReportPage()),
+                
 
               );
             },
