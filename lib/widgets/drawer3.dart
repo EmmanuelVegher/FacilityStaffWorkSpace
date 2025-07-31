@@ -184,6 +184,34 @@ Widget drawer3(
             },
           ),
 
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.analytics,
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Performance Impact',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateLevelEngagementReportPage()),
+
+
+              );
+            },
+          ),
+
 
           // const Divider(
           //   color: Colors.grey,
@@ -321,34 +349,34 @@ Widget drawer3(
             },
           ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-
-          ListTile(
-            leading: Icon(
-              Icons.payment,
-              size: drawerIconSize,
-              color: Colors.orange,
-            ),
-            title: Text(
-              'Payment Module',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const PaymentModulePage()),
-
-              );
-            },
-          ),
+          // const Divider(
+          //   color: Colors.grey,
+          //   height: 1,
+          // ),
+          //
+          //
+          //
+          // ListTile(
+          //   leading: Icon(
+          //     Icons.payment,
+          //     size: drawerIconSize,
+          //     color: Colors.orange,
+          //   ),
+          //   title: Text(
+          //     'Payment Module',
+          //     style: TextStyle(
+          //         fontSize: drawerFontSize,
+          //         color: Get.isDarkMode ? Colors.white : Colors.brown),
+          //   ),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //           builder: (context) => const PaymentModulePage()),
+          //
+          //     );
+          //   },
+          // ),
           const Divider(
             color: Colors.grey,
             height: 1,
@@ -447,33 +475,7 @@ Widget drawer3(
             },
           ),
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
 
-          ListTile(
-            leading: Icon(
-              Icons.psychology,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'Performance Impact',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateLevelEngagementReportPage()),
-                
-
-              );
-            },
-          ),
 
           const Divider(
             color: Colors.grey,
