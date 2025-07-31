@@ -1,7 +1,7 @@
 // lib/pages/reports/state_level_engagement_report_page.dart
 
 // PERFORMANCE IMPACT DASHBOARD
-// ** VERSION 13.1: FULLY IMPLEMENTED PER-STATE SUMMARIES, REORDERED LAYOUT, AND UI/UX ENHANCEMENTS **
+// ** VERSION 15.2: RESTORED ALL MISSING HELPER METHODS & FIXED COMPILER ERRORS **
 
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -38,10 +38,22 @@ class AttendanceDataPoint {
   AttendanceDataPoint({required this.staffId, required this.clockInTime, required this.state});
 }
 
+class _PunctualityTrendData {
+  final DateTime date;
+  final int earlyCount;
+  final int lateCount;
+  _PunctualityTrendData({required this.date, required this.earlyCount, required this.lateCount});
+}
+
 class _ChartData {
   final String category;
   final double value;
   _ChartData(this.category, this.value);
+}
+
+class _PunctualityCounter {
+  int early = 0;
+  int late = 0;
 }
 
 // --- DataTableSources for Paginated Tables ---
@@ -95,7 +107,6 @@ class _RecentlyInactiveStaffDataSource extends DataTableSource {
   int get selectedRowCount => 0;
 }
 
-
 // --- MAIN WIDGET ---
 
 class StateLevelEngagementReportPage extends StatefulWidget {
@@ -120,12 +131,14 @@ class _StateLevelEngagementReportPageState
   List<String> _selectedStates = ['All States'], _selectedFacilities = ['All Facilities'];
   List<String> _displayStates = [];
 
-  // --- GLOBAL AGGREGATES FOR 'ALL STATES' TAB ---
+  // GLOBAL AGGREGATES
   List<_ChartData> _adoptionAllStatesData = [], _activeStaffAllStatesData = [];
+  List<_PunctualityTrendData> _punctualityTrendAllStates = [];
   List<StaffDetails> _inactiveStaffOnLeaveAll = [], _completelyInactiveStaffAll = [];
   List<RecentlyInactiveStaff> _recentlyInactiveStaffAll = [];
   List<_ChartData> _moduleActivityAllStatesData = [];
   Map<String, List<String>> _activeFacilitiesByModuleAll = {};
+  int _totalFilteredFacilitiesAll = 0;
   int _callTrackerTotalCallsAll = 0, _eacTotalCallsAll = 0, _vlTotalCallsAll = 0;
   int _callTrackerTotalDurationAll=0, _callTrackerOutgoingAnsweredAll=0, _callTrackerMissedAll=0, _callTrackerIncomingAnsweredAll=0;
   double _callTrackerOutgoingCostAll=0.0, _callTrackerIncomingCostAll=0.0;
@@ -134,12 +147,14 @@ class _StateLevelEngagementReportPageState
   int _vlTotalDurationAll=0, _vlOutgoingAnsweredAll=0, _vlMissedAll=0, _vlIncomingAnsweredAll=0;
   double _vlOutgoingCostAll=0.0, _vlIncomingCostAll=0.0;
 
-  // --- PER-STATE DATA FOR INDIVIDUAL TABS ---
+  // PER-STATE DATA
   Map<String, List<_ChartData>> _adoptionByStateData = {}, _activeStaffByStateData = {};
+  Map<String, List<_PunctualityTrendData>> _punctualityTrendByState = {};
   Map<String, List<StaffDetails>> _inactiveStaffOnLeaveByState = {}, _completelyInactiveStaffByState = {};
   Map<String, List<RecentlyInactiveStaff>> _recentlyInactiveStaffByState = {};
   Map<String, List<_ChartData>> _moduleActivityByStateData = {};
   Map<String, Map<String, List<String>>> _activeFacilitiesByModuleByState = {};
+  Map<String, int> _totalFilteredFacilitiesByState = {};
   Map<String, int> _callTrackerTotalCallsByState = {}, _eacTotalCallsByState = {}, _vlTotalCallsByState = {};
   Map<String, int> _callTrackerTotalDurationByState={}, _callTrackerOutgoingAnsweredByState={}, _callTrackerMissedByState={}, _callTrackerIncomingAnsweredByState={};
   Map<String, double> _callTrackerOutgoingCostByState={}, _callTrackerIncomingCostByState={};
@@ -157,22 +172,22 @@ class _StateLevelEngagementReportPageState
   }
 
   void _clearAllStateData() {
-    _adoptionAllStatesData = []; _activeStaffAllStatesData = []; _inactiveStaffOnLeaveAll = [];
-    _completelyInactiveStaffAll = []; _recentlyInactiveStaffAll = []; _moduleActivityAllStatesData = [];
-    _activeFacilitiesByModuleAll = {};
-    _adoptionByStateData = {}; _activeStaffByStateData = {}; _inactiveStaffOnLeaveByState = {};
-    _completelyInactiveStaffByState = {}; _recentlyInactiveStaffByState = {}; _moduleActivityByStateData = {};
-    _activeFacilitiesByModuleByState = {};
-
+    _adoptionAllStatesData = []; _activeStaffAllStatesData = []; _punctualityTrendAllStates = [];
+    _inactiveStaffOnLeaveAll = []; _completelyInactiveStaffAll = []; _recentlyInactiveStaffAll = [];
+    _moduleActivityAllStatesData = []; _activeFacilitiesByModuleAll = {}; _totalFilteredFacilitiesAll = 0;
+    _adoptionByStateData = {}; _activeStaffByStateData = {}; _punctualityTrendByState = {};
+    _inactiveStaffOnLeaveByState = {}; _completelyInactiveStaffByState = {}; _recentlyInactiveStaffByState = {};
+    _moduleActivityByStateData = {}; _activeFacilitiesByModuleByState = {}; _totalFilteredFacilitiesByState = {};
     _callTrackerTotalCallsAll = 0; _callTrackerTotalDurationAll=0; _callTrackerOutgoingAnsweredAll=0; _callTrackerMissedAll=0; _callTrackerIncomingAnsweredAll=0; _callTrackerOutgoingCostAll=0.0; _callTrackerIncomingCostAll=0.0;
     _eacTotalCallsAll = 0; _eacTotalDurationAll=0; _eacOutgoingAnsweredAll=0; _eacMissedAll=0; _eacIncomingAnsweredAll=0; _eacOutgoingCostAll=0.0; _eacIncomingCostAll=0.0;
     _vlTotalCallsAll = 0; _vlTotalDurationAll=0; _vlOutgoingAnsweredAll=0; _vlMissedAll=0; _vlIncomingAnsweredAll=0; _vlOutgoingCostAll=0.0; _vlIncomingCostAll=0.0;
-
     _callTrackerTotalCallsByState = {}; _eacTotalCallsByState = {}; _vlTotalCallsByState = {};
     _callTrackerTotalDurationByState={}; _callTrackerOutgoingAnsweredByState={}; _callTrackerMissedByState={}; _callTrackerIncomingAnsweredByState={}; _callTrackerOutgoingCostByState={}; _callTrackerIncomingCostByState={};
     _eacTotalDurationByState={}; _eacOutgoingAnsweredByState={}; _eacMissedByState={}; _eacIncomingAnsweredByState={}; _eacOutgoingCostByState={}; _eacIncomingCostByState={};
     _vlTotalDurationByState={}; _vlOutgoingAnsweredByState={}; _vlMissedByState={}; _vlIncomingAnsweredByState={}; _vlOutgoingCostByState={}; _vlIncomingCostByState={};
   }
+
+  // --- RESTORED: FILTERING & DATA LOADING LOGIC ---
 
   Future<void> _initializeFilters() async {
     setState(() => _isFacilitiesLoading = true);
@@ -280,7 +295,17 @@ class _StateLevelEngagementReportPageState
       QuerySnapshot<Map<String, dynamic>> eacLogs,
       QuerySnapshot<Map<String, dynamic>> vlLogs
       ) {
-    // A map to quickly find a staff's state. Crucial for attributing logs to states.
+    final Map<String, Set<String>> facilitiesByState = {};
+    for (var staff in filteredStaffMap.values) {
+      if(staff.category == 'Facility Staff' && staff.location.isNotEmpty) {
+        facilitiesByState.putIfAbsent(staff.state, () => {}).add(staff.location);
+      }
+    }
+    facilitiesByState.forEach((state, facilities) {
+      _totalFilteredFacilitiesByState[state] = facilities.length;
+    });
+    _totalFilteredFacilitiesAll = facilitiesByState.values.expand((set) => set).toSet().length;
+
     final Map<String, String> staffIdToStateMap = {
       for (var staff in filteredStaffMap.values) staff.id: staff.state
     };
@@ -376,7 +401,6 @@ class _StateLevelEngagementReportPageState
   void _processCallMetrics(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, Map<String, String> staffStateMap) {
     for (var doc in docs) {
       final data = doc.data();
-      // Use 'trackedById' if available, otherwise fall back to 'trackerFacilityState' from the log itself
       final state = staffStateMap[data['trackedById']] ?? data['trackerFacilityState'] as String?;
       if (state == null) continue;
 
@@ -529,10 +553,45 @@ class _StateLevelEngagementReportPageState
 
   void _processChartData(List<AttendanceDataPoint> data) {
     if (data.isEmpty) {
-      setState(() { _adoptionByStateData = {}; _activeStaffByStateData = {}; _adoptionAllStatesData = []; _activeStaffAllStatesData = []; });
+      setState(() {
+        _adoptionByStateData = {}; _activeStaffByStateData = {}; _punctualityTrendByState = {};
+        _adoptionAllStatesData = []; _activeStaffAllStatesData = []; _punctualityTrendAllStates = [];
+      });
       return;
     }
     final monthFormat = DateFormat('MMM yyyy');
+    final dayFormat = DateFormat('yyyy-MM-dd');
+
+    final Map<String, Map<String, _PunctualityCounter>> dailyPunctualityByState = {};
+    for (var record in data) {
+      final dateKey = dayFormat.format(record.clockInTime);
+      final state = record.state;
+      final eightAm = DateTime(record.clockInTime.year, record.clockInTime.month, record.clockInTime.day, 8, 0, 1);
+
+      final counter = dailyPunctualityByState.putIfAbsent(state, () => {}).putIfAbsent(dateKey, () => _PunctualityCounter());
+
+      if (record.clockInTime.isBefore(eightAm)) {
+        counter.early++;
+      } else {
+        counter.late++;
+      }
+    }
+
+    dailyPunctualityByState.forEach((state, dailyData) {
+      _punctualityTrendByState[state] = dailyData.entries.map((entry) {
+        return _PunctualityTrendData(date: dayFormat.parse(entry.key), earlyCount: entry.value.early, lateCount: entry.value.late);
+      }).toList()..sort((a,b) => a.date.compareTo(b.date));
+    });
+
+    _punctualityTrendAllStates = _punctualityTrendByState.values.expand((list) => list)
+        .fold<Map<DateTime, _PunctualityCounter>>({}, (agg, e) {
+      final counter = agg.putIfAbsent(e.date, () => _PunctualityCounter());
+      counter.early += e.earlyCount;
+      counter.late += e.lateCount;
+      return agg;
+    })
+        .entries.map((e) => _PunctualityTrendData(date: e.key, earlyCount: e.value.early, lateCount: e.value.late))
+        .toList()..sort((a,b) => a.date.compareTo(b.date));
 
     final Map<String, Map<String, Set<String>>> monthlyActiveStaffByState = {};
     for (var record in data) {
@@ -703,14 +762,15 @@ class _StateLevelEngagementReportPageState
   }
 
   Widget _buildStateTabView({ required bool isAllStatesTab, required String stateName }) {
-    // Determine which data source to use based on the tab
     final adoptionData = isAllStatesTab ? _adoptionAllStatesData : _adoptionByStateData[stateName] ?? [];
     final activeStaffData = isAllStatesTab ? _activeStaffAllStatesData : _activeStaffByStateData[stateName] ?? [];
+    final punctualityData = isAllStatesTab ? _punctualityTrendAllStates : _punctualityTrendByState[stateName] ?? [];
     final recentlyInactive = isAllStatesTab ? _recentlyInactiveStaffAll : _recentlyInactiveStaffByState[stateName] ?? [];
     final completelyInactive = isAllStatesTab ? _completelyInactiveStaffAll : _completelyInactiveStaffByState[stateName] ?? [];
     final onLeaveInactive = isAllStatesTab ? _inactiveStaffOnLeaveAll : _inactiveStaffOnLeaveByState[stateName] ?? [];
     final moduleActivityData = isAllStatesTab ? _moduleActivityAllStatesData : _moduleActivityByStateData[stateName] ?? [];
     final activeFacilities = isAllStatesTab ? _activeFacilitiesByModuleAll : _activeFacilitiesByModuleByState[stateName] ?? {};
+    final totalFacilities = isAllStatesTab ? _totalFilteredFacilitiesAll : _totalFilteredFacilitiesByState[stateName] ?? 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -720,13 +780,15 @@ class _StateLevelEngagementReportPageState
           const SizedBox(height: 24),
           _buildChartCard(title: "Monthly Active Staff Trend in $stateName", subtitle: "Unique staff with at least one record each month within the date range.", chart: _buildActiveStaffLineChart(activeStaffData), isWide: true),
           const SizedBox(height: 24),
+          _buildChartCard(title: "Daily Clock-in Punctuality Trend in $stateName", subtitle: "Daily count of early vs. late clock-in records.", chart: _buildPunctualityTrendChart(punctualityData), isWide: true),
+          const SizedBox(height: 24),
           _buildRecentlyInactiveStaffSection(recentlyInactive),
           const SizedBox(height: 24),
           _buildCompletelyInactiveStaffSection(completelyInactive),
           const SizedBox(height: 24),
           _buildInactiveStaffOnLeaveSection(onLeaveInactive),
           const SizedBox(height: 24),
-          _buildModuleActivitySection(moduleActivityData, activeFacilities),
+          _buildModuleActivitySection(moduleActivityData, activeFacilities, totalFacilities),
           const SizedBox(height: 24),
           _buildMetricSummarySection(isAllStatesTab, stateName),
         ],
@@ -792,7 +854,7 @@ class _StateLevelEngagementReportPageState
     );
   }
 
-  Widget _buildModuleActivitySection(List<_ChartData> moduleData, Map<String, List<String>> facilityData) {
+  Widget _buildModuleActivitySection(List<_ChartData> moduleData, Map<String, List<String>> facilityData, int totalFacilities) {
     if (moduleData.isEmpty) return const SizedBox.shrink();
     return Card(
       elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), clipBehavior: Clip.antiAlias,
@@ -807,7 +869,7 @@ class _StateLevelEngagementReportPageState
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Wrap(spacing: 24, runSpacing: 24, alignment: WrapAlignment.center, children: [
-              SizedBox(width: 400, height: 350, child: _buildModuleActivityChart(moduleData)),
+              SizedBox(width: 400, height: 350, child: _buildModuleActivityChart(moduleData, totalFacilities)),
               SizedBox(width: 400, height: 350, child: _buildActiveFacilitiesTable(facilityData))
             ]),
           ),
@@ -897,9 +959,6 @@ class _StateLevelEngagementReportPageState
     );
   }
 
-  // Other builder methods (_buildFilterChip, _buildMessageDisplay, charts, etc.) are below
-  // They are mostly unchanged but are included for completeness.
-
   Widget _buildMetricTile(String label, String value, {Color color = Colors.black87}) {
     return SizedBox(
       width: 150,
@@ -914,11 +973,28 @@ class _StateLevelEngagementReportPageState
     );
   }
 
-  Widget _buildModuleActivityChart(List<_ChartData> data) {
+  Widget _buildModuleActivityChart(List<_ChartData> data, int totalFacilities) {
     return SfCartesianChart(
         primaryXAxis: const CategoryAxis(),
         primaryYAxis: NumericAxis(title: const AxisTitle(text: 'Number of Active Facilities'), numberFormat: NumberFormat.compact()),
-        series: <CartesianSeries>[ BarSeries<_ChartData, String>(dataSource: data, xValueMapper: (d,_) => d.category, yValueMapper: (d,_) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true)) ]
+        series: <CartesianSeries>[
+          BarSeries<_ChartData, String>(
+              dataSource: data,
+              xValueMapper: (d,_) => d.category,
+              yValueMapper: (d,_) => d.value,
+              dataLabelSettings: DataLabelSettings(
+                  isVisible: true,
+                  builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
+                    final count = point.y.toInt();
+                    if (totalFacilities == 0) {
+                      return Text('$count');
+                    }
+                    final double percentage = (count / totalFacilities) * 100;
+                    return Text('$count (${percentage.toStringAsFixed(0)}%)');
+                  }
+              )
+          )
+        ]
     );
   }
 
@@ -966,6 +1042,53 @@ class _StateLevelEngagementReportPageState
         primaryYAxis: NumericAxis(title: const AxisTitle(text: 'Number of Active Staff'), numberFormat: NumberFormat.compact()),
         tooltipBehavior: TooltipBehavior(enable: true, header: 'Active Staff'),
         series: <CartesianSeries>[ LineSeries<_ChartData, String>(dataSource: data, xValueMapper: (d, _) => d.category, yValueMapper: (d, _) => d.value, name: 'Active Staff', color: Colors.teal, markerSettings: const MarkerSettings(isVisible: true), dataLabelSettings: const DataLabelSettings(isVisible: true)) ]
+    );
+  }
+
+  Widget _buildPunctualityTrendChart(List<_PunctualityTrendData> data) {
+    return SfCartesianChart(
+      primaryXAxis: DateTimeAxis(
+        dateFormat: DateFormat.MMMd(), intervalType: DateTimeIntervalType.auto, majorGridLines: const MajorGridLines(width: 0),
+      ),
+      primaryYAxis: NumericAxis(
+        title: const AxisTitle(text: 'Number of Clock-ins'), numberFormat: NumberFormat.compact(),
+      ),
+      legend: const Legend(isVisible: true, position: LegendPosition.top),
+      tooltipBehavior: TooltipBehavior(enable: true, shared: true),
+      series: <CartesianSeries>[
+        LineSeries<_PunctualityTrendData, DateTime>(
+            dataSource: data,
+            xValueMapper: (d, _) => d.date,
+            yValueMapper: (d, _) => d.earlyCount,
+            name: 'Early Clock-ins (<= 8:00 AM)', color: Colors.green, markerSettings: const MarkerSettings(isVisible: true),
+            dataLabelSettings: DataLabelSettings(
+                isVisible: true,
+                builder: (dynamic d, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
+                  final currentData = data[pointIndex];
+                  final total = currentData.earlyCount + currentData.lateCount;
+                  if (total == 0) return const Text('');
+                  final percentage = (currentData.earlyCount / total) * 100;
+                  return Text('${percentage.toStringAsFixed(0)}%');
+                }
+            )
+        ),
+        LineSeries<_PunctualityTrendData, DateTime>(
+            dataSource: data,
+            xValueMapper: (d, _) => d.date,
+            yValueMapper: (d, _) => d.lateCount,
+            name: 'Late Clock-ins (> 8:00 AM)', color: Colors.orange, markerSettings: const MarkerSettings(isVisible: true),
+            dataLabelSettings: DataLabelSettings(
+                isVisible: true,
+                builder: (dynamic d, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
+                  final currentData = data[pointIndex];
+                  final total = currentData.earlyCount + currentData.lateCount;
+                  if (total == 0) return const Text('');
+                  final percentage = (currentData.lateCount / total) * 100;
+                  return Text('${percentage.toStringAsFixed(0)}%');
+                }
+            )
+        ),
+      ],
     );
   }
 
@@ -1093,7 +1216,6 @@ class _StateLevelEngagementReportPageState
   }
 }
 
-
 class _ScrollablePaginatedTable extends StatefulWidget {
   final Widget header;
   final List<DataColumn> columns;
@@ -1139,7 +1261,7 @@ class __ScrollablePaginatedTableState extends State<_ScrollablePaginatedTable> {
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
               child: SizedBox(
-                width: 1300, // A fixed wide width to ensure horizontal scrolling is needed
+                width: 1300,
                 child: PaginatedDataTable(
                   rowsPerPage: 5,
                   showFirstLastButtons: true,
