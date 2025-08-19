@@ -1,110 +1,109 @@
 // lib/features/payroll/services/payroll_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import '../models/payroll_models.dart';
 
 class PayrollService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Helper to get number of working days in a month (Mon-Fri)
-  int _getWorkingDaysInMonth(int year, int month) {
-    int workingDays = 0;
-    int daysInMonth = DateTime(year, month + 1, 0).day;
-    for (int day = 1; day <= daysInMonth; day++) {
-      final date = DateTime(year, month, day);
-      if (date.weekday != DateTime.saturday && date.weekday != DateTime.sunday) {
-        workingDays++;
-      }
-    }
-    return workingDays;
-  }
-
+  /// Generates the payroll schedule for a given month and year.
+  ///
+  /// This function now efficiently fetches all designation salaries first, then
+  /// processes each active staff member, looking up their salary from the pre-fetched map.
   Future<String> generatePayrollForPeriod(int year, int month) async {
+    final payrollPeriodId = "${year}_${month.toString().padLeft(2, '0')}";
+    final payrollBatch = _firestore.batch();
+    int staffProcessed = 0;
+    List<String> staffSkipped = [];
+
     try {
-      // 1. Fetch all staff
-      final staffSnapshot = await _firestore.collection('Staff').get();
+      // Step 1: Fetch all designation salaries and store them in a Map for efficient lookup.
+      final salarySnapshot = await _firestore.collection('DesignationSalaries').get();
+      if (salarySnapshot.docs.isEmpty) {
+        return "Error: No salaries found in the 'DesignationSalaries' collection. Please configure salaries first.";
+      }
+      final Map<String, double> salaryMap = {
+        for (var doc in salarySnapshot.docs)
+          doc.id: (doc.data()['salary'] ?? 0.0).toDouble(),
+      };
+
+      // Step 2: Fetch all active staff members.
+      final staffSnapshot = await _firestore.collection('Staff').where('isActive', isEqualTo: true).get();
       if (staffSnapshot.docs.isEmpty) {
-        return "No staff found in the database.";
+        return "No active staff found to generate payroll.";
       }
 
-      // 2. Fetch all designation salaries into a map for quick lookup
-      final salariesSnapshot = await _firestore.collection('DesignationSalaries').get();
-      final salaryMap = {for (var doc in salariesSnapshot.docs) doc.id: (doc.data()['salary'] as num? ?? 0.0).toDouble()};
-
-      // 3. Define payroll period and expected hours
-      final payrollPeriodId = "${year}_${month.toString().padLeft(2, '0')}";
-      final workingDays = _getWorkingDaysInMonth(year, month);
-      final expectedWorkHours = workingDays * 8.0; // Assuming 8-hour work day
-
-      final WriteBatch batch = _firestore.batch();
-
-      // 4. Loop through each staff member to calculate their salary
+      // Step 3: Iterate through each staff member and create their payment record.
       for (final staffDoc in staffSnapshot.docs) {
         final staffData = staffDoc.data();
         final staffId = staffDoc.id;
         final designation = staffData['designation'] as String?;
-        final staffName = '${staffData['firstName'] ?? ''} ${staffData['lastName'] ?? ''}'.trim();
-        final staffEmail = staffData['emailAddress'] as String? ?? 'no-email@example.com';
+        final staffName = staffData['name'] ?? 'Unknown Staff';
 
-        if (designation == null || salaryMap[designation] == null) {
-          print("Skipping ${staffName} (ID: $staffId) due to missing designation or salary info.");
-          continue;
+        // CRITICAL: Check if the staff has a valid designation with a configured salary.
+        if (designation == null || !salaryMap.containsKey(designation)) {
+          // If not, skip this staff member and record their name for the final report.
+          staffSkipped.add('$staffName (Designation: ${designation ?? 'Not Set'})');
+          continue; // Move to the next staff member
         }
 
-        final baseSalary = salaryMap[designation]!;
+        // The salary from the map corresponds to the "Amount/Gross Pay" in your salary scale.
+        final grossPay = salaryMap[designation]!;
 
-        // 5. Fetch attendance records for the month
-        final startDate = DateTime(year, month, 1);
-        final endDate = DateTime(year, month + 1, 0);
-        final attendanceSnapshot = await _firestore
-            .collection('Staff')
-            .doc(staffId)
-            .collection('Record')
-            .where('timestamp', isGreaterThanOrEqualTo: startDate)
-            .where('timestamp', isLessThanOrEqualTo: endDate)
-            .get();
+        // Calculate components based on the salary scale logic from your image.
+        // "Basic" and "Housing" are both 30% of the gross pay.
+        final basicSalaryComponent = grossPay * 0.30;
+        final housingAllowance = grossPay * 0.30;
+        final transportAllowance = grossPay * 0.10;
+        final mealAllowance = grossPay * 0.15;
+        final utilityAllowance = grossPay * 0.15;
 
-        double totalHoursWorked = 0.0;
-        for (final recordDoc in attendanceSnapshot.docs) {
-          totalHoursWorked += (recordDoc.data()['noOfHours'] as num? ?? 0.0).toDouble();
-        }
+        // Create the StaffPayment object with the calculated values.
+        final staffPayment = StaffPayment(
+          staffId: staffId,
+          staffName: staffName,
+          staffEmail: staffData['email'] ?? 'no-email@example.com',
+          designation: designation,
+          baseSalary: basicSalaryComponent, // This is the 30% "Basic" component
+          housingAllowance: housingAllowance,
+          transportAllowance: transportAllowance,
+          mealAllowance: mealAllowance,
+          utilityAllowance: utilityAllowance,
+          grossPay: grossPay, // This is the total gross pay amount
+          manualDeductions: [],
+          paye: 0.0,
+          employeePension: 0.0,
+          totalDeductions: 0.0, // Deductions are initially zero
+          netPay: grossPay,     // Net pay is initially the same as gross
+          workflowStatus: 'PendingProgramReview', // Start of the workflow
+          rejectionReason: null,
+          paidAt: null,
+          paymentReference: null,
+        );
 
-        // 6. Calculate payable salary
-        double percentageWorked = expectedWorkHours > 0 ? (totalHoursWorked / expectedWorkHours) : 0.0;
-        percentageWorked = percentageWorked.clamp(0.0, 1.0); // Ensure percentage is not > 100%
-        final payableSalary = baseSalary * percentageWorked;
-
-        // 7. Prepare the payroll document for batch write
-        final payrollDocRef = _firestore
-            .collection('Payroll')
-            .doc(payrollPeriodId)
-            .collection('StaffPayments')
-            .doc(staffId);
-
-        final paymentData = {
-          'staffId': staffId,
-          'staffName': staffName,
-          'staffEmail': staffEmail,
-          'designation': designation,
-          'totalHoursWorked': totalHoursWorked,
-          'expectedWorkHours': expectedWorkHours,
-          'baseSalary': baseSalary,
-          'payableSalary': payableSalary,
-          'status': 'Pending',
-          'paymentReference': null,
-          'paidAt': null,
-        };
-
-        batch.set(payrollDocRef, paymentData);
+        final docRef = _firestore.collection('Payroll').doc(payrollPeriodId).collection('StaffPayments').doc(staffId);
+        payrollBatch.set(docRef, staffPayment.toMap());
+        staffProcessed++;
       }
 
-      // 8. Commit the batch write
-      await batch.commit();
+      // Set an overall status for the payroll period document itself.
+      final periodDocRef = _firestore.collection('Payroll').doc(payrollPeriodId);
+      payrollBatch.set(periodDocRef, {'status': 'PendingProgramReview', 'lastUpdated': Timestamp.now()}, SetOptions(merge: true));
 
-      return "Successfully generated payroll for ${DateFormat('MMMM yyyy').format(DateTime(year, month))}.";
+      // Commit all the batched writes to Firestore.
+      await payrollBatch.commit();
+
+      // Prepare a final report message.
+      String report = "Payroll generated for $staffProcessed staff. Ready for Program Review.";
+      if (staffSkipped.isNotEmpty) {
+        report += "\n\nSkipped ${staffSkipped.length} staff due to missing or unconfigured designations:\n- ${staffSkipped.join('\n- ')}";
+      }
+
+      return report;
+
     } catch (e) {
-      print("Error generating payroll: $e");
-      return "An error occurred: $e";
+      // Return a comprehensive error message if anything goes wrong.
+      return "An error occurred during payroll generation: $e";
     }
   }
 }

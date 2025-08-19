@@ -142,6 +142,7 @@ dependencies:
   rename: ^3.0.2
   share_plus:
   printing:
+  firebase_messaging:
  # web:
   html:
   csv: ^6.0.0

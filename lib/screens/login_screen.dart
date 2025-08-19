@@ -1,9 +1,10 @@
+import 'package:attendanceappmailtool/main.dart'; // <<<--- ADD THIS IMPORT
+import 'package:attendanceappmailtool/screens/forgot_password_page.dart';
+import 'package:attendanceappmailtool/screens/loading_screen.dart';
 import 'package:attendanceappmailtool/screens/registration_page_2.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'forgot_password_page.dart';
-import 'loading_screen.dart';
-import 'registration_page.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -39,6 +40,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   void _startTypewriterAnimation() {
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       if (_currentCharIndex < _title.length) {
         setState(() {
           _animatedText += _title[_currentCharIndex];
@@ -56,11 +58,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));
+
+      // <<<--- ADD THIS ---<<<
+      // After successful login, save the FCM token
+      await updateAndSaveFcmToken();
+
+      if (mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));
+      }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -69,14 +80,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final googleProvider = GoogleAuthProvider();
       await _auth.signInWithPopup(googleProvider);
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));
+
+      // <<<--- ADD THIS ---<<<
+      // After successful login, save the FCM token
+      await updateAndSaveFcmToken();
+
+      if (mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));
+      }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
+  // The build method remains exactly the same.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -207,11 +228,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               children: [
                                 Text("Don't have an account?", style: TextStyle(color: Colors.grey.shade600)),
                                 TextButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const RegistrationPageWeb2()),
-                                  ),
-                                  child: const Text('Register here', style: TextStyle(color: Colors.redAccent)),
+
+                                  onPressed: () {  },
+                                  child: const Text('Contact the Program Management Team', style: TextStyle(color: Colors.redAccent)),
                                 ),
                               ],
                             ),

@@ -1,22 +1,74 @@
 import 'package:attendanceappmailtool/screens/delete_account/delete_account.dart';
 import 'package:attendanceappmailtool/screens/delete_account/delete_data.dart';
 import 'package:attendanceappmailtool/screens/login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // <<<--- ADD THIS
+import 'package:firebase_auth/firebase_auth.dart'; // <<<--- ADD THIS
+import 'package:firebase_messaging/firebase_messaging.dart'; // <<<--- ADD THIS
+import 'package:flutter/foundation.dart'; // <<<--- ADD THIS
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'package:js/js.dart';
 import 'package:lottie/lottie.dart';
+import 'dart:developer'; // <<<--- ADD THIS
+
 import 'firebase_options.dart';
 
 // Declare the JS function from face_recognition.js
 @JS('loadModels')
 external Future<void> loadModels();
 
+// <<<--- ADD THIS ENTIRE FUNCTION ---<<<
+/// This function handles getting the FCM token for both Mobile and Web
+/// and saving it to Firestore.
+Future<void> updateAndSaveFcmToken() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    log("Cannot save FCM token. User is not logged in.");
+    return;
+  }
+
+  try {
+    String? fcmToken;
+
+    // For WEB, you MUST provide the VAPID key.
+    log("Platform is Web. Getting FCM token with VAPID key...");
+    fcmToken = await FirebaseMessaging.instance.getToken(
+      // IMPORTANT: Paste your VAPID key from the Firebase Console here
+      vapidKey: "BDtoMWZWcGyQ6deMJxkqGnVI1m8YR9rwOn6PDRNvEjFhWjldnk73XQ96wtkNbtjdZIkmgBEYnzw6MrVC43G9tFU",
+    );
+
+    if (fcmToken != null) {
+      log("Web FCM Token found: $fcmToken");
+
+      // Save the token to the user's document in the 'Staff' collection
+      final userDocRef =
+      FirebaseFirestore.instance.collection('Staff').doc(user.uid);
+      await userDocRef.set(
+        {'fcmToken': fcmToken},
+        SetOptions(merge: true), // Use merge to avoid overwriting other data
+      );
+
+      log("✅ FCM Token saved to Firestore successfully!");
+    } else {
+      log("⚠️ Could not get FCM token for web. It was null.");
+    }
+  } catch (e, s) {
+    log("❌ Error saving FCM token", error: e, stackTrace: s);
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // <<<--- ADD THIS ---<<<
+  // Request notification permissions for the web app
+  if (kIsWeb) {
+    await FirebaseMessaging.instance.requestPermission();
+  }
 
   await loadModels(); // Load models once here
 

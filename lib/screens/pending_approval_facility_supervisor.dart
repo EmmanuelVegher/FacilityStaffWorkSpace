@@ -1,3 +1,4 @@
+import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_facility_supervisor.dart';
 import 'package:attendanceappmailtool/screens/timesheet/pending_timesheet_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -153,7 +154,7 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => TimesheetDetailsScreen2(
+        builder: (context) => TimesheetDetailsScreen3(
           timesheetData: doc,
           staffId: doc['staffId'],
         ),
