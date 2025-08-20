@@ -121,11 +121,16 @@ class SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: Lottie.asset(
-          'assets/lottie/loading5.json',
-          width: 200,
-          height: 200,
-          fit: BoxFit.contain,
+        child:
+        // Lottie.asset(
+        //   'assets/lottie/loading5.json',
+        //   width: 200,
+        //   height: 200,
+        //   fit: BoxFit.contain,
+        // ),
+        Text(
+          "Loading...",
+          style: TextStyle(fontSize: 24),
         ),
       ),
     );
