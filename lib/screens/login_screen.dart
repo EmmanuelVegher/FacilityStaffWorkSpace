@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       // <<<--- ADD THIS ---<<<
       // After successful login, save the FCM token
-      await updateAndSaveFcmToken();
+      //await updateAndSaveFcmToken();
 
       if (mounted) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));
@@ -83,7 +83,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       // <<<--- ADD THIS ---<<<
       // After successful login, save the FCM token
-      await updateAndSaveFcmToken();
+      //await updateAndSaveFcmToken();
 
       if (mounted) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoadingScreen()));

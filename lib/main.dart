@@ -21,42 +21,42 @@ external Future<void> loadModels();
 // <<<--- ADD THIS ENTIRE FUNCTION ---<<<
 /// This function handles getting the FCM token for both Mobile and Web
 /// and saving it to Firestore.
-Future<void> updateAndSaveFcmToken() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    log("Cannot save FCM token. User is not logged in.");
-    return;
-  }
-
-  try {
-    String? fcmToken;
-
-    // For WEB, you MUST provide the VAPID key.
-    log("Platform is Web. Getting FCM token with VAPID key...");
-    fcmToken = await FirebaseMessaging.instance.getToken(
-      // IMPORTANT: Paste your VAPID key from the Firebase Console here
-      vapidKey: "BDtoMWZWcGyQ6deMJxkqGnVI1m8YR9rwOn6PDRNvEjFhWjldnk73XQ96wtkNbtjdZIkmgBEYnzw6MrVC43G9tFU",
-    );
-
-    if (fcmToken != null) {
-      log("Web FCM Token found: $fcmToken");
-
-      // Save the token to the user's document in the 'Staff' collection
-      final userDocRef =
-      FirebaseFirestore.instance.collection('Staff').doc(user.uid);
-      await userDocRef.set(
-        {'fcmToken': fcmToken},
-        SetOptions(merge: true), // Use merge to avoid overwriting other data
-      );
-
-      log("✅ FCM Token saved to Firestore successfully!");
-    } else {
-      log("⚠️ Could not get FCM token for web. It was null.");
-    }
-  } catch (e, s) {
-    log("❌ Error saving FCM token", error: e, stackTrace: s);
-  }
-}
+// Future<void> updateAndSaveFcmToken() async {
+//   final user = FirebaseAuth.instance.currentUser;
+//   if (user == null) {
+//     log("Cannot save FCM token. User is not logged in.");
+//     return;
+//   }
+//
+//   try {
+//     String? fcmToken;
+//
+//     // For WEB, you MUST provide the VAPID key.
+//     log("Platform is Web. Getting FCM token with VAPID key...");
+//     fcmToken = await FirebaseMessaging.instance.getToken(
+//       // IMPORTANT: Paste your VAPID key from the Firebase Console here
+//       vapidKey: "BDtoMWZWcGyQ6deMJxkqGnVI1m8YR9rwOn6PDRNvEjFhWjldnk73XQ96wtkNbtjdZIkmgBEYnzw6MrVC43G9tFU",
+//     );
+//
+//     if (fcmToken != null) {
+//       log("Web FCM Token found: $fcmToken");
+//
+//       // Save the token to the user's document in the 'Staff' collection
+//       final userDocRef =
+//       FirebaseFirestore.instance.collection('Staff').doc(user.uid);
+//       await userDocRef.set(
+//         {'fcmToken': fcmToken},
+//         SetOptions(merge: true), // Use merge to avoid overwriting other data
+//       );
+//
+//       log("✅ FCM Token saved to Firestore successfully!");
+//     } else {
+//       log("⚠️ Could not get FCM token for web. It was null.");
+//     }
+//   } catch (e, s) {
+//     log("❌ Error saving FCM token", error: e, stackTrace: s);
+//   }
+// }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,11 +64,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // <<<--- ADD THIS ---<<<
-  // Request notification permissions for the web app
-  if (kIsWeb) {
-    await FirebaseMessaging.instance.requestPermission();
-  }
+  // // <<<--- ADD THIS ---<<<
+  // // Request notification permissions for the web app
+  // if (kIsWeb) {
+  //   await FirebaseMessaging.instance.requestPermission();
+  // }
 
   await loadModels(); // Load models once here
 
