@@ -64,6 +64,7 @@ class TimesheetModel {
   final List<TimesheetEntry> entries;
   final double totalHours;
 
+  // MODIFIED: The constructor now calls a helper method to calculate totalHours correctly.
   TimesheetModel({
     required this.staffId,
     required this.staffName,
@@ -84,7 +85,28 @@ class TimesheetModel {
     this.caritasSupervisorSignature,
     this.caritasSupervisorSignatureDate,
     required this.entries,
-  }) : totalHours = entries.fold(0.0, (sum, item) => sum + item.noOfHours);
+  }) : totalHours = _calculateCappedTotalHours(entries);
+
+  // NEW: Helper method to calculate total hours with an 8-hour daily cap.
+  static double _calculateCappedTotalHours(List<TimesheetEntry> entries) {
+    if (entries.isEmpty) return 0.0;
+
+    final Map<String, double> dailyHours = {};
+    for (final entry in entries) {
+      dailyHours.update(
+        entry.date,
+            (value) => value + entry.noOfHours.toDouble(),
+        ifAbsent: () => entry.noOfHours.toDouble(),
+      );
+    }
+
+    double cappedTotal = 0.0;
+    for (final hours in dailyHours.values) {
+      cappedTotal += (hours > 8.0) ? 8.0 : hours;
+    }
+
+    return cappedTotal;
+  }
 
   factory TimesheetModel.fromMap(Map<String, dynamic> map, String id) {
     var entriesData = (map['timesheetEntries'] as List<dynamic>?)
@@ -890,16 +912,50 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   }
 
   Widget _buildEntriesTable(List<TimesheetEntry> entries) {
+    // 1. Aggregate entries to get a summary for each day.
+    final Map<String, Map<String, dynamic>> dailySummary = {};
+    for (final entry in entries) {
+      dailySummary.update(
+        entry.date,
+            (value) {
+          value['hours'] = value['hours']! + entry.noOfHours.toDouble();
+          if (entry.isOffDay) value['isOffDay'] = true;
+          return value;
+        },
+        ifAbsent: () => {
+          'hours': entry.noOfHours.toDouble(),
+          'isOffDay': entry.isOffDay,
+        },
+      );
+    }
+
+    // 2. Sort the daily entries by date for consistent display.
+    final sortedDates = dailySummary.keys.toList()..sort();
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columns: const [ DataColumn(label: Text("Date")), DataColumn(label: Text("Duration Worked")), DataColumn(label: Text("Hours"), numeric: true)],
-        rows: entries.map((entry) => DataRow(
-            color: WidgetStateProperty.resolveWith<Color?>((s) => entry.isOffDay ? Colors.blue.withOpacity(0.05) : null),
-            cells: [
-              DataCell(Text(entry.date)), DataCell(Text(entry.durationWorked)), DataCell(Text(entry.noOfHours.toStringAsFixed(2))),
-            ]
-        )).toList(),
+        // MODIFIED: Columns are simplified for a daily summary view.
+        columns: const [
+          DataColumn(label: Text("Date")),
+          DataColumn(label: Text("Total Hours"), numeric: true)
+        ],
+        rows: sortedDates.map((date) {
+          final summary = dailySummary[date]!;
+          final double dailyHours = summary['hours']!;
+          // 3. Apply the 8-hour cap for display, matching the total calculation.
+          final double cappedHours = dailyHours > 8.0 ? 8.0 : dailyHours;
+          final bool isOffDay = summary['isOffDay']!;
+
+          return DataRow(
+              color: WidgetStateProperty.resolveWith<Color?>(
+                      (s) => isOffDay ? Colors.blue.withOpacity(0.05) : null),
+              cells: [
+                DataCell(Text(date)),
+                DataCell(Text(cappedHours.toStringAsFixed(2))),
+              ]
+          );
+        }).toList(),
       ),
     );
   }
@@ -1038,122 +1094,206 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     html.Url.revokeObjectUrl(url);
   }
 
+
   Future<pw.Page> _createSingleTimesheetPage(TimesheetModel timesheet, pw.ImageProvider logoImage, pw.Font ttf, pw.Font ttfBold) async {
     final monthName = DateFormat('MMMM, yyyy').format(DateTime(_selectedYear, _selectedMonth));
-    final startDate = DateTime(_selectedYear, _selectedMonth - 1, 21);
-    final endDate = DateTime(_selectedYear, _selectedMonth, 20);
+
+    // *** MODIFIED: Date range is now 20th of previous month to 19th of current month. ***
+    final startDate = DateTime(_selectedYear, _selectedMonth - 1, 20);
+    final endDate = DateTime(_selectedYear, _selectedMonth, 19);
+
     final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
     final tableHeaders = ['Project Name', ...daysInRange.map((date) => DateFormat('dd').format(date)), 'Total Hours', '%'];
-    Map<String, List<double>> projectDailyHours = {};
-    Map<String, List<double>> outOfOfficeDailyHours = {'Annual leave': List.filled(daysInRange.length, 0.0), 'Holiday': List.filled(daysInRange.length, 0.0), 'Maternity': List.filled(daysInRange.length, 0.0)};
-    for(int i = 0; i < daysInRange.length; i++) {
+
+    final mainProjectName = timesheet.projectName ?? "Access Project";
+    final List<String> categories = [
+      mainProjectName,
+      'Annual leave',
+      'Holiday',
+      'Maternity',
+    ];
+
+    Map<String, List<double>> dailyHoursByCategory = {
+      for (var category in categories) category: List.filled(daysInRange.length, 0.0)
+    };
+
+    // Populate hours from entries, capping each day's work at 8 hours.
+    for (int i = 0; i < daysInRange.length; i++) {
       final date = daysInRange[i];
-      for(final entry in timesheet.entries) {
-        if(entry.date == DateFormat('yyyy-MM-dd').format(date)) {
-          double hours = entry.noOfHours.toDouble() > 8.0 ? 8.0 : entry.noOfHours.toDouble();
-          if(entry.isOffDay) {
-            if(outOfOfficeDailyHours.containsKey(entry.durationWorked)) outOfOfficeDailyHours[entry.durationWorked]![i] += hours;
+      final dateString = DateFormat('yyyy-MM-dd').format(date);
+      double dailyTotalForCap = 0; // Track total hours for a single day to cap at 8
+
+      for (final entry in timesheet.entries) {
+        if (entry.date == dateString) {
+          double hours = entry.noOfHours.toDouble();
+          if (dailyTotalForCap + hours > 8.0) {
+            hours = 8.0 - dailyTotalForCap; // Only add the remaining hours up to the cap
+          }
+          if (hours < 0) hours = 0;
+          dailyTotalForCap += hours;
+
+          if (entry.isOffDay) {
+            if (dailyHoursByCategory.containsKey(entry.durationWorked)) {
+              dailyHoursByCategory[entry.durationWorked]![i] += hours;
+            }
           } else {
-            projectDailyHours.putIfAbsent(entry.projectName, () => List.filled(daysInRange.length, 0.0));
-            projectDailyHours[entry.projectName]![i] += hours;
+            dailyHoursByCategory[mainProjectName]![i] += hours;
           }
         }
       }
     }
+
     final int workingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
     final double maxHours = (workingDays * 8.0);
-    List<List<String>> allRows = [];
-    final mainProjectName = timesheet.projectName ?? (projectDailyHours.keys.isNotEmpty ? projectDailyHours.keys.first : "Project");
-    final mainProjectHours = projectDailyHours[mainProjectName] ?? List.filled(daysInRange.length, 0.0);
-    final totalProjectHours = mainProjectHours.reduce((a, b) => a + b);
-    final percentProject = maxHours > 0 ? (totalProjectHours / maxHours * 100) : 0;
-    allRows.add([mainProjectName, ...mainProjectHours.map((h) => h.round().toString()), totalProjectHours.round().toString(), '${percentProject.round()}%']);
-    outOfOfficeDailyHours.forEach((category, hours) {
-      final total = hours.reduce((a, b) => a + b);
-      if (total > 0) {
-        final percent = maxHours > 0 ? (total / maxHours * 100) : 0;
-        allRows.add([category, ...hours.map((h) => h.round().toString()), total.round().toString(), '${percent.round()}%']);
+
+    List<List<String>> tableBodyRows = [];
+
+    for (var category in categories) {
+      final hours = dailyHoursByCategory[category]!;
+      final totalCategoryHours = hours.reduce((a, b) => a + b);
+      final percentCategory = maxHours > 0 ? (totalCategoryHours / maxHours * 100) : 0;
+      tableBodyRows.add([
+        category,
+        ...hours.map((h) => h.round().toString()),
+        totalCategoryHours.round().toString(),
+        '${percentCategory.round()}%'
+      ]);
+    }
+
+    List<String> totalRowStrings = ['Total'];
+    for (int i = 0; i < daysInRange.length; i++) {
+      double dayTotal = 0;
+      for (var category in categories) {
+        dayTotal += dailyHoursByCategory[category]![i];
       }
-    });
+      totalRowStrings.add(dayTotal.round().toString());
+    }
+
+    final double grandTotalHours = totalRowStrings.sublist(1).fold(0.0, (sum, item) => sum + (double.tryParse(item) ?? 0.0));
+    final double grandPercent = maxHours > 0 ? (grandTotalHours / maxHours * 100) : 0.0;
+
+    totalRowStrings.add(grandTotalHours.round().toString());
+    totalRowStrings.add('${grandPercent.round()}%');
+    tableBodyRows.add(totalRowStrings);
+
     final staffSigBytes = await _networkImageToByte(timesheet.staffSignature);
     final facilitySigBytes = await _networkImageToByte(timesheet.facilitySupervisorSignature);
     final caritasSigBytes = await _networkImageToByte(timesheet.caritasSupervisorSignature);
+
     return pw.Page(
       pageFormat: PdfPageFormat.a4.landscape,
       margin: const pw.EdgeInsets.all(30),
       theme: pw.ThemeData.withFont(base: ttf, bold: ttfBold),
       build: (pw.Context context) {
-        return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('Name: ${timesheet.staffName}', style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('Department: ${timesheet.department}', style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('Designation: ${timesheet.designation}', style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('Location: ${timesheet.location}', style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('State: ${timesheet.state}', style: const pw.TextStyle(fontSize: 9)),
-            ]),
-            pw.Column(children: [
-              pw.Text("CARITAS NIGERIA", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
-              pw.SizedBox(height: 5),
-              pw.Text("Monthly Time Report ($monthName)", style: const pw.TextStyle(fontSize: 14))
-            ]),
-            pw.Image(logoImage, width: 70, height: 70),
-          ]),
-          pw.SizedBox(height: 10),
-          pw.Table(
-            border: pw.TableBorder.all(),
-            columnWidths: {0: const pw.FlexColumnWidth(2.5), for (int i = 1; i <= daysInRange.length; i++) i: const pw.FlexColumnWidth(0.7), daysInRange.length + 1: const pw.FlexColumnWidth(1.2), daysInRange.length + 2: const pw.FlexColumnWidth(0.8)},
-            children: [
-              pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: tableHeaders.map((h) => pw.Container(alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(2), child: pw.Text(h, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)))).toList()),
-              ...allRows.map((row) => pw.TableRow(children: row.asMap().entries.map((entry) {
-                final i = entry.key;
-                final data = entry.value;
-                final isWeekend = i > 0 && i <= daysInRange.length && (daysInRange[i-1].weekday == 6 || daysInRange[i-1].weekday == 7);
-                return pw.Container(color: isWeekend ? PdfColors.grey200 : null, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(2), child: pw.Text(data, style: const pw.TextStyle(fontSize: 6.5)));
-              }).toList())),
-              pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: List.generate(tableHeaders.length, (i) {
-                if (i == 0) return pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center);
-                if (i > 0 && i <= daysInRange.length) {
-                  double dayTotal = allRows.fold(0.0, (sum, row) => sum + (double.tryParse(row[i]) ?? 0.0));
-                  return pw.Text(dayTotal.round().toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center);
-                }
-                if (i == daysInRange.length + 1) {
-                  double grandTotal = allRows.fold(0.0, (sum, row) => sum + (double.tryParse(row[i]) ?? 0.0));
-                  return pw.Text(grandTotal.round().toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center);
-                }
-                double grandTotalHours = allRows.fold(0.0, (sum, row) => sum + (double.tryParse(row[daysInRange.length+1]) ?? 0.0));
-                double grandPercent = maxHours > 0 ? (grandTotalHours / maxHours * 100) : 0.0;
-                return pw.Text('${grandPercent.round()}%', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center);
-              }))
-            ],
-          ),
-          pw.Spacer(),
-          pw.Text('Signature & Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-          pw.Divider(height: 1),
-          pw.SizedBox(height: 5),
-          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-            _buildPdfSignatureColumn('Name of Staff', timesheet.staffName, staffSigBytes, timesheet.staffSignatureDate),
-            _buildPdfSignatureColumn('Name of Project Coordinator', timesheet.facilitySupervisor, facilitySigBytes, timesheet.facilitySupervisorSignatureDate),
-            _buildPdfSignatureColumn('Name of Caritas Supervisor', timesheet.caritasSupervisor, caritasSigBytes, timesheet.caritasSupervisorSignatureDate),
-          ]),
-        ]);
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Name: ${timesheet.staffName}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('Department: ${timesheet.department}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('Designation: ${timesheet.designation}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('Location: ${timesheet.location}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('State: ${timesheet.state}', style: const pw.TextStyle(fontSize: 10)),
+                    ]),
+                pw.Column(children: [
+                  pw.Text("CARITAS NIGERIA", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
+                  pw.SizedBox(height: 5),
+                  pw.Text("Monthly Time Report ($monthName)", style: const pw.TextStyle(fontSize: 14))
+                ]),
+                pw.Image(logoImage, width: 70, height: 70),
+              ],
+            ),
+            pw.SizedBox(height: 15),
+            pw.Table(
+              border: pw.TableBorder.all(),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.5),
+                for (int i = 1; i <= daysInRange.length; i++) i: const pw.FlexColumnWidth(0.8),
+                daysInRange.length + 1: const pw.FlexColumnWidth(1.2),
+                daysInRange.length + 2: const pw.FlexColumnWidth(0.8),
+              },
+              children: [
+                pw.TableRow(
+                  children: tableHeaders.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final headerText = entry.value;
+                    bool isWeekendHeader = i > 0 && i <= daysInRange.length && (daysInRange[i - 1].weekday == 6 || daysInRange[i - 1].weekday == 7);
+                    return pw.Container(
+                        color: isWeekendHeader ? PdfColors.black : PdfColors.grey300,
+                        alignment: pw.Alignment.center,
+                        padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                        child: pw.Text(headerText, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: isWeekendHeader ? PdfColors.white : PdfColors.black)));
+                  }).toList(),
+                ),
+                ...tableBodyRows.map((row) {
+                  final isTotalRow = row.first == 'Total';
+                  final style = isTotalRow
+                      ? pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)
+                      : const pw.TextStyle(fontSize: 8);
+
+                  return pw.TableRow(
+                    decoration: isTotalRow ? const pw.BoxDecoration(color: PdfColors.grey300) : null,
+                    children: row.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final data = entry.value;
+                      final isWeekend = i > 0 && i <= daysInRange.length && (daysInRange[i - 1].weekday == 6 || daysInRange[i - 1].weekday == 7);
+
+                      return pw.Container(
+                        color: isWeekend ? PdfColors.black : null,
+                        alignment: pw.Alignment.center,
+                        padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                        child: pw.Text(
+                          isWeekend ? '' : data,
+                          style: style,
+                        ),
+                      );
+                    }).toList(),
+                  );
+                }),
+              ],
+            ),
+            pw.Spacer(),
+            pw.Text('Signature & Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+            pw.Divider(height: 1),
+            pw.SizedBox(height: 5),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                _buildPdfSignatureColumn('Name of Staff', timesheet.staffName, staffSigBytes, timesheet.staffSignatureDate),
+                _buildPdfSignatureColumn('Name of Project Coordinator', timesheet.facilitySupervisor, facilitySigBytes, timesheet.facilitySupervisorSignatureDate),
+                _buildPdfSignatureColumn('Name of Caritas Supervisor', timesheet.caritasSupervisor, caritasSigBytes, timesheet.caritasSupervisorSignatureDate),
+              ],
+            ),
+          ],
+        );
       },
     );
   }
 
   pw.Widget _buildPdfSignatureColumn(String title, String name, Uint8List? imageBytes, String? date) {
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-      pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-      pw.SizedBox(height: 2),
-      pw.Text(name.toUpperCase(), style: const pw.TextStyle(fontSize: 8)),
-      pw.SizedBox(height: 2),
-      pw.Container(
-          height: 35, width: 100,
-          decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
-          child: imageBytes != null && imageBytes.isNotEmpty ? pw.Image(pw.MemoryImage(imageBytes)) : pw.Center(child: pw.Text('Signature', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)))
-      ),
-      pw.SizedBox(height: 2),
-      pw.Text("Date: ${date ?? 'N/A'}", style: const pw.TextStyle(fontSize: 8)),
-    ]);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+        pw.SizedBox(height: 2),
+        pw.Text(name.toUpperCase(), style: const pw.TextStyle(fontSize: 10)),
+        pw.SizedBox(height: 2),
+        pw.Container(
+            height: 35, width: 100,
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
+            child: imageBytes != null && imageBytes.isNotEmpty
+                ? pw.Image(pw.MemoryImage(imageBytes))
+                : pw.Center(child: pw.Text('Signature', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)))
+        ),
+        pw.SizedBox(height: 2),
+        pw.Text("Date: ${date ?? 'N/A'}", style: const pw.TextStyle(fontSize: 10)),
+      ],
+    );
   }
 }
