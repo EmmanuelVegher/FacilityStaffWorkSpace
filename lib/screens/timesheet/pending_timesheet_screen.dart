@@ -469,84 +469,79 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
 
 
   Future<void> _uploadSignatureAndSync() async {
-    final bioData = await _fetchBioDataFromFirestore(widget.staffId);
-    if (bioData == null) return;
-
-    if (selectedBioStaffCategory2 == "Facility Supervisor") {
-      if (selectedSignatureLink == null) {
-        Fluttertoast.showToast(
-          msg: "Cannot Sign timesheet without Staff Signature.",
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-        return;
-      }
+    // 1. Corrected Check: Ensure the supervisor trying to sign (Facility or CARITAS) has uploaded their own signature.
+    if (selectedSignatureLink2 == null) {
+      Fluttertoast.showToast(
+        msg: "Cannot sign. Please upload your signature in your profile first.",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
     }
 
-    if (selectedBioStaffCategory2 == "State Office Staff") {
-      if (selectedSignatureLink == null) {
-        Fluttertoast.showToast(
-          msg: "Cannot Sign timesheet without Staff Signature.",
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-        return;
-      }
+    // 2. Corrected Validation: Ensure the staff has actually signed this specific timesheet document.
+    // This is a more robust check than looking at the staff's profile.
+    if (widget.timesheetData['staffSignature'] == null || (widget.timesheetData['staffSignature'] as String).isEmpty) {
+      Fluttertoast.showToast(
+        msg: "Cannot Sign timesheet without Staff Signature.",
+        toastLength: Toast.LENGTH_LONG,
+        backgroundColor: Colors.black54,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
     }
 
-    if (selectedSignatureLink != null ) {
-      DateTime? timesheetDate1; // Make it nullable
-      try {
-        final dateString = widget.timesheetData['staffSignatureDate'];
-        if (dateString != null && dateString is String) { // Null and type check
-          timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
-        } else {
-          timesheetDate1 = DateTime.now(); // Default if null or not string
-          print("Warning: Timesheet date is null or not a string, using current date as default.");
-        }
-      } catch (e) {
-        print("Error parsing date: $e, using current date as default.");
-        timesheetDate1 = DateTime.now(); // Fallback to current date on error
+    // If all checks pass, proceed with updating Firestore.
+    // The old, incorrect `if` conditions have been replaced by the validation above.
+    DateTime? timesheetDate1;
+    try {
+      final dateString = widget.timesheetData['staffSignatureDate'];
+      if (dateString != null && dateString is String) {
+        timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
+      } else {
+        timesheetDate1 = DateTime.now();
+        print("Warning: Timesheet date is null or not a string, using current date as default.");
       }
-      timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
+    } catch (e) {
+      print("Error parsing date: $e, using current date as default.");
+      timesheetDate1 = DateTime.now();
+    }
+    timesheetDate1 ??= DateTime.now();
 
-      final staffId = widget.timesheetData['staffId'] ?? 'N/A';
-      String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
+    final staffId = widget.timesheetData['staffId'] ?? 'N/A';
+    String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
 
-      try {
-        QuerySnapshot snap = await FirebaseFirestore.instance
-            .collection("Staff")
-            .where("id", isEqualTo: staffId)
-            .get();
+    try {
+      QuerySnapshot snap = await FirebaseFirestore.instance
+          .collection("Staff")
+          .where("id", isEqualTo: staffId)
+          .get();
 
-        Map<String, dynamic> timesheetDataUpdate = {};
-        if (selectedBioStaffCategory2 == "Facility Supervisor"){
-          timesheetDataUpdate = {
-            'facilitySupervisorSignature': selectedSignatureLink2,
-            'facilitySupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-            'facilitySupervisorSignatureStatus':"Approved",
-            'facilitySupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
-          };
-        }
+      Map<String, dynamic> timesheetDataUpdate = {};
+      if (selectedBioStaffCategory2 == "Facility Supervisor") {
+        timesheetDataUpdate = {
+          'facilitySupervisorSignature': selectedSignatureLink2,
+          'facilitySupervisorSignatureDate': DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+          'facilitySupervisorSignatureStatus': "Approved",
+          'facilitySupervisorTimesheetSubmissionTimestamp': DateTime.now().toIso8601String(),
+        };
+      } else if (selectedBioStaffCategory2 == "State Office Staff") { // Handles CARITAS Supervisor
+        timesheetDataUpdate = {
+          'caritasSupervisorSignature': selectedSignatureLink2,
+          'caritasSupervisorSignatureDate': DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+          'caritasSupervisorSignatureStatus': "Approved",
+          'caritasSupervisorTimesheetSubmissionTimestamp': DateTime.now().toIso8601String(),
+        };
+      }
 
-        if (selectedBioStaffCategory2 == "State Office Staff"){
-          timesheetDataUpdate = {
-            'caritasSupervisorSignature': selectedSignatureLink2,
-            'caritasSupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-            'caritasSupervisorSignatureStatus':"Approved",
-            'caritasSupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
-          };
-        }
-
-
+      if (timesheetDataUpdate.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection("Staff")
             .doc(snap.docs[0].id)
@@ -565,18 +560,17 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
           fontSize: 16.0,
         );
 
-        if (selectedBioStaffCategory2 == "Facility Supervisor"){
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
-            ),
-          ).then((_) => _fetchPendingApprovals());
-        }
-
-      } catch (e) {
-        print('Error saving timesheet: $e');
+        // Navigate back after signing
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const PendingApprovalsPage(),
+          ),
+        ).then((_) => _fetchPendingApprovals());
       }
+    } catch (e) {
+      print('Error saving timesheet: $e');
+      Fluttertoast.showToast(msg: "An error occurred while signing.");
     }
   }
 
