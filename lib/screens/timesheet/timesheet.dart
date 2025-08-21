@@ -3029,6 +3029,7 @@ $selectedBioFirstName $selectedBioLastName
   // }
 
   @override
+  @override
   Widget build(BuildContext context) {
 // Responsiveness calculations based on screen width
     final screenWidth = MediaQuery.of(context).size.width;
@@ -3317,261 +3318,123 @@ $selectedBioFirstName $selectedBioLastName
                       ),
 
                       Expanded(
-                        child:RepaintBoundary(
-                            key: _globalKey,
-                            child: Column(
-                                children: [
-                                  SingleChildScrollView(
-                                    controller: _horizontalScrollController,
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const BouncingScrollPhysics(), // Smooth scrolling effect
-                                    padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
-                                    dragStartBehavior: DragStartBehavior.start,
-                                    clipBehavior: Clip.hardEdge,
-                                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                                    child:
-                                    // SizedBox( // <-- Use SizedBox to constrain the width
-                                    //     width: totalContentWidth(), // Calculate this dynamically
-                                    //     child:
-                                    Column(
-                                      children: [
-                                        Column(
-                                          children: [
-                                            // Header Row
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  width: 150,
-                                                  // Set a width for the "Project Name" header
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.blue.shade100,
-                                                  child: const Text(
-                                                    'Project Name',
-                                                    style: TextStyle(
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                                ...daysInRange.map((date) {
-                                                  return Container(
-                                                    width: 50,
-                                                    alignment: Alignment.center,
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    color: isWeekend(date) ? Colors.grey
-                                                        .shade300 : Colors.blue
-                                                        .shade100,
-                                                    child: Text(
-                                                      DateFormat('dd MMM').format(date),
-                                                      style: const TextStyle(
-                                                          fontWeight: FontWeight.bold),
-                                                    ),
-                                                  );
-                                                }),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.blue.shade100,
-                                                  child: const Text(
-                                                    'Total Hours',
-                                                    style: TextStyle(
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.blue.shade100,
-                                                  child: const Text(
-                                                    'Percentage',
-                                                    style: TextStyle(
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ],
-                                            ), 
-                                            const Divider(),
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  width: 150,
-                                                  // Keep the fixed width if you need it
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: projectNames.isEmpty
-                                                      ? const Text('No projects found')
-                                                      : DropdownButton<String>(
-                                                    value: selectedProjectName,
-                                                    isExpanded: true,
-                                                    // This will expand the dropdown to the Container's width
-                                                    items: projectNames.map((
-                                                        projectName) {
-                                                      return DropdownMenuItem<String>(
-                                                        value: projectName,
-                                                        child: FittedBox( // Use FittedBox to wrap the Text
-                                                          fit: BoxFit.scaleDown,
-                                                          // Scales down text to fit
-                                                          alignment: Alignment
-                                                              .centerLeft,
-                                                          // Align text to the left
-                                                          child: Text(projectName ??
-                                                              'No Project Name'),
-                                                        ),
-                                                      );
-                                                    }).toList(),
-                                                    onChanged: (String? newValue) {
-                                                      setState(() {
-                                                        selectedProjectName = newValue;
-                                                      });
-                                                    },
-                                                    hint: const Text('Select Project'),
-                                                  ),
-                                                ),
-                                                ...daysInRange.map((date) {
-                                                  bool weekend = isWeekend(date);
-                                                  String hours = _getDurationForDate2(
-                                                      date, selectedProjectName,
-                                                      selectedProjectName!);
-                                                  return Container(
-                                                    width: 50,
-                                                    // Set a fixed width for each day
-                                                    decoration: BoxDecoration(
-                                                      color: weekend ? Colors.grey
-                                                          .shade300 : Colors.white,
-                                                      border: Border.all(
-                                                          color: Colors.black12),
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment
-                                                          .center,
-                                                      children: [
-                                                        weekend
-                                                            ? const SizedBox
-                                                            .shrink() // No hours on weekends
-                                                            : Text(
-                                                          hours,
-                                                          // Placeholder, replace with Isar data
-                                                          style: const TextStyle(
-                                                              color: Colors.blueAccent),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: Text(
-                                                    //'$totalHours hrs',
-                                                    "${calculateTotalHours1(
-                                                        selectedProjectName)
-                                                        .round()} hrs",
-
-                                                    style: const TextStyle(
-                                                        color: Colors.green,
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: Text(
-                                                    // '${percentageWorked.toStringAsFixed(2)}%',
-                                                    '${calculatePercentageWorked1(
-                                                        selectedProjectName).round()}%',
-                                                    style: const TextStyle(
-                                                        color: Colors.green,
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const Divider(),
-                                            // "Out-of-office" Header Row
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  width: 150,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: const Text(
-                                                    'Out-of-office',
-                                                    style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 18),
-                                                  ),
-                                                ),
-                                                ...List.generate(
-                                                    daysInRange.length, (index) {
-                                                  return Container(
-                                                    width: 50,
-                                                    alignment: Alignment.center,
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    color: Colors.white,
-                                                    child: const Text(
-                                                      '', // Placeholder for out-of-office data, can be replaced later
-                                                    ),
-                                                  );
-                                                }),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: const Text(
-                                                    '', // Placeholder for total hours
-                                                  ),
-                                                ),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: const Text(
-                                                    '', // Placeholder for percentage
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
-                                            // Rows for out-of-office categories
-                                            ...[
-                                              'Annual leave',
-                                              'Holiday',
-                                             // 'Paternity',
-                                              'Maternity'
-                                            ].map((category) {
-                                              double outOfOfficeHours = calculateCategoryHours(
-                                                  category);
-                                              double outOfOfficePercentage = calculateCategoryPercentage(
-                                                  category);
-                                              return Row(
+                          child:RepaintBoundary(
+                              key: _globalKey,
+                              child: Column(
+                                  children: [
+                                    SingleChildScrollView(
+                                      controller: _horizontalScrollController,
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(), // Smooth scrolling effect
+                                      padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
+                                      dragStartBehavior: DragStartBehavior.start,
+                                      clipBehavior: Clip.hardEdge,
+                                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                                      child:
+                                      // SizedBox( // <-- Use SizedBox to constrain the width
+                                      //     width: totalContentWidth(), // Calculate this dynamically
+                                      //     child:
+                                      Column(
+                                        children: [
+                                          Column(
+                                            children: [
+                                              // Header Row
+                                              Row(
                                                 children: [
                                                   Container(
                                                     width: 150,
+                                                    // Set a width for the "Project Name" header
                                                     alignment: Alignment.center,
                                                     padding: const EdgeInsets.all(8.0),
-                                                    color: Colors.white,
-                                                    child: Text(
-                                                      category,
-                                                      style: const TextStyle(
+                                                    color: Colors.blue.shade100,
+                                                    child: const Text(
+                                                      'Project Name',
+                                                      style: TextStyle(
                                                           fontWeight: FontWeight.bold),
                                                     ),
                                                   ),
                                                   ...daysInRange.map((date) {
+                                                    return Container(
+                                                      width: 50,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: isWeekend(date) ? Colors.grey
+                                                          .shade300 : Colors.blue
+                                                          .shade100,
+                                                      child: Text(
+                                                        DateFormat('dd MMM').format(date),
+                                                        style: const TextStyle(
+                                                            fontWeight: FontWeight.bold),
+                                                      ),
+                                                    );
+                                                  }),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.blue.shade100,
+                                                    child: const Text(
+                                                      'Total Hours',
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.blue.shade100,
+                                                    child: const Text(
+                                                      'Percentage',
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const Divider(),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 150,
+                                                    // Keep the fixed width if you need it
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: projectNames.isEmpty
+                                                        ? const Text('No projects found')
+                                                        : DropdownButton<String>(
+                                                      value: selectedProjectName,
+                                                      isExpanded: true,
+                                                      // This will expand the dropdown to the Container's width
+                                                      items: projectNames.map((
+                                                          projectName) {
+                                                        return DropdownMenuItem<String>(
+                                                          value: projectName,
+                                                          child: FittedBox( // Use FittedBox to wrap the Text
+                                                            fit: BoxFit.scaleDown,
+                                                            // Scales down text to fit
+                                                            alignment: Alignment
+                                                                .centerLeft,
+                                                            // Align text to the left
+                                                            child: Text(projectName ??
+                                                                'No Project Name'),
+                                                          ),
+                                                        );
+                                                      }).toList(),
+                                                      onChanged: (String? newValue) {
+                                                        setState(() {
+                                                          selectedProjectName = newValue;
+                                                        });
+                                                      },
+                                                      hint: const Text('Select Project'),
+                                                    ),
+                                                  ),
+                                                  ...daysInRange.map((date) {
                                                     bool weekend = isWeekend(date);
-                                                    String offDayHours = _getDurationForDate2(
+                                                    String hours = _getDurationForDate2(
                                                         date, selectedProjectName,
-                                                        category);
-
-
+                                                        selectedProjectName!);
                                                     return Container(
                                                       width: 50,
                                                       // Set a fixed width for each day
@@ -3589,11 +3452,10 @@ $selectedBioFirstName $selectedBioLastName
                                                               ? const SizedBox
                                                               .shrink() // No hours on weekends
                                                               : Text(
-                                                            offDayHours,
+                                                            hours,
                                                             // Placeholder, replace with Isar data
                                                             style: const TextStyle(
-                                                                color: Colors
-                                                                    .blueAccent),
+                                                                color: Colors.blueAccent),
                                                           ),
                                                         ],
                                                       ),
@@ -3605,9 +3467,11 @@ $selectedBioFirstName $selectedBioLastName
                                                     padding: const EdgeInsets.all(8.0),
                                                     color: Colors.white,
                                                     child: Text(
-                                                      //'${outOfOfficeHours.toStringAsFixed(1)} hrs',
-                                                      "${calculateCategoryHours1(category)
+                                                      //'$totalHours hrs',
+                                                      "${calculateTotalHours1(
+                                                          selectedProjectName)
                                                           .round()} hrs",
+
                                                       style: const TextStyle(
                                                           color: Colors.green,
                                                           fontWeight: FontWeight.bold),
@@ -3619,398 +3483,548 @@ $selectedBioFirstName $selectedBioLastName
                                                     padding: const EdgeInsets.all(8.0),
                                                     color: Colors.white,
                                                     child: Text(
-                                                      //'${outOfOfficePercentage.toStringAsFixed(1)}%',
-                                                      '${calculateCategoryPercentage(
-                                                          category).round()}%',
+                                                      // '${percentageWorked.toStringAsFixed(2)}%',
+                                                      '${calculatePercentageWorked1(
+                                                          selectedProjectName).round()}%',
                                                       style: const TextStyle(
                                                           color: Colors.green,
                                                           fontWeight: FontWeight.bold),
                                                     ),
                                                   ),
                                                 ],
-                                              );
-                                            }),
-                                            // Attendance Rows
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  width: 150,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: const Text(
-                                                    'Total',
-                                                    style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 20),
-                                                  ),
-                                                ),
-                                                ...List.generate(
-                                                    daysInRange.length, (index) {
-                                                  return Container(
-                                                    width: 50,
+                                              ),
+                                              const Divider(),
+                                              // "Out-of-office" Header Row
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 150,
                                                     alignment: Alignment.center,
                                                     padding: const EdgeInsets.all(8.0),
                                                     color: Colors.white,
                                                     child: const Text(
-                                                      '', // Placeholder for out-of-office data, can be replaced later
+                                                      'Out-of-office',
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 18),
                                                     ),
-                                                  );
-                                                }),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: Text(
-                                                    // '$totalGrandHours hrs',
-                                                    "${calculateGrandTotalHours1()
-                                                        .toStringAsFixed(0)} hrs",
-                                                    // Or .round().toString() if grand total should also be rounded.
-                                                    style: const TextStyle(
-                                                        color: Colors.green,
-                                                        fontWeight: FontWeight.bold),
                                                   ),
-                                                ),
-                                                Container(
-                                                  width: 100,
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  color: Colors.white,
-                                                  child: Text(
-                                                    //'${grandPercentageWorked.toStringAsFixed(2)}%',
-                                                    '${calculateGrandPercentageWorked()
-                                                        .round()}%',
-                                                    style: const TextStyle(
-                                                        color: Colors.green,
-                                                        fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
-
-                                          ],
-                                        ),
-
-
-                                      ],
-                                    ),
-                                    //),
-                                  ),
-                                  SizedBox(height: 5 * marginFactor),
-                                  //Signature and Detials
-
-                                  const Divider(),
-                                  Text('Signature & Date', style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
-                                  const Divider(),
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      // Staff Signature Row
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Staff Name Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Name of Staff',
-                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor),
-                                                ),
-                                                SizedBox(height: 5 * marginFactor),
-                                                Text(
-                                                  '${selectedBioFirstName?.toUpperCase()} ${selectedBioLastName?.toUpperCase()}',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(fontSize: 14 * fontSizeFactor, fontFamily: "NexaLight"),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          // Staff Signature Image Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                // --- Staff Signature StreamBuilder ---
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                                      return const CircularProgressIndicator();
-                                                    }
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureUrl = data['staffSignature'];
-                                                      if (signatureUrl != null && signatureUrl.isNotEmpty) {
-                                                        return Image.network(signatureUrl, height: 80, fit: BoxFit.contain);
-                                                      }
-                                                    }
-                                                    // Fallback for no signature or no data
-                                                    return GestureDetector(
-                                                      onTap: _pickImage,
-                                                      child: Container(
-                                                        height: 80,
-                                                        width: 150,
-                                                        decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-                                                        child: const Center(child: Text("Upload Signature")),
+                                                  ...List.generate(
+                                                      daysInRange.length, (index) {
+                                                    return Container(
+                                                      width: 50,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: Colors.white,
+                                                      child: const Text(
+                                                        '', // Placeholder for out-of-office data, can be replaced later
                                                       ),
                                                     );
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          // Staff Signature Date Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureDate = data['staffSignatureDate'];
-                                                      if (signatureDate != null) {
-                                                        return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                      }
-                                                    }
-                                                    return Text(formattedDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Divider(),
-                                      // Project Coordinator Signature Row
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Coordinator Name Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Name of Project Cordinator', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final supervisorName = data['facilitySupervisor'];
-                                                      if (supervisorName != null) {
-                                                        return Text(supervisorName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                      }
-                                                    }
-                                                    return buildFacilitySupervisorDropdown();
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          // Coordinator Signature Image Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureUrl = data['facilitySupervisorSignature'];
-                                                      final status = data['facilitySupervisorSignatureStatus'];
-                                                      final reason = data['facilitySupervisorRejectionReason'];
+                                                  }),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: const Text(
+                                                      '', // Placeholder for total hours
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: const Text(
+                                                      '', // Placeholder for percentage
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
 
-                                                      if (signatureUrl != null && status == "Approved") {
-                                                        return Column(
-                                                          children: [
-                                                            Image.network(signatureUrl, height: 80, fit: BoxFit.contain),
-                                                            Text(status, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                                                          ],
-                                                        );
-                                                      } else {
-                                                        return Column(
-                                                          children: [
-                                                            const Text("Awaiting Signature", style: TextStyle(fontSize: 12)),
-                                                            if(status != null)
-                                                              Text(status, style: TextStyle(color: status == "Rejected" ? Colors.red : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                                                            if(status == "Rejected" && reason != null)
-                                                              Tooltip(message: reason, child: const Icon(Icons.info_outline, size: 16))
-                                                          ],
-                                                        );
-                                                      }
-                                                    }
-                                                    return const Text("Timesheet not submitted", style: TextStyle(fontSize: 12));
-                                                  },
-                                                )
-                                              ],
-                                            ),
-                                          ),
-                                          // Coordinator Signature Date Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureDate = data['facilitySupervisorSignatureDate'];
-                                                      if(signatureDate != null) {
-                                                        return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                      }
-                                                    }
-                                                    return const Text("Awaiting Date", style: TextStyle(fontSize: 12));
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Divider(),
-                                      // CARITAS Supervisor Signature Row
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // CARITAS Supervisor Name Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Name of CARITAS Supervisor', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final supervisorName = data['caritasSupervisor'];
-                                                      if (supervisorName != null) {
-                                                        return Text(supervisorName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                      }
-                                                    }
-                                                    return buildSupervisorDropdown();
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          // CARITAS Supervisor Signature Image Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureUrl = data['caritasSupervisorSignature'];
-                                                      final status = data['caritasSupervisorSignatureStatus'];
-                                                      final reason = data['caritasSupervisorRejectionReason'];
+                                              // Rows for out-of-office categories
+                                              ...[
+                                                'Annual leave',
+                                                'Holiday',
+                                                // 'Paternity',
+                                                'Maternity'
+                                              ].map((category) {
+                                                double outOfOfficeHours = calculateCategoryHours(
+                                                    category);
+                                                double outOfOfficePercentage = calculateCategoryPercentage(
+                                                    category);
+                                                return Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 150,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: Colors.white,
+                                                      child: Text(
+                                                        category,
+                                                        style: const TextStyle(
+                                                            fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ),
+                                                    ...daysInRange.map((date) {
+                                                      bool weekend = isWeekend(date);
+                                                      String offDayHours = _getDurationForDate2(
+                                                          date, selectedProjectName,
+                                                          category);
 
-                                                      if (signatureUrl != null && status == "Approved") {
-                                                        return Column(
+
+                                                      return Container(
+                                                        width: 50,
+                                                        // Set a fixed width for each day
+                                                        decoration: BoxDecoration(
+                                                          color: weekend ? Colors.grey
+                                                              .shade300 : Colors.white,
+                                                          border: Border.all(
+                                                              color: Colors.black12),
+                                                        ),
+                                                        child: Column(
+                                                          mainAxisAlignment: MainAxisAlignment
+                                                              .center,
                                                           children: [
-                                                            Image.network(signatureUrl, height: 80, fit: BoxFit.contain),
-                                                            Text(status, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                                            weekend
+                                                                ? const SizedBox
+                                                                .shrink() // No hours on weekends
+                                                                : Text(
+                                                              offDayHours,
+                                                              // Placeholder, replace with Isar data
+                                                              style: const TextStyle(
+                                                                  color: Colors
+                                                                      .blueAccent),
+                                                            ),
                                                           ],
-                                                        );
-                                                      } else {
-                                                        return Column(
-                                                          children: [
-                                                            const Text("Awaiting Signature", style: TextStyle(fontSize: 12)),
-                                                            if(status != null)
-                                                              Text(status, style: TextStyle(color: status == "Rejected" ? Colors.red : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                                                            if(status == "Rejected" && reason != null)
-                                                              Tooltip(message: reason, child: const Icon(Icons.info_outline, size: 16))
-                                                          ],
-                                                        );
-                                                      }
-                                                    }
-                                                    return const Text("Timesheet not submitted", style: TextStyle(fontSize: 12));
-                                                  },
-                                                )
-                                              ],
-                                            ),
+                                                        ),
+                                                      );
+                                                    }),
+                                                    Container(
+                                                      width: 100,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: Colors.white,
+                                                      child: Text(
+                                                        //'${outOfOfficeHours.toStringAsFixed(1)} hrs',
+                                                        "${calculateCategoryHours1(category)
+                                                            .round()} hrs",
+                                                        style: const TextStyle(
+                                                            color: Colors.green,
+                                                            fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      width: 100,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: Colors.white,
+                                                      child: Text(
+                                                        //'${outOfOfficePercentage.toStringAsFixed(1)}%',
+                                                        '${calculateCategoryPercentage(
+                                                            category).round()}%',
+                                                        style: const TextStyle(
+                                                            color: Colors.green,
+                                                            fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              }),
+                                              // Attendance Rows
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 150,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: const Text(
+                                                      'Total',
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 20),
+                                                    ),
+                                                  ),
+                                                  ...List.generate(
+                                                      daysInRange.length, (index) {
+                                                    return Container(
+                                                      width: 50,
+                                                      alignment: Alignment.center,
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      color: Colors.white,
+                                                      child: const Text(
+                                                        '', // Placeholder for out-of-office data, can be replaced later
+                                                      ),
+                                                    );
+                                                  }),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: Text(
+                                                      // '$totalGrandHours hrs',
+                                                      "${calculateGrandTotalHours1()
+                                                          .toStringAsFixed(0)} hrs",
+                                                      // Or .round().toString() if grand total should also be rounded.
+                                                      style: const TextStyle(
+                                                          color: Colors.green,
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 100,
+                                                    alignment: Alignment.center,
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    color: Colors.white,
+                                                    child: Text(
+                                                      //'${grandPercentageWorked.toStringAsFixed(2)}%',
+                                                      '${calculateGrandPercentageWorked()
+                                                          .round()}%',
+                                                      style: const TextStyle(
+                                                          color: Colors.green,
+                                                          fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+
+
+                                            ],
                                           ),
-                                          // CARITAS Supervisor Signature Date Column
-                                          Container(
-                                            width: screenWidth * 0.3,
-                                            child: Column(
-                                              children: [
-                                                Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
-                                                SizedBox(height: 5 * marginFactor),
-                                                StreamBuilder<DocumentSnapshot>(
-                                                  stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot.hasData && snapshot.data!.exists) {
-                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                      final signatureDate = data['caritasSupervisorSignatureDate'];
-                                                      if(signatureDate != null) {
-                                                        return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
-                                                      }
-                                                    }
-                                                    return const Text("Awaiting Date", style: TextStyle(fontSize: 12));
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+
+
                                         ],
                                       ),
-                                      const Divider(),
-                                      // Submit Button
-                                      StreamBuilder<DocumentSnapshot>(
-                                        stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
-                                        builder: (context, snapshot) {
-                                          bool isFullySigned = false;
-                                          if (snapshot.hasData && snapshot.data!.exists) {
-                                            final data = snapshot.data!.data() as Map<String, dynamic>;
-                                            if (data['caritasSupervisorSignature'] != null &&
-                                                data['facilitySupervisorSignature'] != null &&
-                                                data['staffSignature'] != null) {
-                                              isFullySigned = true;
+                                      //),
+                                    ),
+                                    SizedBox(height: 5 * marginFactor),
+                                    //Signature and Detials
+
+                                    const Divider(),
+                                    Text('Signature & Date', style: TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
+                                    const Divider(),
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      children: [
+                                        // Staff Signature Row
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Staff Name Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Name of Staff',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor),
+                                                  ),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  Text(
+                                                    '${selectedBioFirstName?.toUpperCase()} ${selectedBioLastName?.toUpperCase()}',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(fontSize: 14 * fontSizeFactor, fontFamily: "NexaLight"),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Staff Signature Image Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  // --- Staff Signature StreamBuilder ---
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                                        // While waiting, show the profile signature if available
+                                                        if (staffSignatureLink != null && staffSignatureLink!.isNotEmpty) {
+                                                          return Image.network(staffSignatureLink!, height: 80, fit: BoxFit.contain);
+                                                        }
+                                                        return const CircularProgressIndicator();
+                                                      }
+
+                                                      // Check if a timesheet has been submitted
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureUrl = data['staffSignature'];
+                                                        // If there's a signature in the timesheet, display it
+                                                        if (signatureUrl != null && signatureUrl.isNotEmpty) {
+                                                          return Image.network(signatureUrl, height: 80, fit: BoxFit.contain);
+                                                        }
+                                                      }
+
+                                                      // Fallback 1: If no timesheet signature, show the profile signature
+                                                      if (staffSignatureLink != null && staffSignatureLink!.isNotEmpty) {
+                                                        return Image.network(staffSignatureLink!, height: 80, fit: BoxFit.contain);
+                                                      }
+
+                                                      // Fallback 2: If no signatures at all, show upload box
+                                                      return GestureDetector(
+                                                        onTap: _pickImage,
+                                                        child: Container(
+                                                          height: 80,
+                                                          width: 150,
+                                                          decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+                                                          child: const Center(child: Text("Upload Signature")),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Staff Signature Date Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureDate = data['staffSignatureDate'];
+                                                        if (signatureDate != null) {
+                                                          return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                        }
+                                                      }
+                                                      return Text(formattedDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
+                                        // Project Coordinator Signature Row
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Coordinator Name Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Name of Project Cordinator', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final supervisorName = data['facilitySupervisor'];
+                                                        if (supervisorName != null) {
+                                                          return Text(supervisorName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                        }
+                                                      }
+                                                      return buildFacilitySupervisorDropdown();
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Coordinator Signature Image Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureUrl = data['facilitySupervisorSignature'];
+                                                        final status = data['facilitySupervisorSignatureStatus'];
+                                                        final reason = data['facilitySupervisorRejectionReason'];
+
+                                                        if (signatureUrl != null && status == "Approved") {
+                                                          return Column(
+                                                            children: [
+                                                              Image.network(signatureUrl, height: 80, fit: BoxFit.contain),
+                                                              Text(status, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return Column(
+                                                            children: [
+                                                              const Text("Awaiting Signature", style: TextStyle(fontSize: 12)),
+                                                              if(status != null)
+                                                                Text(status, style: TextStyle(color: status == "Rejected" ? Colors.red : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                              if(status == "Rejected" && reason != null)
+                                                                Tooltip(message: reason, child: const Icon(Icons.info_outline, size: 16))
+                                                            ],
+                                                          );
+                                                        }
+                                                      }
+                                                      return const Text("Timesheet not submitted", style: TextStyle(fontSize: 12));
+                                                    },
+                                                  )
+                                                ],
+                                              ),
+                                            ),
+                                            // Coordinator Signature Date Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureDate = data['facilitySupervisorSignatureDate'];
+                                                        if(signatureDate != null) {
+                                                          return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                        }
+                                                      }
+                                                      return const Text("Awaiting Date", style: TextStyle(fontSize: 12));
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
+                                        // CARITAS Supervisor Signature Row
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // CARITAS Supervisor Name Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Name of CARITAS Supervisor', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final supervisorName = data['caritasSupervisor'];
+                                                        if (supervisorName != null) {
+                                                          return Text(supervisorName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                        }
+                                                      }
+                                                      return buildSupervisorDropdown();
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // CARITAS Supervisor Signature Image Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureUrl = data['caritasSupervisorSignature'];
+                                                        final status = data['caritasSupervisorSignatureStatus'];
+                                                        final reason = data['caritasSupervisorRejectionReason'];
+
+                                                        if (signatureUrl != null && status == "Approved") {
+                                                          return Column(
+                                                            children: [
+                                                              Image.network(signatureUrl, height: 80, fit: BoxFit.contain),
+                                                              Text(status, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return Column(
+                                                            children: [
+                                                              const Text("Awaiting Signature", style: TextStyle(fontSize: 12)),
+                                                              if(status != null)
+                                                                Text(status, style: TextStyle(color: status == "Rejected" ? Colors.red : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                              if(status == "Rejected" && reason != null)
+                                                                Tooltip(message: reason, child: const Icon(Icons.info_outline, size: 16))
+                                                            ],
+                                                          );
+                                                        }
+                                                      }
+                                                      return const Text("Timesheet not submitted", style: TextStyle(fontSize: 12));
+                                                    },
+                                                  )
+                                                ],
+                                              ),
+                                            ),
+                                            // CARITAS Supervisor Signature Date Column
+                                            Container(
+                                              width: screenWidth * 0.3,
+                                              child: Column(
+                                                children: [
+                                                  Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                                  SizedBox(height: 5 * marginFactor),
+                                                  StreamBuilder<DocumentSnapshot>(
+                                                    stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                        final signatureDate = data['caritasSupervisorSignatureDate'];
+                                                        if(signatureDate != null) {
+                                                          return Text(signatureDate, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor));
+                                                        }
+                                                      }
+                                                      return const Text("Awaiting Date", style: TextStyle(fontSize: 12));
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
+                                        // Submit Button
+                                        StreamBuilder<DocumentSnapshot>(
+                                          stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
+                                          builder: (context, snapshot) {
+                                            bool isFullySigned = false;
+                                            if (snapshot.hasData && snapshot.data!.exists) {
+                                              final data = snapshot.data!.data() as Map<String, dynamic>;
+                                              if (data['caritasSupervisorSignature'] != null &&
+                                                  data['facilitySupervisorSignature'] != null &&
+                                                  data['staffSignature'] != null) {
+                                                isFullySigned = true;
+                                              }
                                             }
-                                          }
-                                          return ElevatedButton(
-                                            onPressed: isFullySigned ? sendEmailToSelf : _saveTimesheetToFirestore,
-                                            child: Text(isFullySigned ? 'Email Signed Timesheet to Self' : 'Submit Timesheet'),
-                                          );
-                                        },
-                                      ),
-                                      SizedBox(height: 20 * marginFactor),
-                                    ],
-                                  ),
-                                ]
-                            )
+                                            return ElevatedButton(
+                                              onPressed: isFullySigned ? sendEmailToSelf : _saveTimesheetToFirestore,
+                                              child: Text(isFullySigned ? 'Email Signed Timesheet to Self' : 'Submit Timesheet'),
+                                            );
+                                          },
+                                        ),
+                                        SizedBox(height: 20 * marginFactor),
+                                      ],
+                                    ),
+                                  ]
+                              )
 
 
-                        )
+                          )
                       ),
-                           IconButton(
+                      IconButton(
                         icon: const Icon(Icons.arrow_forward_ios),
                         onPressed: () {
                           _horizontalScrollController.animateTo(
