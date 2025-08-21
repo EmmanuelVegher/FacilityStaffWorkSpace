@@ -1,4 +1,4 @@
-// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.1 - UI FIXES)
+// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.2 - ENHANCED EXPORT)
 
 import 'dart:convert';
 import 'dart:math';
@@ -191,6 +191,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   ];
 
   // Data stores
+  List<Map<String, dynamic>> _allExpectedStaffMaster = [];
   List<TimesheetModel> _allTimesheetsMaster = [];
   List<Map<String, dynamic>> _nonSubmittedStaff = [];
   List<dynamic> _displayedItems = [];
@@ -216,7 +217,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     super.dispose();
   }
 
-  // --- All data loading and processing logic remains unchanged ---
   Future<void> _initializeFilters() async {
     setState(() => _isLoading = true);
     try {
@@ -319,7 +319,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         staffQuery = staffQuery.where('location', whereIn: facilitiesToQuery);
       }
       final staffSnapshot = await staffQuery.get();
-      final List<Map<String, dynamic>> allExpectedStaff = staffSnapshot.docs.map((doc) {
+      _allExpectedStaffMaster = staffSnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'staffId': doc.id,
@@ -332,7 +332,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           'mobile': data['mobile'] ?? 'Not Available',
         };
       }).toList();
-
 
       Query timesheetQuery = _firestore.collectionGroup('TimeSheets').where('state', whereIn: statesToQuery);
 
@@ -359,7 +358,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       }
 
       final List<Map<String, dynamic>> nonSubmitters = [];
-      for (final staff in allExpectedStaff) {
+      for (final staff in _allExpectedStaffMaster) {
         if (!submittedStaffIds.contains(staff['staffId'])) {
           nonSubmitters.add(staff);
         }
@@ -572,16 +571,13 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     final months = List.generate(12, (index) => index + 1);
 
-    // FIX: All filter items are now defined in one place with constraints.
     final List<Widget> filterItems = [
       if (_isFilterLoading)
         const Center(child: Text("Loading filters..."))
       else ...[
-        // Constraining the custom dropdowns
         SizedBox(width: 220, child: _buildMultiSelectStateDropdown()),
         SizedBox(width: 220, child: _buildMultiSelectFacilityDropdown()),
       ],
-      // Constraining the standard dropdowns
       SizedBox(
         width: 150,
         child: DropdownButtonFormField<int>(
@@ -603,7 +599,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         ),
       ),
       SizedBox(
-        width: 210,
+        width: 250,
         child: DropdownButtonFormField<String>(
           value: _selectedStatusFilter,
           decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
@@ -616,7 +612,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           },
         ),
       ),
-      // Constraining the custom staff dropdown
       SizedBox(width: 220, child: _buildMultiSelectStaffDropdown()),
     ];
 
@@ -638,7 +633,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth < 750) {
-              // Small screen layout using GridView
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -649,14 +643,13 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     mainAxisSpacing: 12,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    children: filterItems, // Use the universally constrained list
+                    children: filterItems,
                   ),
                   const SizedBox(height: 16),
                   applyButton,
                 ],
               );
             } else {
-              // Large screen layout using Wrap
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
@@ -666,7 +659,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      ...filterItems, // Use the universally constrained list
+                      ...filterItems,
                       applyButton
                     ],
                   ),
@@ -807,7 +800,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.error),
         ),
         subtitle: Text(
-          _isNonSubmittedExpanded ? 'List of staff with outstanding timesheets.' : '(Tap to see details)',
+          _isNonSubmittedExpanded ? 'Contact details for staff with outstanding timesheets.' : '(Tap to see details)',
           style: TextStyle(color: Colors.grey.shade600),
         ),
         leading: Icon(Icons.person_off, color: Theme.of(context).colorScheme.error),
@@ -816,7 +809,16 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           tiles: _nonSubmittedStaff.map((staff) {
             return ListTile(
               title: Text(staff['staffName'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Facility: ${staff['location']} | State: ${staff['state']} | Phone Number: ${staff['mobile']} | Email: ${staff['email']}'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text('Facility: ${staff['location']} | State: ${staff['state']}'),
+                  Text('Email: ${staff['email']}'),
+                  Text('Mobile: ${staff['mobile']}'),
+                ],
+              ),
+              isThreeLine: true,
             );
           }),
         ).toList(),
@@ -824,7 +826,9 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     );
   }
 
-  List<List<dynamic>> _generateSummaryData() {
+  // --- EXPORT HELPER FUNCTIONS ---
+
+  List<List<dynamic>> _generateFacilitySummaryData() {
     final List<List<dynamic>> rows = [];
     const List<String> headers = [
       'State', 'Facility', 'Total Expected', 'Total Submitted', 'Yet to Submit',
@@ -856,15 +860,75 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     return rows;
   }
 
+  // ADDED: New helper to generate data for the "Submitted Summary" export
+  List<List<dynamic>> _generateSubmittedSummaryData() {
+    final List<List<dynamic>> rows = [];
+    const List<String> headers = [
+      'State', 'Name', 'Location', 'Phone Number', 'Email',
+      'Submission Status', // New column
+      'Total Expected Hours', 'No of Hours Worked', 'Percentage of Hours Worked (%)'
+    ];
+    rows.add(headers);
+
+    final startDate = DateTime(_selectedYear, _selectedMonth - 1, 20);
+    final endDate = DateTime(_selectedYear, _selectedMonth, 19);
+    final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
+    final int workingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+    final double totalExpectedHours = (workingDays * 8.0);
+
+    final staffDetailsMap = { for (var staff in _allExpectedStaffMaster) staff['staffId']: staff };
+
+    for (final timesheet in _allTimesheetsMaster) {
+      final staffInfo = staffDetailsMap[timesheet.staffId];
+      final phone = staffInfo?['mobile'] ?? 'N/A';
+      final email = timesheet.staffEmail != 'N/A' ? timesheet.staffEmail : (staffInfo?['email'] ?? 'N/A');
+      final workedHours = timesheet.totalHours;
+      final percentage = totalExpectedHours > 0 ? (workedHours / totalExpectedHours * 100) : 0.0;
+
+      String submissionStatus;
+      if (timesheet.facilitySupervisorSignatureStatus != 'Approved') {
+        submissionStatus = 'Awaiting Project Cordinators Signature';
+      } else if (timesheet.caritasSupervisorSignatureStatus != 'Approved') {
+        submissionStatus = 'Awaiting CARITAS Staff Signature';
+      } else {
+        submissionStatus = 'Fully Approved';
+      }
+
+      rows.add([
+        timesheet.state,
+        timesheet.staffName,
+        timesheet.location,
+        phone,
+        email,
+        submissionStatus, // New data point
+        totalExpectedHours,
+        workedHours,
+        double.parse(percentage.toStringAsFixed(2)),
+      ]);
+    }
+    return rows;
+  }
+
+
   Future<void> _downloadSummaryAsCsv() async {
     setState(() => _isExporting = true);
     try {
-      final List<List<dynamic>> rows = _generateSummaryData();
+      // Get facility summary
+      final List<List<dynamic>> rows = _generateFacilitySummaryData();
+      rows.add([]); // Blank row for separation
 
+      // Get submitted summary
+      if (_allTimesheetsMaster.isNotEmpty) {
+        rows.add(['Submitted Timesheet Summary']);
+        final submittedRows = _generateSubmittedSummaryData();
+        rows.addAll(submittedRows);
+        rows.add([]); // Blank row
+      }
+
+      // Get non-submitters
       if (_nonSubmittedStaff.isNotEmpty) {
-        rows.add([]);
         rows.add(['Staff Who Have Not Submitted']);
-        rows.add(['Staff Name', 'Facility', 'State','Phone Number', 'Email Address']);
+        rows.add(['Staff Name', 'Facility', 'State', 'Phone Number', 'Email Address']);
         for (final staff in _nonSubmittedStaff) {
           rows.add([
             staff['staffName'],
@@ -890,17 +954,27 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     setState(() => _isExporting = true);
     try {
       final excel = Excel.createExcel();
-      final Sheet summarySheet = excel['Summary'];
 
-      final List<List<dynamic>> summaryRows = _generateSummaryData();
-
+      // Sheet 1: Summary by Facility
+      final Sheet facilitySummarySheet = excel['Summary by Facility'];
+      final List<List<dynamic>> summaryRows = _generateFacilitySummaryData();
       for (var row in summaryRows) {
-        summarySheet.appendRow(row.map((e) {
-          if (e is num) return DoubleCellValue(e.toDouble());
-          return TextCellValue(e.toString());
-        }).toList());
+        facilitySummarySheet.appendRow(row.map((e) => e is num ? DoubleCellValue(e.toDouble()) : TextCellValue(e.toString())).toList());
       }
 
+      // Sheet 2: Submitted Summary (NEW)
+      if (_allTimesheetsMaster.isNotEmpty) {
+        final Sheet submittedSheet = excel['Submitted Summary'];
+        final submittedRows = _generateSubmittedSummaryData();
+        for (var row in submittedRows) {
+          submittedSheet.appendRow(row.map((e) {
+            if (e is num) return DoubleCellValue(e.toDouble());
+            return TextCellValue(e.toString());
+          }).toList());
+        }
+      }
+
+      // Sheet 3: Non-Submitters
       if (_nonSubmittedStaff.isNotEmpty) {
         final Sheet nonSubmitterSheet = excel['Non-Submitters'];
         nonSubmitterSheet.appendRow([
@@ -926,7 +1000,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         _triggerDownload(Uint8List.fromList(fileBytes), 'Timesheet_Summary_${_selectedMonth}_${_selectedYear}.xlsx');
       }
 
-    } catch(e) {
+    } catch(e, stack) {
+      debugPrint("Error generating Excel: $e\n$stack");
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating Excel: $e")));
     } finally {
       if(mounted) setState(() => _isExporting = false);
