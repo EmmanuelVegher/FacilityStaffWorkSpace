@@ -1,9 +1,10 @@
-// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.3 - COMPLETE EXPORT & UI)
+// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.5 - ROBUST TIMESTAMP PARSING)
 
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
@@ -13,6 +14,7 @@ import 'dart:html' as html;
 import 'package:flutter/services.dart' show Uint8List, rootBundle;
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../widgets/drawer3.dart';
 
@@ -43,7 +45,7 @@ class TimesheetEntry {
   }
 }
 
-// MODIFIED: Added supervisor email fields
+// MODIFIED: Changed Timestamp fields to DateTime and added a robust parser
 class TimesheetModel {
   final String staffId;
   final String staffName;
@@ -54,17 +56,20 @@ class TimesheetModel {
   final String state;
   final String? staffSignature;
   final String? staffSignatureDate;
+  final DateTime? staffSignatureDateTime; // MODIFIED
   final String? projectName;
   final String facilitySupervisor;
   final String? facilitySupervisorEmail;
   final String facilitySupervisorSignatureStatus;
   final String? facilitySupervisorSignature;
   final String? facilitySupervisorSignatureDate;
+  final DateTime? facilitySupervisorTimesheetSubmissionDateTime; // MODIFIED
   final String caritasSupervisor;
   final String? caritasSupervisorEmail;
   final String caritasSupervisorSignatureStatus;
   final String? caritasSupervisorSignature;
   final String? caritasSupervisorSignatureDate;
+  final DateTime? caritasSupervisorTimesheetSubmissionDateTime; // MODIFIED
   final List<TimesheetEntry> entries;
   final double totalHours;
 
@@ -78,17 +83,20 @@ class TimesheetModel {
     required this.state,
     this.staffSignature,
     this.staffSignatureDate,
+    this.staffSignatureDateTime,
     this.projectName,
     required this.facilitySupervisor,
     this.facilitySupervisorEmail,
     required this.facilitySupervisorSignatureStatus,
     this.facilitySupervisorSignature,
     this.facilitySupervisorSignatureDate,
+    this.facilitySupervisorTimesheetSubmissionDateTime,
     required this.caritasSupervisor,
     this.caritasSupervisorEmail,
     required this.caritasSupervisorSignatureStatus,
     this.caritasSupervisorSignature,
     this.caritasSupervisorSignatureDate,
+    this.caritasSupervisorTimesheetSubmissionDateTime,
     required this.entries,
   }) : totalHours = _calculateCappedTotalHours(entries);
 
@@ -109,6 +117,17 @@ class TimesheetModel {
     return cappedTotal;
   }
 
+  // ADDED: Robust helper to parse Firestore Timestamps OR date Strings
+  static DateTime? _parseTimestamp(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
   factory TimesheetModel.fromMap(Map<String, dynamic> map, String id) {
     var entriesData = (map['timesheetEntries'] as List<dynamic>?)
         ?.map((e) => TimesheetEntry.fromMap(e as Map<String, dynamic>))
@@ -124,22 +143,24 @@ class TimesheetModel {
       state: map['state'] as String? ?? 'N/A',
       staffSignature: map['staffSignature'] as String?,
       staffSignatureDate: map['staffSignatureDate'] as String?,
+      staffSignatureDateTime: _parseTimestamp(map['staffSignatureTimestamp']), // MODIFIED
       projectName: map['projectName'] as String?,
       facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
       facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?,
       facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
       facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
       facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
+      facilitySupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['facilitySupervisorTimesheetSubmissionTimestamp']), // MODIFIED
       caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
       caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?,
       caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
       caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
       caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
+      caritasSupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['caritasSupervisorTimesheetSubmissionTimestamp']), // MODIFIED
       entries: entriesData,
     );
   }
 }
-
 class TimesheetMetrics {
   int totalExpected = 0;
   int totalSubmitted = 0;
@@ -160,6 +181,20 @@ class FacilityMetrics {
 
   int get pendingFacility => totalSubmitted - approvedByFacility;
   int get pendingCaritas => totalSubmitted - approvedByCaritas;
+}
+
+class TurnaroundTimeMetrics {
+  final double avgStaffToFacilityDays;
+  final double avgFacilityToCaritasDays;
+  final int facilityApprovedCount;
+  final int caritasApprovedCount;
+
+  TurnaroundTimeMetrics({
+    required this.avgStaffToFacilityDays,
+    required this.avgFacilityToCaritasDays,
+    required this.facilityApprovedCount,
+    required this.caritasApprovedCount,
+  });
 }
 
 
@@ -204,11 +239,12 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   List<dynamic> _displayedItems = [];
   TimesheetMetrics _metrics = TimesheetMetrics();
   Map<String, Map<String, FacilityMetrics>> _stateFacilitySummary = {};
+  Map<String, TurnaroundTimeMetrics> _turnaroundTimeSummary = {};
 
   final ScrollController _summaryTableScrollController = ScrollController();
   bool _isSummaryExpanded = false;
   bool _isNonSubmittedExpanded = false;
-  bool _isSubmittedExpanded = false; // ADDED: State for new submitted list card
+  bool _isSubmittedExpanded = false;
 
   @override
   void initState() {
@@ -308,6 +344,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       _displayedItems = [];
       _selectedStaffIds.clear();
       _stateFacilitySummary.clear();
+      _turnaroundTimeSummary = {};
     });
 
     try {
@@ -377,6 +414,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
 
       _calculateStateFacilitySummary();
       _applyFiltersAndCalculateMetrics();
+      _calculateTurnaroundTimes();
 
     } catch (e, stack) {
       debugPrint('Error loading timesheets: $e\n$stack');
@@ -474,6 +512,51 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     });
   }
 
+  void _calculateTurnaroundTimes() {
+    final staffToFacilityTimes = <String, List<double>>{};
+    final facilityToCaritasTimes = <String, List<double>>{};
+
+    for (final timesheet in _allTimesheetsMaster) {
+      final state = timesheet.state;
+      // MODIFIED: Use the new DateTime fields directly
+      final staffDate = timesheet.staffSignatureDateTime;
+      final facilityDate = timesheet.facilitySupervisorTimesheetSubmissionDateTime;
+      final caritasDate = timesheet.caritasSupervisorTimesheetSubmissionDateTime;
+
+      if (staffDate != null && facilityDate != null) {
+        final duration = facilityDate.difference(staffDate).inMilliseconds / (1000 * 60 * 60 * 24);
+        staffToFacilityTimes.putIfAbsent(state, () => []).add(duration > 0 ? duration : 0);
+      }
+
+      if (facilityDate != null && caritasDate != null) {
+        final duration = caritasDate.difference(facilityDate).inMilliseconds / (1000 * 60 * 60 * 24);
+        facilityToCaritasTimes.putIfAbsent(state, () => []).add(duration > 0 ? duration : 0);
+      }
+    }
+
+    final summary = <String, TurnaroundTimeMetrics>{};
+    final allStates = {...staffToFacilityTimes.keys, ...facilityToCaritasTimes.keys};
+
+    for (final state in allStates) {
+      final s2fList = staffToFacilityTimes[state] ?? [];
+      final f2cList = facilityToCaritasTimes[state] ?? [];
+
+      final avgS2F = s2fList.isNotEmpty ? s2fList.reduce((a, b) => a + b) / s2fList.length : 0.0;
+      final avgF2C = f2cList.isNotEmpty ? f2cList.reduce((a, b) => a + b) / f2cList.length : 0.0;
+
+      summary[state] = TurnaroundTimeMetrics(
+        avgStaffToFacilityDays: avgS2F,
+        avgFacilityToCaritasDays: avgF2C,
+        facilityApprovedCount: s2fList.length,
+        caritasApprovedCount: f2cList.length,
+      );
+    }
+
+    setState(() {
+      _turnaroundTimeSummary = summary;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -534,6 +617,9 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildMetricsDashboard(),
+                  // const SizedBox(height: 24),
+                  // if (_turnaroundTimeSummary.isNotEmpty)
+                  //   _buildTurnaroundTimeCharts(),
                   const SizedBox(height: 24),
                   if (_stateFacilitySummary.isNotEmpty)
                     _buildStateFacilitySummaryTable(),
@@ -696,6 +782,234 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         _buildKpiCard("% Fully Approved", "${_metrics.percentFullyApproved.toStringAsFixed(1)}%", Icons.pie_chart, Colors.pink),
       ],
     );
+  }
+
+  Widget _buildTurnaroundTimeCharts() {
+    final sortedStates = _turnaroundTimeSummary.keys.toList()..sort();
+    if (sortedStates.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Average Approval Turnaround Time (in Days)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).primaryColorDark)),
+            const SizedBox(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 600) {
+                  return Column(
+                    children: [
+                      _buildSingleBarChart(
+                        title: 'Staff Submission to Facility Approval',
+                        data: _turnaroundTimeSummary,
+                        sortedStates: sortedStates,
+                        dataSelector: (metrics) => metrics.avgStaffToFacilityDays,
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(height: 40),
+                      _buildSingleBarChart(
+                        title: 'Facility Approval to CARITAS Approval',
+                        data: _turnaroundTimeSummary,
+                        sortedStates: sortedStates,
+                        dataSelector: (metrics) => metrics.avgFacilityToCaritasDays,
+                        color: Colors.deepPurple,
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _buildSingleBarChart(
+                        title: 'Staff Submission to Facility Approval',
+                        data: _turnaroundTimeSummary,
+                        sortedStates: sortedStates,
+                        dataSelector: (metrics) => metrics.avgStaffToFacilityDays,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: _buildSingleBarChart(
+                        title: 'Facility Approval to CARITAS Approval',
+                        data: _turnaroundTimeSummary,
+                        sortedStates: sortedStates,
+                        dataSelector: (metrics) => metrics.avgFacilityToCaritasDays,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSingleBarChart({
+    required String title,
+    required Map<String, TurnaroundTimeMetrics> data,
+    required List<String> sortedStates,
+    required double Function(TurnaroundTimeMetrics) dataSelector,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 250,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              barGroups: sortedStates.asMap().entries.map((entry) {
+                final index = entry.key;
+                final state = entry.value;
+                final metrics = data[state]!;
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: dataSelector(metrics),
+                      color: color,
+                      width: 16,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                );
+              }).toList(),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (double value, TitleMeta meta) {
+                      final index = value.toInt();
+                      if (index < 0 || index >= sortedStates.length) return const SizedBox.shrink();
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 4.0,
+                        child: Text(sortedStates[index], style: const TextStyle(fontSize: 10)),
+                      );
+                    },
+                    reservedSize: 30,
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    getTitlesWidget: (value, meta) => Text(value.round().toString(), style: const TextStyle(fontSize: 10)),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                 // tooltipBgColor: Colors.blueGrey,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final state = sortedStates[group.x];
+                    return BarTooltipItem(
+                      '$state\n',
+                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      children: <material.TextSpan>[
+                        material.TextSpan(
+                          text: '${rod.toY.toStringAsFixed(1)} days',
+                          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Future<void> _downloadBulkPdf() async {
+    setState(() => _isExporting = true);
+    try {
+      if (_allTimesheetsMaster.isEmpty) {
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No submitted timesheets found to generate a bulk PDF.')));
+        return;
+      }
+      final timesheetsToPrint = List<TimesheetModel>.from(_allTimesheetsMaster);
+      if (_selectedStaffIds.isNotEmpty) {
+        final selectionSet = _selectedStaffIds.toSet();
+        timesheetsToPrint.retainWhere((ts) => selectionSet.contains(ts.staffId));
+      }
+
+      if (timesheetsToPrint.isEmpty) {
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No matching timesheets found for the selected staff.')));
+        return;
+      }
+
+      timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
+
+      final pdf = pw.Document();
+      final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
+      final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
+      final ttf = pw.Font.ttf(font);
+      final ttfBold = pw.Font.ttf(boldFont);
+      final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
+      for(final timesheet in timesheetsToPrint) {
+        pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
+      }
+
+      final pdfBytes = await pdf.save();
+      String selectionName = 'Nationwide';
+      if (!_selectedStates.contains('All States')) {
+        selectionName = _selectedStates.join('_').replaceAll(' ', '_');
+      }
+      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${selectionName}_${_selectedMonth}_${_selectedYear}.pdf');
+
+    } catch (e, stack) {
+      debugPrint("Error generating bulk PDF: $e\n$stack");
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred while generating the bulk PDF: $e')));
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<Uint8List?> _networkImageToByte(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.isEmpty || imageUrl == 'null') return null;
+    try {
+      final response = await Dio().get<List<int>>(imageUrl, options: Options(responseType: ResponseType.bytes));
+      if (response.statusCode == 200 && response.data != null && response.data!.isNotEmpty) {
+        return Uint8List.fromList(response.data!);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching image for PDF: $e');
+      return null;
+    }
+  }
+
+  void _triggerDownload(Uint8List data, String filename) {
+    final blob = html.Blob([data]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.document.createElement('a') as html.AnchorElement
+      ..href = url
+      ..style.display = 'none'
+      ..download = filename;
+    html.document.body!.children.add(anchor);
+    anchor.click();
+    html.document.body!.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
   }
 
   Widget _buildStateFacilitySummaryTable() {
@@ -1445,10 +1759,10 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     String text; Color color;
     if (facilityStatus == 'Approved' && caritasStatus == 'Approved') {
       text = 'Fully Approved'; color = Colors.green;
-    } else if (facilityStatus == 'Approved' && caritasStatus == 'Pending') {
-      text = 'CARITAS Pending'; color = Colors.deepPurple;
+    } else if (facilityStatus == 'Approved' && caritasStatus != 'Approved') {
+      text = 'Awaiting CARITAS Signature'; color = Colors.deepPurple;
     } else {
-      text = 'Facility Pending'; color = Colors.orange;
+      text = 'Awaiting Project Coordinator Signature'; color = Colors.orange;
     }
     return Chip(
       label: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
@@ -1577,78 +1891,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     final pdfBytes = await pdf.save();
     _triggerDownload(pdfBytes, 'Timesheet_${timesheet.staffName.replaceAll(' ','_')}_${_selectedMonth}_${_selectedYear}.pdf');
     setState(() => _isExporting = false);
-  }
-
-  Future<void> _downloadBulkPdf() async {
-    setState(() => _isExporting = true);
-    try {
-      if (_allTimesheetsMaster.isEmpty) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No submitted timesheets found to generate a bulk PDF.')));
-        return;
-      }
-      final timesheetsToPrint = List<TimesheetModel>.from(_allTimesheetsMaster);
-      if (_selectedStaffIds.isNotEmpty) {
-        final selectionSet = _selectedStaffIds.toSet();
-        timesheetsToPrint.retainWhere((ts) => selectionSet.contains(ts.staffId));
-      }
-
-      if (timesheetsToPrint.isEmpty) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No matching timesheets found for the selected staff.')));
-        return;
-      }
-
-      timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
-
-      final pdf = pw.Document();
-      final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
-      final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
-      final ttf = pw.Font.ttf(font);
-      final ttfBold = pw.Font.ttf(boldFont);
-      final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
-      for(final timesheet in timesheetsToPrint) {
-        pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
-      }
-
-      final pdfBytes = await pdf.save();
-      String selectionName = 'Nationwide';
-      if (!_selectedStates.contains('All States')) {
-        selectionName = _selectedStates.join('_').replaceAll(' ', '_');
-      }
-      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${selectionName}_${_selectedMonth}_${_selectedYear}.pdf');
-
-    } catch (e, stack) {
-      debugPrint("Error generating bulk PDF: $e\n$stack");
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred while generating the bulk PDF: $e')));
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
-    }
-  }
-
-  Future<Uint8List?> _networkImageToByte(String? imageUrl) async {
-    if (imageUrl == null || imageUrl.isEmpty || imageUrl == 'null') return null;
-    try {
-      final response = await Dio().get<List<int>>(imageUrl, options: Options(responseType: ResponseType.bytes));
-      if (response.statusCode == 200 && response.data != null && response.data!.isNotEmpty) {
-        return Uint8List.fromList(response.data!);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error fetching image for PDF: $e');
-      return null;
-    }
-  }
-
-  void _triggerDownload(Uint8List data, String filename) {
-    final blob = html.Blob([data]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
-    html.document.body!.children.add(anchor);
-    anchor.click();
-    html.document.body!.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
   }
 
   Future<pw.Page> _createSingleTimesheetPage(TimesheetModel timesheet, pw.ImageProvider logoImage, pw.Font ttf, pw.Font ttfBold) async {
