@@ -1,4 +1,4 @@
-// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.2 - ENHANCED EXPORT)
+// A NATIONWIDE PAGE FOR REVIEWING STAFF TIMESHEETS (DASHBOARD VERSION V3.3 - COMPLETE EXPORT & UI)
 
 import 'dart:convert';
 import 'dart:math';
@@ -16,7 +16,7 @@ import 'package:excel/excel.dart';
 
 import '../../widgets/drawer3.dart';
 
-// --- DATA MODELS (Unchanged) ---
+// --- DATA MODELS ---
 class TimesheetEntry {
   final String date;
   final String durationWorked;
@@ -43,6 +43,7 @@ class TimesheetEntry {
   }
 }
 
+// MODIFIED: Added supervisor email fields
 class TimesheetModel {
   final String staffId;
   final String staffName;
@@ -55,10 +56,12 @@ class TimesheetModel {
   final String? staffSignatureDate;
   final String? projectName;
   final String facilitySupervisor;
+  final String? facilitySupervisorEmail;
   final String facilitySupervisorSignatureStatus;
   final String? facilitySupervisorSignature;
   final String? facilitySupervisorSignatureDate;
   final String caritasSupervisor;
+  final String? caritasSupervisorEmail;
   final String caritasSupervisorSignatureStatus;
   final String? caritasSupervisorSignature;
   final String? caritasSupervisorSignatureDate;
@@ -77,10 +80,12 @@ class TimesheetModel {
     this.staffSignatureDate,
     this.projectName,
     required this.facilitySupervisor,
+    this.facilitySupervisorEmail,
     required this.facilitySupervisorSignatureStatus,
     this.facilitySupervisorSignature,
     this.facilitySupervisorSignatureDate,
     required this.caritasSupervisor,
+    this.caritasSupervisorEmail,
     required this.caritasSupervisorSignatureStatus,
     this.caritasSupervisorSignature,
     this.caritasSupervisorSignatureDate,
@@ -121,10 +126,12 @@ class TimesheetModel {
       staffSignatureDate: map['staffSignatureDate'] as String?,
       projectName: map['projectName'] as String?,
       facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
+      facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?,
       facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
       facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
       facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
       caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
+      caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?,
       caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
       caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
       caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
@@ -201,6 +208,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   final ScrollController _summaryTableScrollController = ScrollController();
   bool _isSummaryExpanded = false;
   bool _isNonSubmittedExpanded = false;
+  bool _isSubmittedExpanded = false; // ADDED: State for new submitted list card
 
   @override
   void initState() {
@@ -533,6 +541,9 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                   if (_nonSubmittedStaff.isNotEmpty)
                     _buildNonSubmittedStaffList(),
                   const SizedBox(height: 24),
+                  if (_allTimesheetsMaster.isNotEmpty)
+                    _buildSubmittedStaffList(),
+                  const SizedBox(height: 24),
                   if (_displayedItems.isNotEmpty) ...[
                     Text(
                       "Detailed View: $_selectedStatusFilter",
@@ -826,6 +837,39 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     );
   }
 
+  Widget _buildSubmittedStaffList() {
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: _isSubmittedExpanded,
+        onExpansionChanged: (isExpanded) => setState(() => _isSubmittedExpanded = isExpanded),
+        title: Text(
+          'Staff Who Have Submitted (${_allTimesheetsMaster.length})',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800),
+        ),
+        subtitle: Text(
+          _isSubmittedExpanded ? 'List of staff with submitted timesheets and their status.' : '(Tap to see details)',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        leading: Icon(Icons.check_circle_outline, color: Colors.green.shade800),
+        children: ListTile.divideTiles(
+          context: context,
+          tiles: _allTimesheetsMaster.map((timesheet) {
+            return ListTile(
+              title: Text(timesheet.staffName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Facility: ${timesheet.location}'),
+              trailing: _buildStatusChip(
+                  timesheet.facilitySupervisorSignatureStatus,
+                  timesheet.caritasSupervisorSignatureStatus
+              ),
+            );
+          }),
+        ).toList(),
+      ),
+    );
+  }
+
   // --- EXPORT HELPER FUNCTIONS ---
 
   List<List<dynamic>> _generateFacilitySummaryData() {
@@ -860,13 +904,13 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     return rows;
   }
 
-  // ADDED: New helper to generate data for the "Submitted Summary" export
   List<List<dynamic>> _generateSubmittedSummaryData() {
     final List<List<dynamic>> rows = [];
     const List<String> headers = [
       'State', 'Name', 'Location', 'Phone Number', 'Email',
-      'Submission Status', // New column
-      'Total Expected Hours', 'No of Hours Worked', 'Percentage of Hours Worked (%)'
+      'Submission Status', 'Facility Supervisor', 'Facility Supervisor Email',
+      'CARITAS Supervisor', 'CARITAS Supervisor Email', 'Total Expected Hours',
+      'No of Hours Worked', 'Percentage of Hours Worked (%)'
     ];
     rows.add(headers);
 
@@ -900,7 +944,11 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         timesheet.location,
         phone,
         email,
-        submissionStatus, // New data point
+        submissionStatus,
+        timesheet.facilitySupervisor,
+        timesheet.facilitySupervisorEmail ?? 'N/A',
+        timesheet.caritasSupervisor,
+        timesheet.caritasSupervisorEmail ?? 'N/A',
         totalExpectedHours,
         workedHours,
         double.parse(percentage.toStringAsFixed(2)),
@@ -913,19 +961,17 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   Future<void> _downloadSummaryAsCsv() async {
     setState(() => _isExporting = true);
     try {
-      // Get facility summary
-      final List<List<dynamic>> rows = _generateFacilitySummaryData();
-      rows.add([]); // Blank row for separation
+      final List<List<dynamic>> rows = [];
+      rows.add(['Summary by Facility']);
+      rows.addAll(_generateFacilitySummaryData());
+      rows.add([]);
 
-      // Get submitted summary
       if (_allTimesheetsMaster.isNotEmpty) {
         rows.add(['Submitted Timesheet Summary']);
-        final submittedRows = _generateSubmittedSummaryData();
-        rows.addAll(submittedRows);
-        rows.add([]); // Blank row
+        rows.addAll(_generateSubmittedSummaryData());
+        rows.add([]);
       }
 
-      // Get non-submitters
       if (_nonSubmittedStaff.isNotEmpty) {
         rows.add(['Staff Who Have Not Submitted']);
         rows.add(['Staff Name', 'Facility', 'State', 'Phone Number', 'Email Address']);
@@ -955,14 +1001,12 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     try {
       final excel = Excel.createExcel();
 
-      // Sheet 1: Summary by Facility
       final Sheet facilitySummarySheet = excel['Summary by Facility'];
       final List<List<dynamic>> summaryRows = _generateFacilitySummaryData();
       for (var row in summaryRows) {
         facilitySummarySheet.appendRow(row.map((e) => e is num ? DoubleCellValue(e.toDouble()) : TextCellValue(e.toString())).toList());
       }
 
-      // Sheet 2: Submitted Summary (NEW)
       if (_allTimesheetsMaster.isNotEmpty) {
         final Sheet submittedSheet = excel['Submitted Summary'];
         final submittedRows = _generateSubmittedSummaryData();
@@ -974,7 +1018,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         }
       }
 
-      // Sheet 3: Non-Submitters
       if (_nonSubmittedStaff.isNotEmpty) {
         final Sheet nonSubmitterSheet = excel['Non-Submitters'];
         nonSubmitterSheet.appendRow([
@@ -1484,7 +1527,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           final bool isOffDay = summary['isOffDay']!;
 
           return DataRow(
-              color: WidgetStateProperty.resolveWith<Color?>(
+              color: MaterialStateProperty.resolveWith<Color?>(
                       (s) => isOffDay ? Colors.blue.withOpacity(0.05) : null),
               cells: [
                 DataCell(Text(date)),

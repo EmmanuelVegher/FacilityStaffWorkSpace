@@ -44,6 +44,7 @@ class TimesheetEntry {
   }
 }
 
+// MODIFIED: Added supervisor email fields to the data model
 class TimesheetModel {
   final String staffId;
   final String staffName;
@@ -56,10 +57,12 @@ class TimesheetModel {
   final String? staffSignatureDate;
   final String? projectName;
   final String facilitySupervisor;
+  final String? facilitySupervisorEmail; // ADDED
   final String facilitySupervisorSignatureStatus;
   final String? facilitySupervisorSignature;
   final String? facilitySupervisorSignatureDate;
   final String caritasSupervisor;
+  final String? caritasSupervisorEmail; // ADDED
   final String caritasSupervisorSignatureStatus;
   final String? caritasSupervisorSignature;
   final String? caritasSupervisorSignatureDate;
@@ -78,10 +81,12 @@ class TimesheetModel {
     this.staffSignatureDate,
     this.projectName,
     required this.facilitySupervisor,
+    this.facilitySupervisorEmail, // ADDED
     required this.facilitySupervisorSignatureStatus,
     this.facilitySupervisorSignature,
     this.facilitySupervisorSignatureDate,
     required this.caritasSupervisor,
+    this.caritasSupervisorEmail, // ADDED
     required this.caritasSupervisorSignatureStatus,
     this.caritasSupervisorSignature,
     this.caritasSupervisorSignatureDate,
@@ -122,10 +127,12 @@ class TimesheetModel {
       staffSignatureDate: map['staffSignatureDate'] as String?,
       projectName: map['projectName'] as String?,
       facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
+      facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?, // ADDED
       facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
       facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
       facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
       caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
+      caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?, // ADDED
       caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
       caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
       caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
@@ -192,7 +199,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
   ];
 
   // Data Stores
-  List<Map<String, dynamic>> _allExpectedStaffMaster = []; // FIXED: Added declaration
+  List<Map<String, dynamic>> _allExpectedStaffMaster = [];
   List<TimesheetModel> _allTimesheetsMaster = [];
   List<Map<String, dynamic>> _nonSubmittedStaff = [];
   List<dynamic> _displayedItems = [];
@@ -284,8 +291,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
         staffQuery = staffQuery.where('location', whereIn: facilitiesToQuery);
       }
       final staffSnapshot = await staffQuery.get();
-
-      // FIXED: Populate the master list with full staff details
       _allExpectedStaffMaster = staffSnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return {
@@ -298,6 +303,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
           'email': data['emailAddress'] ?? 'Not Available',
           'mobile': data['mobile'] ?? 'Not Available',
         };
+
       }).toList();
 
       Query timesheetQuery = _firestore.collectionGroup('TimeSheets').where('state', isEqualTo: _userState);
@@ -325,7 +331,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       }
 
       final List<Map<String, dynamic>> nonSubmitters = [];
-      // FIXED: Iterate over the master list to correctly identify non-submitters
       for (final staff in _allExpectedStaffMaster) {
         if (!submittedStaffIds.contains(staff['staffId'])) {
           nonSubmitters.add(staff);
@@ -848,12 +853,14 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     return rows;
   }
 
+  // MODIFIED: This function now includes supervisor details
   List<List<dynamic>> _generateSubmittedSummaryData() {
     final List<List<dynamic>> rows = [];
     const List<String> headers = [
       'State', 'Name', 'Location', 'Phone Number', 'Email',
-      'Submission Status',
-      'Total Expected Hours', 'No of Hours Worked', 'Percentage of Hours Worked (%)'
+      'Submission Status', 'Facility Supervisor', 'Facility Supervisor Email',
+      'CARITAS Supervisor', 'CARITAS Supervisor Email', 'Total Expected Hours',
+      'No of Hours Worked', 'Percentage of Hours Worked (%)'
     ];
     rows.add(headers);
 
@@ -888,6 +895,10 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
         phone,
         email,
         submissionStatus,
+        timesheet.facilitySupervisor,
+        timesheet.facilitySupervisorEmail ?? 'N/A',
+        timesheet.caritasSupervisor,
+        timesheet.caritasSupervisorEmail ?? 'N/A',
         totalExpectedHours,
         workedHours,
         double.parse(percentage.toStringAsFixed(2)),
