@@ -186,7 +186,7 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               Image.asset(
                                 'assets/image/service_delivery1.png', // Assuming this path is correct
-                                height: 400,
+                                height: 250,
                               ),
                               const SizedBox(height: 20),
                             ],
@@ -263,7 +263,7 @@ class _LoginPageState extends State<LoginPage> {
                               Center(
                                 child: Image.asset(
                                   'assets/image/caritaslogo1.png', // Assuming this path is correct
-                                  height: 90,
+                                  height: 60,
                                 ),
                               ),
 
