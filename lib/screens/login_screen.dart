@@ -217,7 +217,7 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             Image.asset(
               'assets/image/service_delivery1.png',
-              height: 150,
+              height: 120,
               semanticLabel: 'Caritas Nigeria Service Delivery Logo',
             ),
             const SizedBox(height: 32),
@@ -264,16 +264,16 @@ class _LoginPageState extends State<LoginPage> {
             const Text(
               "Don't have an account? Contact the Program Team",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black, fontSize: 14),
+              style: TextStyle(color: Colors.black, fontSize: 12),
             ),
             const SizedBox(height: 12),
             Text(
               'Powered By',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
             ),
-            const SizedBox(height: 15),
-            Image.asset('assets/image/caritaslogo1.png', height: 60),
+            const SizedBox(height: 10),
+            Image.asset('assets/image/caritaslogo1.png', height: 30),
           ],
         ),
       ),
