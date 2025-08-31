@@ -272,7 +272,7 @@ class _LoginPageState extends State<LoginPage> {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.of(context).size.width * 0.08,
-        vertical: screenHeight * 0.1,
+        vertical: screenHeight * 0.25,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
