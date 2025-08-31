@@ -32,6 +32,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _mobileNumberController = TextEditingController();
   final _supervisorNameController = TextEditingController();
   final _supervisorEmailController = TextEditingController();
+  final _accountNumberController = TextEditingController();
+  final _sortCodeController = TextEditingController();
 
   // State for UI and data
   bool _isLoading = false; // For the save button's spinner
@@ -51,6 +53,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   String? _selectedGender;
   String? _selectedMaritalStatus;
   String? _selectedRole;
+  String? _selectedBankName;
 
   // State to hold the pre-fetched lists of items for our dropdowns
   List<String> _staffCategoryOptions = [];
@@ -61,7 +64,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   List<DropdownMenuItem<String>> _designationsList = [];
   List<DropdownMenuItem<String>> _supervisorsList = [];
   List<DropdownMenuItem<String>> _supervisorEmailsList = [];
-
+  List<DropdownMenuItem<String>> _banksList = [];
   final List<String> _genderOptions = ['Male', 'Female'];
   final List<String> _maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
 
@@ -89,6 +92,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _lastNameController.text = staff.lastName;
     _emailController.text = staff.emailAddress;
     _mobileNumberController.text = staff.mobile;
+    _accountNumberController.text = staff.accountNumber; // NEW
+    _sortCodeController.text = staff.sortCode; // NEW
     _existingPhotoUrl = staff.photoUrl;
     _selectedGender = staff.gender;
     _selectedMaritalStatus = staff.maritalStatus;
@@ -103,6 +108,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _projectOptions = await _fetchStringList('Project', 'name');
     _departmentsList = await _fetchDepartments();
     _designationsList = await _fetchDesignations();
+    _banksList = await _fetchBanks(); // NEW
 
     // 3. Begin the sequential "waterfall" lookup and fetch for dependent dropdowns
     if (_selectedCategory != null) {
@@ -161,6 +167,21 @@ class _UserFormScreenState extends State<UserFormScreen> {
       });
     }
   }
+
+  // --- NEW: FETCH BANKS METHOD ---
+  Future<List<DropdownMenuItem<String>>> _fetchBanks() async {
+    try {
+      final snapshot = await _firestore.collection("Bank").get();
+      return snapshot.docs.map((doc) => DropdownMenuItem<String>(
+        value: doc['name'] as String,
+        child: Text(doc['name'] as String),
+      )).toList()..sort((a, b) => a.value!.compareTo(b.value!));
+    } catch (e) {
+      debugPrint("Error fetching banks: $e");
+      return [];
+    }
+  }
+
 
   /// Helper to find a document's ID from its human-readable name field.
   Future<String?> _reverseLookupId(String collectionPath, String field, String value) async {
@@ -351,6 +372,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'mobile': _mobileNumberController.text.trim(),
+        'bankName': _selectedBankName ?? '',
+        'accountNumber': _accountNumberController.text.trim(),
+        'sortCode': _sortCodeController.text.trim(),
         'staffCategory': _selectedCategory ?? '',
         'project': _selectedProject ?? '',
         'state': finalStateName,
@@ -530,6 +554,24 @@ class _UserFormScreenState extends State<UserFormScreen> {
           ],
         ),
         const SizedBox(height: 20),
+        // --- NEW: BANKING DETAILS ROW ---
+        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: _buildStyledDropdown(label: "Bank Name", value: _selectedBankName, items: _banksList, onChanged: (v) => setState(() => _selectedBankName = v))),
+            const SizedBox(width: 20),
+            Expanded(flex: 2, child: _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number)),
+            const SizedBox(width: 20),
+            Expanded(flex: 1, child: _buildStyledTextField(controller: _sortCodeController, label: "Sort Code", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null)), // Optional field
+          ],
+        ),
+        const SizedBox(height: 20),
+        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
         _buildDependentFields(),
       ],
     );
@@ -550,6 +592,20 @@ class _UserFormScreenState extends State<UserFormScreen> {
         const SizedBox(height: 20),
         _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v)),
         const SizedBox(height: 20),
+        // --- NEW: BANKING DETAILS FOR MOBILE ---
+        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+        _buildStyledDropdown(label: "Bank Name", value: _selectedBankName, items: _banksList, onChanged: (v) => setState(() => _selectedBankName = v)),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _sortCodeController, label: "Sort Code (Optional)", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null),
+        const SizedBox(height: 20),
+        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+
         _buildDependentFields(),
       ],
     );

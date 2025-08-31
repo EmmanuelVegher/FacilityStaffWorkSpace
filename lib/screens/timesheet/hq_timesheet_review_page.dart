@@ -17,6 +17,7 @@ import 'package:excel/excel.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../widgets/drawer3.dart';
+import '../admin/payment_schedule_page.dart';
 
 // --- DATA MODELS ---
 class TimesheetEntry {
@@ -287,6 +288,32 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         });
       }
     }
+  }
+
+  // ADD THIS METHOD INSIDE THE _TimesheetReviewPageHqState CLASS
+
+  void _navigateToPaymentSchedule() {
+    // Use _allTimesheetsMaster as it contains all submitted timesheets for the selected period
+    final List<TimesheetModel> submittedTimesheets = _allTimesheetsMaster;
+
+    if (submittedTimesheets.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No submitted timesheets available to generate a payment schedule.")),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentSchedulePage(
+          timesheets: submittedTimesheets,
+          year: _selectedYear,
+          month: _selectedMonth,
+        ),
+      ),
+    );
   }
 
   Future<void> _onStateSelectionChange(List<String> selected) async {
@@ -664,6 +691,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     );
   }
 
+// REPLACE YOUR EXISTING _buildResponsiveFilterBar() WITH THIS UPDATED VERSION
+
   Widget _buildResponsiveFilterBar() {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     final months = List.generate(12, (index) => index + 1);
@@ -722,6 +751,19 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       ),
     );
 
+    // --- NEW: Define the Payment Schedule button ---
+    final paymentButton = ElevatedButton.icon(
+      icon: const Icon(Icons.payments_outlined),
+      label: const Text('Payment Schedule'),
+      onPressed: _isLoading || _isFilterLoading ? null : _navigateToPaymentSchedule,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        minimumSize: const Size(0, 50),
+      ),
+    );
+
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -729,7 +771,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         padding: const EdgeInsets.all(12.0),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth < 750) {
+            // --- MODIFIED: Adjusted breakpoint and mobile layout ---
+            if (constraints.maxWidth < 950) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -743,7 +786,13 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     children: filterItems,
                   ),
                   const SizedBox(height: 16),
-                  applyButton,
+                  Row(
+                    children: [
+                      Expanded(child: applyButton),
+                      const SizedBox(width: 16),
+                      Expanded(child: paymentButton),
+                    ],
+                  ),
                 ],
               );
             } else {
@@ -757,7 +806,10 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       ...filterItems,
-                      applyButton
+                      applyButton,
+                      // --- NEW: Added the button to the Wrap widget ---
+                      const SizedBox(width: 8),
+                      paymentButton,
                     ],
                   ),
                 ),

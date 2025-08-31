@@ -20,6 +20,9 @@ class Staff {
   final String maritalStatus;
   final String photoUrl;
   final bool disabled; // <-- ADD THIS
+  final String bankName;
+  final String accountNumber;
+  final String sortCode;
 
 
   String get fullName => '$firstName $lastName'.trim();
@@ -44,7 +47,14 @@ class Staff {
     this.maritalStatus = '',
     this.photoUrl = '',
     this.disabled = false,
+    this.bankName = '',
+    this.accountNumber = '',
+    this.sortCode = '',
   });
+
+
+  // Helper getter for full name
+  //String get fullName => '$firstName $lastName'.trim();
 
   factory Staff.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
@@ -68,6 +78,9 @@ class Staff {
       maritalStatus: data['maritalStatus'] ?? '',
       photoUrl: data['photoUrl'] ?? '',
       disabled: data['disabled'] ?? false, // <-- ADD THIS
+      bankName: data['bankName'] ?? '',
+      accountNumber: data['accountNumber'] ?? '',
+      sortCode: data['sortCode'] ?? '',
     );
   }
 
@@ -90,6 +103,9 @@ class Staff {
       'gender': gender,
       'maritalStatus': maritalStatus,
       'photoUrl': photoUrl,
+      'bankName': bankName,
+      'accountNumber': accountNumber,
+      'sortCode': sortCode,
     };
   }
 }

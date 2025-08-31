@@ -10,6 +10,8 @@ import '../features/payroll/ui/salary_management_page.dart';
 import '../forgot_password3.dart';
 import '../screens/account_management/account_management_hub_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
+import '../screens/admin/bank_management_page.dart';
+import '../screens/admin/salary_scale_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/attendance_analysis_page/hq_attendance_analysis_page.dart';
 import '../screens/call_tracker/hq_call_tracking_reports.dart';
@@ -408,24 +410,52 @@ Widget drawer3(
             color: Colors.grey,
             height: 1,
           ),
-          ListTile(
+
+          ExpansionTile(
             leading: const Icon(Icons.manage_accounts),
-            title: Text(
-              'Account Management',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.of(context).pop(); // Close the drawer
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const AccountManagementHubScreen(),
-              ));
-            },
-          ), const Divider(
+            title: const Text("Account management"),
+            children: [
+              ListTile(
+                leading: const Icon(Icons.manage_accounts),
+                title: Text(
+                  'Manage Account',
+                  style: TextStyle(
+                      fontSize: drawerFontSize,
+                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop(); // Close the drawer
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => const AccountManagementHubScreen(),
+                  ));
+                },
+              ),
+              const Divider(
+                color: Colors.grey,
+                height: 1,
+              ),
+
+              ListTile(
+                leading: const Icon(Icons.account_balance, color: Colors.indigo),
+                title: const Text('Manage Banks'),
+                onTap: () {
+                  Navigator.pop(context); // Close the drawer first
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BankManagementPage()),
+                  );
+                },
+              ),
+              const Divider(color: Colors.grey, height: 1),
+            ],
+          ),
+
+          const Divider(
             color: Colors.grey,
             height: 1,
           ),
+
+
 
           ListTile(
             leading: Icon(
@@ -484,12 +514,25 @@ Widget drawer3(
 
 
           //  if (isAdmin)
-          ExpansionTile( // Group payroll features together
-            leading: Icon(Icons.monetization_on),
-            title: Text("Payroll & Payments"),
+// Find this section in your drawer3.dart file and add the new ListTile
+
+          ExpansionTile(
+            leading: const Icon(Icons.monetization_on),
+            title: const Text("Payroll & Payments"),
             children: [
+              // --- ADD THIS LISTTILE ---
               ListTile(
-                leading: Icon(Icons.price_change),
+                leading: const Icon(Icons.price_change, color: Colors.teal), // Added icon and color
+                title: const Text('Manage Salary Scales'),
+                onTap: () {
+                  Navigator.pop(context); // Close the drawer
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryScalePage()));
+                },
+              ),
+              // --- END OF ADDITION ---
+
+              ListTile(
+                leading: const Icon(Icons.price_change), // This was your old "Manage Salaries"
                 title: const Text('Manage Salaries'),
                 onTap: () {
                   Navigator.pop(context); // Close the drawer
@@ -497,7 +540,7 @@ Widget drawer3(
                 },
               ),
               ListTile(
-                leading: Icon(Icons.payments),
+                leading: const Icon(Icons.payments),
                 title: const Text('Payroll Workflow'),
                 onTap: () {
                   Navigator.pop(context); // Close the drawer
@@ -506,7 +549,6 @@ Widget drawer3(
               ),
             ],
           ),
-
 
 
           const Divider(
