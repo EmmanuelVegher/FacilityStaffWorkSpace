@@ -144,118 +144,124 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Main content area with responsive layout
-          Positioned.fill(
-            child: SingleChildScrollView(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Define a breakpoint to switch between layouts
-                  const double breakpoint = 768.0;
-                  if (constraints.maxWidth > breakpoint) {
-                    // For tablets and desktops
-                    return _buildWideLayout(context);
-                  } else {
-                    // For mobile phones
-                    return _buildNarrowLayout(context);
-                  }
-                },
-              ),
-            ),
-          ),
+      // Use a LayoutBuilder to check the screen width at the top level
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          const double breakpoint = 768.0;
+          final bool isNarrow = constraints.maxWidth < breakpoint;
 
-          // Header shapes and content
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SizedBox(
-              height: 250,
-              child: Stack(
-                children: [
-                  _buildHeaderShape(clipper: GoldWaveClipper(), color: goldColor, height: 200, hasShadow: true),
-                  _buildHeaderShape(clipper: TopWaveClipper(), color: maroonColor, height: 180),
-                ],
+          return Stack(
+            children: [
+              // Main content area
+              Positioned.fill(
+                child: SingleChildScrollView(
+                  // Select the layout based on the screen width
+                  child: isNarrow
+                      ? _buildNarrowLayout(context)
+                      : _buildWideLayout(context),
+                ),
               ),
-            ),
-          ),
 
-          // Footer shape
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: ClipPath(
-              clipper: FooterWaveClipper(),
-              child: Container(
-                width: 450,
-                height: 220,
-                color: maroonColor,
-              ),
-            ),
-          ),
-        ],
+              // Conditionally add Header shapes ONLY for wide screens
+              if (!isNarrow)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SizedBox(
+                    height: 250,
+                    child: Stack(
+                      children: [
+                        _buildHeaderShape(clipper: GoldWaveClipper(), color: goldColor, height: 200, hasShadow: true),
+                        _buildHeaderShape(clipper: TopWaveClipper(), color: maroonColor, height: 180),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Conditionally add Footer shape ONLY for wide screens
+              if (!isNarrow)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  child: ClipPath(
+                    clipper: FooterWaveClipper(),
+                    child: Container(
+                      width: 450,
+                      height: 220,
+                      color: maroonColor,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  /// Builds the layout for narrow screens (Mobile).
+
   Widget _buildNarrowLayout(BuildContext context) {
+    // Get viewport height to ensure content can be centered vertically
     final screenHeight = MediaQuery.of(context).size.height;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: screenHeight * 0.2), // Space for header waves
-          Image.asset(
-            'assets/image/service_delivery1.png',
-            height: 150,
-            semanticLabel: 'Caritas Nigeria Service Delivery Logo',
-          ),
-          const SizedBox(height: 32),
-          _buildTextField(controller: _emailController, hintText: 'Email'),
-          const SizedBox(height: 16),
-          _buildPasswordField(),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
-              child: Text('Forgot Password?', style: TextStyle(color: Colors.grey.shade800)),
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: screenHeight, // Ensure the column can fill the screen
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // Center the content
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/image/service_delivery1.png',
+              height: 150,
+              semanticLabel: 'Caritas Nigeria Service Delivery Logo',
             ),
-          ),
-          const SizedBox(height: 16),
-          _buildLoginButton(
-            text: 'Login',
-            color: Colors.grey.shade700,
-            onPressed: _isLoading ? null : _signIn,
-            isLoading: _isLoading,
-          ),
-          const SizedBox(height: 24),
-          const Row(
-            children: [
-              Expanded(child: Divider()),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text('or', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 32),
+            _buildTextField(controller: _emailController, hintText: 'Email'),
+            const SizedBox(height: 16),
+            _buildPasswordField(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
+                child: Text('Forgot Password?', style: TextStyle(color: Colors.grey.shade800)),
               ),
-              Expanded(child: Divider()),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildLoginButton(
-            text: 'Sign in with Google',
-            color: darkMaroonButtonColor,
-            onPressed: _isLoading ? null : _signInWithGoogle,
-          ),
-          if (_errorMessage.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(_errorMessage, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
             ),
-          SizedBox(height: screenHeight * 0.2), // Space for footer
-        ],
+            const SizedBox(height: 16),
+            _buildLoginButton(
+              text: 'Login',
+              color: Colors.grey.shade700,
+              onPressed: _isLoading ? null : _signIn,
+              isLoading: _isLoading,
+            ),
+            const SizedBox(height: 24),
+            const Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text('or', style: TextStyle(color: Colors.grey)),
+                ),
+                Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _buildLoginButton(
+              text: 'Sign in with Google',
+              color: darkMaroonButtonColor,
+              onPressed: _isLoading ? null : _signInWithGoogle,
+            ),
+            if (_errorMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(_errorMessage, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -343,6 +349,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // --- Helper Widgets for UI (with styling improvements) ---
+
 
   Widget _buildTextField({required TextEditingController controller, required String hintText}) {
     return TextField(
