@@ -286,7 +286,7 @@ class _LoginPageState extends State<LoginPage> {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.of(context).size.width * 0.08,
-        vertical: screenHeight * 0.25,
+        vertical: screenHeight * 0.26,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -298,7 +298,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Image.asset(
                   'assets/image/service_delivery1.png',
-                  height: 250,
+                  height: 300,
                   semanticLabel: 'Caritas Nigeria Service Delivery Logo',
                 ),
               ],
