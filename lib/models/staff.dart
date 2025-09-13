@@ -1,3 +1,5 @@
+// Path: lib/models/staff.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Staff {
@@ -8,8 +10,8 @@ class Staff {
   final String mobile;
   final String staffCategory;
   final String project;
-  final String state; // This will store the STATE NAME (e.g., "Lagos")
-  final String stateId; // This will store the STATE DOCUMENT ID
+  final String state;
+  final String stateId;
   final String location;
   final String department;
   final String designation;
@@ -19,11 +21,12 @@ class Staff {
   final String gender;
   final String maritalStatus;
   final String photoUrl;
-  final bool disabled; // <-- ADD THIS
+  final bool disabled;
   final String bankName;
   final String accountNumber;
   final String sortCode;
-
+  final String programManager; // <-- NEW
+  final String programManagerEmail; // <-- NEW
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -50,11 +53,9 @@ class Staff {
     this.bankName = '',
     this.accountNumber = '',
     this.sortCode = '',
+    this.programManager = '', // <-- NEW
+    this.programManagerEmail = '', // <-- NEW
   });
-
-
-  // Helper getter for full name
-  //String get fullName => '$firstName $lastName'.trim();
 
   factory Staff.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
@@ -77,13 +78,16 @@ class Staff {
       gender: data['gender'] ?? '',
       maritalStatus: data['maritalStatus'] ?? '',
       photoUrl: data['photoUrl'] ?? '',
-      disabled: data['disabled'] ?? false, // <-- ADD THIS
+      disabled: data['disabled'] ?? false,
       bankName: data['bankName'] ?? '',
       accountNumber: data['accountNumber'] ?? '',
       sortCode: data['sortCode'] ?? '',
+      programManager: data['programManager'] ?? '', // <-- NEW (with null safety)
+      programManagerEmail: data['programManagerEmail'] ?? '', // <-- NEW (with null safety)
     );
   }
 
+  // The toMap method is not strictly needed for this screen but is good practice.
   Map<String, dynamic> toMap() {
     return {
       'firstName': firstName,
@@ -106,6 +110,8 @@ class Staff {
       'bankName': bankName,
       'accountNumber': accountNumber,
       'sortCode': sortCode,
+      'programManager': programManager, // <-- NEW
+      'programManagerEmail': programManagerEmail, // <-- NEW
     };
   }
 }

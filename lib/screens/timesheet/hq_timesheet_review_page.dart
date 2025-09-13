@@ -19,34 +19,61 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../widgets/drawer3.dart';
 import '../admin/payment_schedule_page.dart';
 
-// --- DATA MODELS ---
-class TimesheetEntry {
-  final String date;
-  final String durationWorked;
-  final num noOfHours;
-  final bool isOffDay;
-  final String projectName;
 
-  TimesheetEntry({
-    required this.date,
-    required this.durationWorked,
-    required this.noOfHours,
-    required this.isOffDay,
-    required this.projectName,
+
+
+// <<<--- NEW: Innermost data model for recommendation details ---<<<
+// <<<--- MODEL DEFINITIONS START HERE ---<<<
+
+class Recommendation {
+  final double? deductedHours;
+  final String? notes;
+
+  Recommendation({
+    this.deductedHours,
+    this.notes,
   });
 
-  factory TimesheetEntry.fromMap(Map<String, dynamic> map) {
-    return TimesheetEntry(
-      date: map['date'] as String? ?? 'N/A',
-      durationWorked: map['durationWorked'] as String? ?? 'N/A',
-      noOfHours: map['noOfHours'] as num? ?? 0,
-      isOffDay: map['offDay'] as bool? ?? false,
-      projectName: map['projectName'] as String? ?? 'N/A',
+  factory Recommendation.fromMap(Map<String, dynamic> map) {
+    return Recommendation(
+      deductedHours: (map['deductedHours'] as num?)?.toDouble(),
+      notes: map['notes'] as String?,
     );
   }
 }
 
-// MODIFIED: Changed Timestamp fields to DateTime and added a robust parser
+// <<<--- MODIFIED: Added missing fields ---<<<
+class TimesheetEntry {
+  final String date;
+  final num noOfHours;
+  final bool isOffDay; // ADDED
+  final String? durationWorked; // ADDED
+  final Recommendation? recommendation;
+
+  TimesheetEntry({
+    required this.date,
+    required this.noOfHours,
+    required this.isOffDay, // ADDED
+    this.durationWorked, // ADDED
+    this.recommendation,
+  });
+
+  factory TimesheetEntry.fromMap(Map<String, dynamic> map) {
+    return TimesheetEntry(
+      date: map['date'] as String? ?? 'Unknown Date',
+      noOfHours: map['noOfHours'] as num? ?? 0,
+      isOffDay: map['offDay'] as bool? ?? false, // ADDED (Firestore field is 'offDay')
+      durationWorked: map['durationWorked'] as String?, // ADDED
+      recommendation: map['recommendation'] != null
+          ? Recommendation.fromMap(map['recommendation'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+
+
+// <<<--- REWRITTEN: The main TimesheetModel ---<<<
 class TimesheetModel {
   final String staffId;
   final String staffName;
@@ -57,20 +84,20 @@ class TimesheetModel {
   final String state;
   final String? staffSignature;
   final String? staffSignatureDate;
-  final DateTime? staffSignatureDateTime; // MODIFIED
+  final DateTime? staffSignatureDateTime;
   final String? projectName;
   final String facilitySupervisor;
   final String? facilitySupervisorEmail;
   final String facilitySupervisorSignatureStatus;
   final String? facilitySupervisorSignature;
   final String? facilitySupervisorSignatureDate;
-  final DateTime? facilitySupervisorTimesheetSubmissionDateTime; // MODIFIED
+  final DateTime? facilitySupervisorTimesheetSubmissionDateTime;
   final String caritasSupervisor;
   final String? caritasSupervisorEmail;
   final String caritasSupervisorSignatureStatus;
   final String? caritasSupervisorSignature;
   final String? caritasSupervisorSignatureDate;
-  final DateTime? caritasSupervisorTimesheetSubmissionDateTime; // MODIFIED
+  final DateTime? caritasSupervisorTimesheetSubmissionDateTime;
   final List<TimesheetEntry> entries;
   final double totalHours;
 
@@ -118,7 +145,6 @@ class TimesheetModel {
     return cappedTotal;
   }
 
-  // ADDED: Robust helper to parse Firestore Timestamps OR date Strings
   static DateTime? _parseTimestamp(dynamic value) {
     if (value is Timestamp) {
       return value.toDate();
@@ -129,13 +155,13 @@ class TimesheetModel {
     return null;
   }
 
-  factory TimesheetModel.fromMap(Map<String, dynamic> map, String id) {
+  factory TimesheetModel.fromFirestore(DocumentSnapshot doc) {
+    final map = doc.data() as Map<String, dynamic>;
     var entriesData = (map['timesheetEntries'] as List<dynamic>?)
         ?.map((e) => TimesheetEntry.fromMap(e as Map<String, dynamic>))
         .toList() ?? [];
-
     return TimesheetModel(
-      staffId: map['staffId'] as String? ?? id,
+      staffId: map['staffId'] as String? ?? doc.id,
       staffName: map['staffName'] as String? ?? 'N/A',
       staffEmail: map['staffEmail'] as String? ?? 'N/A',
       designation: map['designation'] as String? ?? 'N/A',
@@ -144,24 +170,31 @@ class TimesheetModel {
       state: map['state'] as String? ?? 'N/A',
       staffSignature: map['staffSignature'] as String?,
       staffSignatureDate: map['staffSignatureDate'] as String?,
-      staffSignatureDateTime: _parseTimestamp(map['staffSignatureTimestamp']), // MODIFIED
+      staffSignatureDateTime: _parseTimestamp(map['staffSignatureTimestamp']),
       projectName: map['projectName'] as String?,
       facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
       facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?,
-      facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
+      facilitySupervisorSignatureStatus:
+      map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
       facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
-      facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
-      facilitySupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['facilitySupervisorTimesheetSubmissionTimestamp']), // MODIFIED
+      facilitySupervisorSignatureDate:
+      map['facilitySupervisorSignatureDate'] as String?,
+      facilitySupervisorTimesheetSubmissionDateTime: _parseTimestamp(
+          map['facilitySupervisorTimesheetSubmissionTimestamp']),
       caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
       caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?,
-      caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
+      caritasSupervisorSignatureStatus:
+      map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
       caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
-      caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
-      caritasSupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['caritasSupervisorTimesheetSubmissionTimestamp']), // MODIFIED
+      caritasSupervisorSignatureDate:
+      map['caritasSupervisorSignatureDate'] as String?,
+      caritasSupervisorTimesheetSubmissionDateTime:
+      _parseTimestamp(map['caritasSupervisorTimesheetSubmissionTimestamp']),
       entries: entriesData,
     );
   }
 }
+
 class TimesheetMetrics {
   int totalExpected = 0;
   int totalSubmitted = 0;
@@ -358,6 +391,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     if (mounted) setState(() => _isFilterLoading = false);
   }
 
+  // <<<--- MODIFIED: Fixed the call to TimesheetModel.fromFirestore ---<<<
   Future<void> _loadTimesheets() async {
     if (_selectedStates.isEmpty || (_selectedStates.contains('All States') && _availableStates.length <= 1)) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state.")));
@@ -415,17 +449,19 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
       final timesheetDocId = '${monthName}_$_selectedYear';
 
+      // Handle split September timesheets
+      final part1DocId = '${monthName}_$_selectedYear}_part1';
+      final part2DocId = '${monthName}_$_selectedYear}_part2';
+
       final List<TimesheetModel> fetchedTimesheets = [];
       final Set<String> submittedStaffIds = {};
 
       for (final doc in timesheetSnapshot.docs) {
-        if (doc.id == timesheetDocId) {
-          final data = doc.data();
-          if (data is Map<String, dynamic>) {
-            final staffId = data['staffId'] as String? ?? doc.reference.parent.parent!.id;
-            fetchedTimesheets.add(TimesheetModel.fromMap(data, staffId));
-            submittedStaffIds.add(staffId);
-          }
+        // Check for standard, part1, or part2 timesheets
+        if (doc.id == timesheetDocId || doc.id == part1DocId || doc.id == part2DocId) {
+          final timesheet = TimesheetModel.fromFirestore(doc); // <-- THE FIX IS HERE
+          fetchedTimesheets.add(timesheet);
+          submittedStaffIds.add(timesheet.staffId);
         }
       }
 
@@ -454,6 +490,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   void _applyFiltersAndCalculateMetrics() {
     List<dynamic> filteredList;
@@ -1905,18 +1942,33 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     );
   }
 
+// In _TimesheetReviewPageHqState class
+
+  // <<<--- CORRECTED METHOD ---<<<
   Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
     try {
       final querySnapshot = await _firestore.collectionGroup('TimeSheets').where('staffId', isEqualTo: staffId).get();
-      final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
+
+      // Also check for the split September timesheet IDs
+      final part1DocId = '${timesheetDocId}_part1';
+      final part2DocId = '${timesheetDocId}_part2';
+
+      final docs = querySnapshot.docs.where((doc) =>
+      doc.id == timesheetDocId ||
+          doc.id == part1DocId ||
+          doc.id == part2DocId
+      ).toList();
+
       if (docs.isNotEmpty) {
+        // It's possible for a staff member to have two timesheets in September.
+        // For a single PDF download, we'll just grab the first one found.
         final doc = docs.first;
-        final data = doc.data();
-        if (data is Map<String, dynamic>) {
-          return TimesheetModel.fromMap(data, staffId);
-        }
+
+        // FIX: Call the correct factory 'fromFirestore' which takes the DocumentSnapshot
+        return TimesheetModel.fromFirestore(doc);
       }
-      return null;
+
+      return null; // Return null if no matching timesheet is found
     } catch (e) {
       debugPrint("Error fetching single timesheet for PDF: $e");
       return null;

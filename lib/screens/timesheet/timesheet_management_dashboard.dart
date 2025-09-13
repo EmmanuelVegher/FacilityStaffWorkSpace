@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material; // For TextSpan ambiguity
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -15,131 +16,154 @@ import 'package:flutter/services.dart' show Uint8List, rootBundle;
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 
-import '../../widgets/drawer2.dart'; // Assuming you have a state-level drawer
+import '../../widgets/drawer2.dart'; // State-level drawer
+import '../admin/payment_schedule_page.dart';
+import 'hq_timesheet_review_page.dart'; // NEW: Import for the payment schedule page
+import 'hq_timesheet_review_page.dart' as hq; // NEW: Import for the payment schedule page
 
-// --- DATA MODELS (Unchanged) ---
-class TimesheetEntry {
-  final String date;
-  final String durationWorked;
-  final num noOfHours;
-  final bool isOffDay;
-  final String projectName;
-
-  TimesheetEntry({
-    required this.date,
-    required this.durationWorked,
-    required this.noOfHours,
-    required this.isOffDay,
-    required this.projectName,
-  });
-
-  factory TimesheetEntry.fromMap(Map<String, dynamic> map) {
-    return TimesheetEntry(
-      date: map['date'] as String? ?? 'N/A',
-      durationWorked: map['durationWorked'] as String? ?? 'N/A',
-      noOfHours: map['noOfHours'] as num? ?? 0,
-      isOffDay: map['offDay'] as bool? ?? false,
-      projectName: map['projectName'] as String? ?? 'N/A',
-    );
-  }
-}
-
-// MODIFIED: Added supervisor email fields to the data model
-class TimesheetModel {
-  final String staffId;
-  final String staffName;
-  final String staffEmail;
-  final String designation;
-  final String department;
-  final String location;
-  final String state;
-  final String? staffSignature;
-  final String? staffSignatureDate;
-  final String? projectName;
-  final String facilitySupervisor;
-  final String? facilitySupervisorEmail; // ADDED
-  final String facilitySupervisorSignatureStatus;
-  final String? facilitySupervisorSignature;
-  final String? facilitySupervisorSignatureDate;
-  final String caritasSupervisor;
-  final String? caritasSupervisorEmail; // ADDED
-  final String caritasSupervisorSignatureStatus;
-  final String? caritasSupervisorSignature;
-  final String? caritasSupervisorSignatureDate;
-  final List<TimesheetEntry> entries;
-  final double totalHours;
-
-  TimesheetModel({
-    required this.staffId,
-    required this.staffName,
-    required this.staffEmail,
-    required this.designation,
-    required this.department,
-    required this.location,
-    required this.state,
-    this.staffSignature,
-    this.staffSignatureDate,
-    this.projectName,
-    required this.facilitySupervisor,
-    this.facilitySupervisorEmail, // ADDED
-    required this.facilitySupervisorSignatureStatus,
-    this.facilitySupervisorSignature,
-    this.facilitySupervisorSignatureDate,
-    required this.caritasSupervisor,
-    this.caritasSupervisorEmail, // ADDED
-    required this.caritasSupervisorSignatureStatus,
-    this.caritasSupervisorSignature,
-    this.caritasSupervisorSignatureDate,
-    required this.entries,
-  }) : totalHours = _calculateCappedTotalHours(entries);
-
-  static double _calculateCappedTotalHours(List<TimesheetEntry> entries) {
-    if (entries.isEmpty) return 0.0;
-    final Map<String, double> dailyHours = {};
-    for (final entry in entries) {
-      dailyHours.update(
-        entry.date,
-            (value) => value + entry.noOfHours.toDouble(),
-        ifAbsent: () => entry.noOfHours.toDouble(),
-      );
-    }
-    double cappedTotal = 0.0;
-    for (final hours in dailyHours.values) {
-      cappedTotal += (hours > 8.0) ? 8.0 : hours;
-    }
-    return cappedTotal;
-  }
-
-  factory TimesheetModel.fromMap(Map<String, dynamic> map, String id) {
-    var entriesData = (map['timesheetEntries'] as List<dynamic>?)
-        ?.map((e) => TimesheetEntry.fromMap(e as Map<String, dynamic>))
-        .toList() ?? [];
-
-    return TimesheetModel(
-      staffId: map['staffId'] as String? ?? id,
-      staffName: map['staffName'] as String? ?? 'N/A',
-      staffEmail: map['staffEmail'] as String? ?? 'N/A',
-      designation: map['designation'] as String? ?? 'N/A',
-      department: map['department'] as String? ?? 'N/A',
-      location: map['location'] as String? ?? 'N/A',
-      state: map['state'] as String? ?? 'N/A',
-      staffSignature: map['staffSignature'] as String?,
-      staffSignatureDate: map['staffSignatureDate'] as String?,
-      projectName: map['projectName'] as String?,
-      facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
-      facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?, // ADDED
-      facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
-      facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
-      facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
-      caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
-      caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?, // ADDED
-      caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
-      caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
-      caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
-      entries: entriesData,
-    );
-  }
-}
+// // --- DATA MODELS (Adapted from HQ Version) ---
+// class TimesheetEntry {
+//   final String date;
+//   final String durationWorked;
+//   final num noOfHours;
+//   final bool isOffDay;
+//   final String projectName;
+//
+//   TimesheetEntry({
+//     required this.date,
+//     required this.durationWorked,
+//     required this.noOfHours,
+//     required this.isOffDay,
+//     required this.projectName,
+//   });
+//
+//   factory TimesheetEntry.fromMap(Map<String, dynamic> map) {
+//     return TimesheetEntry(
+//       date: map['date'] as String? ?? 'N/A',
+//       durationWorked: map['durationWorked'] as String? ?? 'N/A',
+//       noOfHours: map['noOfHours'] as num? ?? 0,
+//       isOffDay: map['offDay'] as bool? ?? false,
+//       projectName: map['projectName'] as String? ?? 'N/A',
+//     );
+//   }
+// }
+//
+// // MODIFIED: Replaced with the more robust model from HQ, using DateTime for timestamps.
+// class TimesheetModel {
+//   final String staffId;
+//   final String staffName;
+//   final String staffEmail;
+//   final String designation;
+//   final String department;
+//   final String location;
+//   final String state;
+//   final String? staffSignature;
+//   final String? staffSignatureDate;
+//   final DateTime? staffSignatureDateTime; // MODIFIED
+//   final String? projectName;
+//   final String facilitySupervisor;
+//   final String? facilitySupervisorEmail;
+//   final String facilitySupervisorSignatureStatus;
+//   final String? facilitySupervisorSignature;
+//   final String? facilitySupervisorSignatureDate;
+//   final DateTime? facilitySupervisorTimesheetSubmissionDateTime; // MODIFIED
+//   final String caritasSupervisor;
+//   final String? caritasSupervisorEmail;
+//   final String caritasSupervisorSignatureStatus;
+//   final String? caritasSupervisorSignature;
+//   final String? caritasSupervisorSignatureDate;
+//   final DateTime? caritasSupervisorTimesheetSubmissionDateTime; // MODIFIED
+//   final List<TimesheetEntry> entries;
+//   final double totalHours;
+//
+//   TimesheetModel({
+//     required this.staffId,
+//     required this.staffName,
+//     required this.staffEmail,
+//     required this.designation,
+//     required this.department,
+//     required this.location,
+//     required this.state,
+//     this.staffSignature,
+//     this.staffSignatureDate,
+//     this.staffSignatureDateTime,
+//     this.projectName,
+//     required this.facilitySupervisor,
+//     this.facilitySupervisorEmail,
+//     required this.facilitySupervisorSignatureStatus,
+//     this.facilitySupervisorSignature,
+//     this.facilitySupervisorSignatureDate,
+//     this.facilitySupervisorTimesheetSubmissionDateTime,
+//     required this.caritasSupervisor,
+//     this.caritasSupervisorEmail,
+//     required this.caritasSupervisorSignatureStatus,
+//     this.caritasSupervisorSignature,
+//     this.caritasSupervisorSignatureDate,
+//     this.caritasSupervisorTimesheetSubmissionDateTime,
+//     required this.entries,
+//   }) : totalHours = _calculateCappedTotalHours(entries);
+//
+//   static double _calculateCappedTotalHours(List<TimesheetEntry> entries) {
+//     if (entries.isEmpty) return 0.0;
+//     final Map<String, double> dailyHours = {};
+//     for (final entry in entries) {
+//       dailyHours.update(
+//         entry.date,
+//             (value) => value + entry.noOfHours.toDouble(),
+//         ifAbsent: () => entry.noOfHours.toDouble(),
+//       );
+//     }
+//     double cappedTotal = 0.0;
+//     for (final hours in dailyHours.values) {
+//       cappedTotal += (hours > 8.0) ? 8.0 : hours;
+//     }
+//     return cappedTotal;
+//   }
+//
+//   // ADDED: Robust helper to parse Firestore Timestamps OR date Strings
+//   static DateTime? _parseTimestamp(dynamic value) {
+//     if (value is Timestamp) {
+//       return value.toDate();
+//     }
+//     if (value is String) {
+//       return DateTime.tryParse(value);
+//     }
+//     return null;
+//   }
+//
+//   factory TimesheetModel.fromMap(Map<String, dynamic> map, String id) {
+//     var entriesData = (map['timesheetEntries'] as List<dynamic>?)
+//         ?.map((e) => TimesheetEntry.fromMap(e as Map<String, dynamic>))
+//         .toList() ?? [];
+//
+//     return TimesheetModel(
+//       staffId: map['staffId'] as String? ?? id,
+//       staffName: map['staffName'] as String? ?? 'N/A',
+//       staffEmail: map['staffEmail'] as String? ?? 'N/A',
+//       designation: map['designation'] as String? ?? 'N/A',
+//       department: map['department'] as String? ?? 'N/A',
+//       location: map['location'] as String? ?? 'N/A',
+//       state: map['state'] as String? ?? 'N/A',
+//       staffSignature: map['staffSignature'] as String?,
+//       staffSignatureDate: map['staffSignatureDate'] as String?,
+//       staffSignatureDateTime: _parseTimestamp(map['staffSignatureTimestamp']), // MODIFIED
+//       projectName: map['projectName'] as String?,
+//       facilitySupervisor: map['facilitySupervisor'] as String? ?? 'N/A',
+//       facilitySupervisorEmail: map['facilitySupervisorEmail'] as String?,
+//       facilitySupervisorSignatureStatus: map['facilitySupervisorSignatureStatus'] as String? ?? 'Pending',
+//       facilitySupervisorSignature: map['facilitySupervisorSignature'] as String?,
+//       facilitySupervisorSignatureDate: map['facilitySupervisorSignatureDate'] as String?,
+//       facilitySupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['facilitySupervisorTimesheetSubmissionTimestamp']), // MODIFIED
+//       caritasSupervisor: map['caritasSupervisor'] as String? ?? 'N/A',
+//       caritasSupervisorEmail: map['caritasSupervisorEmail'] as String?,
+//       caritasSupervisorSignatureStatus: map['caritasSupervisorSignatureStatus'] as String? ?? 'Pending',
+//       caritasSupervisorSignature: map['caritasSupervisorSignature'] as String?,
+//       caritasSupervisorSignatureDate: map['caritasSupervisorSignatureDate'] as String?,
+//       caritasSupervisorTimesheetSubmissionDateTime: _parseTimestamp(map['caritasSupervisorTimesheetSubmissionTimestamp']), // MODIFIED
+//       entries: entriesData,
+//     );
+//   }
+// }
 
 class TimesheetMetrics {
   int totalExpected = 0;
@@ -163,7 +187,6 @@ class FacilityMetrics {
   int get pendingCaritas => totalSubmitted - approvedByCaritas;
 }
 
-
 // --- MAIN WIDGET ---
 class TimesheetReviewPage extends StatefulWidget {
   const TimesheetReviewPage({super.key});
@@ -172,9 +195,14 @@ class TimesheetReviewPage extends StatefulWidget {
   _TimesheetReviewPageState createState() => _TimesheetReviewPageState();
 }
 
-class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
+class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTickerProviderStateMixin  {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+
+  // --- NEW State Variables for September Tabs ---
+  TabController? _tabController;
+  int _selectedSeptemberPart = 1; // Default to Part 1
+
 
   // --- State Variables ---
   bool _isFilterLoading = true;
@@ -217,13 +245,92 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
+
+    // Set up the controller based on the initial month
+    _updateTabControllerState();
+
     _initializeUserContext();
   }
 
   @override
   void dispose() {
+    // Always clean up the controller when the page is destroyed.
+    _tabController?.dispose();
     _summaryTableScrollController.dispose();
     super.dispose();
+  }
+
+  // NEW HELPER METHOD: The single source of truth for managing the TabController
+  void _updateTabControllerState() {
+    final bool isSeptember = (_selectedMonth == 9);
+
+    if (isSeptember) {
+      // If it's September and the controller doesn't exist yet, create it.
+      if (_tabController == null) {
+        _tabController = TabController(length: 2, vsync: this, initialIndex: _selectedSeptemberPart - 1);
+      }
+    } else {
+      // If it's NOT September but the controller still exists, destroy it.
+      if (_tabController != null) {
+        // We don't need to call dispose() here because the logic in onChanged will handle it.
+        // But we must set it to null so the UI rebuilds correctly.
+        _tabController?.dispose(); // It's safer to dispose it here.
+        _tabController = null;
+        _selectedSeptemberPart = 1; // Reset to part 1 for the next time
+      }
+    }
+  }
+
+  // // NEW: Creates or disposes the TabController based on the selected month.
+  // void _updateTabController() {
+  //   // If the selected month is September and the controller doesn't exist yet
+  //   if (_selectedMonth == 9 && _tabController == null) {
+  //     _tabController = TabController(length: 2, vsync: this, initialIndex: _selectedSeptemberPart - 1);
+  //     _tabController!.addListener(_onTabChanged);
+  //     // We call setState to ensure the UI rebuilds and shows the TabBar
+  //     setState(() {});
+  //   }
+  //   // If the month is not September but the controller still exists
+  //   else if (_selectedMonth != 9 && _tabController != null) {
+  //     _tabController?.removeListener(_onTabChanged);
+  //     _tabController?.dispose();
+  //     _tabController = null;
+  //     // Reset part selection when leaving September
+  //     if (_selectedSeptemberPart != 1) {
+  //       _selectedSeptemberPart = 1;
+  //     }
+  //     // We call setState to ensure the UI rebuilds and hides the TabBar
+  //     setState(() {});
+  //   }
+  // }
+
+  // NEW: Handles logic when a tab is tapped.
+// NEW: Handles logic when a tab is tapped. (If you don't have this, add it)
+//   void _onTabChanged() {
+//     // Check if the tab index has actually changed to avoid redundant calls
+//     if (_tabController != null && !_tabController!.indexIsChanging) {
+//       final newPart = _tabController!.index + 1;
+//       if (_selectedSeptemberPart != newPart) {
+//         setState(() {
+//           _selectedSeptemberPart = newPart;
+//         });
+//         _loadTimesheets(); // Reload data for the newly selected part
+//       }
+//     }
+//   }
+
+  // NEW: Handles tab selection via the onTap callback, which is safer.
+// Handles tab selection via the onTap callback, which is safer.
+  void _onTabTapped(int index) {
+    // The index is 0 for Part 1, 1 for Part 2.
+    final newPart = index + 1;
+    if (_selectedSeptemberPart != newPart) {
+      setState(() {
+        _selectedSeptemberPart = newPart;
+      });
+      // Reload the data for the newly selected part
+      _loadTimesheets();
+    }
   }
 
   Future<void> _initializeUserContext() async {
@@ -262,6 +369,32 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     facilityNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return facilityNames;
   }
+
+  // --- NEW: Method to navigate to the Payment Schedule Page ---
+  void _navigateToPaymentSchedule() {
+    final List<TimesheetModel> submittedTimesheets = _allTimesheetsMaster;
+
+    if (submittedTimesheets.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No submitted timesheets available to generate a payment schedule.")),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentSchedulePage(
+          timesheets: submittedTimesheets,
+          year: _selectedYear,
+          month: _selectedMonth,
+        ),
+      ),
+    );
+  }
+
+// In _TimesheetReviewPageState
 
   Future<void> _loadTimesheets() async {
     if (_userState == null) {
@@ -314,19 +447,20 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       final timesheetSnapshot = await timesheetQuery.get();
 
       final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
-      final timesheetDocId = '${monthName}_$_selectedYear';
+      final bool isSeptember = _selectedMonth == 9;
+      final String timesheetDocId = isSeptember
+          ? '${monthName}_${_selectedYear}_part$_selectedSeptemberPart'
+          : '${monthName}_$_selectedYear';
 
       final List<TimesheetModel> fetchedTimesheets = [];
       final Set<String> submittedStaffIds = {};
 
       for (final doc in timesheetSnapshot.docs) {
         if (doc.id == timesheetDocId) {
-          final data = doc.data();
-          if (data is Map<String, dynamic>) {
-            final staffId = data['staffId'] as String? ?? doc.reference.parent.parent!.id;
-            fetchedTimesheets.add(TimesheetModel.fromMap(data, staffId));
-            submittedStaffIds.add(staffId);
-          }
+          // <<<--- FIX: Call the correct fromFirestore factory ---<<<
+          final timesheet = TimesheetModel.fromFirestore(doc);
+          fetchedTimesheets.add(timesheet);
+          submittedStaffIds.add(timesheet.staffId);
         }
       }
 
@@ -352,6 +486,22 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
+    try {
+      final querySnapshot = await _firestore.collectionGroup('TimeSheets').where('staffId', isEqualTo: staffId).get();
+      final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
+      if (docs.isNotEmpty) {
+        final doc = docs.first;
+        // <<<--- FIX: Call the correct fromFirestore factory ---<<<
+        return TimesheetModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching single timesheet for PDF: $e");
+      return null;
     }
   }
 
@@ -425,56 +575,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     });
   }
 
-  Future<void> _downloadBulkPdf() async {
-    setState(() => _isExporting = true);
-    try {
-      if (_allTimesheetsMaster.isEmpty) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No submitted timesheets to generate a bulk PDF.')));
-        setState(() => _isExporting = false);
-        return;
-      }
-
-      final timesheetsToPrint = List<TimesheetModel>.from(_allTimesheetsMaster);
-
-      if (_selectedStaffIds.isNotEmpty) {
-        final selectionSet = _selectedStaffIds.toSet();
-        timesheetsToPrint.retainWhere((ts) => selectionSet.contains(ts.staffId));
-      }
-
-      if (timesheetsToPrint.isEmpty) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No matching timesheets for the selected staff.')));
-        setState(() => _isExporting = false);
-        return;
-      }
-
-      timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
-
-      final pdf = pw.Document();
-      final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
-      final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
-      final ttf = pw.Font.ttf(font);
-      final ttfBold = pw.Font.ttf(boldFont);
-      final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
-
-      for(final timesheet in timesheetsToPrint) {
-        pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
-      }
-
-      final pdfBytes = await pdf.save();
-      String selectionName = 'Statewide';
-      if (!_selectedFacilities.contains('All Facilities')) {
-        selectionName = _selectedFacilities.join('_').replaceAll(' ', '_');
-      }
-      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${selectionName}_${_selectedMonth}_${_selectedYear}.pdf');
-
-    } catch (e, stack) {
-      debugPrint("Error generating bulk PDF: $e\n$stack");
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred during bulk PDF generation: $e')));
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -519,6 +619,25 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       body: Column(
         children: [
           _buildResponsiveFilterBar(),
+          // This condition will now work correctly
+          // This condition will now work perfectly every time.
+          // This is the complete and corrected block
+          if (_tabController != null)
+            Container(
+              color: Theme.of(context).canvasColor,
+              child: TabBar(
+                controller: _tabController,
+                onTap: _onTabTapped, // Your handler for tab clicks
+                labelColor: Theme.of(context).primaryColor,
+                unselectedLabelColor: Colors.grey.shade600,
+                indicatorColor: Theme.of(context).primaryColor,
+                // THIS IS THE REQUIRED 'tabs' PARAMETER THAT WAS MISSING
+                tabs: const [
+                  Tab(text: 'Part 1'),
+                  Tab(text: 'Part 2'),
+                ],
+              ),
+            ),
           if (_errorMessage != null)
             Center(child: Padding(padding: const EdgeInsets.all(8.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center))),
           Expanded(
@@ -565,6 +684,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     );
   }
 
+  // MODIFIED: Added Payment Schedule button and responsive layout from HQ version
   Widget _buildResponsiveFilterBar() {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     final months = List.generate(12, (index) => index + 1);
@@ -581,7 +701,16 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
           decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
           items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(0, m)))))
               .toList(),
-          onChanged: (value) => setState(() => _selectedMonth = value!),
+          // THIS IS THE FINAL, CORRECTED LOGIC
+          onChanged: (value) {
+            if (value == null) return;
+
+            // This guarantees the widget tree rebuilds after the state has changed.
+            setState(() {
+              _selectedMonth = value;
+              _updateTabControllerState();
+            });
+          },
         ),
       ),
       SizedBox(
@@ -591,7 +720,13 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
           decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
           items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
               .toList(),
-          onChanged: (value) => setState(() => _selectedYear = value!),
+          onChanged: (value) {
+            if (value != null) {
+              setState(() => _selectedMonth = value);
+              //_updateTabController(); // MODIFIED: Update tabs when month changes
+            }
+          },
+
         ),
       ),
       SizedBox(
@@ -621,6 +756,19 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       ),
     );
 
+    // NEW: Define the Payment Schedule button
+    final paymentButton = ElevatedButton.icon(
+      icon: const Icon(Icons.payments_outlined),
+      label: const Text('Payment Schedule'),
+      onPressed: _isLoading || _isFilterLoading ? null : _navigateToPaymentSchedule,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        minimumSize: const Size(0, 50),
+      ),
+    );
+
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -628,12 +776,12 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
         padding: const EdgeInsets.all(12.0),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth < 750) {
+            if (constraints.maxWidth < 950) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   GridView.count(
-                    childAspectRatio: 3.5,
+                    childAspectRatio: 3.0,
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 12,
@@ -642,7 +790,13 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
                     children: filterItems,
                   ),
                   const SizedBox(height: 16),
-                  applyButton,
+                  Row(
+                    children: [
+                      Expanded(child: applyButton),
+                      const SizedBox(width: 16),
+                      Expanded(child: paymentButton),
+                    ],
+                  ),
                 ],
               );
             } else {
@@ -657,6 +811,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
                     children: [
                       ...filterItems,
                       applyButton,
+                      const SizedBox(width: 8),
+                      paymentButton, // Added button
                     ],
                   ),
                 ),
@@ -783,7 +939,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
                   Text('Facility: ${staff['location']}'),
                   Text('Email: ${staff['email']}'),
                   Text('Mobile: ${staff['mobile']}'),
-                  Text('State: ${staff['state']}'),
                 ],
               ),
               isThreeLine: true,
@@ -853,7 +1008,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     return rows;
   }
 
-  // MODIFIED: This function now includes supervisor details
   List<List<dynamic>> _generateSubmittedSummaryData() {
     final List<List<dynamic>> rows = [];
     const List<String> headers = [
@@ -923,14 +1077,13 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
 
       if (_nonSubmittedStaff.isNotEmpty) {
         rows.add(['Staff Who Have Not Submitted']);
-        rows.add(['Staff Name', 'Facility', 'Email', 'Mobile', 'State']);
+        rows.add(['Staff Name', 'Facility', 'Email', 'Mobile']);
         for (final staff in _nonSubmittedStaff) {
           rows.add([
             staff['staffName'],
             staff['location'],
             staff['email'],
             staff['mobile'],
-            staff['state'],
           ]);
         }
       }
@@ -974,7 +1127,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
           TextCellValue('Facility'),
           TextCellValue('Email'),
           TextCellValue('Mobile'),
-          TextCellValue('State'),
         ]);
         for (final staff in _nonSubmittedStaff) {
           nonSubmitterSheet.appendRow([
@@ -982,7 +1134,6 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
             TextCellValue(staff['location'] ?? ''),
             TextCellValue(staff['email'] ?? ''),
             TextCellValue(staff['mobile'] ?? ''),
-            TextCellValue(staff['state'] ?? ''),
           ]);
         }
       }
@@ -999,6 +1150,9 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
       if(mounted) setState(() => _isExporting = false);
     }
   }
+
+  // --- UI & EXPORT HELPER WIDGETS AND FUNCTIONS ---
+  // (These are largely unchanged from the provided code, so they are included for completeness)
 
   void _triggerDownload(Uint8List data, String filename) {
     final blob = html.Blob([data]);
@@ -1375,7 +1529,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     );
   }
 
-  Widget _buildEntriesTable(List<TimesheetEntry> entries) {
+  Widget _buildEntriesTable(List<hq.TimesheetEntry> entries) {
     final Map<String, Map<String, dynamic>> dailySummary = {};
     for (final entry in entries) {
       dailySummary.update(
@@ -1408,28 +1562,66 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     );
   }
 
-  Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
+  // Future<TimesheetModel?> _fetchTimesheetFromFirestore1(String staffId, String timesheetDocId) async {
+  //   try {
+  //     final querySnapshot = await _firestore.collectionGroup('TimeSheets').where('staffId', isEqualTo: staffId).get();
+  //     final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
+  //     if (docs.isNotEmpty) {
+  //       final doc = docs.first;
+  //       final data = doc.data();
+  //       if (data is Map<String, dynamic>) {
+  //         return TimesheetModel.fromMap(data, staffId);
+  //       }
+  //     }
+  //     return null;
+  //   } catch (e) {
+  //     debugPrint("Error fetching single timesheet for PDF: $e");
+  //     return null;
+  //   }
+  // }
+
+  // In _TimesheetReviewPageHqState class
+
+  // <<<--- CORRECTED METHOD ---<<<
+  Future<TimesheetModel?> _fetchTimesheetFromFirestore2(String staffId, String timesheetDocId) async {
     try {
       final querySnapshot = await _firestore.collectionGroup('TimeSheets').where('staffId', isEqualTo: staffId).get();
-      final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
+
+      // Also check for the split September timesheet IDs
+      final part1DocId = '${timesheetDocId}_part1';
+      final part2DocId = '${timesheetDocId}_part2';
+
+      final docs = querySnapshot.docs.where((doc) =>
+      doc.id == timesheetDocId ||
+          doc.id == part1DocId ||
+          doc.id == part2DocId
+      ).toList();
+
       if (docs.isNotEmpty) {
+        // It's possible for a staff member to have two timesheets in September.
+        // For a single PDF download, we'll just grab the first one found.
         final doc = docs.first;
-        final data = doc.data();
-        if (data is Map<String, dynamic>) {
-          return TimesheetModel.fromMap(data, staffId);
-        }
+
+        // FIX: Call the correct factory 'fromFirestore' which takes the DocumentSnapshot
+        return TimesheetModel.fromFirestore(doc);
       }
-      return null;
+
+      return null; // Return null if no matching timesheet is found
     } catch (e) {
       debugPrint("Error fetching single timesheet for PDF: $e");
       return null;
     }
   }
 
+
   Future<void> _downloadSinglePdf(String staffId) async {
     setState(() => _isExporting = true);
     final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
-    final timesheetDocId = '${monthName}_$_selectedYear';
+    // MODIFIED: Handle document naming for September parts
+    final bool isSeptember = _selectedMonth == 9;
+    final String timesheetDocId = isSeptember
+        ? '${monthName}_${_selectedYear}_part$_selectedSeptemberPart'
+        : '${monthName}_$_selectedYear';
     final timesheet = await _fetchTimesheetFromFirestore(staffId, timesheetDocId);
     if (timesheet == null) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not find timesheet for $staffId to download.')));
@@ -1446,6 +1638,56 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> {
     final pdfBytes = await pdf.save();
     _triggerDownload(pdfBytes, 'Timesheet_${timesheet.staffName.replaceAll(' ','_')}_${_selectedMonth}_${_selectedYear}.pdf');
     setState(() => _isExporting = false);
+  }
+
+  Future<void> _downloadBulkPdf() async {
+    setState(() => _isExporting = true);
+    try {
+      if (_allTimesheetsMaster.isEmpty) {
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No submitted timesheets to generate a bulk PDF.')));
+        setState(() => _isExporting = false);
+        return;
+      }
+
+      final timesheetsToPrint = List<TimesheetModel>.from(_allTimesheetsMaster);
+
+      if (_selectedStaffIds.isNotEmpty) {
+        final selectionSet = _selectedStaffIds.toSet();
+        timesheetsToPrint.retainWhere((ts) => selectionSet.contains(ts.staffId));
+      }
+
+      if (timesheetsToPrint.isEmpty) {
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No matching timesheets for the selected staff.')));
+        setState(() => _isExporting = false);
+        return;
+      }
+
+      timesheetsToPrint.sort((a,b) => a.staffName.compareTo(b.staffName));
+
+      final pdf = pw.Document();
+      final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
+      final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
+      final ttf = pw.Font.ttf(font);
+      final ttfBold = pw.Font.ttf(boldFont);
+      final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
+
+      for(final timesheet in timesheetsToPrint) {
+        pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
+      }
+
+      final pdfBytes = await pdf.save();
+      String selectionName = 'Statewide';
+      if (!_selectedFacilities.contains('All Facilities')) {
+        selectionName = _selectedFacilities.join('_').replaceAll(' ', '_');
+      }
+      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${_userState}_${selectionName}_${_selectedMonth}_${_selectedYear}.pdf');
+
+    } catch (e, stack) {
+      debugPrint("Error generating bulk PDF: $e\n$stack");
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred during bulk PDF generation: $e')));
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
   }
 
   Future<pw.Page> _createSingleTimesheetPage(TimesheetModel timesheet, pw.ImageProvider logoImage, pw.Font ttf, pw.Font ttfBold) async {

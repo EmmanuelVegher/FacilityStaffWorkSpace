@@ -10,6 +10,7 @@ import '../features/payroll/ui/payroll_workflow_page.dart';
 import '../features/payroll/ui/salary_management_page.dart';
 import '../screens/account_management/my_state_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
+import '../screens/admin/pending_schedules_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
@@ -161,11 +162,29 @@ Widget drawer2(
           ListTile(
             leading: Icon(Icons.timer,
                 size: drawerIconSize, color: Colors.orangeAccent),
-            title: Text(
-              'Attendance Analysis',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            title: Row(
+              children: [
+                Text(
+                  'Attendance Analysis',
+                  style: TextStyle(
+                      fontSize: drawerFontSize,
+                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                // --- CONDITIONAL "NEW" TAG ---
+                // This logic will show the chip only until the specified date
+                if (DateTime.now().isBefore(DateTime(2025, 9, 19)))
+                  Chip(
+                    label: const Text(
+                      'NEW',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    ),
+                    backgroundColor: Colors.orangeAccent,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -358,6 +377,18 @@ Widget drawer2(
             },
           ),
 
+          ListTile(
+            leading: const Icon(Icons.playlist_add_check_circle_outlined),
+            title: const Text('Pending Payment Schedules'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PendingSchedulesPage(),
+                ),
+              );
+            },
+          ),
 
 
 

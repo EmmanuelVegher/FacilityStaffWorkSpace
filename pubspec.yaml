@@ -143,6 +143,7 @@ dependencies:
   share_plus:
   printing:
   firebase_messaging:
+  google_fonts:
  # web:
   html:
   csv: ^6.0.0

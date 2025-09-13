@@ -187,7 +187,7 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const ClockAttendanceWeb()),
+                    builder: (context) => const FacialRecognitionPage()),
               );
             },
           ),

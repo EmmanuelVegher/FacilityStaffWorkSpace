@@ -1,16 +1,24 @@
+// lib/Pages/supervisor_form_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../services/metadata_trigger_service.dart';
 
 class SupervisorFormScreen extends StatefulWidget {
   final String stateId;
   final Map<String, dynamic>? existingSupervisorData;
   final String? existingSupervisorId;
 
+  // <<<--- 1. FIX: Change the type from VoidCallback to a Future-returning function ---<<<
+  final Future<void> Function()? onSuccess;
+
   const SupervisorFormScreen({
     super.key,
     required this.stateId,
     this.existingSupervisorData,
     this.existingSupervisorId,
+    this.onSuccess, // <<<--- 2. The constructor now correctly accepts the new type ---<<<
   });
 
   bool get isEditMode => existingSupervisorData != null;
@@ -49,7 +57,11 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
         setState(() => _departmentOptions = departments);
       }
     } catch (e) {
-      // Handle error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching departments: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -63,6 +75,7 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
       'supervisor': supervisorName,
       'email': _emailController.text.trim(),
       'department': _selectedDepartment,
+      'state': widget.stateId,
     };
 
     try {
@@ -71,8 +84,16 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
           .doc(widget.stateId)
           .collection(widget.stateId);
 
-      // In your structure, the document ID is the supervisor's name.
       await collectionRef.doc(supervisorName).set(supervisorData, SetOptions(merge: true));
+
+      if (widget.onSuccess != null) {
+        // <<<--- 3. FIX: This 'await' call is now VALID because the types match ---<<<
+        await widget.onSuccess!();
+      } else {
+        await MetadataTriggerService.triggerSupervisorUpdate();
+      }
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Supervisor ${widget.isEditMode ? 'updated' : 'added'} successfully.'),
@@ -81,6 +102,7 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
       Navigator.of(context).pop();
 
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error saving supervisor: $e'),
         backgroundColor: Colors.red,
@@ -92,6 +114,7 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The build method remains entirely the same as before.
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(

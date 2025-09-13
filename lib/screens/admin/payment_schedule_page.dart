@@ -1,5 +1,9 @@
 // lib/pages/admin/payment_schedule_page.dart
 
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,12 +12,42 @@ import 'package:excel/excel.dart' as xls hide TextSpan;
 import 'dart:html' as html;
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import '../../models/payment_schedule_model.dart';
 import '../timesheet/hq_timesheet_review_page.dart';
 import 'salary_scale_page.dart';
 
 // Model to hold all data for one row in the payment table
+// Add this to lib/models/payment_schedule_model.dart
 
-// 1. Add a new data model for Staff Bank Info
+class Recommendation {
+  final double? deductedHours;
+  final String? notes;
+
+  Recommendation({this.deductedHours, this.notes});
+
+  factory Recommendation.fromMap(Map<String, dynamic> map) {
+    return Recommendation(
+      deductedHours: (map['deductedHours'] as num?)?.toDouble(),
+      notes: map['notes'] as String?,
+    );
+  }
+}
+
+class TimesheetEntry {
+  final Recommendation? recommendation;
+
+  TimesheetEntry({this.recommendation});
+
+  factory TimesheetEntry.fromMap(Map<String, dynamic> map) {
+    return TimesheetEntry(
+      recommendation: map['recommendation'] != null
+          ? Recommendation.fromMap(map['recommendation'])
+          : null,
+    );
+  }
+}
+
+// 1. Add a new data model for Staff Bank Info (No change here)
 class StaffBankInfo {
   final String bankName;
   final String accountNumber;
@@ -21,89 +55,159 @@ class StaffBankInfo {
   StaffBankInfo({this.bankName = '', this.accountNumber = '', this.sortCode = ''});
 }
 
+// 2. Add toJson/fromJson to PaymentScheduleItem (as done in Step 1)
+// In lib/pages/admin/payment_schedule_page.dart
+
 class PaymentScheduleItem {
+  // Core data
   final TimesheetModel timesheet;
   final SalaryScale baseSalary;
   final double expectedHours;
 
-  double actualHoursWorked; // To store the original hours from timesheet
-  double hoursUsedForCalc; // Capped hours for calculation
+  // Calculated fields based on the new logic
+  double actualHoursWorked;
   double percentageWorked;
-  double proratedGross;
-  double proratedBasic;
-  double proratedHousing;
-  double proratedTransport;
-  double proratedMeal;
-  double proratedUtility;
-  double proratedPaye;
+  double payeFromGrossBase;
+  double totalDeductedHoursFromTimesheet;
+  double otherDeductionsAmount;
+  double grossAfterDeductions;
   double proratedNet;
-  bool isEdited = false;
 
-  // --- ADD THESE NEW FIELDS ---
-  double deductionAmount = 0.0;
-  String? deductionReason;
+  // Fields for manual adjustments
+  bool isEdited = false;
   double additionAmount = 0.0;
   String? additionReason;
-  // --- END OF ADDITION ---
+  double deductionAmount = 0.0;
+  String? deductionReason;
+  String comments = '';
 
-  PaymentScheduleItem({
-    required this.timesheet,
-    required this.baseSalary,
-    required this.expectedHours,
-  })  : percentageWorked = 0, proratedGross = 0, proratedBasic = 0, actualHoursWorked = 0,
-        proratedHousing = 0, proratedTransport = 0, proratedMeal = 0,hoursUsedForCalc = 0,
-        proratedUtility = 0, proratedPaye = 0, proratedNet = 0 {
-    // --- Store actual hours from the timesheet ---
+  PaymentScheduleItem({ required this.timesheet, required this.baseSalary, required this.expectedHours,})
+      : actualHoursWorked = 0, percentageWorked = 0, payeFromGrossBase = 0,
+        totalDeductedHoursFromTimesheet = 0, otherDeductionsAmount = 0,
+        grossAfterDeductions = 0, proratedNet = 0 {
     actualHoursWorked = timesheet.totalHours;
     calculateProratedSalary();
   }
 
   void calculateProratedSalary() {
-    // --- Cap the hours worked at the expected hours ---
-    hoursUsedForCalc = (actualHoursWorked > expectedHours) ? expectedHours : actualHoursWorked;
-    // Calculate percentage based on the CAPPED hours
+    double hoursUsedForCalc = (actualHoursWorked > expectedHours) ? expectedHours : actualHoursWorked;
     double rawPercentage = (expectedHours > 0) ? (hoursUsedForCalc / expectedHours * 100) : 0.0;
     percentageWorked = rawPercentage > 100.0 ? 100.0 : rawPercentage;
-
     final ratio = percentageWorked / 100.0;
 
-    if (!isEdited) {
-      proratedGross = (baseSalary.grossPay * ratio) + additionAmount;
-      proratedBasic = baseSalary.basic * ratio;
-      proratedHousing = baseSalary.housing * ratio;
-      proratedTransport = baseSalary.transport * ratio;
-      proratedMeal = baseSalary.meal * ratio;
-      proratedUtility = baseSalary.utility * ratio;
-      proratedPaye = baseSalary.paye * ratio;
+    payeFromGrossBase = baseSalary.grossPay * 0.05;
+
+    totalDeductedHoursFromTimesheet = 0;
+
+    // <<<--- CORRECTION: Use dot notation for object properties ---<<<
+    for (var entry in timesheet.entries) {
+      if (entry.recommendation?.deductedHours != null) {
+        totalDeductedHoursFromTimesheet += entry.recommendation!.deductedHours!;
+      }
     }
 
-    proratedNet = (baseSalary.netPay * ratio) + additionAmount - deductionAmount;
+    double hourlyGrossRate = (expectedHours > 0) ? (baseSalary.grossPay / expectedHours) : 0;
+    otherDeductionsAmount = totalDeductedHoursFromTimesheet * hourlyGrossRate;
+
+    grossAfterDeductions = baseSalary.grossPay - payeFromGrossBase - otherDeductionsAmount;
+    if (grossAfterDeductions < 0) grossAfterDeductions = 0;
+
+    if (totalDeductedHoursFromTimesheet > 0 && expectedHours > 0) {
+      double deductedPercentage = (totalDeductedHoursFromTimesheet / expectedHours) * 100;
+      comments = "${totalDeductedHoursFromTimesheet.toStringAsFixed(1)} hours recommended for deduction (${deductedPercentage.toStringAsFixed(1)}%).";
+    } else {
+      comments = "";
+    }
+
+    if (!isEdited) {
+      proratedNet = (grossAfterDeductions * ratio) + additionAmount - deductionAmount;
+    }
+
     if (proratedNet < 0) proratedNet = 0;
+  }
+
+  // --- (factory fromJson and toJson methods remain unchanged) ---
+// In lib/pages/admin/payment_schedule_page.dart -> class PaymentScheduleItem
+
+  factory PaymentScheduleItem.fromJson(Map<String, dynamic> json, Map<String, SalaryScale> salaryScales) {
+    final salary = salaryScales[json['designation']];
+    if (salary == null) throw Exception("Salary scale not found for designation: ${json['designation']}");
+
+    // Create a temporary TimesheetModel. The error was in this constructor call.
+    final partialTimesheet = TimesheetModel(
+      staffId: json['staffId'],
+      staffName: json['staffName'],
+      designation: json['designation'],
+      state: json['state'],
+      location: json['location'],
+      // <<<--- FIX: The 'totalHours' parameter is removed from here ---<<<
+      staffEmail: '',
+      department: '',
+      caritasSupervisor: '',
+      caritasSupervisorSignatureStatus: '',
+      entries: [], // We pass an empty list because the real hours are in the JSON
+      facilitySupervisor: '',
+      facilitySupervisorSignatureStatus: '',
+    );
+
+    // The rest of the logic is correct and remains the same.
+    final item = PaymentScheduleItem(
+      timesheet: partialTimesheet,
+      baseSalary: salary,
+      expectedHours: (json['expectedHours'] as num).toDouble(),
+    );
+
+    // We overwrite the initial calculated values with the ones saved in the JSON.
+    item.actualHoursWorked = (json['actualHoursWorked'] as num).toDouble();
+    item.isEdited = json['isEdited'] ?? false;
+    item.deductionAmount = (json['deductionAmount'] as num?)?.toDouble() ?? 0.0;
+    item.deductionReason = json['deductionReason'];
+    item.additionAmount = (json['additionAmount'] as num?)?.toDouble() ?? 0.0;
+    item.additionReason = json['additionReason'];
+
+    // The final calculation uses the correct, restored values.
+    item.calculateProratedSalary();
+    return item;
+  }
+
+  Map<String, dynamic> toJson() {
+    // ... no changes needed here
+    return {
+      'staffId': timesheet.staffId, 'staffName': timesheet.staffName, 'designation': timesheet.designation,
+      'state': timesheet.state, 'location': timesheet.location, 'actualHoursWorked': actualHoursWorked,
+      'baseSalaryGross': baseSalary.grossPay, 'baseSalaryNet': baseSalary.netPay, 'expectedHours': expectedHours,
+      'isEdited': isEdited, 'deductionAmount': deductionAmount, 'deductionReason': deductionReason,
+      'additionAmount': additionAmount, 'additionReason': additionReason, 'proratedNet': proratedNet,
+    };
   }
 }
 
-
-
 class PaymentSchedulePage extends StatefulWidget {
-  final List<TimesheetModel> timesheets;
-  final int year;
-  final int month;
+  // --- MODIFIED CONSTRUCTOR ---
+  final List<TimesheetModel>? timesheets; // Nullable for review mode
+  final int? year; // Nullable for review mode
+  final int? month; // Nullable for review mode
+  final PaymentScheduleModel? scheduleModel; // New parameter for review mode
 
   const PaymentSchedulePage({
     Key? key,
-    required this.timesheets,
-    required this.year,
-    required this.month,
-  }) : super(key: key);
+    this.timesheets,
+    this.year,
+    this.month,
+    this.scheduleModel,
+  })  : assert(timesheets != null || scheduleModel != null, "Either timesheets or a scheduleModel must be provided"),
+        super(key: key);
 
   @override
   _PaymentSchedulePageState createState() => _PaymentSchedulePageState();
 }
 
+
 class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   bool _isLoading = true;
   bool _isExporting = false;
   bool _isFiltering = false;
+  bool _isSubmitting = false;
 
   // Data stores
   List<PaymentScheduleItem> _masterPaymentList = [];
@@ -120,65 +224,128 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   final ScrollController _scrollController = ScrollController();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
 
+  // --- NEW: Pagination State ---
+  static const int _rowsPerPage = 50;
+  int _currentPage = 0;
+  List<PaymentScheduleItem> _paginatedList = [];
+
+  // --- NEW WORKFLOW STATE ---
+  late bool _isReviewMode;
+  Map<String, String>? _selectedApprover;
+  List<Map<String, String>> _approverList = [];
+  bool _approversLoading = false;
+
   @override
   void initState() {
     super.initState();
-    _preparePaymentData();
+    _isReviewMode = widget.scheduleModel != null;
+    if (_isReviewMode) {
+      _loadDataFromModel();
+    } else {
+      _preparePaymentData();
+    }
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _preparePaymentData() async {
-    setState(() => _isLoading = true);
 
+
+  // --- NEW: Pagination Logic ---
+  void _paginateData() {
+    final startIndex = _currentPage * _rowsPerPage;
+    // Ensure endIndex does not exceed the list length
+    final endIndex = min(startIndex + _rowsPerPage, _filteredPaymentList.length);
+
+    setState(() {
+      _paginatedList = _filteredPaymentList.sublist(startIndex, endIndex);
+    });
+  }
+
+  // --- NEW: Load data from existing model ---
+  Future<void> _loadDataFromModel() async {
+    setState(() => _isLoading = true);
     try {
       final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
-      final salaryScales = {
-        for (var doc in scaleSnapshot.docs)
-          (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc)
-      };
+      final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
 
-      final startDate = DateTime(widget.year, widget.month - 1, 20);
-      final endDate = DateTime(widget.year, widget.month, 19);
-      final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
-      final int workingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
-      final double totalExpectedHours = (workingDays * 8.0);
+      final List<dynamic> jsonData = jsonDecode(widget.scheduleModel!.scheduleDataJson);
+      final List<PaymentScheduleItem> items = jsonData.map((itemJson) {
+        return PaymentScheduleItem.fromJson(itemJson as Map<String, dynamic>, salaryScales);
+      }).toList();
 
-      final List<PaymentScheduleItem> items = [];
-      final Set<String> states = {};
-      final Set<String> designations = {};
-
-      for (final timesheet in widget.timesheets) {
-        final salary = salaryScales[timesheet.designation.trim()];
-
-        if (salary != null) {
-          items.add(PaymentScheduleItem(
-            timesheet: timesheet,
-            baseSalary: salary,
-            expectedHours: totalExpectedHours,
-          ));
-          states.add(timesheet.state);
-          designations.add(timesheet.designation);
-        } else {
-          debugPrint("Warning: No salary scale found for designation: '${timesheet.designation}' for staff ${timesheet.staffName}");
-        }
-      }
-      final List<String> staffIds = widget.timesheets.map((ts) => ts.staffId).toList();
+      final List<String> staffIds = items.map((item) => item.timesheet.staffId).toList();
       await _fetchStaffBankDetails(staffIds);
-
-      items.sort((a,b) => a.timesheet.staffName.compareTo(b.timesheet.staffName));
+      _setupFilters(items);
 
       setState(() {
         _masterPaymentList = items;
         _filteredPaymentList = items;
-        _availableStates.addAll(states.toList()..sort());
-        _availableDesignations.addAll(designations.toList()..sort());
         _isLoading = false;
       });
+      _paginateData(); // --- NEW: Paginate initial data
+      _getApproversForCurrentStep();
+    } catch (e) {
+      debugPrint("Error loading from model: $e");
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error loading schedule: $e")));
+      setState(() => _isLoading = false);
+    }
+  }
+
+// In _PaymentSchedulePageState
+
+  // In _PaymentSchedulePageState
+  Future<void> _preparePaymentData() async {
+    setState(() => _isLoading = true);
+    try {
+      // 1. Fetch Salary Scales
+      final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
+      final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
+
+      // 2. Calculate Expected Hours for the Month
+      final startDate = DateTime(widget.year!, widget.month! - 1, 20);
+      final endDate = DateTime(widget.year!, widget.month!, 19);
+      final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
+
+      // Calculate working days to determine total expected hours.
+      final int workingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+      final double totalExpectedHours = (workingDays * 8.0);
+
+      final List<PaymentScheduleItem> items = [];
+
+      // 3. Loop through timesheets to build payment items
+      for (final timesheet in widget.timesheets!) {
+        final salary = salaryScales[timesheet.designation.trim()];
+        if (salary != null) {
+          // The new constructor now handles ALL calculations, including deductions from timesheet entries.
+          final paymentItem = PaymentScheduleItem(
+            timesheet: timesheet,
+            baseSalary: salary,
+            expectedHours: totalExpectedHours,
+          );
+          items.add(paymentItem);
+        } else {
+          debugPrint("Warning: No salary scale found for designation: '${timesheet.designation}' for staff ${timesheet.staffName}");
+        }
+      }
+
+      // 4. Fetch bank details and finalize the list
+      final List<String> staffIds = widget.timesheets!.map((ts) => ts.staffId).toList();
+      await _fetchStaffBankDetails(staffIds);
+      items.sort((a, b) => a.timesheet.staffName.compareTo(b.timesheet.staffName));
+      _setupFilters(items);
+
+      setState(() {
+        _masterPaymentList = items;
+        _filteredPaymentList = items;
+        _isLoading = false;
+      });
+      _paginateData();
+      _getApproversForCurrentStep();
 
     } catch (e) {
       debugPrint("Error preparing payment data: $e");
@@ -188,6 +355,172 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       }
     }
   }
+
+  void _setupFilters(List<PaymentScheduleItem> items) {
+    final Set<String> states = {};
+    final Set<String> designations = {};
+    for (var item in items) {
+      states.add(item.timesheet.state);
+      designations.add(item.timesheet.designation);
+    }
+    setState(() {
+      _availableStates..clear()..add('All States')..addAll(states.toList()..sort());
+      _availableDesignations..clear()..add('All Designations')..addAll(designations.toList()..sort());
+    });
+  }
+
+  // --- NEW WORKFLOW METHODS ---
+  String get _currentState {
+    return (_isReviewMode ? widget.scheduleModel!.state : _masterPaymentList.first.timesheet.state);
+  }
+
+  Future<void> _getApproversForCurrentStep() async {
+    setState(() {
+      _approversLoading = true;
+      _approverList = [];
+      _selectedApprover = null;
+    });
+
+    final currentStatus = _isReviewMode ? widget.scheduleModel!.status : "Draft";
+    String nextDept;
+    String? targetState = _currentState;
+
+    switch (currentStatus) {
+      case "Draft":
+        nextDept = "Internal Audit";
+        break;
+      case "Pending Audit":
+        nextDept = "Compliance";
+        break;
+      case "Pending Compliance":
+        nextDept = "Finance";
+        break;
+      case "Pending State Finance":
+        nextDept = "Finance";
+        targetState = null; // HQ Finance is not state-specific
+        break;
+      default:
+        nextDept = ''; // No more steps
+    }
+
+    if (nextDept.isNotEmpty) {
+      _approverList = await _fetchApprovers(nextDept, forState: targetState);
+    }
+
+    setState(() => _approversLoading = false);
+  }
+
+// In lib/pages/admin/payment_schedule_page.dart -> _PaymentSchedulePageState
+
+  Future<List<Map<String, String>>> _fetchApprovers(String department, {String? forState}) async {
+    try {
+      Query query = FirebaseFirestore.instance.collection('Staff').where('department', isEqualTo: department);
+      if (forState != null) {
+        query = query.where('state', isEqualTo: forState);
+      }
+      final snapshot = await query.get();
+      // --- FIX IS HERE ---
+      // Explicitly define the generic type for the map function.
+      return snapshot.docs.map<Map<String, String>>((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
+        return {'name': name, 'email': data['emailAddress'] ?? ''};
+      }).toList();
+      // --- END OF FIX ---
+    } catch (e) {
+      debugPrint("Error fetching approvers: $e");
+      return [];
+    }
+  }
+
+// In lib/pages/admin/payment_schedule_page.dart -> _PaymentSchedulePageState
+
+  Future<void> _submitOrForwardSchedule() async {
+    if (_selectedApprover == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select an approver to forward to.")));
+      return;
+    }
+    setState(() => _isSubmitting = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("You must be logged in to submit.");
+
+      // --- FIX #2: Fetch accurate user info from 'Staff' collection ---
+      final staffDoc = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
+      if (!staffDoc.exists) throw Exception("Could not find your staff profile. Cannot submit.");
+
+      final staffData = staffDoc.data()!;
+      final approverName = '${staffData['firstName'] ?? ''} ${staffData['lastName'] ?? ''}'.trim();
+      final approverEmail = staffData['emailAddress'] ?? user.email!;
+      final approverRole = staffData['designation'] ?? 'Unknown Role';
+      // --- END OF FIX #2 ---
+
+      final totalPayroll = _masterPaymentList.fold(0.0, (sum, item) => sum + item.proratedNet);
+      final scheduleJson = jsonEncode(_masterPaymentList.map((item) => item.toJson()).toList());
+
+      String nextStatus;
+      final currentStatus = _isReviewMode ? widget.scheduleModel!.status : "Draft";
+      switch(currentStatus) {
+        case "Draft": nextStatus = "Pending Audit"; break;
+        case "Pending Audit": nextStatus = "Pending Compliance"; break;
+        case "Pending Compliance": nextStatus = "Pending State Finance"; break;
+        case "Pending State Finance": nextStatus = "Pending HQ Finance"; break;
+        default: throw Exception("Invalid status for forwarding.");
+      }
+
+      final newHistoryEntry = ApprovalHistoryEntry(
+        approverName: approverName, // Use accurate name
+        approverEmail: approverEmail, // Use accurate email
+        role: approverRole, // Use accurate role (designation)
+        action: "Approved and Forwarded",
+        timestamp: Timestamp.now(),
+      );
+
+      // --- FIX #1: Create a predictable Document ID ---
+      final int year = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
+      final int month = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+      final String state = _currentState;
+      final String docId = '${state}_${month}_$year'.replaceAll(' ', '_');
+      // --- END OF FIX #1 ---
+
+      final DocumentReference scheduleRef = FirebaseFirestore.instance.collection('PaymentSchedules').doc(docId);
+
+      if (_isReviewMode) {
+        // Update existing document
+        await scheduleRef.update({
+          'status': nextStatus,
+          'currentAssigneeName': _selectedApprover!['name'],
+          'currentAssigneeEmail': _selectedApprover!['email'],
+          'approvalHistory': FieldValue.arrayUnion([newHistoryEntry.toMap()]),
+          // Also update data in case edits were made before submission was possible
+          'scheduleDataJson': scheduleJson,
+          'totalNetPayroll': totalPayroll,
+        });
+      } else {
+        // Create or Overwrite document using .set with merge option
+        await scheduleRef.set({
+          'year': year, 'month': month, 'state': state,
+          'status': nextStatus, 'submittedByName': approverName, 'submittedByEmail': approverEmail,
+          'submittedAt': Timestamp.now(), 'currentAssigneeName': _selectedApprover!['name'],
+          'currentAssigneeEmail': _selectedApprover!['email'], 'totalNetPayroll': totalPayroll,
+          'scheduleDataJson': scheduleJson,
+          'approvalHistory': [newHistoryEntry.toMap()],
+        }, SetOptions(merge: true)); // merge:true is crucial for updates
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Schedule successfully submitted to $nextStatus.")));
+        Navigator.of(context).pop();
+      }
+
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Submission failed: $e")));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
 
   // 4. NEW: Method to fetch bank details in batches
   Future<void> _fetchStaffBankDetails(List<String> staffIds) async {
@@ -345,24 +678,20 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   }
 
   Future<void> _applyFilters() async {
+    // --- MODIFIED: Reset to page 0 on filter change ---
     setState(() => _isFiltering = true);
     await Future.delayed(const Duration(milliseconds: 300));
 
     List<PaymentScheduleItem> filtered = List.from(_masterPaymentList);
     final String searchQuery = _searchController.text.toLowerCase();
 
-    // Handle Search by Name filter (highest priority)
     if (searchQuery.isNotEmpty) {
       filtered = filtered.where((item) => item.timesheet.staffName.toLowerCase().contains(searchQuery)).toList();
     }
-
-    // Handle State filter
     if (!_selectedStates.contains('All States')) {
       final selectionSet = _selectedStates.toSet();
       filtered = filtered.where((item) => selectionSet.contains(item.timesheet.state)).toList();
     }
-
-    // Handle Designation filter
     if (!_selectedDesignations.contains('All Designations')) {
       final selectionSet = _selectedDesignations.toSet();
       filtered = filtered.where((item) => selectionSet.contains(item.timesheet.designation)).toList();
@@ -370,77 +699,155 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
     setState(() {
       _filteredPaymentList = filtered;
+      _currentPage = 0; // Reset to the first page after filtering
       _isFiltering = false;
     });
+
+    _paginateData(); // Re-paginate the newly filtered data
   }
+
 
   @override
   Widget build(BuildContext context) {
-    final monthName = DateFormat('MMMM').format(DateTime(0, widget.month));
+    final monthName = DateFormat('MMMM').format(DateTime(0, _isReviewMode ? widget.scheduleModel!.month : widget.month!));
+    final year = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
     final double totalNetPayroll = _filteredPaymentList.fold(0.0, (sum, item) => sum + item.proratedNet);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text(
-          "Payment Schedule - $monthName ${widget.year}",
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        title: Text("Payment Schedule - $monthName $year", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 4.0,
         actions: [
-          if(_isExporting)
-            const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
-          else
-            IconButton(
-              icon: const Icon(Icons.download_rounded),
-              tooltip: "Export to Excel",
-              onPressed: _masterPaymentList.isEmpty ? null : _exportToExcel,
-            )
+          if (_isExporting) const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
+          else IconButton(icon: const Icon(Icons.download_rounded), tooltip: "Export to Excel", onPressed: _masterPaymentList.isEmpty ? null : _exportToExcel),
         ],
       ),
+      // --- MODIFIED: Wrapped the body's Column in a SingleChildScrollView ---
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _masterPaymentList.isEmpty
           ? _buildEmptyState("No matching salary data found", "Please ensure staff designations have a corresponding entry in the 'Manage Salary Scales' page.")
-          : Column(
-        children: [
-          _buildFilterBar(),
-          _buildKpiHeader(totalNetPayroll),
-          if (!_isLoading && _filteredPaymentList.isNotEmpty)
-            _buildChartsSection(),
-          Expanded(
-            child: Padding(
+          : SingleChildScrollView(
+        child: Column(
+          children: [
+            if (!_isReviewMode) _buildFilterBar(),
+            _buildKpiHeader(totalNetPayroll),
+            if (!_isLoading && _filteredPaymentList.isNotEmpty) _buildChartsSection(),
+            // --- MODIFIED: Removed Expanded and Padding, now directly in the Column ---
+            Padding(
               padding: const EdgeInsets.all(16.0),
-              child: _filteredPaymentList.isEmpty && !_isFiltering // Don't show empty state while filtering
+              child: _filteredPaymentList.isEmpty && !_isFiltering
                   ? _buildEmptyState("No Staff Found", "No staff match the current filter criteria.")
-              // --- NEW: Wrap the card in a Stack to overlay the loader ---
                   : Stack(
                 alignment: Alignment.center,
                 children: [
-                  // The data table, which becomes slightly transparent while loading
                   AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
                     opacity: _isFiltering ? 0.5 : 1.0,
                     child: _buildDataTableCard(),
                   ),
-
-                  // The animated loader, which appears and disappears
                   if (_isFiltering)
                     const Positioned.fill(
                       child: Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF722F37),
-                        ),
+                        child: CircularProgressIndicator(color: Color(0xFF722F37)),
                       ),
                     ),
                 ],
               ),
             ),
-          ),
-        ],
+            _buildWorkflowSection(),
+          ],
+        ),
       ),
+    );
+  }
+
+  // --- NEW: WORKFLOW UI WIDGET ---
+  Widget _buildWorkflowSection() {
+    final status = _isReviewMode ? widget.scheduleModel!.status : "Draft";
+    String title;
+    bool canForward = false;
+
+    switch (status) {
+      case "Draft": title = "Forward to Internal Audit"; canForward = true; break;
+      case "Pending Audit": title = "Forward to Compliance"; canForward = true; break;
+      case "Pending Compliance": title = "Forward to State Finance"; canForward = true; break;
+      case "Pending State Finance": title = "Forward to HQ Finance"; canForward = true; break;
+      default: title = "Schedule is Fully Approved"; canForward = false;
+    }
+
+    // Do not show workflow if there are no items
+    if (_masterPaymentList.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            const Divider(height: 20),
+            if (canForward) ...[
+              if (_approversLoading) const Center(child: CircularProgressIndicator())
+              else if (_approverList.isEmpty) const Text("No approvers found for the next step.", style: TextStyle(color: Colors.red))
+              else
+                DropdownButtonFormField<Map<String, String>>(
+                  value: _selectedApprover,
+                  decoration: const InputDecoration(
+                    labelText: "Select Approver",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_search),
+                  ),
+                  items: _approverList.map((approver) {
+                    return DropdownMenuItem(
+                      value: approver,
+                      child: Text(approver['name']!),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedApprover = value);
+                  },
+                  validator: (value) => value == null ? 'Please select an approver' : null,
+                ),
+              const SizedBox(height: 16),
+              _isSubmitting
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton.icon(
+                icon: const Icon(Icons.send_rounded),
+                label: const Text("Approve & Forward"),
+                onPressed: _submitOrForwardSchedule,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ] else
+              Text("This schedule has been forwarded and is awaiting action from: ${widget.scheduleModel?.currentAssigneeName ?? 'N/A'}", textAlign: TextAlign.center),
+            if(_isReviewMode) ...[
+              const SizedBox(height: 16),
+              _buildApprovalHistory(),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApprovalHistory() {
+    return ExpansionTile(
+      title: const Text("View Approval History"),
+      children: widget.scheduleModel!.approvalHistory.map((entry) {
+        return ListTile(
+          leading: const Icon(Icons.check_circle, color: Colors.green),
+          title: Text("${entry.role}: ${entry.approverName}"),
+          subtitle: Text("${entry.action} on ${DateFormat.yMMMd().add_jm().format(entry.timestamp.toDate())}"),
+        );
+      }).toList(),
     );
   }
 
@@ -592,7 +999,9 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   }
 
 
-
+  // --- UI BUILDER WIDGETS (Modified/Unchanged) ---
+  // --- REWRITTEN WIDGET: _buildDataTableCard ---
+  // In _PaymentSchedulePageState
   Widget _buildDataTableCard() {
     const double scrollAmount = 300.0;
     return Card(
@@ -601,7 +1010,6 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
-          // --- Header with scroll controls ---
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             color: Colors.grey[200],
@@ -619,111 +1027,132 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
             ),
           ),
           const Divider(height: 1, thickness: 1),
+          SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 24,
+              // <<<--- MODIFIED: Column headers updated ---<<<
+              columns: const [
+                DataColumn(label: Text('S/No')), DataColumn(label: Text('Staff Name')), DataColumn(label: Text('Designation')),
+                DataColumn(label: Text('State')), DataColumn(label: Text('Bank Name')), DataColumn(label: Text('Account Number')),
+                DataColumn(label: Text('Sort Code')), DataColumn(label: Text('Expected Hrs'), numeric: true),
+                DataColumn(label: Text('Hrs Worked'), numeric: true), DataColumn(label: Text('% Worked'), numeric: true),
+                DataColumn(label: Text('Gross Pay (Base)'), numeric: true),
+                DataColumn(label: Text('PAYE (5%)'), numeric: true), // New column
+                DataColumn(label: Text('Other Deductions'), numeric: true), // Renamed column
+                DataColumn(label: Text('Gross after Deductions'), numeric: true), // New column
+                DataColumn(label: Text('Additions'), numeric: true), // Manual additions
+                DataColumn(label: Text('Final Net Pay'), numeric: true), // Updated calculation
+                DataColumn(label: Text('Comments')), // Updated content
+                DataColumn(label: Text('Action')),
+              ],
+              rows: _paginatedList.asMap().entries.map((entry) {
+                int index = (_currentPage * _rowsPerPage) + entry.key;
+                PaymentScheduleItem item = entry.value;
 
-          // --- Fully Scrollable Data Table Implementation ---
-          Expanded(
-            child: SingleChildScrollView( // Vertical scroll for the entire table
-              child: SingleChildScrollView( // Horizontal scroll for the entire table
-                controller: _scrollController,
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  // The header and rows will now scroll together
-                  columnSpacing: 24,
-                  columns: const [
-                    DataColumn(label: Text('S/No')),
-                    DataColumn(label: Text('Staff Name')),
-                    DataColumn(label: Text('Designation')),
-                    DataColumn(label: Text('State')),
-                    DataColumn(label: Text('Bank Name')),
-                    DataColumn(label: Text('Account Number')),
-                    DataColumn(label: Text('Sort Code')),
-                    DataColumn(label: Text('Expected Hrs'), numeric: true),
-                    DataColumn(label: Text('Hrs Worked'), numeric: true),
-                    DataColumn(label: Text('% Worked'), numeric: true),
-                    DataColumn(label: Text('Gross Pay (Base)'), numeric: true), // <-- ADDED COLUMN
-                    DataColumn(label: Text('Prorated Gross'), numeric: true),
-                    DataColumn(label: Text('Additions'), numeric: true),
-                    DataColumn(label: Text('Deductions'), numeric: true),
-                    DataColumn(label: Text('Comments')),
-                    DataColumn(label: Text('Final Net Pay'), numeric: true),
-                    DataColumn(label: Text('Action')),
+                final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
+
+                // <<<--- MODIFIED: New cell for "Other Deductions" with percentage ---<<<
+                double deductedPercentage = (item.expectedHours > 0) ? (item.totalDeductedHoursFromTimesheet / item.expectedHours * 100) : 0;
+                String deductionText = item.otherDeductionsAmount > 0
+                    ? "${_currencyFormat.format(item.otherDeductionsAmount)}\n(-${deductedPercentage.toStringAsFixed(1)}%)"
+                    : _currencyFormat.format(0);
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text((index + 1).toString())),
+                    DataCell(Row(children: [
+                      if (item.additionAmount > 0) Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
+                      if (item.deductionAmount > 0) Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
+                      if (item.isEdited) const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
+                      if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited) const SizedBox(width: 4),
+                      Text(item.timesheet.staffName),
+                    ])),
+                    DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
+                    DataCell(Text(item.timesheet.state)), DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
+                    DataCell(Text(bankInfo.accountNumber)), DataCell(Text(bankInfo.sortCode)),
+                    DataCell(Text(item.expectedHours.toStringAsFixed(2))), DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
+                    DataCell(_buildPercentageChip(item.percentageWorked)), DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
+
+                    // <<<--- MODIFIED: DataCells updated to match new columns ---<<<
+                    DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))), // PAYE cell
+                    DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)), // Other Deductions cell
+                    DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))), // Gross after Deductions cell
+                    DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))), // Manual Additions
+                    DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))), // Final Net Pay cell
+                    DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))), // Comments cell
+                    DataCell(IconButton(
+                      icon: const Icon(Icons.edit_note, size: 20),
+                      color: _isReviewMode ? Colors.grey : Colors.blueAccent,
+                      onPressed: _isReviewMode ? null : () => _showEditSalaryDialog(item),
+                      tooltip: _isReviewMode ? 'Schedule Submitted (Read-only)' : 'Adjust Salary',
+                    )),
                   ],
-                  rows: _filteredPaymentList.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    PaymentScheduleItem item = entry.value;
-                    // --- NEW: Get bank info from cache ---
-                    final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
-                    String comment = [item.additionReason, item.deductionReason]
-                        .where((s) => s != null && s.isNotEmpty)
-                        .join('; ');
-
-                    return DataRow(
-                      cells: [
-                        DataCell(Text((index + 1).toString())),
-                        DataCell(
-                          Row(
-                            children: [
-                              if (item.additionAmount > 0)
-                                Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
-                              if (item.deductionAmount > 0)
-                                Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
-                              if (item.isEdited && item.additionAmount == 0 && item.deductionAmount == 0)
-                                const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
-                              if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited)
-                                const SizedBox(width: 4),
-                              Text(item.timesheet.staffName),
-                            ],
-                          ),
-                        ),
-                        DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
-                        DataCell(Text(item.timesheet.state)),
-                        // --- NEW CELLS ---
-                        DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
-                        DataCell(Text(bankInfo.accountNumber)),
-                        DataCell(Text(bankInfo.sortCode)),
-                        // --- END OF NEW ---
-                        DataCell(Text(item.expectedHours.toStringAsFixed(2))),
-                        DataCell(Text(item.hoursUsedForCalc.toStringAsFixed(2))),
-                        DataCell(_buildPercentageChip(item.percentageWorked)),
-                        DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))), // <-- DATA FOR NEW COLUMN
-                        DataCell(Text(_currencyFormat.format(item.proratedGross))),
-                        DataCell(
-                          Text(
-                            _currencyFormat.format(item.additionAmount),
-                            style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            _currencyFormat.format(item.deductionAmount),
-                            style: TextStyle(color: item.deductionAmount > 0 ? Colors.red.shade700 : Colors.grey),
-                          ),
-                        ),
-                        DataCell(SizedBox(width: 200, child: Text(comment, overflow: TextOverflow.ellipsis))),
-                        DataCell(
-                          Text(
-                            _currencyFormat.format(item.proratedNet),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        DataCell(
-                          IconButton(
-                            icon: const Icon(Icons.edit_note, size: 20, color: Colors.blueAccent),
-                            onPressed: () => _showEditSalaryDialog(item),
-                            tooltip: 'Adjust Salary',
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                );
+              }).toList(),
             ),
+          ),
+          const Divider(height: 1),
+          _buildPaginationControls(),
+        ],
+      ),
+    );
+  }
+
+  // --- NEW WIDGET: _buildPaginationControls ---
+  Widget _buildPaginationControls() {
+    final totalItems = _filteredPaymentList.length;
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    final totalPages = (totalItems / _rowsPerPage).ceil();
+    final startItem = (_currentPage * _rowsPerPage) + 1;
+    final endItem = min((_currentPage + 1) * _rowsPerPage, totalItems);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "Showing $startItem-$endItem of $totalItems",
+            style: const TextStyle(color: Colors.grey),
+          ),
+          Row(
+            children: [
+              Text("Page ${_currentPage + 1} of $totalPages"),
+              const SizedBox(width: 16),
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: _currentPage == 0
+                    ? null
+                    : () {
+                  setState(() {
+                    _currentPage--;
+                  });
+                  _paginateData();
+                },
+                tooltip: "Previous Page",
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: (_currentPage + 1) >= totalPages
+                    ? null
+                    : () {
+                  setState(() {
+                    _currentPage++;
+                  });
+                  _paginateData();
+                },
+                tooltip: "Next Page",
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildPercentageChip(double percentage) {
     Color chipColor;
@@ -801,9 +1230,15 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                   return;
                 }
 
-                // Recalculate the number of working days in the month
-                final startDate = DateTime(widget.year, widget.month - 1, 20);
-                final endDate = DateTime(widget.year, widget.month, 19);
+                // --- FIX IS HERE ---
+                // Determine the correct year and month before using them
+                final int currentYear = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
+                final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+
+                // Recalculate the number of working days in the month using the non-nullable variables
+                final startDate = DateTime(currentYear, currentMonth - 1, 20);
+                final endDate = DateTime(currentYear, currentMonth, 19);
+                // --- END OF FIX ---
                 final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
                 final int totalWorkingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
 
@@ -1022,6 +1457,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
 
 
+  // In _PaymentSchedulePageState
   Future<void> _exportToExcel() async {
     if (_filteredPaymentList.isEmpty) {
       if (mounted) {
@@ -1036,21 +1472,16 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
     try {
       final excel = xls.Excel.createExcel();
-      // 1. Get the default sheet created by createExcel()
       final String defaultSheetName = excel.sheets.keys.first;
       final xls.Sheet sheet = excel.sheets[defaultSheetName]!;
-      // 2. Rename it to what you want
-      //sheet.sheet = 'Payment Schedule';
-      // --- END OF FIX ---
-    //  final  xls.Sheet sheet = excel['Payment Schedule'];
 
-      // --- MODIFIED: Added "Gross Pay (Base)" header ---
+      // <<<--- CORRECTION: Updated headers to match the new structure ---<<<
       const List<String> headers = [
         'S/No', 'Staff Name', 'Designation', 'State', 'Location',
-        'Bank Name', 'Account Number', 'Sort Code', // <-- ADDED
-        'Expected Hours', 'Hours Worked', '% Worked (Capped at 100%)', 'Gross Pay (Base)',
-        'Prorated Gross', 'Addition Amount', 'Addition Reason', 'Deduction Amount',
-        'Deduction Reason', 'Final Net Pay', 'Is Manually Edited?'
+        'Bank Name', 'Account Number', 'Sort Code',
+        'Expected Hours', 'Hours Worked', '% Worked', 'Gross Pay (Base)',
+        'PAYE (5%)', 'Other Deductions', 'Gross after Deductions',
+        'Additions (Manual)', 'Final Net Pay', 'Comments', 'Is Manually Edited?'
       ];
       sheet.appendRow(headers.map((e) =>  xls.TextCellValue(e)).toList());
 
@@ -1064,46 +1495,37 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         );
       }
 
-      // Iterate through the filtered data and append rows
+      // Iterate through data and append rows
       for (int i = 0; i < _filteredPaymentList.length; i++) {
         final item = _filteredPaymentList[i];
-        // --- Get bank info from cache for export ---
         final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
 
-        // --- MODIFIED: Added item.baseSalary.grossPay to the row data ---
+        // <<<--- CORRECTION: Row data now uses the new properties ---<<<
         final List< xls.CellValue> rowData = [
           xls.IntCellValue(i + 1),
           xls.TextCellValue(item.timesheet.staffName),
           xls.TextCellValue(item.timesheet.designation),
           xls.TextCellValue(item.timesheet.state),
           xls.TextCellValue(item.timesheet.location),
-          // --- ADDED BANK DATA ---
           xls.TextCellValue(bankInfo.bankName),
           xls.TextCellValue(bankInfo.accountNumber),
           xls.TextCellValue(bankInfo.sortCode),
-          // --- END OF ADDED ---
           xls.DoubleCellValue(item.expectedHours),
-          xls.DoubleCellValue(item.timesheet.totalHours),
+          xls.DoubleCellValue(item.actualHoursWorked),
           xls.TextCellValue('${item.percentageWorked.toStringAsFixed(1)}%'),
-          xls.DoubleCellValue(item.baseSalary.grossPay), // <-- THE NEW DATA CELL
-          xls.DoubleCellValue(item.proratedGross),
+          xls.DoubleCellValue(item.baseSalary.grossPay),
+          xls.DoubleCellValue(item.payeFromGrossBase),           // New property
+          xls.DoubleCellValue(item.otherDeductionsAmount),     // New property
+          xls.DoubleCellValue(item.grossAfterDeductions),        // New property
           xls.DoubleCellValue(item.additionAmount),
-          xls.TextCellValue(item.additionReason ?? ''),
-          xls.DoubleCellValue(item.deductionAmount),
-          xls.TextCellValue(item.deductionReason ?? ''),
           xls.DoubleCellValue(item.proratedNet),
+          xls.TextCellValue(item.comments),                      // New property
           xls.TextCellValue(item.isEdited ? 'Yes' : 'No'),
         ];
 
         sheet.appendRow(rowData);
       }
 
-      // Auto-fit columns
-      // for (var i = 0; i < headers.length; i++) {
-      //   sheet.setColAutoFit(i);
-      // }
-
-      // Save the file and trigger the download
       final fileBytes = excel.save();
 
       if (fileBytes != null) {

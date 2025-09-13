@@ -31,6 +31,16 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
   final _supervisorNameController = TextEditingController(); // For manual entry
   final _supervisorEmailController = TextEditingController(); // For manual entry
 
+
+  // --- ADD these new controllers ---
+  final _accountNumberController = TextEditingController();
+  final _sortCodeController = TextEditingController();
+
+// --- ADD these new state variables for dropdowns ---
+  String? _selectedBankName;
+  String? _selectedProgramManagerId;
+  String? _selectedProgramManagerEmail;
+
   bool _isLoading = false;
   String _errorMessage = '';
   bool _isPasswordObscured = true;
@@ -53,6 +63,71 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
 
   final List<String> _genderOptions = ['Male', 'Female'];
   final List<String> _maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
+
+  // In _RegistrationPageWebState class:
+
+// --- ADD this new method to fetch bank names ---
+  Future<List<DropdownMenuItem<String>>> _fetchBanks() async {
+    try {
+      final snapshot = await _firestore.collection("Bank").get();
+      return snapshot.docs
+          .map((doc) => DropdownMenuItem<String>(
+        value: doc['name'] as String,
+        child: Text(doc['name'] as String),
+      ))
+          .toList()
+        ..sort((a, b) => a.value!.compareTo(b.value!));
+    } catch (e) {
+      debugPrint("Error fetching banks: $e");
+      return [];
+    }
+  }
+
+// --- ADD this new method to fetch Program Managers ---
+  Future<List<DropdownMenuItem<String>>> _fetchProgramManagers() async {
+    if (stateName == null) return []; // Depends on state
+    try {
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(stateName)
+          .collection(stateName!)
+          .where("department", isEqualTo: "Program Management")
+          .get();
+
+      final managers = snapshot.docs
+          .map((doc) => DropdownMenuItem<String>(
+        value: doc.id, // Supervisor name is the document ID
+        child: Text(doc.id),
+      ))
+          .toList();
+
+      managers.sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
+      return managers;
+    } catch (e) {
+      debugPrint("Error fetching program managers: $e");
+      return [];
+    }
+  }
+
+// --- ADD this new method to fetch Program Manager emails ---
+  Future<List<DropdownMenuItem<String>>> _fetchProgramManagerEmails() async {
+    if (stateName == null || _selectedProgramManagerId == null) return [];
+    try {
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(stateName)
+          .collection(stateName!)
+          .doc(_selectedProgramManagerId)
+          .get();
+
+      if (!snapshot.exists) return [];
+      final email = snapshot.data()?['email'] as String?;
+      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
+    } catch (e) {
+      debugPrint("Error fetching program manager email: $e");
+      return [];
+    }
+  }
 
   // --- DATA FETCHING (Using your provided logic) ---
 
@@ -225,6 +300,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
 
   // --- ACTIONS ---
 
+
   Future<void> _pickProfileImage() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
     if (result != null && result.files.isNotEmpty) {
@@ -246,6 +322,8 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
   }
 
   // --- REGISTRATION LOGIC (THE MAIN FIX) ---
+
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
       _showResultDialog(
@@ -286,6 +364,8 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
         finalLocationName = doc.data()?['LocationName'] as String? ?? locationName!;
       }
 
+      final creatorName = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+
       await _firestore.collection('Staff').doc(user.uid).set({
         'id': user.uid,
         'firstName': _firstNameController.text.trim(),
@@ -304,14 +384,24 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
         'gender': _selectedGender ?? '',
         'maritalStatus': _selectedMaritalStatus ?? '',
         'photoUrl': photoUrl ?? '',
-        'lastUpdateDate': FieldValue.serverTimestamp(),
         'isVerified': user.emailVerified,
+        'disabled': false,
+        'createdDate': FieldValue.serverTimestamp(),
+        'lastUpdateDate': FieldValue.serverTimestamp(),
+
+        // --- ADDED FIELDS ---
+        'bankName': _selectedBankName ?? '',
+        'accountNumber': _accountNumberController.text.trim(),
+        'sortCode': _sortCodeController.text.trim(),
+        'programManager': _selectedProgramManagerId ?? '',
+        'programManagerEmail': _selectedProgramManagerEmail ?? '',
+        'createdBy': creatorName,
+        'createdByEmail': _emailController.text.trim(),
       });
 
-      // Show success dialog and then navigate
       await _showResultDialog(
         title: 'Registration Successful',
-        content: 'Your account has been created. You will now be taken to the home page.',
+        content: 'Your account has been created. You will now be taken to the login page.',
         onOkPressed: () {
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
@@ -322,21 +412,18 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
         },
       );
 
-
     } on FirebaseAuthException catch (e) {
-      // Show error dialog for Firebase specific errors
       await _showResultDialog(
         title: 'Registration Failed',
         content: e.message ?? 'An unknown authentication error occurred.',
       );
     } catch (e) {
-      // Show error dialog for any other errors
       await _showResultDialog(
         title: 'An Error Occurred',
         content: 'An unexpected error occurred during registration: ${e.toString()}',
       );
     } finally {
-      if(mounted) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
@@ -457,6 +544,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
   Widget _buildDesktopLayout() {
     return Column(
       children: [
+        // --- Personal Info Rows (No change) ---
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -486,6 +574,27 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
           ],
         ),
         const SizedBox(height: 20),
+
+        // --- NEW: BANKING DETAILS ROW ---
+        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: _buildFutureDropdown(label: "Bank Name", future: _fetchBanks(), value: _selectedBankName, onChanged: (v) => setState(() => _selectedBankName = v))),
+            const SizedBox(width: 20),
+            Expanded(flex: 2, child: _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number)),
+            const SizedBox(width: 20),
+            Expanded(flex: 1, child: _buildStyledTextField(controller: _sortCodeController, label: "Sort Code", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null)),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+
         _buildDependentFields(),
         const SizedBox(height: 20),
         _buildStyledTextField(controller: _passwordController, label: "Password", icon: Icons.lock, obscureText: _isPasswordObscured, suffixIcon: IconButton(icon: Icon(_isPasswordObscured ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured))),
@@ -496,6 +605,7 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
   Widget _buildMobileLayout() {
     return Column(
       children: [
+        // --- Personal Info (No change) ---
         _buildStyledTextField(controller: _firstNameController, label: "First Name", icon: Icons.person),
         const SizedBox(height: 20),
         _buildStyledTextField(controller: _lastNameController, label: "Last Name", icon: Icons.person),
@@ -510,6 +620,22 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
         const SizedBox(height: 20),
         _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v)),
         const SizedBox(height: 20),
+
+        // --- NEW: BANKING DETAILS FOR MOBILE ---
+        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+        _buildFutureDropdown(label: "Bank Name", future: _fetchBanks(), value: _selectedBankName, onChanged: (v) => setState(() => _selectedBankName = v)),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number),
+        const SizedBox(height: 20),
+        _buildStyledTextField(controller: _sortCodeController, label: "Sort Code (Optional)", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null),
+        const SizedBox(height: 20),
+
+        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Divider(),
+        const SizedBox(height: 10),
+
         _buildDependentFields(),
         const SizedBox(height: 20),
         _buildStyledTextField(controller: _passwordController, label: "Password", icon: Icons.lock, obscureText: _isPasswordObscured, suffixIcon: IconButton(icon: Icon(_isPasswordObscured ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured))),
@@ -546,6 +672,9 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
           _buildFutureDropdown(label: "State", future: _fetchStatesBasedOnCategory(), value: stateName,
             onChanged: (v) => setState(() {
               stateName = v; locationName = null; departmentName = null; designation = null; supervisorName = null; supervisorEmail = null;
+              // Reset program manager when state changes
+              _selectedProgramManagerId = null;
+              _selectedProgramManagerEmail = null;
             }),
           ),
         ],
@@ -571,6 +700,29 @@ class _RegistrationPageWebState extends State<RegistrationPageWeb> {
             onChanged: (v) => setState(() {
               designation = v; supervisorName = null; supervisorEmail = null;
             }),
+          ),
+        ],
+        // --- NEW: ADD PROGRAM MANAGER DROPDOWNS ---
+        if (designation != null) ...[
+          const SizedBox(height: 20),
+          _buildFutureDropdown(label: "Program Manager Name", future: _fetchProgramManagers(), value: _selectedProgramManagerId,
+            onChanged: (v) async {
+              setState(() {
+                _selectedProgramManagerId = v;
+                _selectedProgramManagerEmail = null; // Reset email
+              });
+              // Auto-fetch and select the email
+              final emails = await _fetchProgramManagerEmails();
+              if (emails.isNotEmpty) {
+                setState(() => _selectedProgramManagerEmail = emails.first.value);
+              }
+            },
+          ),
+        ],
+        if (_selectedProgramManagerId != null) ...[
+          const SizedBox(height: 20),
+          _buildFutureDropdown(label: "Program Manager Email", future: _fetchProgramManagerEmails(), value: _selectedProgramManagerEmail,
+            onChanged: (v) => setState(() => _selectedProgramManagerEmail = v),
           ),
         ],
         if (designation != null && _selectedCategory != 'Facility Supervisor') ...[

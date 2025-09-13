@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
@@ -54,6 +55,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
   String? _selectedMaritalStatus;
   String? _selectedRole;
   String? _selectedBankName;
+  String? _selectedProgramManagerId;
+  String? _selectedProgramManagerEmail;
 
   // State to hold the pre-fetched lists of items for our dropdowns
   List<String> _staffCategoryOptions = [];
@@ -65,6 +68,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
   List<DropdownMenuItem<String>> _supervisorsList = [];
   List<DropdownMenuItem<String>> _supervisorEmailsList = [];
   List<DropdownMenuItem<String>> _banksList = [];
+  // ADD these two new lists for the Program Manager dropdowns
+  List<DropdownMenuItem<String>> _programManagersList = [];
+  List<DropdownMenuItem<String>> _programManagerEmailsList = [];
   final List<String> _genderOptions = ['Male', 'Female'];
   final List<String> _maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
 
@@ -79,6 +85,65 @@ class _UserFormScreenState extends State<UserFormScreen> {
       _isInitializing = false;
     }
   }
+
+  /// Fetches supervisors specifically from the "Program Management" department.
+  Future<List<DropdownMenuItem<String>>> _fetchProgramManagers() async {
+    // This requires a state to be selected first
+    if (_selectedStateId == null) return [];
+
+    try {
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(_selectedStateId)
+          .collection(_selectedStateId!)
+          .where("department", isEqualTo: "Program Management")
+          .get();
+
+      if (snapshot.docs.isEmpty) return [];
+
+      final managers = snapshot.docs.map((doc) {
+        // The supervisor's name is the document ID
+        final supervisorName = doc.id;
+        return DropdownMenuItem<String>(
+          value: supervisorName,
+          child: Text(supervisorName),
+        );
+      }).toList();
+
+      // Sort the list alphabetically by name
+      managers.sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
+      return managers;
+
+    } catch (e) {
+      debugPrint("Error fetching program managers: $e");
+      return [];
+    }
+  }
+
+  /// Fetches the email for the selected Program Manager.
+  Future<List<DropdownMenuItem<String>>> _fetchProgramManagerEmails() async {
+    if (_selectedProgramManagerId == null || _selectedStateId == null) return [];
+
+    try {
+      final snapshot = await _firestore
+          .collection("Supervisors")
+          .doc(_selectedStateId)
+          .collection(_selectedStateId!)
+          .doc(_selectedProgramManagerId)
+          .get();
+
+      if (!snapshot.exists) return [];
+
+      final email = snapshot.data()?['email'] as String?;
+
+      // Return a list with a single item if the email exists
+      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
+    } catch (e) {
+      debugPrint("Error fetching program manager email: $e");
+      return [];
+    }
+  }
+
 
   /// The main function to pre-fetch all data and set initial values for Edit Mode.
 // In _UserFormScreenState class
@@ -102,6 +167,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _selectedRole = staff.role;
     _selectedDepartmentName = staff.department;
     _selectedDesignationName = staff.designation;
+    _selectedProgramManagerId = staff.programManager;
+    _selectedProgramManagerEmail = staff.programManagerEmail;
 
     // 2. Fetch all top-level (non-dependent) dropdown lists
     _staffCategoryOptions = await _fetchStringList('StaffCategory', 'name');
@@ -116,12 +183,18 @@ class _UserFormScreenState extends State<UserFormScreen> {
       final foundStateId = await _reverseLookupId('Location', 'name', staff.state);
       if (foundStateId != null) {
         _selectedStateId = foundStateId;
+        _programManagersList = await _fetchProgramManagers();
         _locationsList = await _fetchLocations();
         final foundLocationId = await _reverseLookupId('Location/$_selectedStateId/$_selectedStateId', 'LocationName', staff.location);
         if (foundLocationId != null) {
           _selectedLocationId = foundLocationId;
         }
       }
+    }
+
+    // --- NEW: Pre-populate program manager email if a manager was loaded ---
+    if (_selectedProgramManagerId != null) {
+      _programManagerEmailsList = await _fetchProgramManagerEmails();
     }
 
     // 4. Handle supervisor (which depends on state and department)
@@ -349,6 +422,24 @@ class _UserFormScreenState extends State<UserFormScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // --- NEW: Get logged-in user details for tracking ---
+      String createdBy = 'Unknown User';
+      String createdByEmail = 'Unknown Email';
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null && currentUser.email != null) {
+        createdByEmail = currentUser.email!;
+        // For a better user experience, user's name should be available from a state
+        // manager. A direct Firestore read here adds a small delay.
+        final staffDoc = await _firestore.collection('Staff').where('emailAddress', isEqualTo: currentUser.email!).limit(1).get();
+        if (staffDoc.docs.isNotEmpty) {
+          final staffData = staffDoc.docs.first.data();
+          createdBy = '${staffData['firstName']} ${staffData['lastName']}';
+        } else {
+          createdBy = currentUser.displayName ?? currentUser.email!; // Fallback
+        }
+      }
+
       String? finalPhotoUrl = _existingPhotoUrl;
       if (_profileImageBytes != null) {
         String userId = widget.staff!.id;
@@ -391,9 +482,22 @@ class _UserFormScreenState extends State<UserFormScreen> {
         'maritalStatus': _selectedMaritalStatus ?? '',
         'photoUrl': finalPhotoUrl ?? '',
         'lastUpdateDate': FieldValue.serverTimestamp(),
+        'programManager': _selectedProgramManagerId ?? '',
+        'programManagerEmail': _selectedProgramManagerEmail ?? '',
+        'lastUpdatedBy': createdBy, // Using 'lastUpdatedBy' is better for edits
+        'lastUpdatedByEmail': createdByEmail,
       };
 
-      await _firestore.collection('Staff').doc(widget.staff!.id).update(dataToSave);
+      // The prompt requested 'createdBy', which is usually set once.
+      // In an edit form, we add it if it doesn't already exist.
+      final staffDocRef = _firestore.collection('Staff').doc(widget.staff!.id);
+      final currentStaffDoc = await staffDocRef.get();
+      if (!currentStaffDoc.exists || currentStaffDoc.data()?['createdBy'] == null) {
+        dataToSave['createdBy'] = createdBy;
+        dataToSave['createdByEmail'] = createdByEmail;
+      }
+
+      await staffDocRef.update(dataToSave);
 
       await _showResultDialog(
           title: 'Success',
@@ -721,12 +825,48 @@ class _UserFormScreenState extends State<UserFormScreen> {
             onChanged: (value) => setState(() => _selectedSupervisorEmail = value),
           ),
         ],
+        // --- ADD THE NEW PROGRAM MANAGER DROPDOWNS HERE ---
+        if (_selectedDesignationName != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Program Manager Name",
+            value: _selectedProgramManagerId,
+            items: _programManagersList,
+            onChanged: (value) async {
+              setState(() {
+                _selectedProgramManagerId = value;
+                // Reset the dependent email dropdown
+                _selectedProgramManagerEmail = null;
+                _programManagerEmailsList = [];
+              });
+              // Fetch the corresponding email
+              _programManagerEmailsList = await _fetchProgramManagerEmails();
+              if (_programManagerEmailsList.isNotEmpty) {
+                // Auto-select the email since there will only be one
+                _selectedProgramManagerEmail = _programManagerEmailsList.first.value;
+              }
+              if(mounted) setState(() {});
+            },
+          ),
+        ],
+        if (_selectedProgramManagerId != null) ...[
+          const SizedBox(height: 20),
+          _buildStyledDropdown<String>(
+            label: "Program Manager Email",
+            value: _selectedProgramManagerEmail,
+            items: _programManagerEmailsList,
+            // This dropdown is auto-populated, so onChanged just updates state
+            onChanged: (value) => setState(() => _selectedProgramManagerEmail = value),
+          ),
+        ],
+        // --- END OF NEW DROPDOWNS ---
         if (_selectedCategory == 'Facility Supervisor') ...[
           const SizedBox(height: 20),
           _buildStyledTextField(controller: _supervisorNameController, label: 'Supervisor Name (Manual)', icon: Icons.person_search, validator: (v) => null),
           const SizedBox(height: 20),
           _buildStyledTextField(controller: _supervisorEmailController, label: 'Supervisor Email (Manual)', icon: Icons.alternate_email, keyboardType: TextInputType.emailAddress, validator: (v) => null),
         ],
+
         if (_selectedCategory != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(

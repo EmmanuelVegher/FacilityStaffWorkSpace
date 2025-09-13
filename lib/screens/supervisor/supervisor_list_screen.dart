@@ -1,6 +1,9 @@
+// lib/Pages/supervisor_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'supervisor_form_screen.dart'; // We will create this next
+import '../../services/metadata_trigger_service.dart';
+import 'supervisor_form_screen.dart';
 
 class SupervisorListScreen extends StatelessWidget {
   final String stateName;
@@ -12,6 +15,7 @@ class SupervisorListScreen extends StatelessWidget {
     required this.stateId,
   });
 
+  // <<<--- MODIFIED: This function now calls the metadata trigger ---<<<
   Future<void> _deleteSupervisor(BuildContext context, String supervisorId) async {
     try {
       await FirebaseFirestore.instance
@@ -20,6 +24,10 @@ class SupervisorListScreen extends StatelessWidget {
           .collection(stateId)
           .doc(supervisorId)
           .delete();
+
+      // After a successful deletion, trigger the metadata update.
+      await MetadataTriggerService.triggerSupervisorUpdate();
+
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Supervisor deleted successfully.'), backgroundColor: Colors.green));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting supervisor: $e'), backgroundColor: Colors.red));
@@ -122,6 +130,8 @@ class SupervisorListScreen extends StatelessWidget {
                                   stateId: stateId,
                                   existingSupervisorData: supervisorData,
                                   existingSupervisorId: supervisorDoc.id,
+                                  // <<<--- PASS the trigger function to the form screen ---<<<
+                                  onSuccess: MetadataTriggerService.triggerSupervisorUpdate,
                                 ),
                               ));
                             },
@@ -143,7 +153,11 @@ class SupervisorListScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => SupervisorFormScreen(stateId: stateId),
+            builder: (_) => SupervisorFormScreen(
+              stateId: stateId,
+              // <<<--- PASS the trigger function to the form screen ---<<<
+              onSuccess: MetadataTriggerService.triggerSupervisorUpdate,
+            ),
           ));
         },
         backgroundColor: Colors.red.shade700,

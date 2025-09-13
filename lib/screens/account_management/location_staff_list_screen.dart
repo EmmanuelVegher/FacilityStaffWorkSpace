@@ -5,6 +5,8 @@ import 'package:flutter_email_sender/flutter_email_sender.dart';
 import '../../models/staff.dart';
 import 'user_form_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:html' as html;
+import 'package:excel/excel.dart';
 
 class LocationStaffListScreen extends StatefulWidget {
   final String stateName;
@@ -26,6 +28,7 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSendingEmail = false;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -42,6 +45,122 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
+  // --- ADD THIS ENTIRE NEW METHOD ---
+  /// Fetches staff data, generates an Excel file, and triggers a download.
+  Future<void> _downloadStaffListAsExcel() async {
+    if (_isDownloading) return; // Prevent multiple calls
+    setState(() => _isDownloading = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preparing Excel file for download...')),
+    );
+
+    try {
+      // 1. Fetch all staff for the current view from Firestore
+      final staffSnapshot = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('state', isEqualTo: widget.stateName)
+          .where('staffCategory', isEqualTo: widget.staffCategory)
+          .get();
+
+      final List<Staff> staffList = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+
+      if (staffList.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No staff data available to download.'), backgroundColor: Colors.orange),
+        );
+        return; // Exit if there's nothing to download
+      }
+
+      // 2. Create an Excel workbook and sheet
+      var excel = Excel.createExcel();
+      Sheet sheetObject = excel['Staff List'];
+
+      // 3. Define and style the header row
+      List<String> headers = [
+        'Full Name',
+        'Email Address',
+        'Phone Number',
+        'Gender',
+        'State',
+        'Location',
+        'Staff Category',
+        'Department',
+        'Designation',
+        'Supervisor',
+        "Supervisor's Email",
+        'Attendance Record Count'
+      ];
+      var headerStyle = CellStyle(bold: true);
+    //  sheetObject.appendRow(headers.map((e) => TextCellValue(e, cellStyle: headerStyle)).toList());
+
+      // 4. Fetch attendance for each user and add data rows
+      for (final staff in staffList) {
+        // Efficiently get the count of attendance records
+        final attendanceSnapshot = await FirebaseFirestore.instance
+            .collection('Staff')
+            .doc(staff.id)
+            .collection('Record')
+            .count()
+            .get();
+
+        final attendanceCount = attendanceSnapshot.count ?? 0;
+
+        // Create a list of cell values for the current staff member
+        List<CellValue> row = [
+          TextCellValue(staff.fullName),
+          TextCellValue(staff.emailAddress),
+          TextCellValue(staff.mobile),
+          TextCellValue(staff.gender),
+          TextCellValue(staff.state),
+          TextCellValue(staff.location),
+          TextCellValue(staff.staffCategory),
+          TextCellValue(staff.department),
+          TextCellValue(staff.designation),
+          TextCellValue(staff.supervisor),
+          TextCellValue(staff.supervisorEmail),
+          IntCellValue(attendanceCount)
+        ];
+        sheetObject.appendRow(row);
+      }
+
+      // Auto-fit columns for better readability
+      // for (var i = 0; i < headers.length; i++) {
+      //   sheetObject.setColAutoFit(i);
+      // }
+
+      // 5. Save the file and trigger the download (for web)
+      final excelBytes = excel.save();
+      if (excelBytes != null) {
+        final blob = html.Blob([excelBytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        // Sanitize filename to remove invalid characters
+        final safeCategory = widget.staffCategory.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+        final safeState = widget.stateName.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "${safeState}_${safeCategory}_Staff_List.xlsx")
+          ..click();
+        html.Url.revokeObjectUrl(url);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download started!'), backgroundColor: Colors.green),
+        );
+      } else {
+        throw Exception("Failed to save the Excel file.");
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating Excel file: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    } finally {
+      // Ensure the download state is reset even if an error occurs
+      if(mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
+  }
+
 
   // --- NEW METHOD TO FIND USERS AND LAUNCH EMAIL ---
   Future<void> _launchEmailForNonUsers() async {
@@ -268,6 +387,26 @@ The Service Delivery Workspace Team
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        // ADD THE 'actions' WIDGET FOR THE DOWNLOAD BUTTON
+        actions: [
+          if (_isDownloading)
+            const Padding(
+              padding: EdgeInsets.only(right: 20.0),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.download_for_offline_outlined, size: 28),
+              tooltip: 'Download Staff List as Excel',
+              onPressed: _downloadStaffListAsExcel,
+            ),
+        ],
       ),
       body: Container(
         width: double.infinity,
@@ -516,8 +655,13 @@ class _StaffListTileState extends State<_StaffListTile> {
               buildSubtitleLine('Phone Number', widget.staff.mobile),
               buildSubtitleLine('Department', widget.staff.department),
               buildSubtitleLine('Designation', widget.staff.designation),
+              buildSubtitleLine('Bank', widget.staff.bankName),
+              buildSubtitleLine('Account Number', widget.staff.accountNumber),
               buildSubtitleLine('Name of Supervisor', widget.staff.supervisor),
               buildSubtitleLine("Supervisor's Email Address", widget.staff.supervisorEmail),
+              buildSubtitleLine("Program Manager", widget.staff.programManager),
+              buildSubtitleLine("Program Manager's Email Address", widget.staff.programManagerEmail),
+
               if (_attendanceCount == null)
                 Text('Attendance: Loading...', style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic, fontSize: 12))
               else

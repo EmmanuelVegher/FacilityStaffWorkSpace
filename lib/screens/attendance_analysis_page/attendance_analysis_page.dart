@@ -7,6 +7,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:attendanceappmailtool/screens/attendance_analysis_page/recommendation_info.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,9 +23,10 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'package:excel/excel.dart' as xls;
 
-
-import '../../widgets/drawer2.dart'; // Assuming a state-level drawer
+import '../../widgets/drawer2.dart';
+import 'daily_record_management_page.dart'; // Assuming a state-level drawer
 
 // (AnimatedNumberText widget remains the same)
 class AnimatedNumberText extends StatelessWidget {
@@ -63,14 +65,37 @@ class AnimatedNumberText extends StatelessWidget {
   }
 }
 
-// --- DATA MODELS ---
+// EXPANDED StaffInfo to include all details for the export
 class StaffInfo {
   final String id;
-  final String name;
-  final String location;
+  final String name; // Combined name: "John Doe"
+  final String firstName;
+  final String lastName;
+  final String location; // Assigned Facility
   final String designation;
-  StaffInfo({required this.id, required this.name, required this.location, required this.designation});
+  final String supervisorEmail;
+  final String state;
+  final String department;
+  final String mobile;
+  final String email;
+  final String staffCategory;
+
+  StaffInfo({
+    required this.id,
+    required this.name,
+    required this.firstName,
+    required this.lastName,
+    required this.location,
+    required this.designation,
+    required this.supervisorEmail,
+    required this.state,
+    required this.department,
+    required this.mobile,
+    required this.email,
+    required this.staffCategory,
+  });
 }
+
 
 class FacilityDetails {
   final String name;
@@ -81,7 +106,9 @@ class FacilityDetails {
 }
 
 
+// EXPANDED AttendanceRecord to include string values for the export
 class AttendanceRecord {
+  final String recordId;
   final String staffId;
   final String staffName;
   final String assignedFacility;
@@ -89,8 +116,18 @@ class AttendanceRecord {
   final double hoursWorked;
   final GeoPoint? clockInLocation;
   final GeoPoint? clockOutLocation;
+  final String deductionStatus;
+  final RecommendationInfo? recommendation;
+  // New fields for detailed export
+  final String? clockInTime;
+  final String? clockOutTime;
+  final String? clockInLocationString;
+  final String? clockOutLocationString;
+  final String? durationWorked;
+
 
   AttendanceRecord({
+    required this.recordId,
     required this.staffId,
     required this.staffName,
     required this.assignedFacility,
@@ -98,6 +135,14 @@ class AttendanceRecord {
     required this.hoursWorked,
     this.clockInLocation,
     this.clockOutLocation,
+    this.deductionStatus = 'None',
+    this.recommendation,
+    // Add new fields to constructor
+    this.clockInTime,
+    this.clockOutTime,
+    this.clockInLocationString,
+    this.clockOutLocationString,
+    this.durationWorked,
   });
 }
 
@@ -119,8 +164,22 @@ class OutlierRecord {
 
 class AggregatedSummary {
   final String name;
+
+  // This map now stores the full AttendanceRecord for a specific day.
+  // This is essential for accessing the recordId when the user wants to edit it.
+  Map<DateTime, AttendanceRecord> dailyRecords = {};
+
+  // For high-level summaries (like total by designation), we still need to sum hours.
   Map<DateTime, double> dailyHours = {};
-  double get totalHours => dailyHours.values.fold(0.0, (sum, item) => sum + item);
+
+  // The getter can now calculate total hours from either data source.
+  double get totalHours {
+    if (dailyRecords.isNotEmpty) {
+      return dailyRecords.values.fold(0.0, (sum, record) => sum + record.hoursWorked);
+    }
+    return dailyHours.values.fold(0.0, (sum, hours) => sum + hours);
+  }
+
   AggregatedSummary({required this.name});
 }
 
@@ -142,10 +201,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   // --- Services & State ---
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  bool _isUpdateBannerVisible = true;
+  // This will hold the detailed staff info needed for the export.
+  Map<String, StaffInfo> _staffDetailsMap = {};
 
   final ScrollController _facilityTableController = ScrollController();
   final ScrollController _designationTableController = ScrollController();
-
+  List<AttendanceRecord> _recordsWithRecommendations = [];
   bool _isPageReady = false;
   bool _isLoading = false;
   bool _isExporting = false;
@@ -192,12 +254,15 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     target: LatLng(9.0820, 8.6753), // Center of Nigeria
     zoom: 5.5,
   );
+  String? _currentUserEmail;
+  Map<String, StaffInfo> _staffInfoByNameMap = {};
 
 
   @override
   void initState() {
     super.initState();
     _tooltipBehavior = TooltipBehavior(enable: true);
+    _currentUserEmail = _firebaseAuth.currentUser?.email;
     _initializeFilters();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -294,7 +359,11 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
   Future<List<String>> _getUniqueFieldValues(String field) async {
     if(_userState == null) return [];
-    final snapshot = await _firestore.collection('Staff').where('state', isEqualTo: _userState).where('staffCategory', isEqualTo: "Facility Staff").get();
+    final snapshot = await _firestore.collection('Staff')
+        .where('state', isEqualTo: _userState)
+        .where('staffCategory', isEqualTo: "Facility Staff")
+        .where('accountStatus', isEqualTo: 'Active')
+        .get();
     final Set<String> values = {};
     for (final doc in snapshot.docs) {
       final value = doc.data()[field] as String?;
@@ -305,28 +374,46 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   }
 
   Future<void> _updateStaffFilter() async {
-    if(_userState == null) return;
-    var query = _firestore.collection('Staff').where('state', isEqualTo: _userState);
+    if (_userState == null) return;
+    var query = _firestore
+        .collection('Staff')
+        .where('state', isEqualTo: _userState)
+        .where('accountStatus', isEqualTo: 'Active');
 
-    if(_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30){
+    if (_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30) {
       query = query.where('designation', whereIn: _selectedDesignations);
     }
 
     final snapshot = await query.get();
-    var staffList = snapshot.docs.map((doc) => StaffInfo(
+    var staffList = snapshot.docs.map((doc) {
+      final data = doc.data();
+      final firstName = data['firstName'] as String? ?? '';
+      final lastName = data['lastName'] as String? ?? '';
+      return StaffInfo(
         id: doc.id,
-        name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
-        location: doc.data()['location'] ?? '',
-        designation: doc.data()['designation'] ?? ''
-    )).toList();
+        name: '$firstName $lastName'.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        location: data['location'] as String? ?? '',
+        designation: data['designation'] as String? ?? '',
+        supervisorEmail: data['supervisorEmail'] as String? ?? '',
+        // Add new fields
+        state: data['state'] as String? ?? '',
+        department: data['department'] as String? ?? '',
+        mobile: data['mobile'] as String? ?? '',
+        email: data['emailAddress'] as String? ?? '',
+        staffCategory: data['staffCategory'] as String? ?? '',
+      );
+    }).toList();
 
     if (_selectedFacilities.isNotEmpty) {
-      staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
+      staffList
+          .retainWhere((staff) => _selectedFacilities.contains(staff.location));
     }
 
     staffList.sort((a, b) => a.name.compareTo(b.name));
 
-    if(mounted){
+    if (mounted) {
       setState(() {
         _availableStaff = staffList;
         final availableStaffIds = _availableStaff.map((s) => s.id).toSet();
@@ -335,43 +422,80 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
   }
 
+
   Future<void> _loadDashboardData() async {
     if (_userState == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User state not found.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("User state not found.")));
       return;
     }
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      var staffQuery = _firestore.collection('Staff').where('state', isEqualTo: _userState);
+      // --- QUERY MODIFICATION ---
+      // Start with the base query, scoped to the user's state and active staff.
+      var staffQuery = _firestore
+          .collection('Staff')
+          .where('state', isEqualTo: _userState)
+          .where('accountStatus', isEqualTo: 'Active');
 
+      // Apply optional dropdown filters
       if (_selectedStaffIds.isNotEmpty) {
         if (_selectedStaffIds.length <= 30) {
-          staffQuery = staffQuery.where(FieldPath.documentId, whereIn: _selectedStaffIds);
+          staffQuery =
+              staffQuery.where(FieldPath.documentId, whereIn: _selectedStaffIds);
         }
       } else if (_selectedDesignations.isNotEmpty) {
         if (_selectedDesignations.length <= 30) {
-          staffQuery = staffQuery.where('designation', whereIn: _selectedDesignations);
+          staffQuery =
+              staffQuery.where('designation', whereIn: _selectedDesignations);
         }
       }
 
+
       final staffSnapshot = await staffQuery.get();
-      var staffList = staffSnapshot.docs.map((doc) => StaffInfo(id: doc.id, name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(), location: doc.data()['location'] ?? 'N/A', designation: doc.data()['designation'] ?? 'N/A')).toList();
+      // Create the comprehensive list of StaffInfo objects with all new fields
+      var staffList = staffSnapshot.docs.map((doc) {
+        final data = doc.data();
+        final firstName = data['firstName'] as String? ?? '';
+        final lastName = data['lastName'] as String? ?? '';
+        return StaffInfo(
+          id: doc.id,
+          name: '$firstName $lastName'.trim(),
+          firstName: firstName,
+          lastName: lastName,
+          location: data['location'] as String? ?? 'N/A',
+          designation: data['designation'] as String? ?? 'N/A',
+          supervisorEmail: data['supervisorEmail'] as String? ?? '',
+          state: data['state'] as String? ?? 'N/A',
+          department: data['department'] as String? ?? 'N/A',
+          mobile: data['mobile'] as String? ?? 'N/A',
+          email: data['emailAddress'] as String? ?? 'N/A',
+          staffCategory: data['staffCategory'] as String? ?? 'N/A',
+        );
+      }).toList();
 
       if (_selectedFacilities.isNotEmpty) {
-        staffList.retainWhere((staff) => _selectedFacilities.contains(staff.location));
+        staffList.retainWhere(
+                (staff) => _selectedFacilities.contains(staff.location));
       }
 
       if (staffList.isEmpty) {
-        _processAndAggregateData([], [], []);
+        _processAndAggregateData([], [], [], {});
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
+      // Create lookup maps for efficiency
+      final staffInfoByNameMap = {for (var staff in staffList) staff.name: staff};
       final filteredStaffIds = staffList.map((s) => s.id).toSet();
       final staffInfoMap = {for (var s in staffList) s.id: s};
 
-      final recordsSnapshot = await _firestore.collectionGroup('Record')
+      final recordsSnapshot = await _firestore
+          .collectionGroup('Record')
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
           .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
           .get();
@@ -381,11 +505,17 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       for (final recordDoc in recordsSnapshot.docs) {
         final staffId = recordDoc.reference.parent.parent!.id;
 
+        // Only process records for the staff who passed our initial filters
         if (filteredStaffIds.contains(staffId)) {
           final staffInfo = staffInfoMap[staffId]!;
           final data = recordDoc.data();
-          final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
 
+          RecommendationInfo? recommendation;
+          if (data['recommendation'] != null && data['recommendation'] is Map) {
+            recommendation = RecommendationInfo.fromMap(data['recommendation'] as Map<String, dynamic>);
+          }
+
+          final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
           GeoPoint? clockInPoint;
           final clockInLat = (data['clockInLatitude'] as num?)?.toDouble();
           final clockInLon = (data['clockInLongitude'] as num?)?.toDouble();
@@ -402,70 +532,494 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
           allRecords.add(
               AttendanceRecord(
-                  staffId: staffId,
-                  staffName: staffInfo.name,
-                  assignedFacility: staffInfo.location,
-                  date: recordTimestamp,
-                  hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
-                  clockInLocation: clockInPoint,
-                  clockOutLocation: clockOutPoint
+                recordId: recordDoc.id,
+                staffId: staffId,
+                staffName: staffInfo.name,
+                assignedFacility: staffInfo.location,
+                date: recordTimestamp,
+                hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
+                clockInLocation: clockInPoint,
+                clockOutLocation: clockOutPoint,
+                deductionStatus: data['deductionStatus'] as String? ?? 'None',
+                recommendation: recommendation,
+                clockInTime: data['clockIn'] as String?,
+                clockOutTime: data['clockOut'] as String?,
+                clockInLocationString: data['clockInLocation'] as String?,
+                clockOutLocationString: data['clockOutLocation'] as String?,
+                durationWorked: data['durationWorked'] as String?,
               )
           );
         }
       }
 
-      final dateRange = List.generate(_endDate.difference(_startDate).inDays + 1, (i) => _startDate.add(Duration(days: i)));
-      _processAndAggregateData(allRecords, staffList, dateRange);
+      final dateRange = List.generate(
+          _endDate.difference(_startDate).inDays + 1,
+              (i) => _startDate.add(Duration(days: i)));
+
+      _processAndAggregateData(allRecords, staffList, dateRange, staffInfoByNameMap);
 
     } catch (e, stack) {
       debugPrint("Error loading dashboard data: $e\n$stack");
       if (mounted) {
-        setState(() => _errorMessage = "An error occurred. Make sure the required Firestore index has been created. Error: $e");
+        setState(() => _errorMessage = "An error occurred. Check Firestore indexes. Error: $e");
       }
     } finally {
       if(mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _processAndAggregateData(List<AttendanceRecord> records, List<StaffInfo> staff, List<DateTime> dateRange){
+  void _processAndAggregateData(
+      List<AttendanceRecord> records,
+      List<StaffInfo> staff,
+      List<DateTime> dateRange,
+      Map<String, StaffInfo> staffInfoByNameMap, // <-- ACCEPT THE MAP
+      ) {
     final facilityData = <String, AggregatedSummary>{};
     final designationData = <String, AggregatedSummary>{};
     final facilityStaffData = <String, Map<String, AggregatedSummary>>{};
-    final staffMap = {for(var s in staff) s.id: s};
+    final staffMap = {for (var s in staff) s.id: s};
 
-    for(final record in records) {
+    for (final record in records) {
       final staffInfo = staffMap[record.staffId];
-      if(staffInfo == null) continue;
+      if (staffInfo == null) continue;
 
       final day = DateTime(record.date.year, record.date.month, record.date.day);
 
-      facilityData.putIfAbsent(staffInfo.location, () => AggregatedSummary(name: staffInfo.location));
-      facilityData[staffInfo.location]!.dailyHours[day] = (facilityData[staffInfo.location]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      final facilitySummary = facilityData.putIfAbsent(staffInfo.location, () => AggregatedSummary(name: staffInfo.location));
+      facilitySummary.dailyHours[day] = (facilitySummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
-      designationData[staffInfo.designation]!.dailyHours[day] = (designationData[staffInfo.designation]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      final designationSummary = designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
+      designationSummary.dailyHours[day] = (designationSummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      facilityStaffData.putIfAbsent(staffInfo.location, () => {});
-      facilityStaffData[staffInfo.location]!.putIfAbsent(staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
-      facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] = (facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      final staffMapForFacility = facilityStaffData.putIfAbsent(staffInfo.location, () => {});
+      final staffSummary = staffMapForFacility.putIfAbsent(staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
+      staffSummary.dailyRecords[day] = record;
     }
 
     _generateMapMarkers(records);
     _findOutliers(records);
 
-    if(mounted){
+    final recommendations = records.where((r) => r.deductionStatus != 'None').toList();
+    recommendations.sort((a, b) => b.date.compareTo(a.date));
+
+    // --- FINAL STATE UPDATE ---
+    // This is the single source of truth for rebuilding the UI.
+    if (mounted) {
       setState(() {
         _allRecords = records;
+        _recordsWithRecommendations = recommendations;
         _facilitySummaries = facilityData;
         _designationSummaries = designationData;
         _facilityStaffSummaries = facilityStaffData;
         _dateRangeForTables = dateRange;
         _totalHoursAll = records.fold(0.0, (sum, r) => sum + r.hoursWorked);
+        _staffInfoByNameMap = staffInfoByNameMap; // <-- SAVE THE MAP TO STATE HERE
+        _staffDetailsMap = staffMap; // Make detailed staff data available for export
       });
     }
   }
 
-  // --- WIDGET BUILD METHODS ---
+  // --- NEW METHOD: _exportAttendanceListToCsv ---
+  Future<void> _exportAttendanceListToCsv() async {
+    if (_allRecords.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No attendance data to export.")),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+    await Future.delayed(const Duration(milliseconds: 100)); // Allow UI to update
+
+    try {
+      List<List<dynamic>> rows = [];
+
+      // Header Row
+      rows.add([
+        'First Name',
+        'Last Name',
+        'State',
+        'Department',
+        'Designation',
+        'Assigned Facility',
+        'Mobile',
+        'Email Address',
+        'Staff Category',
+        'Date',
+        'Clock In Time',
+        'Clock Out Time',
+        'Hours Worked',
+        'Duration Worked',
+        'Clock In Location',
+        'Clock In Latitude',
+        'Clock In Longitude',
+        'Clock Out Location',
+        'Clock Out Latitude',
+        'Clock Out Longitude',
+        'Deduction Status',
+        'Comments/Reason',
+        'Recommended By'
+      ]);
+
+      // Create a sorted list of records for a clean report
+      final sortedRecords = List<AttendanceRecord>.from(_allRecords);
+      sortedRecords.sort((a, b) {
+        int nameComp = a.staffName.compareTo(b.staffName);
+        if (nameComp != 0) return nameComp;
+        return a.date.compareTo(b.date);
+      });
+
+      for (final record in sortedRecords) {
+        final staffInfo = _staffDetailsMap[record.staffId];
+
+        if (staffInfo == null) continue; // Skip if staff details not found
+
+        rows.add([
+          staffInfo.firstName,
+          staffInfo.lastName,
+          staffInfo.state,
+          staffInfo.department,
+          staffInfo.designation,
+          staffInfo.location, // Assigned Facility
+          staffInfo.mobile,
+          staffInfo.email,
+          staffInfo.staffCategory,
+          DateFormat('yyyy-MM-dd').format(record.date),
+          record.clockInTime ?? 'N/A',
+          record.clockOutTime ?? 'N/A',
+          record.hoursWorked.toStringAsFixed(2),
+          record.durationWorked ?? 'N/A',
+          record.clockInLocationString ?? 'N/A',
+          record.clockInLocation?.latitude ?? '',
+          record.clockInLocation?.longitude ?? '',
+          record.clockOutLocationString ?? 'N/A',
+          record.clockOutLocation?.latitude ?? '',
+          record.clockOutLocation?.longitude ?? '',
+          record.deductionStatus,
+          record.recommendation?.notes ?? '',
+          record.recommendation?.recommenderName ?? ''
+        ]);
+      }
+
+
+      String csvData = const ListToCsvConverter().convert(rows);
+      _triggerDownload(
+        utf8.encode(csvData),
+        'attendance_list_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error generating detailed CSV: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _exportAttendanceListToExcel() async {
+    if (_allRecords.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No attendance data to export.")),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+    // Give the UI a moment to show the loading indicator
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      // 1. Create a new Excel document
+      var excel = xls.Excel.createExcel();
+
+      // ===================================================================
+      //  SHEET 1: ATTENDANCE LIST
+      // ===================================================================
+      xls.Sheet sheetObject = excel['Attendance']; // Create a sheet
+
+      // 2. Define a style for the header row (Bold text)
+      var headerStyle = xls.CellStyle(
+        bold: true,
+        textWrapping: xls.TextWrapping.WrapText,
+        verticalAlign: xls.VerticalAlign.Center,
+        horizontalAlign: xls.HorizontalAlign.Center,
+       // backgroundColorHex: '#FFD3D3D3', // Light grey background
+      );
+
+      // 3. Create the list of headers
+      List<String> headers = [
+        'First Name', 'Last Name', 'State', 'Department', 'Designation',
+        'Assigned Facility', 'Mobile', 'Email Address', 'Staff Category', 'Date',
+        'Clock In Time', 'Clock Out Time', 'Hours Worked', 'Duration Worked',
+        'Clock In Location', 'Clock In Latitude', 'Clock In Longitude',
+        'Clock Out Location', 'Clock Out Latitude', 'Clock Out Longitude',
+        'Deduction Status', 'Comments/Reason', 'Recommended By'
+      ];
+
+      // 4. Apply headers and their style to the first row
+      for (var i = 0; i < headers.length; i++) {
+        var cell = sheetObject.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = xls.TextCellValue(headers[i]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // 5. Sort data for a clean report
+      final sortedRecords = List<AttendanceRecord>.from(_allRecords);
+      sortedRecords.sort((a, b) {
+        int nameComp = a.staffName.compareTo(b.staffName);
+        if (nameComp != 0) return nameComp;
+        return a.date.compareTo(b.date);
+      });
+
+      // 6. Populate data rows
+      for (int i = 0; i < sortedRecords.length; i++) {
+        final record = sortedRecords[i];
+        final staffInfo = _staffDetailsMap[record.staffId];
+        if (staffInfo == null) continue;
+
+        // Create a list of values for the current row
+        List<xls.CellValue> rowData = [
+          xls.TextCellValue(staffInfo.firstName),
+          xls.TextCellValue(staffInfo.lastName),
+          xls.TextCellValue(staffInfo.state),
+          xls.TextCellValue(staffInfo.department),
+          xls.TextCellValue(staffInfo.designation),
+          xls.TextCellValue(staffInfo.location),
+          xls.TextCellValue(staffInfo.mobile),
+          xls.TextCellValue(staffInfo.email),
+          xls.TextCellValue(staffInfo.staffCategory),
+          xls.TextCellValue(DateFormat('yyyy-MM-dd').format(record.date)),
+          xls.TextCellValue(record.clockInTime ?? 'N/A'),
+          xls.TextCellValue(record.clockOutTime ?? 'N/A'),
+          xls.DoubleCellValue(record.hoursWorked), // Use DoubleCellValue for numbers
+          xls.TextCellValue(record.durationWorked ?? 'N/A'),
+          xls.TextCellValue(record.clockInLocationString ?? 'N/A'),
+          xls.TextCellValue(record.clockInLocation?.latitude.toString() ?? ''),
+          xls.TextCellValue(record.clockInLocation?.longitude.toString() ?? ''),
+          xls.TextCellValue(record.clockOutLocationString ?? 'N/A'),
+          xls.TextCellValue(record.clockOutLocation?.latitude.toString() ?? ''),
+          xls.TextCellValue(record.clockOutLocation?.longitude.toString() ?? ''),
+          xls.TextCellValue(record.deductionStatus),
+          xls.TextCellValue(record.recommendation?.notes ?? ''),
+          xls.TextCellValue(record.recommendation?.recommenderName ?? '')
+        ];
+
+        // Add the row data to the sheet
+        sheetObject.insertRowIterables(rowData, i + 1, startingColumn: 0);
+      }
+
+      // ===================================================================
+      //  NEW --- SHEET 2: GEO-FENCED FACILITIES --- NEW
+      // ===================================================================
+      xls.Sheet facilitySheet = excel['Geo-Fenced Facilities'];
+
+      // Define headers for the new sheet
+      List<String> facilityHeaders = [
+        'Facility Name', 'LGA', 'State', 'Latitude', 'Longitude', 'Radius (meters)'
+      ];
+
+      // Apply headers and style to the first row of the new sheet
+      for (var i = 0; i < facilityHeaders.length; i++) {
+        var cell = facilitySheet.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = xls.TextCellValue(facilityHeaders[i]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // Query Firestore for facilities in the user's state
+      final facilitiesSnapshot = await _firestore
+          .collection('Facilities')
+          .where('state', isEqualTo: _userState)
+          .get();
+
+      // Populate the facility data rows
+      for (int i = 0; i < facilitiesSnapshot.docs.length; i++) {
+        final doc = facilitiesSnapshot.docs[i];
+        final data = doc.data();
+
+        List<xls.CellValue> rowData = [
+          xls.TextCellValue(data['LocationName'] as String? ?? 'N/A'),
+          xls.TextCellValue(data['lga'] as String? ?? 'N/A'),
+          xls.TextCellValue(data['state'] as String? ?? 'N/A'),
+          xls.TextCellValue(data['Latitude'] as String? ?? ''),
+          xls.TextCellValue(data['Longitude'] as String? ?? ''),
+          xls.TextCellValue(data['Radius'] as String? ?? '0'),
+        ];
+        facilitySheet.insertRowIterables(rowData, i + 1, startingColumn: 0);
+      }
+
+      // Auto-fit columns for the new sheet
+      // for (var i = 0; i < facilityHeaders.length; i++) {
+      //   facilitySheet.xls.setColAutoFit(i);
+      // }
+
+      // 7. Auto-fit all columns
+      // for (var i = 0; i < headers.length; i++) {
+      //   sheetObject.setColAutoFit(i);
+      // }
+
+      // 8. Save the file and trigger the download
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        _triggerDownload(
+          fileBytes,
+          'Attendance_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx',
+          // This is the correct MIME type for modern Excel files
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error generating Excel file: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  // --- RENAMED: _exportToCsv -> _exportSummaryToCsv ---
+  Future<void> _exportSummaryToCsv() async {
+    setState(() => _isExporting = true);
+    List<List<dynamic>> rows = [];
+    rows.add(['Attendance Summary by Facility']);
+    rows.add(['Facility', 'Total Hours']);
+    _facilitySummaries.forEach((key, value) {
+      rows.add([key, value.totalHours.toStringAsFixed(2)]);
+    });
+    rows.add([]);
+    rows.add(['Attendance Summary by Designation']);
+    rows.add(['Designation', 'Total Hours']);
+    _designationSummaries.forEach((key, value) {
+      rows.add([key, value.totalHours.toStringAsFixed(2)]);
+    });
+    String csvData = const ListToCsvConverter().convert(rows);
+    _triggerDownload(utf8.encode(csvData),
+        'attendance_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+    setState(() => _isExporting = false);
+  }
+
+// --- NEW, FULLY CORRECTED WIDGET ---
+
+  Widget _buildRecommendationsLogSection() {
+    if (_recordsWithRecommendations.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: const Icon(Icons.playlist_add_check_circle_rounded),
+        title: Text(
+          "Recommendations Log",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+        ),
+        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Staff')),
+                DataColumn(label: Text('Date')),
+                DataColumn(label: Text('Recommendation')),
+                DataColumn(label: Text('Recommended By')), // New column
+                DataColumn(label: Text('Reason / Notes')),
+              ],
+              rows: _recordsWithRecommendations.map((record) {
+                String statusText = record.deductionStatus;
+                Color statusColor = Colors.black;
+                final rec = record.recommendation;
+
+                // Use a switch for clarity
+                switch (record.deductionStatus) {
+                  case 'Partial':
+                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                    statusColor = Colors.orange.shade800;
+                    break;
+                  case 'Full':
+                    statusText = 'Full Deduction (8 hrs)';
+                    statusColor = Colors.red.shade800;
+                    break;
+                  case 'ApprovedPartial':
+                  // --- THE FIX ---
+                  // Read from the main hours field, which is now the source of truth for approved time.
+                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                    statusColor = Colors.blue.shade800;
+                    break;
+                  case 'ApprovedFull':
+                    statusText = 'Full Approval (8 hrs)';
+                    statusColor = Colors.indigo.shade800;
+                    break;
+                  default:
+                  // Fallback for any other status
+                    statusText = record.deductionStatus;
+                    break;
+                }
+
+                final recommenderText = rec != null
+                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
+                    : 'N/A';
+                final notesText = rec?.notes ?? 'No notes provided.';
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text(record.staffName)),
+                    DataCell(Text(DateFormat.yMd().format(record.date))),
+                    DataCell(Text(
+                      statusText,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    )),
+                    DataCell(Text(recommenderText)),
+                    DataCell(Text(notesText)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  // Add this new method inside the _AttendanceAnalysisPageState class
+
+  Widget _buildUpdateBanner() {
+    // Define the expiry date for the notification
+    final DateTime expiryDate = DateTime(2025, 9, 19);
+
+    // Check if the banner should be visible
+    if (DateTime.now().isBefore(expiryDate) && _isUpdateBannerVisible) {
+      return MaterialBanner(
+        padding: const EdgeInsets.all(12),
+        backgroundColor: Colors.blue.shade50,
+        surfaceTintColor: Colors.white,
+        elevation: 1,
+        leading: Icon(Icons.info_outline, color: Colors.blue.shade800),
+        content: Text(
+          'New Updates! You can now make recommendations for Partial/Full Deductions of filled attendance either due to truancy etc or Partial Approval/Full Approval of attendance attendance for missed days and view staff you directly supervise. Action buttons are enabled only for your team.',
+          style: TextStyle(color: Colors.blue.shade900),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () {
+              setState(() {
+                _isUpdateBannerVisible = false; // Hide the banner for this session
+              });
+            },
+          ),
+        ],
+      );
+    } else {
+      // Return an empty widget if the date has passed or banner is dismissed
+      return const SizedBox.shrink();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -482,13 +1036,44 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               icon: const Icon(Icons.download_outlined),
               tooltip: "Download Options",
               onSelected: (value) {
-                if(value == 'csv') _exportToCsv();
-                if(value == 'pdf') _exportChartsToPdf();
+                if (value == 'excel_list') _exportAttendanceListToExcel(); // Call new Excel method
+                if (value == 'csv_list') _exportAttendanceListToCsv();
+                if (value == 'csv_summary') _exportSummaryToCsv();
+                if (value == 'pdf') _exportChartsToPdf();
               },
               enabled: !_isLoading && _allRecords.isNotEmpty,
               itemBuilder: (context) => [
-                const PopupMenuItem(value: 'csv', child: ListTile(leading: Icon(Icons.table_chart_outlined), title: Text("Export Data (CSV)"))),
-                const PopupMenuItem(value: 'pdf', child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text("Export Charts (PDF)"))),
+                // New Menu Item for the native Excel file
+                const PopupMenuItem(
+                  value: 'excel_list',
+                  child: ListTile(
+                    leading: Icon(Icons.grid_on_sharp, color: Colors.green),
+                    title: Text("Download List (Excel)"),
+                  ),
+                ),
+
+                const PopupMenuItem(
+                  value: 'csv_list',
+                  child: ListTile(
+                    leading: Icon(Icons.list_alt_rounded),
+                    title: Text("Download List (CSV)"),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'csv_summary',
+                  child: ListTile(
+                    leading: Icon(Icons.table_chart_outlined),
+                    title: Text("Download Summary (CSV)"),
+                  ),
+                ),
+
+                const PopupMenuItem(
+                  value: 'pdf',
+                  child: ListTile(
+                    leading: Icon(Icons.picture_as_pdf_outlined),
+                    title: Text("Export Charts (PDF)"),
+                  ),
+                ),
               ],
             )
         ],
@@ -496,6 +1081,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       drawer: drawer2(context),
       body: Column(
         children: [
+          _buildUpdateBanner(),
           _buildFilterBar(),
           Expanded(
             child: Stack(
@@ -572,16 +1158,15 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   style: TextStyle(color: Colors.teal[800], fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
+                // In the MultiSelectDialogField for Facilities:
                 onConfirm: (results) {
-                  // This callback fires when the user presses "OK", which closes the dropdown.
-                  // The logic here ensures that if "(All Facilities)" was selected, it behaves as intended.
                   setState(() {
                     final castedResults = results.cast<String>();
+                    // If "All Facilities" is selected, select everything.
                     if (castedResults.contains(_allFacilitiesOption)) {
-                      // User selected "All", so we populate the list with all available facilities.
                       _selectedFacilities = List<String>.from(_availableFacilities);
                     } else {
-                      // User made specific selections.
+                      // Otherwise, just take the specific selections.
                       _selectedFacilities = castedResults;
                     }
                     // After updating facilities, the list of available staff might change.
@@ -615,13 +1200,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     overflow: TextOverflow.ellipsis
                 ),
                 onConfirm: (values) {
-                  // This callback fires when the user presses "OK", closing the dropdown.
-                  // It handles the "All" selection case correctly.
                   setState(() {
                     final castedValues = values.cast<String>();
+                    // If "All Designations" is selected, select everything.
                     if (castedValues.contains(_allDesignationsOption)) {
                       _selectedDesignations = List<String>.from(_availableDesignations);
                     } else {
+                      // Otherwise, just take the specific selections.
                       _selectedDesignations = castedValues;
                     }
                     _updateStaffFilter();
@@ -654,13 +1239,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 onConfirm: (values) {
-                  // This callback fires when the user presses "OK", closing the dropdown.
-                  // It handles the "All" selection case correctly.
                   setState(() {
                     final castedValues = values.cast<String>();
+                    // If "All Staff" is selected, select all available staff IDs.
                     if (castedValues.contains(_allStaffOption)) {
                       _selectedStaffIds = _availableStaff.map((s) => s.id).toList();
                     } else {
+                      // Otherwise, just take the specific selections.
                       _selectedStaffIds = castedValues;
                     }
                   });
@@ -728,10 +1313,11 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 ),
               ),
             ),
-
           if (hasLoadedData) ...[
             const SizedBox(height: 24),
             _buildKpiSection(),
+            const SizedBox(height: 24),
+            _buildRecommendationsLogSection(),
             const SizedBox(height: 24),
             _buildLocationMapCard(),
             const SizedBox(height: 24),
@@ -940,53 +1526,175 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
   Widget _buildFacilitySummaryTable() {
     final sortedFacilities = _facilityStaffSummaries.keys.toList()..sort();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("Attendance by Facility", style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Card( clipBehavior: Clip.antiAlias, child: Column( children: [
-          SingleChildScrollView( controller: _facilityTableController, scrollDirection: Axis.horizontal, child: DataTable(
-            columns: [
-              const DataColumn(label: Text('Location / Staff')),
-              ..._dateRangeForTables.map((date) => DataColumn(label: Text(DateFormat('EEE\nMMM dd').format(date)), numeric: true)),
-              const DataColumn(label: Text('Total'), numeric: true),
-            ],
-            rows: sortedFacilities.expand((facility) {
-              final staffSummaries = _facilityStaffSummaries[facility]!;
-              final sortedStaff = staffSummaries.keys.toList()..sort();
-              final facilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + s.totalHours);
-              return [
-                DataRow(
-                  color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
-                  cells: [
-                    DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
-                    ..._dateRangeForTables.map((date) {
-                      final dailyTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + (s.dailyHours[date] ?? 0.0));
-                      return DataCell(Text(dailyTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)));
-                    }),
-                    DataCell(Text(facilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          elevation: 2,
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _facilityTableController,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: [
+                    const DataColumn(label: Text('Location / Staff')),
+                    ..._dateRangeForTables.map((date) => DataColumn(
+                        label: Text(DateFormat('EEE\nMMM dd').format(date)),
+                        numeric: true
+                    )),
+                    const DataColumn(label: Text('Total'), numeric: true),
                   ],
+                  rows: sortedFacilities.expand((facility) {
+                    final staffSummaries = _facilityStaffSummaries[facility]!;
+                    final sortedStaff = staffSummaries.keys.toList()..sort();
+                    final facilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + s.totalHours);
+
+                    return [
+                      // Facility Header Row
+                      DataRow(
+                        color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
+                        cells: [
+                          DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
+                          ..._dateRangeForTables.map((date) {
+                            final dailyFacilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + (s.dailyRecords[date]?.hoursWorked ?? 0.0));
+                            return DataCell(Text(dailyFacilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)));
+                          }),
+                          DataCell(Text(facilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+
+                      // Rows for Each Staff Member
+                      ...sortedStaff.map((staffName) {
+                        final summary = staffSummaries[staffName]!;
+
+                        // --- NEW: PERMISSION CHECK ---
+                        final staffDetails = _staffInfoByNameMap[staffName];
+                        final bool canEdit = staffDetails?.supervisorEmail == _currentUserEmail;
+
+                        return DataRow(cells: [
+                          DataCell(Padding(padding: const EdgeInsets.only(left: 16.0), child: Text(staffName))),
+
+                          ..._dateRangeForTables.map((date) {
+                            final recordForDay = summary.dailyRecords[date];
+
+                            // --- RENDER 'ADD' BUTTON (with permission check) ---
+                            if (recordForDay == null) {
+                              return DataCell(
+                                Center(
+                                  child: IconButton(
+                                    icon: Icon(Icons.add_comment_outlined, size: 20, color: canEdit ? Colors.blue.shade300 : Colors.grey.shade400),
+                                    tooltip: canEdit ? "Create & Approve Record" : "You are not this staff's supervisor",
+                                    onPressed: canEdit ? () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => DailyRecordManagementPage(
+                                            staffId: staffDetails!.id, // Use reliable ID
+                                            recordId: null,
+                                            date: date,
+                                          ),
+                                        ),
+                                      ).then((madeChanges) {
+                                        if (madeChanges == true) _loadDashboardData();
+                                      });
+                                    } : null, // Disable if no permission
+                                  ),
+                                ),
+                              );
+                            }
+                            // --- RENDER 'EDIT' BUTTON (with permission check) ---
+                            else {
+                              // ... (logic to get hours, backgroundColor, statusIcon remains the same)
+                              final hours = recordForDay.hoursWorked;
+                              Color backgroundColor = Colors.transparent;
+                              IconData? statusIcon;
+                              Color? iconColor;
+
+                              switch (recordForDay.deductionStatus) {
+                                case 'Partial':
+                                  backgroundColor = Colors.orange.withOpacity(0.1);
+                                  statusIcon = Icons.warning_amber_rounded;
+                                  iconColor = Colors.orange.shade700;
+                                  break;
+                                case 'Full':
+                                  backgroundColor = Colors.red.withOpacity(0.1);
+                                  statusIcon = Icons.gpp_bad_rounded;
+                                  iconColor = Colors.red.shade700;
+                                  break;
+                                case 'ApprovedPartial':
+                                  backgroundColor = Colors.blue.withOpacity(0.1);
+                                  statusIcon = Icons.thumb_up_alt_rounded;
+                                  iconColor = Colors.blue.shade700;
+                                  break;
+                                case 'ApprovedFull':
+                                  backgroundColor = Colors.green.withOpacity(0.1);
+                                  statusIcon = Icons.verified_user_rounded;
+                                  iconColor = Colors.green.shade700;
+                                  break;
+                              }
+
+                              return DataCell(
+                                Container(
+                                  color: backgroundColor,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
+                                      const SizedBox(width: 4),
+                                      Text(hours.toStringAsFixed(2)),
+                                      IconButton(
+                                        icon: Icon(Icons.edit_note_outlined, size: 20, color: canEdit ? Theme.of(context).textTheme.bodyMedium?.color : Colors.grey.shade400),
+                                        tooltip: canEdit ? "Manage Record" : "You are not this staff's supervisor",
+                                        onPressed: canEdit ? () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) => DailyRecordManagementPage(
+                                                staffId: recordForDay.staffId,
+                                                recordId: recordForDay.recordId,
+                                                date: date,
+                                              ),
+                                            ),
+                                          ).then((madeChanges) {
+                                            if (madeChanges == true) _loadDashboardData();
+                                          });
+                                        } : null, // Disable if no permission
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                          }),
+                          DataCell(Text(summary.totalHours.toStringAsFixed(2))),
+                        ]);
+                      })
+                    ];
+                  }).toList(),
                 ),
-                ...sortedStaff.map((staffName) {
-                  final summary = staffSummaries[staffName]!;
-                  return DataRow(cells: [
-                    DataCell(Padding(padding: const EdgeInsets.only(left: 16.0), child: Text(staffName))),
-                    ..._dateRangeForTables.map((date) => DataCell(Text((summary.dailyHours[date] ?? 0).toStringAsFixed(2)))),
-                    DataCell(Text(summary.totalHours.toStringAsFixed(2))),
-                  ]);
-                })
-              ];
-            }).toList(),
+              ),
+              // Horizontal Scroll Controls
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: "Scroll Left",
+                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: "Scroll Right",
+                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ),
-          Row( mainAxisAlignment: MainAxisAlignment.end, children: [
-            IconButton( icon: const Icon(Icons.arrow_back), onPressed: () => _facilityTableController.animateTo( _facilityTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-            IconButton( icon: const Icon(Icons.arrow_forward), onPressed: () => _facilityTableController.animateTo( _facilityTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-          ],
-          )
-        ],
-        ),
         ),
         const SizedBox(height: 16),
         _buildSummaryPieChart("Facility Hours Distribution", _facilitySummaries, key: _facilityPieChartKey),
