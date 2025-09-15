@@ -25,6 +25,30 @@ import '../../widgets/drawer.dart';
 import '../../widgets/drawer2.dart'; // Your custom drawer widget
 
 // --- DATA MODELS (Shared with state-level page) ---
+// ADD THIS NEW CLASS WITH THE OTHER DATA MODELS
+class RecommendationInfo {
+  final String recommenderName;
+  final String recommenderDesignation;
+  final String notes;
+  final int? deductedHours;
+
+  RecommendationInfo({
+    required this.recommenderName,
+    required this.recommenderDesignation,
+    required this.notes,
+    this.deductedHours,
+  });
+
+  factory RecommendationInfo.fromMap(Map<String, dynamic> map) {
+    return RecommendationInfo(
+      recommenderName: map['recommenderName'] as String? ?? 'N/A',
+      recommenderDesignation: map['recommenderDesignation'] as String? ?? 'N/A',
+      notes: map['notes'] as String? ?? '',
+      deductedHours: map['deductedHours'] as int?,
+    );
+  }
+}
+
 class StaffInfo {
   final String id;
   final String name;
@@ -40,6 +64,7 @@ class FacilityDetails {
   FacilityDetails({required this.name, required this.coordinates, required this.radius});
 }
 
+// REPLACE THE EXISTING AttendanceRecord CLASS WITH THIS UPDATED VERSION
 class AttendanceRecord {
   final String staffId;
   final String staffName;
@@ -48,6 +73,10 @@ class AttendanceRecord {
   final double hoursWorked;
   final GeoPoint? clockInLocation;
   final GeoPoint? clockOutLocation;
+  // New fields for recommendations
+  final String deductionStatus;
+  final RecommendationInfo? recommendation;
+
 
   AttendanceRecord({
     required this.staffId,
@@ -57,6 +86,9 @@ class AttendanceRecord {
     required this.hoursWorked,
     this.clockInLocation,
     this.clockOutLocation,
+    // Add new fields to constructor
+    this.deductionStatus = 'None',
+    this.recommendation,
   });
 }
 
@@ -76,10 +108,24 @@ class OutlierRecord {
   });
 }
 
+// REPLACE the existing AggregatedSummary class with this one.
 class AggregatedSummary {
   final String name;
+
+  // For detailed views like the staff table, storing the full record.
+  Map<DateTime, AttendanceRecord> dailyRecords = {};
+
+  // For high-level summaries like the designation table.
   Map<DateTime, double> dailyHours = {};
-  double get totalHours => dailyHours.values.fold(0.0, (sum, item) => sum + item);
+
+  // The getter can now calculate total hours from either data source.
+  double get totalHours {
+    if (dailyRecords.isNotEmpty) {
+      return dailyRecords.values.fold(0.0, (sum, record) => sum + record.hoursWorked);
+    }
+    return dailyHours.values.fold(0.0, (sum, hours) => sum + hours);
+  }
+
   AggregatedSummary({required this.name});
 }
 
@@ -124,6 +170,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
 
   // --- Data & Chart State ---
   List<AttendanceRecord> _allRecords = [];
+  List<AttendanceRecord> _recordsWithRecommendations = [];
   Map<String, AggregatedSummary> _staffSummaries = {};
   Map<String, AggregatedSummary> _designationSummaries = {};
   List<DateTime> _dateRangeForTables = [];
@@ -246,6 +293,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
   }
 
   /// Main data loading logic for the facility.
+// REPLACE THE EXISTING _loadDashboardData METHOD
   Future<void> _loadDashboardData() async {
     if (_userFacility == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cannot load data: User's facility is unknown.")));
@@ -307,15 +355,25 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
           final staffInfo = staffInfoMap[staffId]!;
           final data = recordDoc.data();
 
+          // --- NEW LOGIC TO PARSE RECOMMENDATION ---
+          RecommendationInfo? recommendation;
+          if (data['recommendation'] != null && data['recommendation'] is Map) {
+            recommendation = RecommendationInfo.fromMap(data['recommendation'] as Map<String, dynamic>);
+          }
+          // --- END OF NEW LOGIC ---
+
           allRecords.add(
               AttendanceRecord(
-                  staffId: staffId,
-                  staffName: staffInfo.name,
-                  assignedFacility: staffInfo.location,
-                  date: (data['timestamp'] as Timestamp).toDate(),
-                  hoursWorked: (data['noOfHours']as num? ?? 0.0).toDouble(),
-                  clockInLocation: (data['clockInLatitude'] != null) ? GeoPoint(data['clockInLatitude'], data['clockInLongitude']) : null,
-                  clockOutLocation: (data['clockOutLatitude'] != null) ? GeoPoint(data['clockOutLatitude'], data['clockOutLongitude']) : null
+                staffId: staffId,
+                staffName: staffInfo.name,
+                assignedFacility: staffInfo.location,
+                date: (data['timestamp'] as Timestamp).toDate(),
+                hoursWorked: (data['noOfHours']as num? ?? 0.0).toDouble(),
+                clockInLocation: (data['clockInLatitude'] != null) ? GeoPoint(data['clockInLatitude'], data['clockInLongitude']) : null,
+                clockOutLocation: (data['clockOutLatitude'] != null) ? GeoPoint(data['clockOutLatitude'], data['clockOutLongitude']) : null,
+                // Pass new data to the record
+                deductionStatus: data['deductionStatus'] as String? ?? 'None',
+                recommendation: recommendation,
               )
           );
         }
@@ -346,14 +404,17 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
       // Find staff info from available list (since it's already filtered)
       final staffInfo = _availableStaff.firstWhere((s) => s.id == record.staffId);
 
-      // Aggregate by Staff Member
-      staffData.putIfAbsent(record.staffName, () => AggregatedSummary(name: record.staffName));
-      staffData[record.staffName]!.dailyHours[day] = (staffData[record.staffName]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      // Aggregate by Staff Member - using the new dailyRecords map
+      final staffSummary = staffData.putIfAbsent(record.staffName, () => AggregatedSummary(name: record.staffName));
+      staffSummary.dailyRecords[day] = record; // Store the entire record
 
-      // Aggregate by Designation
-      designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
-      designationData[staffInfo.designation]!.dailyHours[day] = (designationData[staffInfo.designation]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      // Aggregate by Designation - using the existing dailyHours map
+      final designationSummary = designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
+      designationSummary.dailyHours[day] = (designationSummary.dailyHours[day] ?? 0) + record.hoursWorked;
     }
+
+    final recommendations = records.where((r) => r.deductionStatus != 'None').toList();
+    recommendations.sort((a, b) => b.date.compareTo(a.date));
 
     _generateMapMarkers(records);
     _findOutliers(records);
@@ -361,6 +422,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
     if(mounted){
       setState(() {
         _allRecords = records;
+        _recordsWithRecommendations = recommendations;
         _staffSummaries = staffData;
         _designationSummaries = designationData;
         _dateRangeForTables = dateRange;
@@ -368,6 +430,87 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
       });
     }
   }
+
+
+  Widget _buildRecommendationsLogSection() {
+    if (_recordsWithRecommendations.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: const Icon(Icons.playlist_add_check_circle_rounded),
+        title: Text(
+          "Recommendations Log",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+        ),
+        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Staff')),
+                DataColumn(label: Text('Date')),
+                DataColumn(label: Text('Recommendation')),
+                DataColumn(label: Text('Recommended By')),
+                DataColumn(label: Text('Reason / Notes')),
+              ],
+              rows: _recordsWithRecommendations.map((record) {
+                String statusText = record.deductionStatus;
+                Color statusColor = Colors.black;
+                final rec = record.recommendation;
+
+                switch (record.deductionStatus) {
+                  case 'Partial':
+                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                    statusColor = Colors.orange.shade800;
+                    break;
+                  case 'Full':
+                    statusText = 'Full Deduction (8 hrs)';
+                    statusColor = Colors.red.shade800;
+                    break;
+                  case 'ApprovedPartial':
+                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                    statusColor = Colors.blue.shade800;
+                    break;
+                  case 'ApprovedFull':
+                    statusText = 'Full Approval (8 hrs)';
+                    statusColor = Colors.indigo.shade800;
+                    break;
+                  default:
+                    statusText = record.deductionStatus;
+                    break;
+                }
+
+                final recommenderText = rec != null
+                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
+                    : 'N/A';
+                final notesText = rec?.notes ?? 'No notes provided.';
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text(record.staffName)),
+                    DataCell(Text(DateFormat.yMd().format(record.date))),
+                    DataCell(Text(
+                      statusText,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    )),
+                    DataCell(Text(recommenderText)),
+                    DataCell(Text(notesText)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
 
   // --- WIDGET BUILD METHODS ---
   @override
@@ -554,6 +697,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
     );
   }
 
+//  _buildDashboardBody METHOD
   Widget _buildDashboardBody() {
     if (_allRecords.isEmpty && _errorMessage == null && !_isLoading) {
       return Center(
@@ -579,6 +723,9 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildKpiSection(),
+          const SizedBox(height: 24),
+          // ADD THE CALL TO THE NEW WIDGET HERE
+          _buildRecommendationsLogSection(),
           const SizedBox(height: 24),
           _buildLocationMapCard(),
           const SizedBox(height: 24),
@@ -672,6 +819,7 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
     );
   }
 
+// REPLACE the existing _buildStaffSummaryTable widget with this new version.
   Widget _buildStaffSummaryTable() {
     final sortedStaff = _staffSummaries.values.toList()..sort((a,b) => b.totalHours.compareTo(a.totalHours));
     return Column(
@@ -689,7 +837,75 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
             rows: sortedStaff.map((summary) {
               return DataRow(cells: [
                 DataCell(Text(summary.name, style: const TextStyle(fontWeight: FontWeight.bold))),
-                ..._dateRangeForTables.map((date) => DataCell(Text((summary.dailyHours[date] ?? 0).toStringAsFixed(1)))),
+
+                ..._dateRangeForTables.map((date) {
+                  final recordForDay = summary.dailyRecords[date];
+
+                  // If no record, show default text
+                  if (recordForDay == null) {
+                    return DataCell(Text('0.0'));
+                  }
+
+                  // If a record exists, determine colors, icon, and tooltip
+                  final hours = recordForDay.hoursWorked;
+                  Color backgroundColor = Colors.transparent;
+                  IconData? statusIcon;
+                  Color? iconColor;
+                  String tooltipMessage = "Hours: ${hours.toStringAsFixed(1)}";
+
+                  switch (recordForDay.deductionStatus) {
+                    case 'Partial':
+                      backgroundColor = Colors.orange.withOpacity(0.1);
+                      statusIcon = Icons.warning_amber_rounded;
+                      iconColor = Colors.orange.shade700;
+                      break;
+                    case 'Full':
+                      backgroundColor = Colors.red.withOpacity(0.1);
+                      statusIcon = Icons.gpp_bad_rounded;
+                      iconColor = Colors.red.shade700;
+                      break;
+                    case 'ApprovedPartial':
+                      backgroundColor = Colors.blue.withOpacity(0.1);
+                      statusIcon = Icons.thumb_up_alt_rounded;
+                      iconColor = Colors.blue.shade700;
+                      break;
+                    case 'ApprovedFull':
+                      backgroundColor = Colors.green.withOpacity(0.1);
+                      statusIcon = Icons.verified_user_rounded;
+                      iconColor = Colors.green.shade700;
+                      break;
+                  }
+
+                  // Build a detailed tooltip message if there's a recommendation
+                  if (recordForDay.recommendation != null) {
+                    final rec = recordForDay.recommendation!;
+                    tooltipMessage += "\nStatus: ${recordForDay.deductionStatus}";
+                    tooltipMessage += "\nReason: ${rec.notes.isNotEmpty ? rec.notes : 'N/A'}";
+                    tooltipMessage += "\nBy: ${rec.recommenderName}";
+                  }
+
+                  return DataCell(
+                    Tooltip(
+                      message: tooltipMessage,
+                      child: Container(
+                        color: backgroundColor,
+                        // Use BoxConstraints.expand() to make the color fill the cell
+                        constraints: const BoxConstraints.expand(),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
+                            if (statusIcon != null) const SizedBox(width: 4),
+                            Text(hours.toStringAsFixed(1)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
                 DataCell(Text(summary.totalHours.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold))),
               ]);
             }).toList(),

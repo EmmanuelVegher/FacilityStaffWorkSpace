@@ -1,7 +1,6 @@
 // A DEDICATED, FEATURE-RICH PAGE FOR HQ ATTENDANCE ANALYSIS
 // REWRITTEN FOR HEADQUARTERS TO MONITOR ALL STATES CENTRALLY
-// FEATURES: CASCADING FILTERS (STATE -> FACILITY/DESIGNATION -> STAFF) AND SCALABLE QUERIES
-// ** VERSION 2: CORRECTED TYPE ASSIGNMENT AND GENERIC TYPE INFERENCE ERRORS **
+// FEATURES: CASCADING FILTERS, RECOMMENDATION LOGS, AND DETAILED ATTENDANCE VIEW
 
 import 'dart:convert';
 import 'dart:math';
@@ -64,7 +63,7 @@ class AnimatedNumberText extends StatelessWidget {
   }
 }
 
-// --- DATA MODELS (Unchanged) ---
+// --- DATA MODELS ---
 class StaffInfo {
   final String id;
   final String name;
@@ -81,6 +80,31 @@ class FacilityDetails {
   FacilityDetails({required this.name, required this.coordinates, required this.radius});
 }
 
+// --- NEW: RecommendationInfo Model ---
+class RecommendationInfo {
+  final String recommenderName;
+  final String recommenderDesignation;
+  final String notes;
+  final int? deductedHours;
+
+  RecommendationInfo({
+    required this.recommenderName,
+    required this.recommenderDesignation,
+    required this.notes,
+    this.deductedHours,
+  });
+
+  factory RecommendationInfo.fromMap(Map<String, dynamic> map) {
+    return RecommendationInfo(
+      recommenderName: map['recommenderName'] as String? ?? 'N/A',
+      recommenderDesignation: map['recommenderDesignation'] as String? ?? 'N/A',
+      notes: map['notes'] as String? ?? '',
+      deductedHours: map['deductedHours'] as int?,
+    );
+  }
+}
+
+// --- UPDATED: AttendanceRecord Model ---
 class AttendanceRecord {
   final String staffId;
   final String staffName;
@@ -89,6 +113,9 @@ class AttendanceRecord {
   final double hoursWorked;
   final GeoPoint? clockInLocation;
   final GeoPoint? clockOutLocation;
+  // New fields
+  final String deductionStatus;
+  final RecommendationInfo? recommendation;
 
   AttendanceRecord({
     required this.staffId,
@@ -98,6 +125,9 @@ class AttendanceRecord {
     required this.hoursWorked,
     this.clockInLocation,
     this.clockOutLocation,
+    // Add to constructor
+    this.deductionStatus = 'None',
+    this.recommendation,
   });
 }
 
@@ -117,12 +147,27 @@ class OutlierRecord {
   });
 }
 
+// --- UPDATED: AggregatedSummary Model ---
 class AggregatedSummary {
   final String name;
+
+  // For detailed views like the staff table, storing the full record.
+  Map<DateTime, AttendanceRecord> dailyRecords = {};
+
+  // For high-level summaries like the designation table.
   Map<DateTime, double> dailyHours = {};
-  double get totalHours => dailyHours.values.fold(0.0, (sum, item) => sum + item);
+
+  // The getter can now calculate total hours from either data source.
+  double get totalHours {
+    if (dailyRecords.isNotEmpty) {
+      return dailyRecords.values.fold(0.0, (sum, record) => sum + record.hoursWorked);
+    }
+    return dailyHours.values.fold(0.0, (sum, hours) => sum + hours);
+  }
+
   AggregatedSummary({required this.name});
 }
+
 
 class _ChartData {
   final String category;
@@ -144,6 +189,9 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
   final ScrollController _facilityTableController = ScrollController();
   final ScrollController _designationTableController = ScrollController();
+
+  // --- NEW: State variable for recommendations ---
+  List<AttendanceRecord> _recordsWithRecommendations = [];
 
   bool _isPageReady = false;
   bool _isLoading = false;
@@ -214,8 +262,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   }
 
   // --- HQ FILTERING LOGIC ---
-
-  // Fetches data using chunked 'whereIn' queries to overcome Firestore's 30-item limit.
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchWithChunkedIn(
       Query<Map<String, dynamic>> baseQuery,
       String field,
@@ -224,7 +270,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     if (values.isEmpty) return [];
 
     final List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs = [];
-    // Firestore limits 'whereIn' to 30 values. We chunk the list to handle this.
     for (var i = 0; i < values.length; i += 30) {
       final chunk = values.sublist(i, min(i + 30, values.length));
       final snapshot = await baseQuery.where(field, whereIn: chunk).get();
@@ -233,10 +278,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     return allDocs;
   }
 
-
-// Step 1: Update the initialization method
   Future<void> _initializeStateFilter() async {
-    // This now only turns the loader ON. It will be turned OFF by the last function in the chain.
     setState(() => _isLoading = true);
     try {
       final facilitiesSnapshot = await _firestore.collection('Facilities').get();
@@ -247,7 +289,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
           states.add(state);
         }
       }
-
       final sortedStates = states.toList()..sort();
 
       if (mounted) {
@@ -267,51 +308,26 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
         await _updateStaffFilter();
         if (!mounted) return;
 
-        // The final call will be responsible for turning off the loader.
         await _loadDashboardData();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _errorMessage = "Error initializing filters and loading data: $e";
-          _isLoading = false; // Turn off loader on error
+          _isLoading = false;
         });
       }
     }
-    // REMOVED the finally block here to prevent premature deactivation of the loader.
   }
 
-  Widget _buildLoadingOverlay() {
-    return Container(
-      color: Colors.black.withOpacity(0.6),
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text(
-              "Please wait...",
-              style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Step 2: When states are selected, update the dependent filters.
   Future<void> _onStateSelectionChange(List<String> results) async {
     setState(() {
       _isLoading = true;
-      // Handle the "(All States)" selection
       if (results.contains(_allStatesOption)) {
         _selectedStates = List<String>.from(_availableStates);
       } else {
         _selectedStates = results;
       }
-
-      // Reset all child filters
       _selectedFacilities = [];
       _availableFacilities = [];
       _selectedDesignations = [];
@@ -319,53 +335,38 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       _selectedStaffIds = [];
       _availableStaff = [];
     });
-
-    // Now, fetch the new options for facilities and designations based on selected states.
     await _updateFacilityAndDesignationFilters();
-
     setState(() => _isLoading = false);
   }
 
-  // Step 3: Fetch available facilities and designations for the selected states.
   Future<void> _updateFacilityAndDesignationFilters() async {
     if (_selectedStates.isEmpty) return;
-
     try {
-      // Fetch facilities
       final facilityDocs = await _fetchWithChunkedIn(
         _firestore.collection('Facilities').where('category', isEqualTo: 'Facility'),
         'state',
         _selectedStates,
       );
-
       final List<String> facilities = [];
       final Map<String, FacilityDetails> facilityDetailsMap = {};
-
       for (var doc in facilityDocs) {
         final data = doc.data();
         final name = data['LocationName'] as String?;
         final lat = double.tryParse(data['Latitude']?.toString() ?? '');
         final lon = double.tryParse(data['Longitude']?.toString() ?? '');
         final radius = double.tryParse(data['Radius']?.toString() ?? '');
-
         if (name != null && lat != null && lon != null && radius != null) {
           facilities.add(name);
-          facilityDetailsMap[name] = FacilityDetails(
-            name: name,
-            coordinates: GeoPoint(lat, lon),
-            radius: radius,
-          );
+          facilityDetailsMap[name] = FacilityDetails(name: name, coordinates: GeoPoint(lat, lon), radius: radius);
         }
       }
       facilities.sort();
 
-      // Fetch designations
       final staffDocs = await _fetchWithChunkedIn(
         _firestore.collection('Staff').where('staffCategory', isEqualTo: "Facility Staff"),
         'state',
         _selectedStates,
       );
-
       final Set<String> designations = {};
       for (final doc in staffDocs) {
         final value = doc.data()['designation'] as String?;
@@ -385,23 +386,11 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     }
   }
 
-  // Step 4: When facilities or designations change, update the staff filter.
-  // **REWRITTEN to fix "more than one 'whereIn'" Firestore error.**
   Future<void> _updateStaffFilter() async {
     if (_selectedStates.isEmpty) return;
-
     setState(() => _isLoading = true);
-
     try {
-      // Step A: Query by state first, as it's the top-level filter.
-      // This uses our one and only allowed 'whereIn' clause for this query.
-      final staffDocs = await _fetchWithChunkedIn(
-        _firestore.collection('Staff'),
-        'state',
-        _selectedStates,
-      );
-
-      // Step B: Map the raw documents to our StaffInfo model.
+      final staffDocs = await _fetchWithChunkedIn(_firestore.collection('Staff'), 'state', _selectedStates);
       var staffList = staffDocs.map((doc) => StaffInfo(
           id: doc.id,
           name: '${doc.data()['firstName'] ?? ''} ${doc.data()['lastName'] ?? ''}'.trim(),
@@ -409,28 +398,19 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
           designation: doc.data()['designation'] ?? 'N/A'
       )).toList();
 
-      // Step C: Apply the other filters (designation, facility) client-side.
-      // This is less efficient than a server-side filter but is necessary
-      // to work around Firestore's limitations.
-
-      // Client-side filter for designations.
       if (_selectedDesignations.isNotEmpty) {
         final designationSet = _selectedDesignations.toSet();
         staffList.retainWhere((staff) => designationSet.contains(staff.designation));
       }
-
-      // Client-side filter for facilities.
       if (_selectedFacilities.isNotEmpty) {
         final facilitySet = _selectedFacilities.toSet();
         staffList.retainWhere((staff) => facilitySet.contains(staff.location));
       }
-
       staffList.sort((a, b) => a.name.compareTo(b.name));
 
       if(mounted){
         setState(() {
           _availableStaff = staffList;
-          // Ensure any previously selected staff are still valid after filtering.
           final availableStaffIds = _availableStaff.map((s) => s.id).toSet();
           _selectedStaffIds.retainWhere((id) => availableStaffIds.contains(id));
         });
@@ -443,30 +423,22 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     }
   }
 
-
   // --- DATA LOADING & PROCESSING ---
-
-  // Step 2: Update the main data loading function
   Future<void> _loadDashboardData() async {
     if (_selectedStates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state to load data.")));
       return;
     }
-    // This just ensures the loader is ON if called by the button.
     setState(() { _isLoading = true; _errorMessage = null; });
-
     try {
       List<StaffInfo> staffToQuery;
-
       if (_selectedStaffIds.isNotEmpty) {
         staffToQuery = _availableStaff.where((s) => _selectedStaffIds.contains(s.id)).toList();
       } else {
         await _updateStaffFilter();
         staffToQuery = List<StaffInfo>.from(_availableStaff);
       }
-
       if (staffToQuery.isEmpty) {
-        // If there's no staff, process empty data, which will turn off the loader.
         _processAndAggregateData([], []);
         return;
       }
@@ -485,23 +457,31 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
         if (filteredStaffIds.contains(staffId)) {
           final staffInfo = staffInfoMap[staffId]!;
           final data = recordDoc.data();
+
+          // --- NEW: Parse recommendation data ---
+          RecommendationInfo? recommendation;
+          if (data['recommendation'] != null && data['recommendation'] is Map) {
+            recommendation = RecommendationInfo.fromMap(data['recommendation'] as Map<String, dynamic>);
+          }
+
           allRecords.add(
               AttendanceRecord(
-                // ... (rest of the record creation is the same)
                   staffId: staffId,
                   staffName: staffInfo.name,
                   assignedFacility: staffInfo.location,
                   date: (data['timestamp'] as Timestamp).toDate(),
                   hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
                   clockInLocation: (data['clockInLatitude'] != null && data['clockInLongitude'] != null) ? GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble()) : null,
-                  clockOutLocation: (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) ? GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble()) : null
+                  clockOutLocation: (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) ? GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble()) : null,
+                  // Pass new data to the record
+                  deductionStatus: data['deductionStatus'] as String? ?? 'None',
+                  recommendation: recommendation
               )
           );
         }
       }
 
       final dateRange = List.generate(_endDate.difference(_startDate).inDays + 1, (i) => _startDate.add(Duration(days: i)));
-      // This function will now turn off the loader.
       _processAndAggregateData(allRecords, dateRange);
 
     } catch (e, stack) {
@@ -509,20 +489,17 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       if (mounted) {
         setState(() {
           _errorMessage = "An error occurred while loading data. Please check Firestore indexes. Error: $e";
-          _isLoading = false; // Turn off loader on error
+          _isLoading = false;
         });
       }
     }
-    // REMOVED the finally block here.
   }
-
 
   void _processAndAggregateData(List<AttendanceRecord> records, List<DateTime> dateRange) {
     final facilityData = <String, AggregatedSummary>{};
     final designationData = <String, AggregatedSummary>{};
     final facilityStaffData = <String, Map<String, AggregatedSummary>>{};
 
-    // ... (rest of the processing logic is the same)
     final staffDetailsFromRecords = <String, StaffInfo>{};
     for(final record in records) {
       if (!staffDetailsFromRecords.containsKey(record.staffId)) {
@@ -537,38 +514,43 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
       final day = DateTime(record.date.year, record.date.month, record.date.day);
 
-      facilityData.putIfAbsent(staffInfo.location, () => AggregatedSummary(name: staffInfo.location));
-      facilityData[staffInfo.location]!.dailyHours[day] = (facilityData[staffInfo.location]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      // Facility summary (high-level)
+      final facilitySummary = facilityData.putIfAbsent(staffInfo.location, () => AggregatedSummary(name: staffInfo.location));
+      facilitySummary.dailyHours[day] = (facilitySummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
-      designationData[staffInfo.designation]!.dailyHours[day] = (designationData[staffInfo.designation]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      // Designation summary (high-level)
+      final designationSummary = designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
+      designationSummary.dailyHours[day] = (designationSummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      facilityStaffData.putIfAbsent(staffInfo.location, () => {});
-      facilityStaffData[staffInfo.location]!.putIfAbsent(staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
-      facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] = (facilityStaffData[staffInfo.location]![staffInfo.name]!.dailyHours[day] ?? 0) + record.hoursWorked;
+      // Staff summary (detailed)
+      final staffMapForFacility = facilityStaffData.putIfAbsent(staffInfo.location, () => {});
+      final staffSummary = staffMapForFacility.putIfAbsent(staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
+      staffSummary.dailyRecords[day] = record; // Store the full record
     }
 
+    // --- NEW: Populate recommendations list ---
+    final recommendations = records.where((r) => r.deductionStatus != 'None').toList();
+    recommendations.sort((a, b) => b.date.compareTo(a.date));
 
     _generateMapMarkers(records);
     _findOutliers(records);
 
     if(mounted){
-      // This setState call now updates the data AND turns off the loading indicator simultaneously.
       setState(() {
         _allRecords = records;
+        _recordsWithRecommendations = recommendations; // Set new state
         _facilitySummaries = facilityData;
         _designationSummaries = designationData;
         _facilityStaffSummaries = facilityStaffData;
         _dateRangeForTables = dateRange;
         _totalHoursAll = records.fold(0.0, (sum, r) => sum + r.hoursWorked);
-        _isLoading = false; // <<< THIS IS THE KEY CHANGE
+        _isLoading = false;
       });
     }
   }
 
 
   // --- WIDGET BUILD METHODS ---
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -603,7 +585,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             child: Stack(
               children: [
                 _buildDashboardBody(),
-                // MODIFIED: Use the new, more descriptive loading overlay
                 if (_isLoading) _buildLoadingOverlay(),
                 if (_errorMessage != null)
                   Container(
@@ -626,6 +607,25 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     );
   }
 
+  Widget _buildLoadingOverlay() {
+    return Container(
+      color: Colors.black.withOpacity(0.6),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              "Please wait...",
+              style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterBar() {
     return Card(
       margin: const EdgeInsets.all(8.0),
@@ -642,10 +642,8 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
 
-            // --- NEW: State Filter ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
-              // **FIXED**: Added explicit type <String> and wrapped async call in a void lambda.
               child: MultiSelectDialogField<String>(
                 items: [
                   MultiSelectItem<String>(_allStatesOption, _allStatesOption),
@@ -676,7 +674,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
               ),
             ),
 
-            // --- Facility Filter (Now dependent on State) ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
@@ -717,7 +714,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
               ),
             ),
 
-            // --- Designation Filter (Now dependent on State) ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
@@ -756,7 +752,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
               ),
             ),
 
-            // --- Staff Filter (Dependent on all above) ---
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
@@ -804,10 +799,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       ),
     );
   }
-
-  // --- All other methods from _showDateRangePicker onwards remain the same ---
-  // They are generic and will work correctly with the data loaded by the new
-  // HQ-level filtering logic.
 
   void _showDateRangePicker() {
     showDialog(
@@ -862,6 +853,8 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             const SizedBox(height: 24),
             _buildKpiSection(),
             const SizedBox(height: 24),
+            _buildRecommendationsLogSection(), // ADDED WIDGET
+            const SizedBox(height: 24),
             _buildLocationMapCard(),
             const SizedBox(height: 24),
             _buildOutlierAnalysisSection(),
@@ -895,6 +888,86 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             const SizedBox(height: 24),
             _buildDesignationSummaryTable(),
           ]
+        ],
+      ),
+    );
+  }
+
+  // --- NEW: Recommendation Log Widget ---
+  Widget _buildRecommendationsLogSection() {
+    if (_recordsWithRecommendations.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: const Icon(Icons.playlist_add_check_circle_rounded),
+        title: Text(
+          "Recommendations Log",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+        ),
+        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Staff')),
+                DataColumn(label: Text('Date')),
+                DataColumn(label: Text('Recommendation')),
+                DataColumn(label: Text('Recommended By')),
+                DataColumn(label: Text('Reason / Notes')),
+              ],
+              rows: _recordsWithRecommendations.map((record) {
+                String statusText = record.deductionStatus;
+                Color statusColor = Colors.black;
+                final rec = record.recommendation;
+
+                switch (record.deductionStatus) {
+                  case 'Partial':
+                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                    statusColor = Colors.orange.shade800;
+                    break;
+                  case 'Full':
+                    statusText = 'Full Deduction (8 hrs)';
+                    statusColor = Colors.red.shade800;
+                    break;
+                  case 'ApprovedPartial':
+                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                    statusColor = Colors.blue.shade800;
+                    break;
+                  case 'ApprovedFull':
+                    statusText = 'Full Approval (8 hrs)';
+                    statusColor = Colors.indigo.shade800;
+                    break;
+                  default:
+                    statusText = record.deductionStatus;
+                    break;
+                }
+
+                final recommenderText = rec != null
+                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
+                    : 'N/A';
+                final notesText = rec?.notes ?? 'No notes provided.';
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text(record.staffName)),
+                    DataCell(Text(DateFormat.yMd().format(record.date))),
+                    DataCell(Text(
+                      statusText,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    )),
+                    DataCell(Text(recommenderText)),
+                    DataCell(Text(notesText)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -1067,61 +1140,151 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
     );
   }
 
+  // --- REPLACED: Facility Summary Table with Colors and Tooltips ---
   Widget _buildFacilitySummaryTable() {
     final sortedFacilities = _facilityStaffSummaries.keys.toList()..sort();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("Attendance by Facility", style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Card( clipBehavior: Clip.antiAlias, child: Column( children: [
-          SingleChildScrollView( controller: _facilityTableController, scrollDirection: Axis.horizontal, child: DataTable(
-            columns: [
-              const DataColumn(label: Text('Location / Staff')),
-              ..._dateRangeForTables.map((date) => DataColumn(label: Text(DateFormat('EEE\nMMM dd').format(date)), numeric: true)),
-              const DataColumn(label: Text('Total'), numeric: true),
-            ],
-            rows: sortedFacilities.expand((facility) {
-              final staffSummaries = _facilityStaffSummaries[facility]!;
-              final sortedStaff = staffSummaries.keys.toList()..sort();
-              final facilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + s.totalHours);
-              return [
-                DataRow(
-                  color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
-                  cells: [
-                    DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
-                    ..._dateRangeForTables.map((date) {
-                      final dailyTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + (s.dailyHours[date] ?? 0.0));
-                      return DataCell(Text(dailyTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)));
-                    }),
-                    DataCell(Text(facilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          elevation: 2,
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _facilityTableController,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: [
+                    const DataColumn(label: Text('Location / Staff')),
+                    ..._dateRangeForTables.map((date) => DataColumn(
+                        label: Text(DateFormat('EEE\nMMM dd').format(date)),
+                        numeric: true
+                    )),
+                    const DataColumn(label: Text('Total'), numeric: true),
                   ],
+                  rows: sortedFacilities.expand((facility) {
+                    final staffSummaries = _facilityStaffSummaries[facility]!;
+                    final sortedStaff = staffSummaries.keys.toList()..sort();
+                    final facilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + s.totalHours);
+
+                    return [
+                      // Facility Header Row
+                      DataRow(
+                        color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
+                        cells: [
+                          DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
+                          ..._dateRangeForTables.map((date) {
+                            final dailyFacilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + (s.dailyRecords[date]?.hoursWorked ?? 0.0));
+                            return DataCell(Text(dailyFacilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)));
+                          }),
+                          DataCell(Text(facilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+
+                      // Rows for Each Staff Member
+                      ...sortedStaff.map((staffName) {
+                        final summary = staffSummaries[staffName]!;
+                        return DataRow(cells: [
+                          DataCell(Padding(padding: const EdgeInsets.only(left: 16.0), child: Text(staffName))),
+
+                          ..._dateRangeForTables.map((date) {
+                            final recordForDay = summary.dailyRecords[date];
+
+                            if (recordForDay == null) {
+                              return DataCell(Text('0.00'));
+                            }
+
+                            final hours = recordForDay.hoursWorked;
+                            Color backgroundColor = Colors.transparent;
+                            IconData? statusIcon;
+                            Color? iconColor;
+                            String tooltipMessage = "Hours: ${hours.toStringAsFixed(2)}";
+
+                            switch (recordForDay.deductionStatus) {
+                              case 'Partial':
+                                backgroundColor = Colors.orange.withOpacity(0.1);
+                                statusIcon = Icons.warning_amber_rounded;
+                                iconColor = Colors.orange.shade700;
+                                break;
+                              case 'Full':
+                                backgroundColor = Colors.red.withOpacity(0.1);
+                                statusIcon = Icons.gpp_bad_rounded;
+                                iconColor = Colors.red.shade700;
+                                break;
+                              case 'ApprovedPartial':
+                                backgroundColor = Colors.blue.withOpacity(0.1);
+                                statusIcon = Icons.thumb_up_alt_rounded;
+                                iconColor = Colors.blue.shade700;
+                                break;
+                              case 'ApprovedFull':
+                                backgroundColor = Colors.green.withOpacity(0.1);
+                                statusIcon = Icons.verified_user_rounded;
+                                iconColor = Colors.green.shade700;
+                                break;
+                            }
+
+                            if (recordForDay.recommendation != null) {
+                              final rec = recordForDay.recommendation!;
+                              tooltipMessage += "\nStatus: ${recordForDay.deductionStatus}";
+                              tooltipMessage += "\nReason: ${rec.notes.isNotEmpty ? rec.notes : 'N/A'}";
+                              tooltipMessage += "\nBy: ${rec.recommenderName}";
+                            }
+
+                            return DataCell(
+                              Tooltip(
+                                message: tooltipMessage,
+                                child: Container(
+                                  color: backgroundColor,
+                                  constraints: const BoxConstraints.expand(),
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
+                                      if (statusIcon != null) const SizedBox(width: 4),
+                                      Text(hours.toStringAsFixed(2)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          DataCell(Text(summary.totalHours.toStringAsFixed(2))),
+                        ]);
+                      })
+                    ];
+                  }).toList(),
                 ),
-                ...sortedStaff.map((staffName) {
-                  final summary = staffSummaries[staffName]!;
-                  return DataRow(cells: [
-                    DataCell(Padding(padding: const EdgeInsets.only(left: 16.0), child: Text(staffName))),
-                    ..._dateRangeForTables.map((date) => DataCell(Text((summary.dailyHours[date] ?? 0).toStringAsFixed(2)))),
-                    DataCell(Text(summary.totalHours.toStringAsFixed(2))),
-                  ]);
-                })
-              ];
-            }).toList(),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: "Scroll Left",
+                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    tooltip: "Scroll Right",
+                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ),
-          Row( mainAxisAlignment: MainAxisAlignment.end, children: [
-            IconButton( icon: const Icon(Icons.arrow_back), onPressed: () => _facilityTableController.animateTo( _facilityTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-            IconButton( icon: const Icon(Icons.arrow_forward), onPressed: () => _facilityTableController.animateTo( _facilityTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-          ],
-          )
-        ],
-        ),
         ),
         const SizedBox(height: 16),
         _buildSummaryPieChart("Facility Hours Distribution", _facilitySummaries, key: _facilityPieChartKey),
       ],
     );
   }
+
 
   Widget _buildDesignationSummaryTable() {
     final sortedDesignations = _designationSummaries.keys.toList()..sort();
