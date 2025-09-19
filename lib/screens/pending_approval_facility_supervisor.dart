@@ -132,8 +132,14 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
 
       if (mounted) {
         setState(() {
-          // Combine and map the results to the list
-          pendingTimesheets = allPendingDocs.map((doc) => doc.data()).toList();
+          // --- THIS IS THE UPDATED PART ---
+          pendingTimesheets = allPendingDocs.map((doc) {
+            final data = doc.data();
+            // Manually add the document ID to the map under the key 'docId'
+            data['docId'] = doc.id;
+            return data;
+          }).toList();
+          // --- END OF UPDATE ---
         });
       }
     } catch (e) {
@@ -145,6 +151,22 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  // ADD THIS HELPER METHOD
+  String _formatTimesheetPeriod(String rawPeriod) {
+    if (!rawPeriod.contains('_')) return rawPeriod; // Return as-is if not in the expected format
+
+    // Replace underscores with spaces
+    String formatted = rawPeriod.replaceAll('_', ' ');
+
+    // Capitalize "part" and wrap in parentheses
+    if (formatted.contains('part')) {
+      formatted = formatted.replaceFirst('p', 'P'); // Capitalize 'P'
+      formatted = formatted.replaceFirstMapped(
+          RegExp(r'(Part \d+)'), (match) => '(${match.group(1)})');
+    }
+    return formatted;
   }
 
   void _navigateToTimesheetDetails(Map<String, dynamic> doc) async {
@@ -252,10 +274,16 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
     // Safely get data with fallback values
     final staffName = doc['staffName'] ?? 'N/A';
     final location = doc['location'] ?? 'N/A';
-    final timesheetPeriod = doc['monthYear'] ?? 'N/A';
+
+    // --- THIS IS THE UPDATED LINE ---
+    // Use the 'docId' we just added. Fallback to 'month' if it exists, otherwise 'N/A'.
+    final timesheetPeriod = _formatTimesheetPeriod(doc['docId'] ?? doc['month'] ?? 'N/A');
+    // --- END OF UPDATE ---
+
     final staffDesignation = doc['designation'] ?? 'N/A';
     final state = doc['state'] ?? 'N/A';
     final department = doc['department'] ?? 'N/A';
+
 
     return Card(
       elevation: 3,

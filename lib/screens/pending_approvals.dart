@@ -189,6 +189,22 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     }
   }
 
+  // --- NEW HELPER METHOD ---
+// Add this helper method inside your _PendingApprovalsPageState class.
+  String _formatTimesheetPeriod(String rawPeriod) {
+    if (!rawPeriod.contains('_')) return rawPeriod;
+
+    // Replace underscores with spaces
+    String formatted = rawPeriod.replaceAll('_', ' ');
+
+    // Capitalize "part" and wrap it in parentheses
+    if (formatted.contains('part')) {
+      formatted = formatted.replaceFirst('p', 'P');
+      formatted = formatted.replaceFirstMapped(
+          RegExp(r'(Part \d+)'), (match) => '(${match.group(1)})');
+    }
+    return formatted;
+  }
 
   Future<void> _fetchPendingApprovals1() async {
     setState(() => isLoading = true);
@@ -341,6 +357,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       // Get the supervisor's email from the loaded bioData and convert it to lowercase
       // for a case-insensitive comparison.
       final userEmailLower = bioData!.emailAddress!.toLowerCase();
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> allPendingTimesheets = [];
 
       // --- Fetch and Filter Pending Leaves ---
       final leavesSnapshot = await FirebaseFirestore.instance
@@ -354,18 +371,16 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
         return supervisorEmail?.toLowerCase() == userEmailLower;
       }).toList();
 
-      // --- Fetch and Filter Pending Timesheets (CARITAS Supervisor) ---
-      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+      // Fetch and filter CARITAS supervisor timesheets
+      final caritasSnapshot = await FirebaseFirestore.instance
           .collectionGroup('TimeSheets')
           .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
           .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
           .get();
-
-      final filteredCaritasTimesheetsDocs = caritasSupervisorTimesheetsSnapshot.docs.where((doc) {
+      allPendingTimesheets.addAll(caritasSnapshot.docs.where((doc) {
         final supervisorEmail = doc.data()['caritasSupervisorEmail'] as String?;
-        // Compare both emails in lowercase.
         return supervisorEmail?.toLowerCase() == userEmailLower;
-      }).toList();
+      }));
 
       // --- Fetch and Filter Pending Timesheets (Facility Supervisor) ---
       final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
@@ -393,10 +408,17 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
 
       if (mounted) {
         setState(() {
-          pendingLeaves = filteredLeavesDocs.map((doc) => doc.data()).toList();
-          pendingTimesheetsFacilitySupervisor = filteredFacilityTimesheetsDocs.map((doc) => doc.data()).toList();
-          pendingTimesheetsCaritasSupervisor = filteredCaritasTimesheetsDocs.map((doc) => doc.data()).toList();
-          pendingReviews = reviews;
+          // --- THIS IS THE KEY CHANGE ---
+          // Map the documents, adding the unique ID of each one to its data map.
+          pendingTimesheetsCaritasSupervisor = allPendingTimesheets.map((doc) {
+            final data = doc.data();
+            data['docId'] = doc.id; // Add the document ID here!
+            return data;
+          }).toList();
+          // --- END OF CHANGE ---
+
+          // (Update other lists like pendingLeaves here if needed)
+          // ...
         });
       }
     } catch (e) {
@@ -647,6 +669,9 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
     final staffCategory = doc['staffCategory'] ?? 'N/A';
     final staffEmail = doc['staffEmail'] ?? 'N/A';
     final staffPhone = doc['staffPhone'] ?? 'N/A';
+    // --- THIS IS THE UPDATED LINE ---
+    // Use the 'docId' for the title, fallback to 'month', then 'N/A'.
+    final timesheetPeriod = _formatTimesheetPeriod(doc['docId'] ?? doc['month'] ?? 'N/A');
     //final staffMonth = doc.id ?? 'N/A';
 
 
@@ -674,6 +699,19 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
               "$staffName",
               style: TextStyle(fontSize: fontSizeTitle, fontWeight: FontWeight.bold, color: wineColor),
             ),
+            // --- ADD THIS NEW WIDGET FOR THE TIMESHEET PERIOD ---
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+              child: Text(
+                "Timesheet for: $timesheetPeriod",
+                style: TextStyle(
+                  fontSize: fontSizeRegular,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.black54,
+                ),
+              ),
+            ),
+            // --- END OF ADDITION ---
             SizedBox(height: paddingValue / 2),
             _buildDetailRow("Location Name", location, fontSizeRegularBold, fontSizeRegular),
             SizedBox(height: paddingValue / 2),
@@ -744,16 +782,16 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   }
 
   void _onApprovePressed(Map<String, dynamic> doc) async {
+    // This existing method is now correct because `doc` contains the `docId`.
     setState(() {
       isApproveLoading = true;
     });
 
-    // Simulate delay if needed, otherwise go straight to navigation
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TimesheetDetailsScreen2(
-          timesheetData: doc,
+          timesheetData: doc, // Pass the whole map
           staffId: doc['staffId'],
         ),
       ),
@@ -763,6 +801,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       isApproveLoading = false;
     });
   }
+
 
 
   Widget _buildDetailRow(String label, String? value, double labelFontSize, double valueFontSize, {Color? textColor}) {

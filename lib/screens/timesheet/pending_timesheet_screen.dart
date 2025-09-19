@@ -390,11 +390,14 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
   late double iconSizeFactor;
   late double tableFontSizeFactor;
   late double dropdownFontSizeFactor;
-
+  late List<DateTime> daysInRange;
+  String displayMonthYear = "Loading...";
+  String? filteredMonthYear;
 
   @override
   void initState() {
     super.initState();
+    _initializeDateRangeFromData();
     _loadBioData().then((_){
       _loadBioData2();
       _fetchPendingApprovals();
@@ -402,6 +405,99 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     });
   }
 
+
+
+  void _initializeDateRangeFromData() {
+    final monthField = widget.timesheetData['month'] as String?;
+    if (monthField == null || monthField.isEmpty) {
+      // Fallback for old data without the 'month' field
+      daysInRange = [];
+      displayMonthYear = "Invalid Date";
+      return;
+    }
+
+    final parts = monthField.split('_');
+    final int monthIndex = int.parse(parts[0]); // 0-indexed month
+    final int year = int.parse(parts[1]);
+    final String part = parts.length > 2 ? parts[2] : '';
+
+    DateTime startDate;
+    DateTime endDate;
+    String monthName = DateFormat('MMMM').format(DateTime(year, monthIndex + 1));
+
+    if (monthIndex == 8 && part.isNotEmpty) { // Special case for September (month index 8)
+      displayMonthYear = "$monthName, $year (${part.replaceFirst('p', 'P')})";
+      if (part == 'part1') {
+        startDate = DateTime(year, 8, 20); // Aug 20
+        endDate = DateTime(year, 9, 19);   // Sep 19
+      } else { // part2
+        startDate = DateTime(year, 9, 20); // Sep 20
+        endDate = DateTime(year, 9, 30);   // Sep 30
+      }
+    } else if (monthIndex == 9) { // Special case for October
+      displayMonthYear = "$monthName, $year";
+      startDate = DateTime(year, 10, 1);
+      endDate = DateTime(year, 10, 19);
+    } else { // Standard months
+      displayMonthYear = "$monthName, $year";
+      endDate = DateTime(year, monthIndex + 1, 19);
+      startDate = DateTime(endDate.year, endDate.month - 1, 20);
+    }
+
+    // Populate the list of days for the determined range
+    final tempDays = <DateTime>[];
+    for (var d = startDate; d.isBefore(endDate.add(const Duration(days: 1))); d = d.add(const Duration(days: 1))) {
+      tempDays.add(d);
+    }
+
+    setState(() {
+      daysInRange = tempDays;
+      // Also update the filteredMonthYear to ensure it uses the correct doc ID
+      filteredMonthYear = _getTimesheetDocId(widget.timesheetData);
+    });
+  }
+
+
+  // NEW HELPER: Correctly constructs the timesheet document ID, handling split months.
+  String _getTimesheetDocId(Map<String, dynamic> timesheetData) {
+    // The 'month' field (e.g., "8_2025_part1") is the source of truth.
+    final monthField = timesheetData['month'] as String?;
+    if (monthField == null || monthField.isEmpty) {
+      // Fallback to the old method if 'month' field is missing.
+      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final date = DateFormat('MMMM dd, yyyy').parse(dateString);
+      return DateFormat('MMMM_yyyy').format(date);
+    }
+
+    final parts = monthField.split('_');
+    if (parts.length < 2) {
+      // Handle unexpected format
+      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final date = DateFormat('MMMM dd, yyyy').parse(dateString);
+      return DateFormat('MMMM_yyyy').format(date);
+    }
+
+    try {
+      // parts[0] is month number (e.g., '8' for September)
+      // parts[1] is the year
+      final monthNum = int.parse(parts[0]) + 1; // DateTime constructor is 1-based (1=Jan)
+      final yearNum = int.parse(parts[1]);
+      final monthName = DateFormat('MMMM').format(DateTime(yearNum, monthNum));
+
+      // Reconstruct the ID, including the optional "_partX"
+      String docId = '${monthName}_${yearNum}';
+      if (parts.length > 2) {
+        docId += '_${parts.sublist(2).join('_')}'; // Handles "part1", "part2", etc.
+      }
+      return docId;
+    } catch (e) {
+      // Fallback on parsing error
+      print("Error parsing month field for doc ID: $e");
+      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final date = DateFormat('MMMM dd, yyyy').parse(dateString);
+      return DateFormat('MMMM_yyyy').format(date);
+    }
+  }
 
   Future<void> _fetchPendingApprovals() async {
     setState(() {
@@ -499,24 +595,25 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
     }
 
     // If all checks pass, proceed with updating Firestore.
-    // The old, incorrect `if` conditions have been replaced by the validation above.
-    DateTime? timesheetDate1;
-    try {
-      final dateString = widget.timesheetData['staffSignatureDate'];
-      if (dateString != null && dateString is String) {
-        timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
-      } else {
-        timesheetDate1 = DateTime.now();
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
-      }
-    } catch (e) {
-      print("Error parsing date: $e, using current date as default.");
-      timesheetDate1 = DateTime.now();
-    }
-    timesheetDate1 ??= DateTime.now();
+    // // The old, incorrect `if` conditions have been replaced by the validation above.
+    // DateTime? timesheetDate1;
+    // try {
+    //   final dateString = widget.timesheetData['staffSignatureDate'];
+    //   if (dateString != null && dateString is String) {
+    //     timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
+    //   } else {
+    //     timesheetDate1 = DateTime.now();
+    //     print("Warning: Timesheet date is null or not a string, using current date as default.");
+    //   }
+    // } catch (e) {
+    //   print("Error parsing date: $e, using current date as default.");
+    //   timesheetDate1 = DateTime.now();
+    // }
+    // timesheetDate1 ??= DateTime.now();
 
+    // USE the new helper function to get the CORRECT document ID
+    final String timesheetDocId = _getTimesheetDocId(widget.timesheetData);
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
-    String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
 
     try {
       QuerySnapshot snap = await FirebaseFirestore.instance
@@ -546,7 +643,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
             .collection("Staff")
             .doc(snap.docs[0].id)
             .collection("TimeSheets")
-            .doc(monthYear)
+            .doc(timesheetDocId)
             .set(timesheetDataUpdate, SetOptions(merge: true));
 
         print('Timesheet signed and updated in Firestore');
@@ -575,6 +672,195 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
   }
 
 
+
+// --- NEW METHOD ---
+// Add this complete method and its helper to your _TimesheetDetailsScreen2State class.
+
+  Widget _buildDeductionSummarySection() {
+    final timesheetEntries = (widget.timesheetData['timesheetEntries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final recordsWithDeductions = timesheetEntries.where((entry) {
+      final status = entry['deductionStatus'] as String?;
+      return status != null && status != 'None';
+    }).toList();
+
+    if (recordsWithDeductions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    recordsWithDeductions.sort((a, b) {
+      try {
+        return DateFormat('yyyy-MM-dd').parse(a['date']).compareTo(DateFormat('yyyy-MM-dd').parse(b['date']));
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: const Icon(Icons.playlist_add_check_circle_rounded, color: Colors.deepOrange),
+        title: Text("Deduction & Approval Log", style: TextStyle(fontSize: 18 * titleFontSizeFactor, fontWeight: FontWeight.bold)),
+        subtitle: Text("${recordsWithDeductions.length} day(s) with an action taken"),
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 16.0, left: 16.0, right: 16.0),
+            child: DataTable(
+              columnSpacing: 20.0,
+              columns: const [
+                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Recommendation', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Recommended By', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Reason / Notes', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: recordsWithDeductions.map((record) {
+                final recommendation = record['recommendation'] as Map<String, dynamic>? ?? {};
+                String statusText = record['deductionStatus'] ?? 'N/A';
+                Color statusColor = Colors.black;
+
+                switch (record['deductionStatus']) {
+                  case 'Partial':
+                    statusText = 'Partial Deduction (${recommendation['deductedHours'] ?? 0} hrs)';
+                    statusColor = Colors.orange.shade800;
+                    break;
+                  case 'Full':
+                    statusText = 'Full Deduction (8 hrs)';
+                    statusColor = Colors.red.shade800;
+                    break;
+                  case 'ApprovedPartial':
+                    final hours = (record['noOfHours'] as num?)?.toDouble() ?? 0.0;
+                    statusText = 'Partial Approval (${hours.toInt()} hr${hours == 1 ? '' : 's'})';
+                    statusColor = Colors.blue.shade800;
+                    break;
+                  case 'ApprovedFull':
+                    statusText = 'Full Approval (8 hrs)';
+                    statusColor = Colors.indigo.shade800;
+                    break;
+                }
+
+                final recommenderText = '${recommendation['recommenderName'] ?? 'N/A'}\n(${recommendation['recommenderDesignation'] ?? 'N/A'})';
+                final notesText = recommendation['notes'] as String? ?? 'No notes provided.';
+
+                return DataRow(cells: [
+                  DataCell(Text(DateFormat.yMd().format(DateFormat('yyyy-MM-dd').parse(record['date'])))),
+                  DataCell(Text(statusText, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor))),
+                  DataCell(Text(recommenderText)),
+                  DataCell(
+                    Tooltip(
+                      message: notesText,
+                      child: Container(
+                        width: 350,
+                        child: Text(notesText, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ),
+                ]);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- NEW HELPER METHOD ---
+// Add this method to your _TimesheetDetailsScreen2State class.
+
+  Widget _buildTimesheetCell(DateTime date, String category, String projectName) {
+    // Helper to find the record for a specific day
+    Map<String, dynamic>? _getEntryForDate(DateTime date) {
+      final entries = widget.timesheetData['timesheetEntries'] as List<dynamic>?;
+      if (entries == null) return null;
+      final targetDateString = DateFormat('yyyy-MM-dd').format(date);
+      for (final entry in entries) {
+        if (entry is Map<String, dynamic> && entry['date'] == targetDateString) {
+          return entry;
+        }
+      }
+      return null;
+    }
+
+    bool weekend = isWeekend(date);
+    if (weekend) {
+      return Container(
+        width: 50,
+        decoration: BoxDecoration(color: Colors.grey.shade300, border: Border.all(color: Colors.black12)),
+      );
+    }
+
+    final recordForDay = _getEntryForDate(date);
+
+    if (recordForDay == null) {
+      return Container(
+        width: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+        child: const Text("0.00"),
+      );
+    }
+
+    final isProjectRow = category == projectName;
+    final isOffDay = recordForDay['offDay'] as bool? ?? false;
+    final offDayCategory = recordForDay['durationWorked'] as String?;
+    bool isMatch = (isProjectRow && !isOffDay) || (!isProjectRow && isOffDay && offDayCategory?.toLowerCase() == category.toLowerCase());
+
+    if (!isMatch) {
+      return Container(
+        width: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+        child: const Text("0.00"),
+      );
+    }
+
+    final hours = (recordForDay['noOfHours'] as num? ?? 0.0).toStringAsFixed(2);
+    Color backgroundColor = Colors.white;
+    IconData? statusIcon;
+    Color? iconColor;
+
+    switch (recordForDay['deductionStatus'] as String? ?? 'None') {
+      case 'Partial': backgroundColor = Colors.orange.withOpacity(0.1); statusIcon = Icons.warning_amber_rounded; iconColor = Colors.orange.shade700; break;
+      case 'Full': backgroundColor = Colors.red.withOpacity(0.1); statusIcon = Icons.gpp_bad_rounded; iconColor = Colors.red.shade700; break;
+      case 'ApprovedPartial': backgroundColor = Colors.blue.withOpacity(0.1); statusIcon = Icons.thumb_up_alt_rounded; iconColor = Colors.blue.shade700; break;
+      case 'ApprovedFull': backgroundColor = Colors.green.withOpacity(0.1); statusIcon = Icons.verified_user_rounded; iconColor = Colors.green.shade700; break;
+    }
+
+    final recommendation = recordForDay['recommendation'] as Map<String, dynamic>?;
+    final deductedHours = (recommendation?['deductedHours'] as num?);
+
+    return Container(
+      width: 50,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: backgroundColor, border: Border.all(color: Colors.black12)),
+      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 4.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (statusIcon != null) Icon(statusIcon, size: 12, color: iconColor),
+              if (statusIcon != null) const SizedBox(width: 2),
+              Flexible(child: Text(hours, style: const TextStyle(color: Colors.blueAccent, fontSize: 13))),
+            ],
+          ),
+          if (deductedHours != null && deductedHours > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: Text('(-${deductedHours.toStringAsFixed(1)}h)',
+                  style: TextStyle(color: Colors.red[700], fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --- NEW HELPER METHOD ---
+// Add this method inside your _TimesheetDetailsScreen2State class.
 
   Future<void> _showLogo() async {
     try {
@@ -2158,81 +2444,80 @@ $selectedBioFirstName $selectedBioLastName
     return null;
   }
 
-  Future<void> _rejectTimesheet(String staffId, String monthYear, String selectedBioStaffCategory) async {
-    // ... (Reject timesheet logic - update to Firestore directly) ...
+  Future<void> _rejectTimesheet() async {
+    final staffId = widget.timesheetData['staffId'] as String?;
+    final selectedBioStaffCategory = selectedBioStaffCategory2;
+
+    if (staffId == null || selectedBioStaffCategory == null) {
+      Fluttertoast.showToast(msg: "Error: Cannot identify staff or supervisor role.");
+      return;
+    }
+
+    // --- START OF FIX ---
+    // USE the new helper function to get the CORRECT document ID
+    final String timesheetDocId = _getTimesheetDocId(widget.timesheetData);
+    // --- END OF FIX ---
+
     String rejectionReason = "";
-    bool isValidReason = false;
+    final _formKey = GlobalKey<FormState>();
 
     await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Return Timesheet'),
-          content: TextFormField(
-            onChanged: (value) {
-              rejectionReason = value;
-              isValidReason = value.trim().isNotEmpty;
-            },
-            decoration: InputDecoration(
-              labelText: 'Reason for Returning Timesheet',
-              hintText: 'Enter Reason for Returning this Timesheet',
-              border: const OutlineInputBorder(),
-              errorText: !isValidReason && rejectionReason.isNotEmpty ? 'Please enter a valid reason' : null,
-            ),
-            maxLines: 3,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator: (value) => value == null || value.isEmpty ? 'Please enter a reason' : null,
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
+          content: Form(
+            key: _formKey,
+            child: TextFormField(
+              onChanged: (value) => rejectionReason = value,
+              decoration: const InputDecoration(labelText: 'Reason for Returning Timesheet'),
+              maxLines: 3,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'A reason is required.';
+                }
+                return null;
               },
             ),
+          ),
+          actions: <Widget>[
+            TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(context).pop()),
             TextButton(
-              onPressed: !isValidReason
-                  ? () async {
-                try {
-                  Map<String, dynamic> updateData = {};
-                  if(selectedBioStaffCategory == "Facility Supervisor"){
-                    updateData = {'facilitySupervisorSignatureStatus': 'Rejected', 'facilitySupervisorRejectionReason': rejectionReason};
-                  } else {
-                    updateData = {'caritasSupervisorSignatureStatus': 'Rejected', 'caritasSupervisorRejectionReason': rejectionReason};
+              child: const Text('Return'),
+              onPressed: () async {
+                if (_formKey.currentState!.validate()) {
+                  try {
+                    Map<String, dynamic> updateData = {};
+                    if(selectedBioStaffCategory == "Facility Supervisor"){
+                      updateData = {'facilitySupervisorSignatureStatus': 'Rejected', 'facilitySupervisorRejectionReason': rejectionReason};
+                    } else { // Handles CARITAS Supervisor
+                      updateData = {
+                        'caritasSupervisorSignatureStatus': 'Rejected',
+                        'caritasSupervisorRejectionReason': rejectionReason
+                      };
+                    }
+
+                    await FirebaseFirestore.instance
+                        .collection("Staff")
+                        .doc(staffId)
+                        .collection("TimeSheets")
+                        .doc(timesheetDocId) // <-- USE THE CORRECT ID HERE
+                        .update(updateData);
+
+                    Navigator.of(context).pop();
+                    Fluttertoast.showToast(msg: "Timesheet Returned");
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PendingApprovalsPage()),
+                    ).then((_) => _fetchPendingApprovals());
+
+                  } catch (e) {
+                    print('Error rejecting timesheet: $e');
+                    Fluttertoast.showToast(msg: 'Error rejecting timesheet');
                   }
-
-                  await FirebaseFirestore.instance
-                      .collection("Staff")
-                      .doc(staffId)
-                      .collection("TimeSheets")
-                      .doc(monthYear)
-                      .update(updateData);
-
-
-                  Navigator.of(context).pop();
-
-                  Fluttertoast.showToast(
-                    msg: "Timesheet Returned",
-                    toastLength: Toast.LENGTH_SHORT,
-                    backgroundColor: Colors.black54,
-                    gravity: ToastGravity.BOTTOM,
-                    timeInSecForIosWeb: 1,
-                    textColor: Colors.white,
-                    fontSize: 16.0,
-                  );
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
-                    ),
-                  ).then((_) => _fetchPendingApprovals());
-                } catch (e) {
-                  print('Error rejecting timesheet: $e');
-                  Fluttertoast.showToast(msg: 'Error rejecting timesheet');
                 }
-              }
-                  : null,
-              child: const Text('Save'),
+              },
             ),
           ],
         );
@@ -2799,7 +3084,7 @@ $selectedBioFirstName $selectedBioLastName
     //     : null;
     final staffSignature = widget.timesheetData['staffSignature'] ?? 'N/A';
     final monthYear = DateFormat('MMMM, yyyy').format(timesheetDate1);
-    final filteredMonthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
+    final filteredMonthYear = widget.timesheetData['docId'] ?? DateFormat('MMMM_yyyy').format(DateTime.now());
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
     final daysInRange2 = initializeDateRange(int.parse(month),int.parse(year));
@@ -2905,14 +3190,51 @@ $selectedBioFirstName $selectedBioLastName
                     const SizedBox(width: 10),
 
                     Text(
-                      monthYear,
+                      displayMonthYear,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
+                    //                           displayMonthYear, // Use the new state variable
+                    //   style: const TextStyle(fontWeight: FontWeight.bold),
+                    // ),
 
                   ],
                 ),
               ),
               const Divider(),
+              // ==========================================================
+              // === PASTE THE NEW SCROLL CONTROLS WIDGET HERE          ===
+              // ==========================================================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios),
+                    tooltip: 'Scroll Left',
+                    onPressed: () {
+                      _horizontalScrollController.animateTo(
+                        _horizontalScrollController.offset - 200,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 20),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward_ios),
+                    tooltip: 'Scroll Right',
+                    onPressed: () {
+                      _horizontalScrollController.animateTo(
+                        _horizontalScrollController.offset + 200,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                  ),
+                ],
+              ),
+              // ==========================================================
+              // === END OF NEW WIDGET                                  ===
+              // ==========================================================
               // Attendance Sheet in a Container with 50% screen height
               Container(
 
@@ -2955,82 +3277,17 @@ $selectedBioFirstName $selectedBioLastName
                                                     // Header Row
                                                     Row(
                                                       children: [
-                                                        Container(
-                                                          width: 150, // Set a width for the "Project Name" header
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text(
-                                                            'Project Name',
-                                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                        ...daysInRange2.map((date) {
-                                                          return Container(
-                                                            width: 50,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: isWeekend(date) ? Colors.grey.shade300 : Colors.blue.shade100,
-                                                            child: Text(
-                                                              DateFormat('dd MMM').format(date),
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          );
-                                                        }),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text(
-                                                            'Total Hours',
-                                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text(
-                                                            'Percentage',
-                                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
+                                                        Container(width: 150, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.blue.shade100, child: const Text('Project Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                                        ...daysInRange2.map((date) => Container(width: 50, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: isWeekend(date) ? Colors.grey.shade300 : Colors.blue.shade100, child: Text(DateFormat('dd MMM').format(date), style: const TextStyle(fontWeight: FontWeight.bold)))),
+                                                        Container(width: 100, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.blue.shade100, child: const Text('Total Hours', style: TextStyle(fontWeight: FontWeight.bold))),
+                                                        Container(width: 100, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.blue.shade100, child: const Text('Percentage', style: TextStyle(fontWeight: FontWeight.bold))),
                                                       ],
                                                     ),
                                                     const Divider(),
                                                     Row(
                                                       children: [
-                                                        Container(
-                                                          width: 150, // Keep the fixed width if you need it
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.white,
-                                                          child: Text(projectName),
-                                                        ),
-                                                        ...daysInRange2.map((date) {
-                                                          bool weekend = isWeekend(date);
-                                                          String hours = _getDurationForDate(date, projectName, projectName!,widget.timesheetData['timesheetEntries'].cast<Map<String, dynamic>>() );
-                                                          return Container(
-                                                            width: 50, // Set a fixed width for each day
-                                                            decoration: BoxDecoration(
-                                                              color: weekend ? Colors.grey.shade300 : Colors.white,
-                                                              border: Border.all(color: Colors.black12),
-                                                            ),
-                                                            child: Column(
-                                                              mainAxisAlignment: MainAxisAlignment.center,
-                                                              children: [
-                                                                weekend
-                                                                    ? const SizedBox.shrink() // No hours on weekends
-                                                                    : Text(
-                                                                  hours, // Placeholder, replace with Isar data
-                                                                  style: const TextStyle(color: Colors.blueAccent),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          );
-                                                        }),
+                                                        Container(width: 150, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.white, child: Text(projectName)),
+                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)).toList(),
                                                         Container(
                                                           width: 100,
                                                           alignment: Alignment.center,
@@ -3101,46 +3358,11 @@ $selectedBioFirstName $selectedBioLastName
                                                       ],
                                                     ),
                                                     // Rows for out-of-office categories
-                                                    ...['Annual leave', 'Holiday',  'Maternity'].map((category) {
-                                                      // double outOfOfficeHours = calculateCategoryHours(category);
-                                                      //double outOfOfficePercentage = calculateCategoryPercentage(category);
+                                                    ...['Annual leave', 'Holiday', 'Maternity'].map((category) {
                                                       return Row(
                                                         children: [
-                                                          Container(
-                                                            width: 150,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text(
-                                                              category,
-                                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ),
-                                                          ...daysInRange2.map((date) {
-                                                            bool weekend = isWeekend(date);
-                                                            String offDayHours = _getDurationForDate(date, projectName, category,widget.timesheetData['timesheetEntries'].cast<Map<String, dynamic>>() );
-
-
-                                                            return Container(
-                                                              width: 50, // Set a fixed width for each day
-                                                              decoration: BoxDecoration(
-                                                                color: weekend ? Colors.grey.shade300 : Colors.white,
-                                                                border: Border.all(color: Colors.black12),
-                                                              ),
-                                                              child: Column(
-                                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                                children: [
-                                                                  weekend
-                                                                      ? const SizedBox.shrink() // No hours on weekends
-                                                                      : Text(
-                                                                    offDayHours, // Placeholder, replace with Isar data
-                                                                    style: const TextStyle(color: Colors.blueAccent),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            );
-
-                                                          }),
+                                                          Container(width: 150, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.white, child: Text(category, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)).toList(),
                                                           Container(
                                                             width: 100,
                                                             alignment: Alignment.center,
@@ -3242,7 +3464,10 @@ $selectedBioFirstName $selectedBioLastName
                                           ],
                                         ),
                                       ),
-
+                                      // --- ADD DEDUCTION LOG HERE ---
+                                      const Divider(),
+                                      _buildDeductionSummarySection(),
+                                      // --- END OF ADDITION ---
 
                                       //Signature and Details
 
@@ -4654,7 +4879,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           const SizedBox(width:8),
                                                           ElevatedButton.icon(
                                                             onPressed: () {
-                                                              _rejectTimesheet(staffId, filteredMonthYear,selectedBioStaffCategory!);
+                                                              _rejectTimesheet();
                                                             },
                                                             icon: const Icon(
                                                               Icons.cancel, // Add an appropriate icon
@@ -4723,7 +4948,7 @@ $selectedBioFirstName $selectedBioLastName
                                                         const SizedBox(width:8),
                                                         ElevatedButton.icon(
                                                           onPressed: () {
-                                                            _rejectTimesheet(staffId, filteredMonthYear,selectedBioStaffCategory!);
+                                                            _rejectTimesheet();
                                                           },
                                                           icon: const Icon(
                                                             Icons.cancel, // Add an appropriate icon
