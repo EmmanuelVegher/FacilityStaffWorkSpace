@@ -95,11 +95,11 @@ class PaymentScheduleItem {
     percentageWorked = rawPercentage > 100.0 ? 100.0 : rawPercentage;
     final ratio = percentageWorked / 100.0;
 
-    payeFromGrossBase = baseSalary.grossPay * 0.05;
+    // --- CHANGE: Updated from 5% (0.05) to 2% (0.02) ---
+    payeFromGrossBase = baseSalary.grossPay * 0.02;
 
     totalDeductedHoursFromTimesheet = 0;
 
-    // <<<--- CORRECTION: Use dot notation for object properties ---<<<
     for (var entry in timesheet.entries) {
       if (entry.recommendation?.deductedHours != null) {
         totalDeductedHoursFromTimesheet += entry.recommendation!.deductedHours!;
@@ -126,7 +126,7 @@ class PaymentScheduleItem {
     if (proratedNet < 0) proratedNet = 0;
   }
 
-  // --- (factory fromJson and toJson methods remain unchanged) ---
+
 // In lib/pages/admin/payment_schedule_page.dart -> class PaymentScheduleItem
 
   factory PaymentScheduleItem.fromJson(Map<String, dynamic> json, Map<String, SalaryScale> salaryScales) {
@@ -764,7 +764,8 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
     );
   }
 
-  // --- NEW: WORKFLOW UI WIDGET ---
+
+
   Widget _buildWorkflowSection() {
     final status = _isReviewMode ? widget.scheduleModel!.status : "Draft";
     String title;
@@ -778,7 +779,6 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       default: title = "Schedule is Fully Approved"; canForward = false;
     }
 
-    // Do not show workflow if there are no items
     if (_masterPaymentList.isEmpty) return const SizedBox.shrink();
 
     return Card(
@@ -795,37 +795,48 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
               if (_approversLoading) const Center(child: CircularProgressIndicator())
               else if (_approverList.isEmpty) const Text("No approvers found for the next step.", style: TextStyle(color: Colors.red))
               else
-                DropdownButtonFormField<Map<String, String>>(
-                  value: _selectedApprover,
-                  decoration: const InputDecoration(
-                    labelText: "Select Approver",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_search),
-                  ),
-                  items: _approverList.map((approver) {
-                    return DropdownMenuItem(
-                      value: approver,
-                      child: Text(approver['name']!),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() => _selectedApprover = value);
-                  },
-                  validator: (value) => value == null ? 'Please select an approver' : null,
+              // --- CHANGE: Wrapped dropdown and button in a Row ---
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<Map<String, String>>(
+                        value: _selectedApprover,
+                        decoration: const InputDecoration(
+                          labelText: "Select Approver",
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person_search),
+                        ),
+                        items: _approverList.map((approver) {
+                          return DropdownMenuItem(
+                            value: approver,
+                            child: Text(approver['name']!),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => _selectedApprover = value);
+                        },
+                        validator: (value) => value == null ? 'Please select an approver' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    _isSubmitting
+                        ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: CircularProgressIndicator(),
+                    )
+                        : ElevatedButton.icon(
+                      icon: const Icon(Icons.send_rounded),
+                      label: const Text("Approve & Forward"),
+                      onPressed: _submitOrForwardSchedule,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                      ),
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 16),
-              _isSubmitting
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton.icon(
-                icon: const Icon(Icons.send_rounded),
-                label: const Text("Approve & Forward"),
-                onPressed: _submitOrForwardSchedule,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
             ] else
               Text("This schedule has been forwarded and is awaiting action from: ${widget.scheduleModel?.currentAssigneeName ?? 'N/A'}", textAlign: TextAlign.center),
             if(_isReviewMode) ...[
@@ -999,9 +1010,6 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   }
 
 
-  // --- UI BUILDER WIDGETS (Modified/Unchanged) ---
-  // --- REWRITTEN WIDGET: _buildDataTableCard ---
-  // In _PaymentSchedulePageState
   Widget _buildDataTableCard() {
     const double scrollAmount = 300.0;
     return Card(
@@ -1032,19 +1040,19 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columnSpacing: 24,
-              // <<<--- MODIFIED: Column headers updated ---<<<
               columns: const [
                 DataColumn(label: Text('S/No')), DataColumn(label: Text('Staff Name')), DataColumn(label: Text('Designation')),
                 DataColumn(label: Text('State')), DataColumn(label: Text('Bank Name')), DataColumn(label: Text('Account Number')),
                 DataColumn(label: Text('Sort Code')), DataColumn(label: Text('Expected Hrs'), numeric: true),
                 DataColumn(label: Text('Hrs Worked'), numeric: true), DataColumn(label: Text('% Worked'), numeric: true),
                 DataColumn(label: Text('Gross Pay (Base)'), numeric: true),
-                DataColumn(label: Text('PAYE (5%)'), numeric: true), // New column
-                DataColumn(label: Text('Other Deductions'), numeric: true), // Renamed column
-                DataColumn(label: Text('Gross after Deductions'), numeric: true), // New column
-                DataColumn(label: Text('Additions'), numeric: true), // Manual additions
-                DataColumn(label: Text('Final Net Pay'), numeric: true), // Updated calculation
-                DataColumn(label: Text('Comments')), // Updated content
+                // --- CHANGE: Renamed column header ---
+                DataColumn(label: Text('Withholding Tax (WHT)'), numeric: true),
+                DataColumn(label: Text('Other Deductions'), numeric: true),
+                DataColumn(label: Text('Gross after Deductions'), numeric: true),
+                DataColumn(label: Text('Additions'), numeric: true),
+                DataColumn(label: Text('Final Net Pay'), numeric: true),
+                DataColumn(label: Text('Comments')),
                 DataColumn(label: Text('Action')),
               ],
               rows: _paginatedList.asMap().entries.map((entry) {
@@ -1053,7 +1061,6 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
                 final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
 
-                // <<<--- MODIFIED: New cell for "Other Deductions" with percentage ---<<<
                 double deductedPercentage = (item.expectedHours > 0) ? (item.totalDeductedHoursFromTimesheet / item.expectedHours * 100) : 0;
                 String deductionText = item.otherDeductionsAmount > 0
                     ? "${_currencyFormat.format(item.otherDeductionsAmount)}\n(-${deductedPercentage.toStringAsFixed(1)}%)"
@@ -1074,14 +1081,12 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                     DataCell(Text(bankInfo.accountNumber)), DataCell(Text(bankInfo.sortCode)),
                     DataCell(Text(item.expectedHours.toStringAsFixed(2))), DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
                     DataCell(_buildPercentageChip(item.percentageWorked)), DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
-
-                    // <<<--- MODIFIED: DataCells updated to match new columns ---<<<
-                    DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))), // PAYE cell
-                    DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)), // Other Deductions cell
-                    DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))), // Gross after Deductions cell
-                    DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))), // Manual Additions
-                    DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))), // Final Net Pay cell
-                    DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))), // Comments cell
+                    DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))),
+                    DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)),
+                    DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))),
+                    DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))),
+                    DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))),
+                    DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))),
                     DataCell(IconButton(
                       icon: const Icon(Icons.edit_note, size: 20),
                       color: _isReviewMode ? Colors.grey : Colors.blueAccent,
@@ -1457,7 +1462,6 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
 
 
-  // In _PaymentSchedulePageState
   Future<void> _exportToExcel() async {
     if (_filteredPaymentList.isEmpty) {
       if (mounted) {
@@ -1467,20 +1471,18 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       }
       return;
     }
-
     setState(() => _isExporting = true);
-
     try {
       final excel = xls.Excel.createExcel();
       final String defaultSheetName = excel.sheets.keys.first;
       final xls.Sheet sheet = excel.sheets[defaultSheetName]!;
 
-      // <<<--- CORRECTION: Updated headers to match the new structure ---<<<
+      // --- CHANGE: Renamed header ---
       const List<String> headers = [
         'S/No', 'Staff Name', 'Designation', 'State', 'Location',
         'Bank Name', 'Account Number', 'Sort Code',
         'Expected Hours', 'Hours Worked', '% Worked', 'Gross Pay (Base)',
-        'PAYE (5%)', 'Other Deductions', 'Gross after Deductions',
+        'Withholding Tax (WHT)', 'Other Deductions', 'Gross after Deductions',
         'Additions (Manual)', 'Final Net Pay', 'Comments', 'Is Manually Edited?'
       ];
       sheet.appendRow(headers.map((e) =>  xls.TextCellValue(e)).toList());
@@ -1494,13 +1496,9 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
           fontColorHex:  xls.ExcelColor.fromHexString("#FFFFFF"),
         );
       }
-
-      // Iterate through data and append rows
       for (int i = 0; i < _filteredPaymentList.length; i++) {
         final item = _filteredPaymentList[i];
         final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
-
-        // <<<--- CORRECTION: Row data now uses the new properties ---<<<
         final List< xls.CellValue> rowData = [
           xls.IntCellValue(i + 1),
           xls.TextCellValue(item.timesheet.staffName),
@@ -1514,20 +1512,17 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
           xls.DoubleCellValue(item.actualHoursWorked),
           xls.TextCellValue('${item.percentageWorked.toStringAsFixed(1)}%'),
           xls.DoubleCellValue(item.baseSalary.grossPay),
-          xls.DoubleCellValue(item.payeFromGrossBase),           // New property
-          xls.DoubleCellValue(item.otherDeductionsAmount),     // New property
-          xls.DoubleCellValue(item.grossAfterDeductions),        // New property
+          xls.DoubleCellValue(item.payeFromGrossBase),
+          xls.DoubleCellValue(item.otherDeductionsAmount),
+          xls.DoubleCellValue(item.grossAfterDeductions),
           xls.DoubleCellValue(item.additionAmount),
           xls.DoubleCellValue(item.proratedNet),
-          xls.TextCellValue(item.comments),                      // New property
+          xls.TextCellValue(item.comments),
           xls.TextCellValue(item.isEdited ? 'Yes' : 'No'),
         ];
-
         sheet.appendRow(rowData);
       }
-
       final fileBytes = excel.save();
-
       if (fileBytes != null) {
         final blob = html.Blob([fileBytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
