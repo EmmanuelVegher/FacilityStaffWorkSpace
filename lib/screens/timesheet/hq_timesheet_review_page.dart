@@ -448,14 +448,21 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
           ? _availableFacilities.where((f) => f != 'All Facilities').toList()
           : _selectedFacilities;
 
-      // This query remains the same...
+      // <<<--- REWRITTEN QUERY LOGIC TO FIX 'whereIn' ERROR ---<<<
+
+      // 1. Build the Staff Query
       Query staffQuery = _firestore.collection('Staff')
-          .where('staffCategory', isEqualTo: 'Facility Staff')
-          .where('state', whereIn: statesToQuery);
+          .where('staffCategory', isEqualTo: 'Facility Staff');
 
       if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
+        // If specific facilities are selected, this is the most direct and specific filter.
+        // This avoids using a 'whereIn' on the state.
         staffQuery = staffQuery.where('location', whereIn: facilitiesToQuery);
+      } else if (statesToQuery.isNotEmpty) {
+        // Otherwise, if only states are selected, filter by state.
+        staffQuery = staffQuery.where('state', whereIn: statesToQuery);
       }
+
       final staffSnapshot = await staffQuery.get();
       _allExpectedStaffMaster = staffSnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -471,18 +478,24 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
         };
       }).toList();
 
-      Query timesheetQuery = _firestore.collectionGroup('TimeSheets').where('state', whereIn: statesToQuery);
-
+      // 2. Build the Timesheet Query using the same logic
+      Query timesheetQuery = _firestore.collectionGroup('TimeSheets');
+      
       if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
-        timesheetQuery = timesheetQuery.where('location', whereIn: facilitiesToQuery);
+          // If specific facilities are selected, filter by location.
+          timesheetQuery = timesheetQuery.where('location', whereIn: facilitiesToQuery);
+      } else if (statesToQuery.isNotEmpty) {
+          // Otherwise, filter by state.
+          timesheetQuery = timesheetQuery.where('state', whereIn: statesToQuery);
       }
+
+      // --->>> END OF REWRITTEN LOGIC <<<---
+
       final timesheetSnapshot = await timesheetQuery.get();
 
       final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
       final bool isSeptember = _selectedMonth == 9;
-
-      // <<<--- REWRITTEN LOGIC ---<<<
-      // This now correctly builds the document ID based on the selected month and, for September, the selected tab.
+      
       final String timesheetDocId = isSeptember
           ? '${monthName}_${_selectedYear}_part$_selectedSeptemberPart'
           : '${monthName}_${_selectedYear}';
@@ -491,14 +504,12 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       final Set<String> submittedStaffIds = {};
 
       for (final doc in timesheetSnapshot.docs) {
-        // The check is now against the single, correctly formatted document ID.
         if (doc.id == timesheetDocId) {
           final timesheet = TimesheetModel.fromFirestore(doc);
           fetchedTimesheets.add(timesheet);
           submittedStaffIds.add(timesheet.staffId);
         }
       }
-      // --->>> END OF REWRITTEN LOGIC <<<---
 
       final List<Map<String, dynamic>> nonSubmitters = [];
       for (final staff in _allExpectedStaffMaster) {

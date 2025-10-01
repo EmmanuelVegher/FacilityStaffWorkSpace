@@ -7,18 +7,26 @@
 async function loadModels() {
   try {
     console.log("Loading face-api.js models...");
-    await faceapi.nets.tinyFaceDetector.loadFromUri('./models/tiny_face_detector');
-    console.log("tinyFaceDetector model loaded");
-    await faceapi.nets.faceLandmark68Net.loadFromUri('./models/face_landmark_68');
-    console.log("faceLandmark68Net model loaded");
-    await faceapi.nets.faceRecognitionNet.loadFromUri('./models/face_recognition');
-    console.log("faceRecognitionNet model loaded");
-    await faceapi.nets.ssdMobilenetv1.loadFromUri('./models/ssd_mobilenetv1');
-    console.log("ssdMobilenetv1 model loaded");
 
-    console.log("Face-api.js models loaded successfully");
+    // Load models in parallel for better performance
+    const modelPromises = [
+      faceapi.nets.tinyFaceDetector.loadFromUri('./models/tiny_face_detector'),
+      faceapi.nets.mtcnn.loadFromUri('./models/mtcnn'),
+      faceapi.nets.faceLandmark68Net.loadFromUri('./models/face_landmark_68'),
+      faceapi.nets.faceRecognitionNet.loadFromUri('./models/face_recognition'),
+      faceapi.nets.ssdMobilenetv1.loadFromUri('./models/ssd_mobilenetv1')
+    ];
+
+    await Promise.all(modelPromises);
+
+    console.log("All face-api.js models loaded successfully");
+
+    // Set up global reference for models loaded status
+    window.faceModelsLoaded = true;
+
   } catch (error) {
     console.error("Error loading face-api.js models:", error);
+    window.faceModelsLoaded = false;
   }
 }
 
@@ -31,39 +39,79 @@ async function captureDescriptorFromVideo(videoElementId) {
     console.error("Video element not found:", videoElementId);
     return null;
   }
+
   // Wait until the video has loaded data.
   if (video.readyState < 2) {
     await new Promise(resolve => {
       video.onloadeddata = resolve;
     });
   }
+
   if (!video.srcObject) {
     console.error("Video element has no srcObject. Camera stream may not be active.");
     return null;
   }
 
-  try {
-    console.log("Attempting face detection using SSD Mobilenet v1...");
-    const detection = await faceapi
-      .detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!detection) {
-      console.warn("No face detected in video element (SSD Mobilenet v1)");
-      return null;
-    }
-
-    // Convert the raw descriptor to a Float32Array (ensuring consistency)
-    // We will now pass the descriptor as is and let Dart handle conversion.
-    const descriptor = detection.descriptor; // No conversion here in JS anymore.
-    console.log("captureDescriptorFromVideo: Face descriptor (raw from face-api):", Array.from(descriptor)); // Log raw descriptor
-    console.log("captureDescriptorFromVideo: Descriptor Type (raw from face-api):", descriptor.constructor.name);
-    return descriptor;
-  } catch (error) {
-    console.error("Error during face detection (SSD Mobilenet v1):", error);
+  // Check if models are loaded
+  if (!window.faceModelsLoaded) {
+    console.error("Face detection models not loaded yet");
     return null;
   }
+
+  const detectionOptions = [
+    // Try MTCNN with different settings
+    new faceapi.MtcnnOptions({ minFaceSize: 80 }),
+    new faceapi.MtcnnOptions({ minFaceSize: 100 }),
+    new faceapi.MtcnnOptions({ minFaceSize: 120 }),
+    // Try SSD Mobilenet with different settings
+    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5, maxResults: 1 }),
+    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3, maxResults: 1 }),
+    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2, maxResults: 1 }),
+    // Try Tiny Face Detector
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }),
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }),
+  ];
+
+  for (let i = 0; i < detectionOptions.length; i++) {
+    try {
+      const option = detectionOptions[i];
+      console.log(`Attempting face detection with option ${i + 1}/${detectionOptions.length}...`);
+
+      let detection;
+
+      if (option instanceof faceapi.MtcnnOptions) {
+        detection = await faceapi
+          .detectSingleFace(video, option)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      } else if (option instanceof faceapi.SsdMobilenetv1Options) {
+        detection = await faceapi
+          .detectSingleFace(video, option)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      } else if (option instanceof faceapi.TinyFaceDetectorOptions) {
+        detection = await faceapi
+          .detectSingleFace(video, option)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      }
+
+      if (detection) {
+        const descriptor = detection.descriptor;
+        if (descriptor && descriptor.length === 128) {
+          console.log(`Face detected successfully with option ${i + 1}, descriptor length:`, descriptor.length);
+          return descriptor;
+        } else {
+          console.warn(`Invalid descriptor length with option ${i + 1}:`, descriptor?.length);
+        }
+      }
+    } catch (error) {
+      console.warn(`Face detection failed with option ${i + 1}:`, error.message);
+    }
+  }
+
+  console.warn("No face detected with any detection method");
+  return null;
 }
 
 function _convertJsDescriptor(descriptor) {
@@ -133,28 +181,82 @@ function compareDescriptors(descriptor1, descriptor2, threshold) {
 }
 
 async function compareFaceFromVideo(videoElementId, trainingDescriptor, threshold) {
+  console.log("compareFaceFromVideo: Starting comparison with threshold:", threshold);
+
   const liveDescriptor = await captureDescriptorFromVideo(videoElementId);
   if (!liveDescriptor) {
     console.log("compareFaceFromVideo: liveDescriptor is null (No face detected). Returning null.");
     return null; // Indicate no face detected
   }
+
   if (!trainingDescriptor) {
     console.error("compareFaceFromVideo: trainingDescriptor is null!");
     return false; // Cannot compare without training data
   }
-  // Convert trainingDescriptor to a Float32Array if it's not already.
-  const jsTrainingDescriptor = trainingDescriptor instanceof Float32Array
-    ? trainingDescriptor
-    : new Float32Array(trainingDescriptor);
-  if (jsTrainingDescriptor.length !== 128) {
-    console.error("compareFaceFromVideo: trainingDescriptor length is not 128 after conversion. Length:", jsTrainingDescriptor.length);
+
+  // Ensure trainingDescriptor is a Float32Array
+  let jsTrainingDescriptor;
+  try {
+    if (trainingDescriptor instanceof Float32Array) {
+      jsTrainingDescriptor = trainingDescriptor;
+    } else if (Array.isArray(trainingDescriptor)) {
+      jsTrainingDescriptor = new Float32Array(trainingDescriptor);
+    } else {
+      console.error("compareFaceFromVideo: trainingDescriptor is not a valid type");
+      return false;
+    }
+
+    if (jsTrainingDescriptor.length !== 128) {
+      console.error("compareFaceFromVideo: trainingDescriptor length is not 128. Length:", jsTrainingDescriptor.length);
+      return false;
+    }
+  } catch (error) {
+    console.error("compareFaceFromVideo: Error converting trainingDescriptor:", error);
     return false;
   }
 
   const isMatch = compareDescriptors(liveDescriptor, jsTrainingDescriptor, threshold);
-  console.log("compareFaceFromVideo: isMatch:", isMatch);
+  console.log("compareFaceFromVideo: isMatch:", isMatch, "distance threshold:", threshold);
   return isMatch;
+}
+
+// Auto face verification system
+let autoVerificationInterval = null;
+let isAutoVerificationRunning = false;
+
+async function startAutoVerification(videoElementId, trainingDescriptor, threshold, callback) {
+  if (isAutoVerificationRunning) {
+    console.log("Auto verification already running");
+    return;
+  }
+
+  console.log("Starting auto face verification...");
+  isAutoVerificationRunning = true;
+
+  autoVerificationInterval = setInterval(async () => {
+    try {
+      const result = await compareFaceFromVideo(videoElementId, trainingDescriptor, threshold);
+      if (result === true) {
+        console.log("Auto verification successful!");
+        stopAutoVerification();
+        if (callback) callback(true);
+      }
+    } catch (error) {
+      console.error("Error in auto verification:", error);
+    }
+  }, 1000); // Check every second
+}
+
+function stopAutoVerification() {
+  if (autoVerificationInterval) {
+    clearInterval(autoVerificationInterval);
+    autoVerificationInterval = null;
+  }
+  isAutoVerificationRunning = false;
+  console.log("Auto verification stopped");
 }
 
 window.captureDescriptorFromVideo = captureDescriptorFromVideo;
 window.compareFaceFromVideo = compareFaceFromVideo;
+window.startAutoVerification = startAutoVerification;
+window.stopAutoVerification = stopAutoVerification;

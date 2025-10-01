@@ -22,6 +22,7 @@ import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
 import '../screens/profile_page2.dart';
 import '../screens/psychological_survey_analysis_page/PsychologicalSurveyAnalysisPage.dart';
+import '../screens/performance_impact_dashboad/state_performance_impact_dashboard.dart';
 import '../screens/supervisor/supervisor_task_summary_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
@@ -225,6 +226,44 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AttendanceAnalysisPage()),
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.analytics,
+                size: drawerIconSize, color: Colors.blue),
+            title: Row(
+              children: [
+                Text(
+                  'Performance Impact',
+                  style: TextStyle(
+                      fontSize: drawerFontSize,
+                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                // --- NEW: "NEW" FLAG FOR 30 DAYS ---
+                if (DateTime.now().isBefore(DateTime(2025, 10, 31)))
+                  Chip(
+                    label: const Text(
+                      'NEW',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    ),
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StatePerformanceImpactDashboardPage()),
               );
             },
           ),

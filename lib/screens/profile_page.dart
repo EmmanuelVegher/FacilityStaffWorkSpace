@@ -466,79 +466,29 @@ class _ProfilePageState extends State<ProfilePage> {
                                         fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
                                       ),
 
-                                      EditableStaffCategoryTile(
-                                        icon: Icons.category,
-                                        title: "Staff Category",
-                                        initialValue: _staffData?.staffCategory ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('staffCategory', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                            newCategory = newValue;
-                                          });
-                                        },
-                                        fetchStaffCategory: () => _fetchStaffCategoryFromFirestore(),
+                                      ListTile(
+                                        leading: const Icon(Icons.category),
+                                        title: Text("Staff Category", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.staffCategory ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      newCategory != null || _staffData?.state != null
-                                          ? EditableStateTile(
-                                        icon: Icons.place,
-                                        title: "State",
-                                        initialValue: _staffData?.state ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('state', newValue);
-                                          setState(() {
-                                            newState = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchStates: () => _fetchStatesFromFirestore(_staffData?.staffCategory ?? ''),
-                                      )
-                                          : ListTile(
+                                      ListTile(
                                         leading: const Icon(Icons.place),
                                         title: Text("State", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.state.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      _staffData?.state != null
-                                          ? EditableLocationTile(
-                                        icon: Icons.my_location,
-                                        title: _staffData?.staffCategory == "Facility Staff"
+                                      ListTile(
+                                        leading: const Icon(Icons.my_location),
+                                        title: Text(_staffData?.staffCategory == "Facility Staff"
                                             ? "Facility Name"
                                             : _staffData?.staffCategory == "State Office Staff"
                                             ? "Office Name"
-                                            : "Office Name",
-                                        initialValue: _staffData?.location ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('location', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchLocations: () => _fetchLocationsFromFirestore(_staffData?.state ?? '', _staffData?.staffCategory ?? ''),
-                                      )
-                                          : ListTile(
-                                        leading: const Icon(Icons.my_location),
-                                        title: Text("Office Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                            : "Office Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.location.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      _buildEditableListTile1(
-                                        icon: Icons.email,
-                                        title: 'Email',
-                                        initialValue: _staffData?.emailAddress,
-                                        controller: _emailController,
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) async {
-                                          _updateFirestoreField('emailAddress', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
+                                      ListTile(
+                                        leading: const Icon(Icons.email),
+                                        title: Text('Email', style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.emailAddress ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
                                       _buildEditableListTile1(
                                         icon: Icons.phone,
@@ -554,77 +504,22 @@ class _ProfilePageState extends State<ProfilePage> {
                                           });
                                         },
                                       ),
-                                      EditableDepartmentTile(
-                                        icon: Icons.local_fire_department_sharp,
-                                        title: 'Department',
-                                        initialValue: _staffData?.department ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('department', newValue);
-                                          setState(() {
-                                            updatedDepartment = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchDepartments: () => _staffData?.staffCategory == 'Facility Staff'
-                                            ? _fetchDepartmentsForFacilityFromFirestore()
-                                            : _fetchDepartmentsFromFirestore(),
+                                      ListTile(
+                                        leading: const Icon(Icons.local_fire_department_sharp),
+                                        title: Text('Department', style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.department ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      updatedDepartment != null || _staffData?.designation != null
-                                          ? EditableDesignationTile(
-                                        icon: Icons.person,
-                                        title: 'Designation',
-                                        initialValue: _staffData?.designation ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('designation', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchDesignations: () => _fetchDesignationsFromFirestore(_staffData?.department ?? '', _staffData?.staffCategory ?? ''),
-                                      )
-                                          : ListTile(
+                                      ListTile(
                                         leading: const Icon(Icons.person),
                                         title: Text("Designation", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.designation.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      EditableProjectTile(
-                                        icon: Icons.work,
-                                        title: 'Project',
-                                        initialValue: _staffData?.project ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('project', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchProjects: () => _fetchProjectsFromFirestore(),
+                                      ListTile(
+                                        leading: const Icon(Icons.work),
+                                        title: Text('Project', style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.project ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
-                                      updatedDepartment != null || _staffData?.supervisor != null
-                                          ? EditableSupervisorTile(
-                                        icon: Icons.person,
-                                        title: "Supervisor's Name",
-                                        initialValue: _staffData?.supervisor ?? '',
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) async {
-                                          List<String?> supervisorsemail = await _getSupervisorEmailFromFirestore(_staffData?.department ?? '', newValue,_staffData?.state ?? '');
-                                          _updateFirestoreField('supervisor', newValue);
-                                          _updateFirestoreField('supervisorEmail', supervisorsemail.isNotEmpty ? supervisorsemail[0] : null);
-
-                                          setState(() {
-                                            _staffData!.supervisorEmail = supervisorsemail.isNotEmpty ? supervisorsemail[0] : null;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchSupervisor: () => _fetchSupervisorsFromFirestore(_staffData?.department ?? '', _staffData?.state ?? ''),
-                                      )
-                                          : ListTile(
+                                      ListTile(
                                         leading: const Icon(Icons.person),
                                         title: Text("Supervisor's Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.supervisor.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
@@ -633,6 +528,144 @@ class _ProfilePageState extends State<ProfilePage> {
                                         leading: const Icon(Icons.email),
                                         title: Text("Supervisor's Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
                                         subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // --- NEW FIELDS ADDED ---
+
+                                      // Account Information Section
+                                      Container(
+                                        padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
+                                        alignment: Alignment.topLeft,
+                                        child: Text(
+                                          "Account Information",
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: fontSizeSectionTitle,
+                                          ),
+                                          textAlign: TextAlign.left,
+                                        ),
+                                      ),
+
+                                      // Account Number
+                                      ListTile(
+                                        leading: const Icon(Icons.account_balance_wallet),
+                                        title: Text("Account Number", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.accountNumber?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Account Status
+                                      ListTile(
+                                        leading: const Icon(Icons.account_circle),
+                                        title: Text("Account Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.accountStatus?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Bank Name
+                                      ListTile(
+                                        leading: const Icon(Icons.account_balance),
+                                        title: Text("Bank Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.bankName?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Sort Code
+                                      ListTile(
+                                        leading: const Icon(Icons.sort),
+                                        title: Text("Sort Code", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.sortCode?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Program Manager Information Section
+                                      Container(
+                                        padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
+                                        alignment: Alignment.topLeft,
+                                        child: Text(
+                                          "Program Management",
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: fontSizeSectionTitle,
+                                          ),
+                                          textAlign: TextAlign.left,
+                                        ),
+                                      ),
+
+                                      // Program Manager
+                                      ListTile(
+                                        leading: const Icon(Icons.supervisor_account),
+                                        title: Text("Program Manager", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.programManager?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Program Manager Email
+                                      ListTile(
+                                        leading: const Icon(Icons.email),
+                                        title: Text("Program Manager Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.programManagerEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // User Role
+                                      ListTile(
+                                        leading: const Icon(Icons.person_outline),
+                                        title: Text("Role", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.role?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // System Information Section
+                                      Container(
+                                        padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
+                                        alignment: Alignment.topLeft,
+                                        child: Text(
+                                          "System Information",
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: fontSizeSectionTitle,
+                                          ),
+                                          textAlign: TextAlign.left,
+                                        ),
+                                      ),
+
+                                      // Staff ID
+                                      ListTile(
+                                        leading: const Icon(Icons.perm_identity),
+                                        title: Text("Staff ID", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.id?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Sync Status
+                                      ListTile(
+                                        leading: const Icon(Icons.sync),
+                                        title: Text("Sync Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.isSynced == true ? 'Synced' : 'Not Synced', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Created By
+                                      ListTile(
+                                        leading: const Icon(Icons.person_add),
+                                        title: Text("Created By", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.createdBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Created By Email
+                                      ListTile(
+                                        leading: const Icon(Icons.email),
+                                        title: Text("Created By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.createdByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Last Updated By
+                                      ListTile(
+                                        leading: const Icon(Icons.update),
+                                        title: Text("Last Updated By", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.lastUpdatedBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
+                                      ),
+
+                                      // Last Updated By Email
+                                      ListTile(
+                                        leading: const Icon(Icons.email),
+                                        title: Text("Last Updated By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
+                                        subtitle: Text(_staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
                                       ),
                                       // Padding(
                                       //   padding: const EdgeInsets.symmetric(vertical: 10.0),
@@ -876,6 +909,17 @@ class _ProfilePageState extends State<ProfilePage> {
           case 'gender': _staffData!.gender = newValue; break;
           case 'maritalStatus': _staffData!.maritalStatus = newValue; break;
           case 'photoUrl': _staffData!.photoUrl = newValue; break;
+          // --- NEW FIELDS ADDED ---
+          case 'accountNumber': _staffData!.accountNumber = newValue; break;
+          case 'accountStatus': _staffData!.accountStatus = newValue; break;
+          case 'bankName': _staffData!.bankName = newValue; break;
+          case 'sortCode': _staffData!.sortCode = newValue; break;
+          case 'programManager': _staffData!.programManager = newValue; break;
+          case 'programManagerEmail': _staffData!.programManagerEmail = newValue; break;
+          case 'createdBy': _staffData!.createdBy = newValue; break;
+          case 'createdByEmail': _staffData!.createdByEmail = newValue; break;
+          case 'lastUpdatedBy': _staffData!.lastUpdatedBy = newValue; break;
+          case 'lastUpdatedByEmail': _staffData!.lastUpdatedByEmail = newValue; break;
         }
       }
     }

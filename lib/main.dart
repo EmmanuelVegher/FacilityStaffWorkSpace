@@ -1,6 +1,6 @@
-import 'package:attendanceappmailtool/screens/delete_account/delete_account.dart';
-import 'package:attendanceappmailtool/screens/delete_account/delete_data.dart';
-import 'package:attendanceappmailtool/screens/login_screen.dart';
+import 'package:service_delivery_workspace/screens/delete_account/delete_account.dart';
+import 'package:service_delivery_workspace/screens/delete_account/delete_data.dart';
+import 'package:service_delivery_workspace/screens/login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // <<<--- ADD THIS
 import 'package:firebase_auth/firebase_auth.dart'; // <<<--- ADD THIS
 import 'package:firebase_messaging/firebase_messaging.dart'; // <<<--- ADD THIS

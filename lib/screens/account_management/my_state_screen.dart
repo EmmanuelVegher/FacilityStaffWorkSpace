@@ -1,8 +1,8 @@
 // IMPORTANT: Adjust these import paths to match your project structure.
-import 'package:attendanceappmailtool/models/staff.dart';
-import 'package:attendanceappmailtool/screens/account_management/location_staff_list_screen.dart';
-import 'package:attendanceappmailtool/screens/registration_page.dart';
-import 'package:attendanceappmailtool/screens/supervisor/supervisor_list_screen.dart';
+import 'package:service_delivery_workspace/models/staff.dart';
+import 'package:service_delivery_workspace/screens/account_management/location_staff_list_screen.dart';
+import 'package:service_delivery_workspace/screens/registration_page.dart';
+import 'package:service_delivery_workspace/screens/supervisor/supervisor_list_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';

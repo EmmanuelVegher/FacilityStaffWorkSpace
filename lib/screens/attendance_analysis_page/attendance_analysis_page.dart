@@ -7,7 +7,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:attendanceappmailtool/screens/attendance_analysis_page/recommendation_info.dart';
+import 'package:service_delivery_workspace/screens/attendance_analysis_page/recommendation_info.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:firebase_auth/firebase_auth.dart';

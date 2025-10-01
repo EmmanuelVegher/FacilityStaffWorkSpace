@@ -1,4 +1,4 @@
-import 'package:attendanceappmailtool/screens/account_management/state_dashboard_screen.dart';
+import 'package:service_delivery_workspace/screens/account_management/state_dashboard_screen.dart';
 // IMPORTANT: Adjust this import path if your registration page is in a different directory.
 
 import 'package:flutter/material.dart';

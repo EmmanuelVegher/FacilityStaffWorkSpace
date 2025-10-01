@@ -1,7 +1,7 @@
 // pages/call_tracker/call_tracker_page_web.dart (Web Version)
-import 'package:attendanceappmailtool/screens/call_tracker/report_page.dart';
-import 'package:attendanceappmailtool/screens/call_tracker/today_call_page.dart';
-import 'package:attendanceappmailtool/screens/call_tracker/upcoming_appointment.dart';
+import 'package:service_delivery_workspace/screens/call_tracker/report_page.dart';
+import 'package:service_delivery_workspace/screens/call_tracker/today_call_page.dart';
+import 'package:service_delivery_workspace/screens/call_tracker/upcoming_appointment.dart';
 import 'package:flutter/material.dart';
 
 import 'contact_list.dart';

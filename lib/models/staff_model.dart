@@ -26,6 +26,19 @@ class StaffModel {
   bool? isRemoteDelete;
   bool? isRemoteUpdate;
 
+  // --- NEW FIELDS ADDED ---
+  String? accountNumber;
+  String? accountStatus;
+  String? bankName;
+  String? sortCode;
+  String? programManager;
+  String? programManagerEmail;
+  String? createdBy;
+  String? createdByEmail;
+  String? lastUpdatedBy;
+  String? lastUpdatedByEmail;
+  String? fcmToken;
+
   StaffModel({
     this.id,
     this.firstName,
@@ -50,6 +63,18 @@ class StaffModel {
     this.version,
     this.isRemoteDelete,
     this.isRemoteUpdate,
+    // --- NEW FIELDS ADDED ---
+    this.accountNumber,
+    this.accountStatus,
+    this.bankName,
+    this.sortCode,
+    this.programManager,
+    this.programManagerEmail,
+    this.createdBy,
+    this.createdByEmail,
+    this.lastUpdatedBy,
+    this.lastUpdatedByEmail,
+    this.fcmToken,
   });
 
   factory StaffModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
@@ -78,6 +103,18 @@ class StaffModel {
       version: data?['version'],
       isRemoteDelete: data?['isRemoteDelete'],
       isRemoteUpdate: data?['isRemoteUpdate'],
+      // --- NEW FIELDS ADDED ---
+      accountNumber: data?['accountNumber'],
+      accountStatus: data?['accountStatus'],
+      bankName: data?['bankName'],
+      sortCode: data?['sortCode'],
+      programManager: data?['programManager'],
+      programManagerEmail: data?['programManagerEmail'],
+      createdBy: data?['createdBy'],
+      createdByEmail: data?['createdByEmail'],
+      lastUpdatedBy: data?['lastUpdatedBy'],
+      lastUpdatedByEmail: data?['lastUpdatedByEmail'],
+      fcmToken: data?['fcmToken'],
     );
   }
 
@@ -105,6 +142,18 @@ class StaffModel {
       'version': version,
       'isRemoteDelete': isRemoteDelete,
       'isRemoteUpdate': isRemoteUpdate,
+      // --- NEW FIELDS ADDED ---
+      'accountNumber': accountNumber,
+      'accountStatus': accountStatus,
+      'bankName': bankName,
+      'sortCode': sortCode,
+      'programManager': programManager,
+      'programManagerEmail': programManagerEmail,
+      'createdBy': createdBy,
+      'createdByEmail': createdByEmail,
+      'lastUpdatedBy': lastUpdatedBy,
+      'lastUpdatedByEmail': lastUpdatedByEmail,
+      'fcmToken': fcmToken,
     };
   }
 }

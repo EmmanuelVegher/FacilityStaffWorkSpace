@@ -1,4 +1,4 @@
-import 'package:attendanceappmailtool/screens/staff_dashboard.dart';
+import 'package:service_delivery_workspace/screens/staff_dashboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
