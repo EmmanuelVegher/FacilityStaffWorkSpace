@@ -28,9 +28,44 @@ import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
+import '../screens/admin/audit_logs_state_page.dart';
+import '../screens/admin/staff_status_report_state_page.dart';
 import 'app_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Access control: only Program Management can access Account Management entries
+Future<bool> _hasProgramManagementAccess() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final doc = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
+    final dept = (doc.data()?['department'] as String? ?? '').trim().toLowerCase();
+    return dept == 'program management';
+  } catch (_) {
+    return false;
+  }
+}
 
+// Access control for Pending Payment Schedules
+Future<bool> _hasPendingPaymentAccess() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final doc = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
+    final dept = (doc.data()?['department'] as String? ?? '').trim().toLowerCase();
+    const allowed = {
+      'program management',
+      'compliance',
+      'state management',
+      'internal audit',
+      'finance',
+    };
+    return allowed.contains(dept);
+  } catch (_) {
+    return false;
+  }
+}
 
 Widget drawer2(
     BuildContext context,
@@ -376,16 +411,28 @@ Widget drawer2(
               );
             },
           ),
+   const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
 
-          ListTile(
-            leading: const Icon(Icons.playlist_add_check_circle_outlined),
-            title: const Text('Pending Payment Schedules'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PendingSchedulesPage(),
-                ),
+          // Pending Payment Schedules visible only to specific departments
+          FutureBuilder<bool>(
+            future: _hasPendingPaymentAccess(),
+            builder: (context, snapshot) {
+              final allowed = snapshot.data == true;
+              if (!allowed) return const SizedBox.shrink();
+              return ListTile(
+                leading: const Icon(Icons.playlist_add_check_circle_outlined),
+                title: const Text('Pending Payment Schedules'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PendingSchedulesPage(),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -451,17 +498,59 @@ Widget drawer2(
             color: Colors.grey,
             height: 1,
           ),
+
+          // NEW: State-specific reports for drawer2
           ListTile(
-            leading: const Icon(Icons.manage_accounts),
+            leading: const Icon(Icons.group, color: Colors.teal),
             title: Text(
-              'Account Management',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              'Staff Status Report',
+              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
             ),
             onTap: () {
-              Navigator.of(context).pop(); // Close the drawer
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const MyStateScreen(),
-              ));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StaffStatusReportStatePage()),
+              );
+            },
+          ),
+          const Divider(color: Colors.grey, height: 1),
+          ListTile(
+            leading: const Icon(Icons.history, color: Colors.brown),
+            title: Text(
+              'Audit Logs',
+              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AuditLogsStatePage()),
+              );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          // Account Management is only visible to Program Management department
+          FutureBuilder<bool>(
+            future: _hasProgramManagementAccess(),
+            builder: (context, snapshot) {
+              final allowed = snapshot.data == true;
+              if (!allowed) return const SizedBox.shrink();
+              return ListTile(
+                leading: const Icon(Icons.manage_accounts),
+                title: Text(
+                  'Account Management',
+                  style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop(); // Close the drawer
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => const MyStateScreen(),
+                  ));
+                },
+              );
             },
           ),
 

@@ -12,6 +12,8 @@ import '../screens/account_management/account_management_hub_screen.dart';
 import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/admin/bank_management_page.dart';
 import '../screens/admin/salary_scale_page.dart';
+import '../screens/admin/audit_logs_page.dart';
+import '../screens/admin/staff_status_report_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/attendance_analysis_page/hq_attendance_analysis_page.dart';
 import '../screens/call_tracker/hq_call_tracking_reports.dart';
@@ -39,8 +41,40 @@ import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Access control: only Program Management can access Account Management entries
+Future<bool> _hasProgramManagementAccess() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final doc = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
+    final dept = (doc.data()?['department'] as String? ?? '').trim().toLowerCase();
+    return dept == 'program management';
+  } catch (_) {
+    return false;
+  }
+}
 
+/// Access control for Payroll & Payments section
+Future<bool> _hasPayrollAccess() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final doc = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
+    final dept = (doc.data()?['department'] as String? ?? '').trim().toLowerCase();
+    const allowed = {
+      'program management',
+      'compliance',
+      'internal audit',
+      'finance',
+    };
+    return allowed.contains(dept);
+  } catch (_) {
+    return false;
+  }
+}
 
 Widget drawer3(
     BuildContext context,
@@ -411,43 +445,79 @@ Widget drawer3(
             height: 1,
           ),
 
-          ExpansionTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: const Text("Account management"),
-            children: [
-              ListTile(
+          // Account Management is only visible to Program Management department
+          FutureBuilder<bool>(
+            future: _hasProgramManagementAccess(),
+            builder: (context, snapshot) {
+              final allowed = snapshot.data == true;
+              if (!allowed) return const SizedBox.shrink();
+              return ExpansionTile(
                 leading: const Icon(Icons.manage_accounts),
-                title: Text(
-                  'Manage Account',
-                  style: TextStyle(
-                      fontSize: drawerFontSize,
-                      color: Get.isDarkMode ? Colors.white : Colors.brown),
-                ),
-                onTap: () {
-                  Navigator.of(context).pop(); // Close the drawer
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => const AccountManagementHubScreen(),
-                  ));
-                },
-              ),
-              const Divider(
-                color: Colors.grey,
-                height: 1,
-              ),
+                title: const Text("Account management"),
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.manage_accounts),
+                    title: Text(
+                      'Manage Account',
+                      style: TextStyle(
+                          fontSize: drawerFontSize,
+                          color: Get.isDarkMode ? Colors.white : Colors.brown),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop(); // Close the drawer
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => const AccountManagementHubScreen(),
+                      ));
+                    },
+                  ),
+                  const Divider(
+                    color: Colors.grey,
+                    height: 1,
+                  ),
 
-              ListTile(
-                leading: const Icon(Icons.account_balance, color: Colors.indigo),
-                title: const Text('Manage Banks'),
-                onTap: () {
-                  Navigator.pop(context); // Close the drawer first
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const BankManagementPage()),
-                  );
-                },
-              ),
-              const Divider(color: Colors.grey, height: 1),
-            ],
+                  ListTile(
+                    leading: const Icon(Icons.account_balance, color: Colors.indigo),
+                    title: const Text('Manage Banks'),
+                    onTap: () {
+                      Navigator.pop(context); // Close the drawer first
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const BankManagementPage()),
+                      );
+                    },
+                  ),
+                  const Divider(color: Colors.grey, height: 1),
+
+                  // Audit Logs
+                  ListTile(
+                    leading: const Icon(Icons.history, color: Colors.brown),
+                    title: const Text('Audit Logs'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AuditLogsPage()),
+                      );
+                    },
+                  ),
+                  const Divider(color: Colors.grey, height: 1),
+
+                  // Staff Status Report
+                  ListTile(
+                    leading: const Icon(Icons.group, color: Colors.teal),
+                    title: const Text('Staff Status Report'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const StaffStatusReportPage()),
+                      );
+                    },
+                  ),
+                  const Divider(color: Colors.grey, height: 1),
+                ],
+              );
+            },
           ),
 
           const Divider(
@@ -516,38 +586,45 @@ Widget drawer3(
           //  if (isAdmin)
 // Find this section in your drawer3.dart file and add the new ListTile
 
-          ExpansionTile(
-            leading: const Icon(Icons.monetization_on),
-            title: const Text("Payroll & Payments"),
-            children: [
-              // --- ADD THIS LISTTILE ---
-              ListTile(
-                leading: const Icon(Icons.price_change, color: Colors.teal), // Added icon and color
-                title: const Text('Manage Salary Scales'),
-                onTap: () {
-                  Navigator.pop(context); // Close the drawer
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryScalePage()));
-                },
-              ),
-              // --- END OF ADDITION ---
+          FutureBuilder<bool>(
+            future: _hasPayrollAccess(),
+            builder: (context, snapshot) {
+              final allowed = snapshot.data == true;
+              if (!allowed) return const SizedBox.shrink();
+              return ExpansionTile(
+                leading: const Icon(Icons.monetization_on),
+                title: const Text("Payroll & Payments"),
+                children: [
+                  // --- ADD THIS LISTTILE ---
+                  ListTile(
+                    leading: const Icon(Icons.price_change, color: Colors.teal), // Added icon and color
+                    title: const Text('Manage Salary Scales'),
+                    onTap: () {
+                      Navigator.pop(context); // Close the drawer
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryScalePage()));
+                    },
+                  ),
+                  // --- END OF ADDITION ---
 
-              ListTile(
-                leading: const Icon(Icons.price_change), // This was your old "Manage Salaries"
-                title: const Text('Manage Salaries'),
-                onTap: () {
-                  Navigator.pop(context); // Close the drawer
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryManagementPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.payments),
-                title: const Text('Payroll Workflow'),
-                onTap: () {
-                  Navigator.pop(context); // Close the drawer
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const PayrollReviewPage()));
-                },
-              ),
-            ],
+                  ListTile(
+                    leading: const Icon(Icons.price_change), // This was your old "Manage Salaries"
+                    title: const Text('Manage Salaries'),
+                    onTap: () {
+                      Navigator.pop(context); // Close the drawer
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryManagementPage()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.payments),
+                    title: const Text('Payroll Workflow'),
+                    onTap: () {
+                      Navigator.pop(context); // Close the drawer
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const PayrollReviewPage()));
+                    },
+                  ),
+                ],
+              );
+            },
           ),
 
 

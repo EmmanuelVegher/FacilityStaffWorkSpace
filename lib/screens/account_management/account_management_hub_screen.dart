@@ -13,6 +13,7 @@ class AccountManagementHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Direct rendering without lightweight guard to avoid unnecessary refreshes
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -57,16 +58,14 @@ class AccountManagementHubScreen extends StatelessWidget {
 
               final states = snapshot.data!.docs;
 
-              // --- NEW: Logic to Center a Fixed 2-Column Grid ---
               return Center(
                 child: Container(
-                  // Define the maximum width for the grid container
                   constraints: const BoxConstraints(maxWidth: 650),
                   child: GridView.builder(
                     padding: const EdgeInsets.all(24.0),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, // Exactly two columns
-                      childAspectRatio: 1.4, // Adjust for desired card height
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.4,
                       crossAxisSpacing: 24,
                       mainAxisSpacing: 24,
                     ),
@@ -84,14 +83,13 @@ class AccountManagementHubScreen extends StatelessWidget {
           ),
         ),
       ),
-// --- UPDATED: Use a Row for multiple FABs ---
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32.0), // Align to screen edges
+        padding: const EdgeInsets.only(left: 32.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             FloatingActionButton.extended(
-              heroTag: 'fab_add_supervisor', // Unique heroTag
+              heroTag: 'fab_add_supervisor',
               onPressed: () {
                 Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const SupervisorHubScreen(),
@@ -103,7 +101,7 @@ class AccountManagementHubScreen extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             FloatingActionButton.extended(
-              heroTag: 'fab_add_user', // Unique heroTag
+              heroTag: 'fab_add_user',
               onPressed: () {
                 Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const RegistrationPageWeb(),

@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'package:pdf/pdf.dart';
@@ -240,13 +241,14 @@ class TimesheetReviewPageHq extends StatefulWidget {
   _TimesheetReviewPageHqState createState() => _TimesheetReviewPageHqState();
 }
 
-class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
+class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // --- State Variables ---
   bool _isFilterLoading = true;
   bool _isLoading = false;
   bool _isExporting = false;
+  bool _canSeePaymentButton = false;
   String? _errorMessage;
 
   // Filter selections
@@ -265,6 +267,10 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     'Awaiting Facility Approval',
     'Awaiting Caritas Approval'
   ];
+
+  // --- NEW State Variables for September Tabs ---
+  late TabController _tabController;
+  int _selectedSeptemberPart = 1; // Default to Part 1
 
   // Data stores
   List<Map<String, dynamic>> _allExpectedStaffMaster = [];
@@ -286,13 +292,29 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
+    _tabController = TabController(length: 2, vsync: this);
+    _loadPaymentButtonAccess();
     _initializeFilters();
   }
 
   @override
   void dispose() {
+    _tabController?.dispose();
     _summaryTableScrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPaymentButtonAccess() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final doc = await _firestore.collection('Staff').doc(user.uid).get();
+      final dept = (doc.data()?['department'] as String? ?? '').trim().toLowerCase();
+      final allowed = dept == 'program management';
+      if (mounted) setState(() => _canSeePaymentButton = allowed);
+    } catch (_) {
+      if (mounted) setState(() => _canSeePaymentButton = false);
+    }
   }
 
   Future<void> _initializeFilters() async {
@@ -321,6 +343,14 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         });
       }
     }
+  }
+
+  // --- NEW: Handle September tab changes ---
+  void _onSeptemberTabChanged(int index) {
+    setState(() {
+      _selectedSeptemberPart = index + 1; // Convert 0-based index to 1-based part number
+    });
+    _loadTimesheets(); // Reload timesheets for the selected part
   }
 
   // ADD THIS METHOD INSIDE THE _TimesheetReviewPageHqState CLASS
@@ -391,7 +421,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     if (mounted) setState(() => _isFilterLoading = false);
   }
 
-  // <<<--- MODIFIED: Fixed the call to TimesheetModel.fromFirestore ---<<<
+
+
   Future<void> _loadTimesheets() async {
     if (_selectedStates.isEmpty || (_selectedStates.contains('All States') && _availableStates.length <= 1)) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state.")));
@@ -417,6 +448,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
           ? _availableFacilities.where((f) => f != 'All Facilities').toList()
           : _selectedFacilities;
 
+      // This query remains the same...
       Query staffQuery = _firestore.collection('Staff')
           .where('staffCategory', isEqualTo: 'Facility Staff')
           .where('state', whereIn: statesToQuery);
@@ -447,23 +479,26 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       final timesheetSnapshot = await timesheetQuery.get();
 
       final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
-      final timesheetDocId = '${monthName}_$_selectedYear';
+      final bool isSeptember = _selectedMonth == 9;
 
-      // Handle split September timesheets
-      final part1DocId = '${monthName}_$_selectedYear}_part1';
-      final part2DocId = '${monthName}_$_selectedYear}_part2';
+      // <<<--- REWRITTEN LOGIC ---<<<
+      // This now correctly builds the document ID based on the selected month and, for September, the selected tab.
+      final String timesheetDocId = isSeptember
+          ? '${monthName}_${_selectedYear}_part$_selectedSeptemberPart'
+          : '${monthName}_${_selectedYear}';
 
       final List<TimesheetModel> fetchedTimesheets = [];
       final Set<String> submittedStaffIds = {};
 
       for (final doc in timesheetSnapshot.docs) {
-        // Check for standard, part1, or part2 timesheets
-        if (doc.id == timesheetDocId || doc.id == part1DocId || doc.id == part2DocId) {
-          final timesheet = TimesheetModel.fromFirestore(doc); // <-- THE FIX IS HERE
+        // The check is now against the single, correctly formatted document ID.
+        if (doc.id == timesheetDocId) {
+          final timesheet = TimesheetModel.fromFirestore(doc);
           fetchedTimesheets.add(timesheet);
           submittedStaffIds.add(timesheet.staffId);
         }
       }
+      // --->>> END OF REWRITTEN LOGIC <<<---
 
       final List<Map<String, dynamic>> nonSubmitters = [];
       for (final staff in _allExpectedStaffMaster) {
@@ -490,7 +525,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   void _applyFiltersAndCalculateMetrics() {
     List<dynamic> filteredList;
@@ -672,6 +706,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     child: Text(_errorMessage!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)
                 )
             ),
+          // --- NEW: September Tabs ---
+          if (_selectedMonth == 9) _buildSeptemberTabs(),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -826,8 +862,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                   Row(
                     children: [
                       Expanded(child: applyButton),
-                      const SizedBox(width: 16),
-                      Expanded(child: paymentButton),
+                      if (_canSeePaymentButton) const SizedBox(width: 16),
+                      if (_canSeePaymentButton) Expanded(child: paymentButton),
                     ],
                   ),
                 ],
@@ -844,9 +880,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
                     children: [
                       ...filterItems,
                       applyButton,
-                      // --- NEW: Added the button to the Wrap widget ---
-                      const SizedBox(width: 8),
-                      paymentButton,
+                      if (_canSeePaymentButton) const SizedBox(width: 8),
+                      if (_canSeePaymentButton) paymentButton,
                     ],
                   ),
                 ),
@@ -1947,24 +1982,16 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   // <<<--- CORRECTED METHOD ---<<<
   Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
     try {
-      final querySnapshot = await _firestore.collectionGroup('TimeSheets').where('staffId', isEqualTo: staffId).get();
+      final querySnapshot = await _firestore
+          .collectionGroup('TimeSheets')
+          .where('staffId', isEqualTo: staffId)
+          .get();
 
-      // Also check for the split September timesheet IDs
-      final part1DocId = '${timesheetDocId}_part1';
-      final part2DocId = '${timesheetDocId}_part2';
-
-      final docs = querySnapshot.docs.where((doc) =>
-      doc.id == timesheetDocId ||
-          doc.id == part1DocId ||
-          doc.id == part2DocId
-      ).toList();
+      // Find the document with the exact ID from the results.
+      final docs = querySnapshot.docs.where((doc) => doc.id == timesheetDocId).toList();
 
       if (docs.isNotEmpty) {
-        // It's possible for a staff member to have two timesheets in September.
-        // For a single PDF download, we'll just grab the first one found.
         final doc = docs.first;
-
-        // FIX: Call the correct factory 'fromFirestore' which takes the DocumentSnapshot
         return TimesheetModel.fromFirestore(doc);
       }
 
@@ -1978,13 +2005,25 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
   Future<void> _downloadSinglePdf(String staffId) async {
     setState(() => _isExporting = true);
     final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
-    final timesheetDocId = '${monthName}_$_selectedYear';
-    final timesheet = await _fetchTimesheetFromFirestore(staffId, timesheetDocId);
+    final bool isSeptember = _selectedMonth == 9;
+
+    // <<<--- REWRITTEN LOGIC ---<<<
+    // Build the specific document ID based on the selected month and, if September, the selected tab part.
+    final String timesheetDocId = isSeptember
+        ? '${monthName}_${_selectedYear}_part$_selectedSeptemberPart'
+        : '${monthName}_${_selectedYear}';
+
+    // Fetch the specific timesheet.
+    final TimesheetModel? timesheet = await _fetchTimesheetFromFirestore(staffId, timesheetDocId);
+    // --->>> END OF REWRITTEN LOGIC <<<---
+
     if (timesheet == null) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not find the latest timesheet for staff ID $staffId to download.')));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not find timesheet for staff ID $staffId for the selected period.')));
       setState(() => _isExporting = false);
       return;
     }
+    
+    // PDF generation logic remains the same
     final pdf = pw.Document();
     final font = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
     final boldFont = await rootBundle.load("assets/fonts/OpenSans-Bold.ttf");
@@ -1996,6 +2035,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
     _triggerDownload(pdfBytes, 'Timesheet_${timesheet.staffName.replaceAll(' ','_')}_${_selectedMonth}_${_selectedYear}.pdf');
     setState(() => _isExporting = false);
   }
+
 
   Future<pw.Page> _createSingleTimesheetPage(TimesheetModel timesheet, pw.ImageProvider logoImage, pw.Font ttf, pw.Font ttfBold) async {
     final monthName = DateFormat('MMMM, yyyy').format(DateTime(_selectedYear, _selectedMonth));
@@ -2156,6 +2196,34 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> {
         pw.SizedBox(height: 2),
         pw.Text("Date: ${date ?? 'N/A'}", style: const pw.TextStyle(fontSize: 10)),
       ],
+    );
+  }
+
+  // --- NEW: Build September Tabs Widget ---
+  Widget _buildSeptemberTabs() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Part 1'),
+              Tab(text: 'Part 2'),
+            ],
+            indicatorColor: const Color(0xFF722F37),
+            labelColor: const Color(0xFF722F37),
+            unselectedLabelColor: Colors.grey,
+            onTap: (index) {
+              setState(() {
+                _selectedSeptemberPart = index + 1;
+              });
+              _loadTimesheets();
+            },
+          ),
+          const Divider(height: 1),
+        ],
+      ),
     );
   }
 }

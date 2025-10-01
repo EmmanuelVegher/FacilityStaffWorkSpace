@@ -7,6 +7,7 @@ import 'user_form_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:html' as html;
 import 'package:excel/excel.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LocationStaffListScreen extends StatefulWidget {
   final String stateName;
@@ -21,7 +22,8 @@ class LocationStaffListScreen extends StatefulWidget {
   });
 
   @override
-  State<LocationStaffListScreen> createState() => _LocationStaffListScreenState();
+  State<LocationStaffListScreen> createState() =>
+      _LocationStaffListScreenState();
 }
 
 class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
@@ -46,6 +48,7 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
     super.dispose();
   }
 
+
   // --- ADD THIS ENTIRE NEW METHOD ---
   /// Fetches staff data, generates an Excel file, and triggers a download.
   Future<void> _downloadStaffListAsExcel() async {
@@ -61,13 +64,17 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
           .collection('Staff')
           .where('state', isEqualTo: widget.stateName)
           .where('staffCategory', isEqualTo: widget.staffCategory)
+          .where('accountStatus', isEqualTo: 'Active')
           .get();
 
-      final List<Staff> staffList = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+      final List<Staff> staffList =
+          staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
 
       if (staffList.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No staff data available to download.'), backgroundColor: Colors.orange),
+          const SnackBar(
+              content: Text('No staff data available to download.'),
+              backgroundColor: Colors.orange),
         );
         return; // Exit if there's nothing to download
       }
@@ -92,7 +99,7 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
         'Attendance Record Count'
       ];
       var headerStyle = CellStyle(bold: true);
-    //  sheetObject.appendRow(headers.map((e) => TextCellValue(e, cellStyle: headerStyle)).toList());
+      //  sheetObject.appendRow(headers.map((e) => TextCellValue(e, cellStyle: headerStyle)).toList());
 
       // 4. Fetch attendance for each user and add data rows
       for (final staff in staffList) {
@@ -132,40 +139,48 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
       // 5. Save the file and trigger the download (for web)
       final excelBytes = excel.save();
       if (excelBytes != null) {
-        final blob = html.Blob([excelBytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        final blob = html.Blob([
+          excelBytes
+        ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         final url = html.Url.createObjectUrlFromBlob(blob);
         // Sanitize filename to remove invalid characters
-        final safeCategory = widget.staffCategory.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
-        final safeState = widget.stateName.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+        final safeCategory =
+            widget.staffCategory.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+        final safeState =
+            widget.stateName.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
         final anchor = html.AnchorElement(href: url)
-          ..setAttribute("download", "${safeState}_${safeCategory}_Staff_List.xlsx")
+          ..setAttribute(
+              "download", "${safeState}_${safeCategory}_Staff_List.xlsx")
           ..click();
         html.Url.revokeObjectUrl(url);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download started!'), backgroundColor: Colors.green),
+          const SnackBar(
+              content: Text('Download started!'),
+              backgroundColor: Colors.green),
         );
       } else {
         throw Exception("Failed to save the Excel file.");
       }
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating Excel file: ${e.toString()}'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error creating Excel file: ${e.toString()}'),
+            backgroundColor: Colors.red),
       );
     } finally {
       // Ensure the download state is reset even if an error occurs
-      if(mounted) {
+      if (mounted) {
         setState(() => _isDownloading = false);
       }
     }
   }
 
-
   // --- NEW METHOD TO FIND USERS AND LAUNCH EMAIL ---
   Future<void> _launchEmailForNonUsers() async {
     setState(() => _isSendingEmail = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Finding users with zero attendance...')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Finding users with zero attendance...')));
 
     try {
       // 1. Get all staff in the current view
@@ -173,9 +188,11 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
           .collection('Staff')
           .where('state', isEqualTo: widget.stateName)
           .where('staffCategory', isEqualTo: widget.staffCategory)
+          .where('accountStatus', isEqualTo: 'Active')
           .get();
 
-      final List<Staff> allStaff = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+      final List<Staff> allStaff =
+          staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
       List<String> recipientEmails = [];
 
       // 2. For each staff member, check their attendance count
@@ -184,7 +201,8 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
             .collection('Staff')
             .doc(staff.id)
             .collection('Record')
-            .limit(1) // We only need to know if it's > 0, so limit(1) is efficient
+            .limit(
+                1) // We only need to know if it's > 0, so limit(1) is efficient
             .get();
 
         if (recordCountSnapshot.docs.isEmpty) {
@@ -196,13 +214,17 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
       }
 
       if (recipientEmails.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Great! Everyone in this category has attendance records.'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Great! Everyone in this category has attendance records.'),
+            backgroundColor: Colors.green));
         setState(() => _isSendingEmail = false);
         return;
       }
 
       // 3. Prepare and launch the email
-      final String subject = 'Important: Action Required for Service Delivery Workspace App';
+      final String subject =
+          'Important: Action Required for Service Delivery Workspace App';
 
       // Refined email body
       final String body = '''
@@ -239,14 +261,14 @@ The Service Delivery Workspace Team
       } else {
         throw 'Could not launch email client.';
       }
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red));
     } finally {
       setState(() => _isSendingEmail = false);
     }
   }
-
 
   /// --- NEW: "Copy & Go" Dialog ---
   void _showEmailDialog(List<String> recipients, String subject, String body) {
@@ -259,7 +281,8 @@ The Service Delivery Workspace Team
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('The following users have zero attendance records:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('The following users have zero attendance records:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -275,11 +298,13 @@ The Service Delivery Workspace Team
                 label: const Text('Copy All Emails (for BCC)'),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: recipients.join(',')));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emails copied to clipboard!')));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Emails copied to clipboard!')));
                 },
               ),
               const Divider(height: 30),
-              const Text('Email Content:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Email Content:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               SelectableText("Subject: $subject"),
               const SizedBox(height: 8),
@@ -305,7 +330,9 @@ The Service Delivery Workspace Team
               try {
                 await FlutterEmailSender.send(email);
               } catch (error) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open email client. Please copy the details manually.')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text(
+                        'Could not open email client. Please copy the details manually.')));
               }
             },
           )
@@ -317,21 +344,28 @@ The Service Delivery Workspace Team
   /// --- UPDATED: This method now calls the dialog ---
   Future<void> _processReminderEmail() async {
     setState(() => _isSendingEmail = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Finding users with zero attendance...')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Finding users with zero attendance...')));
 
     try {
       final staffSnapshot = await FirebaseFirestore.instance
           .collection('Staff')
           .where('state', isEqualTo: widget.stateName)
           .where('staffCategory', isEqualTo: widget.staffCategory)
+          .where('accountStatus', isEqualTo: 'Active')
           .get();
 
-      final List<Staff> allStaff = staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+      final List<Staff> allStaff =
+          staffSnapshot.docs.map((doc) => Staff.fromFirestore(doc)).toList();
       List<String> recipientEmails = [];
 
       for (final staff in allStaff) {
         final recordCountSnapshot = await FirebaseFirestore.instance
-            .collection('Staff').doc(staff.id).collection('Record').limit(1).get();
+            .collection('Staff')
+            .doc(staff.id)
+            .collection('Record')
+            .limit(1)
+            .get();
 
         if (recordCountSnapshot.docs.isEmpty && staff.emailAddress.isNotEmpty) {
           recipientEmails.add(staff.emailAddress);
@@ -339,12 +373,16 @@ The Service Delivery Workspace Team
       }
 
       if (recipientEmails.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Great! Everyone in this category has attendance records.'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Great! Everyone in this category has attendance records.'),
+            backgroundColor: Colors.green));
         setState(() => _isSendingEmail = false);
         return;
       }
 
-      final String subject = 'Important: Action Required for Service Delivery Workspace App';
+      final String subject =
+          'Important: Action Required for Service Delivery Workspace App';
       final String body = '''Dear Team,
 
 This is a friendly reminder regarding the use of the Service Delivery Workspace App for attendance tracking. We've noticed that some accounts have not yet recorded any clock-ins.
@@ -364,15 +402,14 @@ The Service Delivery Workspace Team
 
       // Show the new dialog instead of trying to launch mailto directly
       _showEmailDialog(recipientEmails, subject, body);
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red));
     } finally {
       setState(() => _isSendingEmail = false);
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +424,6 @@ The Service Delivery Workspace Team
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
-        // ADD THE 'actions' WIDGET FOR THE DOWNLOAD BUTTON
         actions: [
           if (_isDownloading)
             const Padding(
@@ -401,10 +437,21 @@ The Service Delivery Workspace Team
               ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.download_for_offline_outlined, size: 28),
-              tooltip: 'Download Staff List as Excel',
-              onPressed: _downloadStaffListAsExcel,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: TextButton.icon(
+                onPressed: _downloadStaffListAsExcel,
+                icon: const Icon(Icons.download_for_offline_outlined, color: Colors.black),
+                label: const Text(
+                  'Download Excel',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
             ),
         ],
       ),
@@ -433,6 +480,7 @@ The Service Delivery Workspace Team
                       .collection('Staff')
                       .where('state', isEqualTo: widget.stateName)
                       .where('staffCategory', isEqualTo: widget.staffCategory)
+                      .where('accountStatus', isEqualTo: 'Active')
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -442,19 +490,34 @@ The Service Delivery Workspace Team
                       return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(child: Text('No staff found for ${widget.staffCategory} in ${widget.stateName}.', style: const TextStyle(color: Colors.white)));
+                      return Center(
+                          child: Text(
+                              'No staff found for ${widget.staffCategory} in ${widget.stateName}.',
+                              style: const TextStyle(color: Colors.white)));
                     }
 
-                    List<Staff> allStaff = snapshot.data!.docs.map((doc) => Staff.fromFirestore(doc)).toList();
+                    List<Staff> allStaff = snapshot.data!.docs
+                        .map((doc) => Staff.fromFirestore(doc))
+                        .toList();
 
                     if (_searchQuery.isNotEmpty) {
-                      allStaff = allStaff.where((staff) =>
-                      staff.fullName.toLowerCase().contains(_searchQuery) ||
-                          staff.emailAddress.toLowerCase().contains(_searchQuery) ||
-                          staff.location.toLowerCase().contains(_searchQuery)).toList();
+                      allStaff = allStaff
+                          .where((staff) =>
+                              staff.fullName
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              staff.emailAddress
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              staff.location
+                                  .toLowerCase()
+                                  .contains(_searchQuery))
+                          .toList();
                     }
                     if (allStaff.isEmpty) {
-                      return const Center(child: Text('No users match your search.', style: TextStyle(color: Colors.white)));
+                      return const Center(
+                          child: Text('No users match your search.',
+                              style: TextStyle(color: Colors.white)));
                     }
 
                     final groupedStaff = _groupStaffByLocation(allStaff);
@@ -480,12 +543,19 @@ The Service Delivery Workspace Team
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isSendingEmail ? null : _processReminderEmail, // <-- Calls the new method
+        onPressed: _isSendingEmail
+            ? null
+            : _processReminderEmail,
         backgroundColor: _isSendingEmail ? Colors.grey : Colors.blue.shade700,
         icon: _isSendingEmail
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.email_outlined, color: Colors.white),
-        label: const Text('Remind Non-Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text('Remind Non-Users',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -502,10 +572,14 @@ The Service Delivery Workspace Team
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
           filled: true,
           fillColor: Colors.white.withOpacity(0.9),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none),
           contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
           suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(icon: Icon(Icons.clear, color: Colors.grey.shade600), onPressed: () => _searchController.clear())
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade600),
+                  onPressed: () => _searchController.clear())
               : null,
         ),
       ),
@@ -515,7 +589,8 @@ The Service Delivery Workspace Team
   Map<String, List<Staff>> _groupStaffByLocation(List<Staff> staffList) {
     final Map<String, List<Staff>> grouped = {};
     for (var staff in staffList) {
-      final location = staff.location.isEmpty ? 'Unspecified Location' : staff.location;
+      final location =
+          staff.location.isEmpty ? 'Unspecified Location' : staff.location;
       if (grouped[location] == null) {
         grouped[location] = [];
       }
@@ -530,7 +605,8 @@ class _LocationExpansionTile extends StatelessWidget {
   final String location;
   final List<Staff> staffInLocation;
 
-  const _LocationExpansionTile({required this.location, required this.staffInLocation});
+  const _LocationExpansionTile(
+      {required this.location, required this.staffInLocation});
 
   @override
   Widget build(BuildContext context) {
@@ -546,11 +622,16 @@ class _LocationExpansionTile extends StatelessWidget {
       child: ExpansionTile(
         title: Text(
           '$location (${staffInLocation.length})',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800, fontSize: 18),
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
+              fontSize: 18),
         ),
         iconColor: Colors.red.shade700,
         collapsedIconColor: Colors.grey.shade700,
-        children: staffInLocation.map((staff) => _StaffListTile(staff: staff)).toList(),
+        children: staffInLocation
+            .map((staff) => _StaffListTile(staff: staff))
+            .toList(),
       ),
     );
   }
@@ -604,18 +685,72 @@ class _StaffListTileState extends State<_StaffListTile> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: Text('Are you sure you want to delete the account for ${staff.fullName}? This cannot be undone.'),
+        title: const Text('Update Account Status'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_off, color: Colors.orange),
+              title: const Text('Resigned'),
+              onTap: () async {
+                await FirebaseFirestore.instance
+                    .collection('Staff')
+                    .doc(staff.id)
+                    .update({'accountStatus': 'Resigned'});
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Account status updated to Resigned'),
+                        backgroundColor: Colors.green),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.cancel_schedule_send, color: Colors.red),
+              title: const Text('Terminated'),
+              onTap: () async {
+                await FirebaseFirestore.instance
+                    .collection('Staff')
+                    .doc(staff.id)
+                    .update({'accountStatus': 'Terminated'});
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Account status updated to Terminated'),
+                        backgroundColor: Colors.green),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.pause_circle_filled, color: Colors.blueGrey),
+              title: const Text('Inactive'),
+              onTap: () async {
+                await FirebaseFirestore.instance
+                    .collection('Staff')
+                    .doc(staff.id)
+                    .update({'accountStatus': 'Inactive'});
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Account status updated to Inactive'),
+                        backgroundColor: Colors.green),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
         actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(ctx).pop()),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('DELETE'),
-            onPressed: () {
-              FirebaseFirestore.instance.collection('Staff').doc(staff.id).delete();
-              Navigator.of(ctx).pop();
-            },
-          ),
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(ctx).pop()),
         ],
       ),
     );
@@ -641,10 +776,16 @@ class _StaffListTileState extends State<_StaffListTile> {
           leading: CircleAvatar(
             radius: 28,
             backgroundColor: Colors.grey.shade300,
-            backgroundImage: widget.staff.photoUrl.isNotEmpty ? NetworkImage(widget.staff.photoUrl) : null,
-            child: widget.staff.photoUrl.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 30) : null,
+            backgroundImage: widget.staff.photoUrl.isNotEmpty
+                ? NetworkImage(widget.staff.photoUrl)
+                : null,
+            child: widget.staff.photoUrl.isEmpty
+                ? const Icon(Icons.person, color: Colors.white, size: 30)
+                : null,
           ),
-          title: Text(widget.staff.fullName, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade900)),
+          title: Text(widget.staff.fullName,
+              style: TextStyle(
+                  fontWeight: FontWeight.w600, color: Colors.grey.shade900)),
           // --- NEW: Rebuilt subtitle with more information ---
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,14 +799,21 @@ class _StaffListTileState extends State<_StaffListTile> {
               buildSubtitleLine('Bank', widget.staff.bankName),
               buildSubtitleLine('Account Number', widget.staff.accountNumber),
               buildSubtitleLine('Name of Supervisor', widget.staff.supervisor),
-              buildSubtitleLine("Supervisor's Email Address", widget.staff.supervisorEmail),
+              buildSubtitleLine(
+                  "Supervisor's Email Address", widget.staff.supervisorEmail),
               buildSubtitleLine("Program Manager", widget.staff.programManager),
-              buildSubtitleLine("Program Manager's Email Address", widget.staff.programManagerEmail),
-
+              buildSubtitleLine("Program Manager's Email Address",
+                  widget.staff.programManagerEmail),
               if (_attendanceCount == null)
-                Text('Attendance: Loading...', style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic, fontSize: 12))
+                Text('Attendance: Loading...',
+                    style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                        fontSize: 12))
               else
-                Text('Attendance: $_attendanceCount records', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+                Text('Attendance: $_attendanceCount records',
+                    style:
+                        TextStyle(color: Colors.grey.shade700, fontSize: 12)),
             ],
           ),
           trailing: Row(
@@ -680,7 +828,7 @@ class _StaffListTileState extends State<_StaffListTile> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
-                tooltip: 'Delete User',
+                tooltip: 'Update Account Status',
                 onPressed: () => _showDeleteConfirmation(context, widget.staff),
               ),
             ],

@@ -208,6 +208,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
   bool _isFilterLoading = true;
   bool _isLoading = false;
   bool _isExporting = false;
+  bool _canSeePaymentButton = false;
   String? _errorMessage;
 
   // Filter & User Context
@@ -339,8 +340,15 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       final user = _firebaseAuth.currentUser;
       if (user == null) throw Exception("User not logged in.");
       final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
-      final userState = staffDoc.data()?['state'] as String?;
+      final data = staffDoc.data();
+      final userState = data?['state'] as String?;
       if (userState == null || userState.isEmpty) throw Exception("State not found for user.");
+
+      // Compute access for Payment Schedule button:
+      final dept = (data?['department'] as String? ?? '').trim().toLowerCase();
+      final desig = (data?['designation'] as String? ?? '').trim().toLowerCase();
+      final canSeePayment = dept == 'program management' &&
+          (desig == 'senior program manager' || desig == 'program manager');
 
       _userState = userState;
       final facilityNames = await _getFacilitiesForState(userState);
@@ -349,6 +357,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
         setState(() {
           _availableFacilities = ['All Facilities', ...facilityNames];
           _selectedFacilities = ['All Facilities'];
+          _canSeePaymentButton = canSeePayment;
         });
         await _loadTimesheets();
       }
@@ -793,8 +802,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
                   Row(
                     children: [
                       Expanded(child: applyButton),
-                      const SizedBox(width: 16),
-                      Expanded(child: paymentButton),
+                      if (_canSeePaymentButton) const SizedBox(width: 16),
+                      if (_canSeePaymentButton) Expanded(child: paymentButton),
                     ],
                   ),
                 ],
@@ -811,8 +820,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
                     children: [
                       ...filterItems,
                       applyButton,
-                      const SizedBox(width: 8),
-                      paymentButton, // Added button
+                      if (_canSeePaymentButton) const SizedBox(width: 8),
+                      if (_canSeePaymentButton) paymentButton, // Conditionally show
                     ],
                   ),
                 ),
