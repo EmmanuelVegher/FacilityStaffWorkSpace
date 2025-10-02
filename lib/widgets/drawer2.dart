@@ -209,7 +209,7 @@ Widget drawer2(
                 const SizedBox(width: 8),
                 // --- CONDITIONAL "NEW" TAG ---
                 // This logic will show the chip only until the specified date
-                if (DateTime.now().isBefore(DateTime(2025, 9, 19)))
+                if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
                   Chip(
                     label: const Text(
                       'NEW',
@@ -541,9 +541,26 @@ Widget drawer2(
           // NEW: State-specific reports for drawer2
           ListTile(
             leading: const Icon(Icons.group, color: Colors.teal),
-            title: Text(
-              'Staff Status Report',
-              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+            title: Row(
+              children: [
+                Text(
+                  'Staff Status Report',
+                  style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                // --- NEW: "NEW" FLAG FOR 30 DAYS ---
+                if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
+                  Chip(
+                    label: const Text(
+                      'NEW',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    ),
+                    backgroundColor: Colors.teal,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -555,9 +572,26 @@ Widget drawer2(
           const Divider(color: Colors.grey, height: 1),
           ListTile(
             leading: const Icon(Icons.history, color: Colors.brown),
-            title: Text(
-              'Audit Logs',
-              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+            title: Row(
+              children: [
+                Text(
+                  'Audit Logs',
+                  style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                // --- NEW: "NEW" FLAG FOR 30 DAYS ---
+                if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
+                  Chip(
+                    label: const Text(
+                      'NEW',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    ),
+                    backgroundColor: Colors.brown,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
             ),
             onTap: () {
               Navigator.push(

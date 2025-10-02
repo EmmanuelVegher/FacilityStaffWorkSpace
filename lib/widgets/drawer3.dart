@@ -491,7 +491,24 @@ Widget drawer3(
                   // Audit Logs
                   ListTile(
                     leading: const Icon(Icons.history, color: Colors.brown),
-                    title: const Text('Audit Logs'),
+                    title: Row(
+                      children: [
+                        const Text('Audit Logs'),
+                        const SizedBox(width: 8),
+                        // --- NEW: "NEW" FLAG FOR 30 DAYS ---
+                        if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
+                          Chip(
+                            label: const Text(
+                              'NEW',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
+                            backgroundColor: Colors.brown,
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -505,7 +522,24 @@ Widget drawer3(
                   // Staff Status Report
                   ListTile(
                     leading: const Icon(Icons.group, color: Colors.teal),
-                    title: const Text('Staff Status Report'),
+                    title: Row(
+                      children: [
+                        const Text('Staff Status Report'),
+                        const SizedBox(width: 8),
+                        // --- NEW: "NEW" FLAG FOR 30 DAYS ---
+                        if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
+                          Chip(
+                            label: const Text(
+                              'NEW',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
+                            backgroundColor: Colors.teal,
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(

@@ -989,8 +989,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   // Add this new method inside the _AttendanceAnalysisPageState class
 
   Widget _buildUpdateBanner() {
-    // Define the expiry date for the notification
-    final DateTime expiryDate = DateTime(2025, 9, 19);
+    // Define the expiry date for the notification - extended to show longer
+    final DateTime expiryDate = DateTime(2025, 12, 31);
 
     // Check if the banner should be visible
     if (DateTime.now().isBefore(expiryDate) && _isUpdateBannerVisible) {
@@ -1000,9 +1000,37 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         surfaceTintColor: Colors.white,
         elevation: 1,
         leading: Icon(Icons.info_outline, color: Colors.blue.shade800),
-        content: Text(
-          'New Updates! You can now make recommendations for Partial/Full Deductions of filled attendance either due to truancy etc or Partial Approval/Full Approval of attendance attendance for missed days and view staff you directly supervise. Action buttons are enabled only for your team.',
-          style: TextStyle(color: Colors.blue.shade900),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'New Updates! You can now make recommendations for Partial/Full Deductions of filled attendance either due to truancy etc or Partial Approval/Full Approval of attendance attendance for missed days and view staff you directly supervise. Action buttons are enabled only for your team.',
+              style: TextStyle(color: Colors.blue.shade900),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                // Open YouTube link in new tab
+                html.window.open('https://youtu.be/I_D7rWG3PiQ', 'youtube_tutorial');
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.play_circle_fill, color: Colors.red.shade600, size: 20),
+                  const SizedBox(width: 4),
+                  Text(
+                    'View Tutorial',
+                    style: TextStyle(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: <Widget>[
           TextButton(
@@ -1372,17 +1400,53 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           SizedBox(
             height: 450,
             child: _isPageReady
-                ? GoogleMap(
-              onMapCreated: (controller) => _mapController = controller,
-              initialCameraPosition: _initialCameraPosition,
-              markers: _mapMarkers,
-              mapType: MapType.normal,
-            )
+                ? _buildGoogleMap()
                 : const Center(child: Text("Initializing Map...")),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildGoogleMap() {
+    try {
+      return GoogleMap(
+        onMapCreated: (controller) => _mapController = controller,
+        initialCameraPosition: _initialCameraPosition,
+        markers: _mapMarkers,
+        mapType: MapType.normal,
+      );
+    } catch (e) {
+      // Handle Google Maps errors (billing issues, deprecated API, etc.)
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Map temporarily unavailable',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Location data is still available in the detailed records below.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+            if (e.toString().contains('BillingNotEnabledMapError')) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Note: Google Maps billing needs to be enabled for map display.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildOutlierAnalysisSection() {
@@ -1741,37 +1805,43 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   // --- HELPER METHODS (UNCHANGED FROM HERE) ---
 
   void _generateMapMarkers(List<AttendanceRecord> records) {
-    final Set<Marker> markers = {};
-    if (records.isEmpty) {
-      if(mounted) setState(() => _mapMarkers = {});
-      return;
-    }
+    try {
+      final Set<Marker> markers = {};
+      if (records.isEmpty) {
+        if(mounted) setState(() => _mapMarkers = {});
+        return;
+      }
 
-    for (final record in records) {
-      if (record.clockInLocation != null) {
-        markers.add(Marker(
-          markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
-          position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: InfoWindow(
-            title: '${record.staffName} - Clock In',
-            snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
-          ),
-        ));
+      for (final record in records) {
+        if (record.clockInLocation != null) {
+          markers.add(Marker(
+            markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
+            position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: '${record.staffName} - Clock In',
+              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            ),
+          ));
+        }
+        if (record.clockOutLocation != null) {
+          markers.add(Marker(
+            markerId: MarkerId('out-${record.staffId}-${record.date.toIso8601String()}'),
+            position: LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            infoWindow: InfoWindow(
+              title: '${record.staffName} - Clock Out',
+              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            ),
+          ));
+        }
       }
-      if (record.clockOutLocation != null) {
-        markers.add(Marker(
-          markerId: MarkerId('out-${record.staffId}-${record.date.toIso8601String()}'),
-          position: LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(
-            title: '${record.staffName} - Clock Out',
-            snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
-          ),
-        ));
-      }
+      if (mounted) setState(() => _mapMarkers = markers);
+    } catch (e) {
+      // Handle marker creation errors (deprecated API, etc.)
+      debugPrint("Error generating map markers: $e");
+      if (mounted) setState(() => _mapMarkers = {});
     }
-    if (mounted) setState(() => _mapMarkers = markers);
   }
 
   void _findOutliers(List<AttendanceRecord> records) {

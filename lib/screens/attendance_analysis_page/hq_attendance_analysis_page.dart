@@ -988,17 +988,53 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
           SizedBox(
             height: 450,
             child: _isPageReady
-                ? GoogleMap(
-              onMapCreated: (controller) => _mapController = controller,
-              initialCameraPosition: _initialCameraPosition,
-              markers: _mapMarkers,
-              mapType: MapType.normal,
-            )
+                ? _buildGoogleMap()
                 : const Center(child: Text("Initializing Map...")),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildGoogleMap() {
+    try {
+      return GoogleMap(
+        onMapCreated: (controller) => _mapController = controller,
+        initialCameraPosition: _initialCameraPosition,
+        markers: _mapMarkers,
+        mapType: MapType.normal,
+      );
+    } catch (e) {
+      // Handle Google Maps errors (billing issues, deprecated API, etc.)
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Map temporarily unavailable',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Location data is still available in the detailed records below.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+            if (e.toString().contains('BillingNotEnabledMapError')) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Note: Google Maps billing needs to be enabled for map display.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildOutlierAnalysisSection() {
@@ -1324,37 +1360,43 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
   // --- HELPER METHODS (UNCHANGED) ---
   void _generateMapMarkers(List<AttendanceRecord> records) {
-    final Set<Marker> markers = {};
-    if (records.isEmpty) {
-      if(mounted) setState(() => _mapMarkers = {});
-      return;
-    }
+    try {
+      final Set<Marker> markers = {};
+      if (records.isEmpty) {
+        if(mounted) setState(() => _mapMarkers = {});
+        return;
+      }
 
-    for (final record in records) {
-      if (record.clockInLocation != null) {
-        markers.add(Marker(
-          markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
-          position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: InfoWindow(
-            title: '${record.staffName} - Clock In',
-            snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
-          ),
-        ));
+      for (final record in records) {
+        if (record.clockInLocation != null) {
+          markers.add(Marker(
+            markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
+            position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: '${record.staffName} - Clock In',
+              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            ),
+          ));
+        }
+        if (record.clockOutLocation != null) {
+          markers.add(Marker(
+            markerId: MarkerId('out-${record.staffId}-${record.date.toIso8601String()}'),
+            position: LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            infoWindow: InfoWindow(
+              title: '${record.staffName} - Clock Out',
+              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            ),
+          ));
+        }
       }
-      if (record.clockOutLocation != null) {
-        markers.add(Marker(
-          markerId: MarkerId('out-${record.staffId}-${record.date.toIso8601String()}'),
-          position: LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(
-            title: '${record.staffName} - Clock Out',
-            snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
-          ),
-        ));
-      }
+      if (mounted) setState(() => _mapMarkers = markers);
+    } catch (e) {
+      // Handle marker creation errors (deprecated API, etc.)
+      debugPrint("Error generating map markers: $e");
+      if (mounted) setState(() => _mapMarkers = {});
     }
-    if (mounted) setState(() => _mapMarkers = markers);
   }
 
   void _findOutliers(List<AttendanceRecord> records) {

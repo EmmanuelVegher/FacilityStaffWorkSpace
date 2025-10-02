@@ -768,15 +768,51 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
           ),
           SizedBox(
               height: 400,
-              child: GoogleMap(
-                onMapCreated: (controller) => _mapController = controller,
-                initialCameraPosition: _initialCameraPosition,
-                markers: _mapMarkers,
-              )
+              child: _buildGoogleMap()
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildGoogleMap() {
+    try {
+      return GoogleMap(
+        onMapCreated: (controller) => _mapController = controller,
+        initialCameraPosition: _initialCameraPosition,
+        markers: _mapMarkers,
+      );
+    } catch (e) {
+      // Handle Google Maps errors (billing issues, deprecated API, etc.)
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Map temporarily unavailable',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Location data is still available in the detailed records below.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+            if (e.toString().contains('BillingNotEnabledMapError')) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Note: Google Maps billing needs to be enabled for map display.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildOutlierAnalysisSection() {
@@ -1027,32 +1063,38 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
   }
 
   void _generateMapMarkers(List<AttendanceRecord> records) {
-    Set<Marker> markers = {};
+    try {
+      Set<Marker> markers = {};
 
-    // Add a marker for the facility itself
-    if (_facilityDetails != null) {
-      markers.add(Marker(
-        markerId: MarkerId('facility_${_facilityDetails!.name}'),
-        position: LatLng(_facilityDetails!.coordinates.latitude, _facilityDetails!.coordinates.longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        infoWindow: InfoWindow(title: _facilityDetails!.name, snippet: 'Facility Location'),
-      ));
-    }
-
-    for (final record in records) {
-      if (record.clockInLocation != null) {
+      // Add a marker for the facility itself
+      if (_facilityDetails != null) {
         markers.add(Marker(
-          markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
-          position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: InfoWindow(
-            title: '${record.staffName} - Clock In',
-            snippet: 'On ${DateFormat.yMd().add_jm().format(record.date)}',
-          ),
+          markerId: MarkerId('facility_${_facilityDetails!.name}'),
+          position: LatLng(_facilityDetails!.coordinates.latitude, _facilityDetails!.coordinates.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: InfoWindow(title: _facilityDetails!.name, snippet: 'Facility Location'),
         ));
       }
+
+      for (final record in records) {
+        if (record.clockInLocation != null) {
+          markers.add(Marker(
+            markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
+            position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: '${record.staffName} - Clock In',
+              snippet: 'On ${DateFormat.yMd().add_jm().format(record.date)}',
+            ),
+          ));
+        }
+      }
+      if (mounted) setState(() => _mapMarkers = markers);
+    } catch (e) {
+      // Handle marker creation errors (deprecated API, etc.)
+      debugPrint("Error generating map markers: $e");
+      if (mounted) setState(() => _mapMarkers = {});
     }
-    if (mounted) setState(() => _mapMarkers = markers);
   }
 
   void _findOutliers(List<AttendanceRecord> records) {
