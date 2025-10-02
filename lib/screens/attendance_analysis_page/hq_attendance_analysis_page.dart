@@ -12,7 +12,9 @@ import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// import 'package:google_maps_flutter/google_maps_flutter.dart'; // COMMENTED OUT - Using OpenStreetMap instead
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:pdf/pdf.dart';
@@ -233,14 +235,16 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   late TooltipBehavior _tooltipBehavior;
 
   // --- Map and Outlier State ---
-  GoogleMapController? _mapController;
-  Set<Marker> _mapMarkers = {};
+  // GoogleMapController? _mapController; // COMMENTED OUT - Using OpenStreetMap instead
+  MapController? _mapController;
+  List<Marker> _mapMarkers = []; // Changed from Set<Marker> to List<Marker> for flutter_map
   Map<String, FacilityDetails> _facilityDetails = {};
   List<OutlierRecord> _outlierRecords = [];
-  static const CameraPosition _initialCameraPosition = CameraPosition(
-    target: LatLng(9.0820, 8.6753), // Center of Nigeria
-    zoom: 5.5,
-  );
+  // static const CameraPosition _initialCameraPosition = CameraPosition( // COMMENTED OUT - Using OpenStreetMap instead
+  //   target: LatLng(9.0820, 8.6753), // Center of Nigeria
+  //   zoom: 5.5,
+  // );
+  static const latlng.LatLng _initialMapCenter = latlng.LatLng(9.0820, 8.6753); // Center of Nigeria
 
 
   @override
@@ -998,14 +1002,24 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
   Widget _buildGoogleMap() {
     try {
-      return GoogleMap(
-        onMapCreated: (controller) => _mapController = controller,
-        initialCameraPosition: _initialCameraPosition,
-        markers: _mapMarkers,
-        mapType: MapType.normal,
+      return FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _initialMapCenter,
+          initialZoom: 6.0,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.app',
+          ),
+          MarkerLayer(
+            markers: _mapMarkers,
+          ),
+        ],
       );
     } catch (e) {
-      // Handle Google Maps errors (billing issues, deprecated API, etc.)
+      // Handle map errors (OpenStreetMap issues, etc.)
       return Container(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1023,14 +1037,6 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
-            if (e.toString().contains('BillingNotEnabledMapError')) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Note: Google Maps billing needs to be enabled for map display.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ],
         ),
       );
@@ -1361,41 +1367,39 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   // --- HELPER METHODS (UNCHANGED) ---
   void _generateMapMarkers(List<AttendanceRecord> records) {
     try {
-      final Set<Marker> markers = {};
+      final List<Marker> markers = [];
       if (records.isEmpty) {
-        if(mounted) setState(() => _mapMarkers = {});
+        if(mounted) setState(() => _mapMarkers = []);
         return;
       }
 
       for (final record in records) {
         if (record.clockInLocation != null) {
           markers.add(Marker(
-            markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
-            position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-            infoWindow: InfoWindow(
-              title: '${record.staffName} - Clock In',
-              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            point: latlng.LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            child: Icon(
+              Icons.location_on,
+              color: Colors.green,
+              size: 30,
             ),
           ));
         }
         if (record.clockOutLocation != null) {
           markers.add(Marker(
-            markerId: MarkerId('out-${record.staffId}-${record.date.toIso8601String()}'),
-            position: LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(
-              title: '${record.staffName} - Clock Out',
-              snippet: 'Facility: ${record.assignedFacility} on ${DateFormat.yMd().format(record.date)}',
+            point: latlng.LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
+            child: Icon(
+              Icons.location_on,
+              color: Colors.red,
+              size: 30,
             ),
           ));
         }
       }
       if (mounted) setState(() => _mapMarkers = markers);
     } catch (e) {
-      // Handle marker creation errors (deprecated API, etc.)
+      // Handle marker creation errors
       debugPrint("Error generating map markers: $e");
-      if (mounted) setState(() => _mapMarkers = {});
+      if (mounted) setState(() => _mapMarkers = []);
     }
   }
 

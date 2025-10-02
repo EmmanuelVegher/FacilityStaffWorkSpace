@@ -12,7 +12,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// import 'package:google_maps_flutter/google_maps_flutter.dart'; // COMMENTED OUT - Using OpenStreetMap instead
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:pdf/pdf.dart';
@@ -184,13 +186,15 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
   late TooltipBehavior _tooltipBehavior;
 
   // --- Map and Outlier State ---
-  GoogleMapController? _mapController;
-  Set<Marker> _mapMarkers = {};
+  // GoogleMapController? _mapController; // COMMENTED OUT - Using OpenStreetMap instead
+  MapController? _mapController;
+  List<Marker> _mapMarkers = []; // Changed from Set<Marker> to List<Marker> for flutter_map
   List<OutlierRecord> _outlierRecords = [];
-  CameraPosition _initialCameraPosition = const CameraPosition(
-    target: LatLng(9.0820, 8.6753), // Default center
-    zoom: 6,
-  );
+  // CameraPosition _initialCameraPosition = const CameraPosition( // COMMENTED OUT - Using OpenStreetMap instead
+  //   target: LatLng(9.0820, 8.6753), // Default center
+  //   zoom: 6,
+  // );
+  latlng.LatLng _initialMapCenter = const latlng.LatLng(9.0820, 8.6753); // Default center
 
   @override
   void initState() {
@@ -257,7 +261,8 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
 
       if (lat != null && lon != null && radius != null) {
         _facilityDetails = FacilityDetails(name: _userFacility!, coordinates: GeoPoint(lat, lon), radius: radius);
-        _initialCameraPosition = CameraPosition(target: LatLng(lat, lon), zoom: 14);
+        // _initialCameraPosition = CameraPosition(target: LatLng(lat, lon), zoom: 14); // COMMENTED OUT - Using OpenStreetMap instead
+        _initialMapCenter = latlng.LatLng(lat, lon);
       } else {
         throw Exception("Facility '$_userFacility' has invalid location data.");
       }
@@ -777,13 +782,24 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
 
   Widget _buildGoogleMap() {
     try {
-      return GoogleMap(
-        onMapCreated: (controller) => _mapController = controller,
-        initialCameraPosition: _initialCameraPosition,
-        markers: _mapMarkers,
+      return FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _initialMapCenter,
+          initialZoom: 14.0,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.app',
+          ),
+          MarkerLayer(
+            markers: _mapMarkers,
+          ),
+        ],
       );
     } catch (e) {
-      // Handle Google Maps errors (billing issues, deprecated API, etc.)
+      // Handle map errors (OpenStreetMap issues, etc.)
       return Container(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -801,14 +817,6 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
-            if (e.toString().contains('BillingNotEnabledMapError')) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Note: Google Maps billing needs to be enabled for map display.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ],
         ),
       );
@@ -1064,36 +1072,37 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
 
   void _generateMapMarkers(List<AttendanceRecord> records) {
     try {
-      Set<Marker> markers = {};
+      List<Marker> markers = [];
 
       // Add a marker for the facility itself
       if (_facilityDetails != null) {
         markers.add(Marker(
-          markerId: MarkerId('facility_${_facilityDetails!.name}'),
-          position: LatLng(_facilityDetails!.coordinates.latitude, _facilityDetails!.coordinates.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          infoWindow: InfoWindow(title: _facilityDetails!.name, snippet: 'Facility Location'),
+          point: latlng.LatLng(_facilityDetails!.coordinates.latitude, _facilityDetails!.coordinates.longitude),
+          child: Icon(
+            Icons.business,
+            color: Colors.blue,
+            size: 40,
+          ),
         ));
       }
 
       for (final record in records) {
         if (record.clockInLocation != null) {
           markers.add(Marker(
-            markerId: MarkerId('in-${record.staffId}-${record.date.toIso8601String()}'),
-            position: LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-            infoWindow: InfoWindow(
-              title: '${record.staffName} - Clock In',
-              snippet: 'On ${DateFormat.yMd().add_jm().format(record.date)}',
+            point: latlng.LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            child: Icon(
+              Icons.location_on,
+              color: Colors.green,
+              size: 30,
             ),
           ));
         }
       }
       if (mounted) setState(() => _mapMarkers = markers);
     } catch (e) {
-      // Handle marker creation errors (deprecated API, etc.)
+      // Handle marker creation errors
       debugPrint("Error generating map markers: $e");
-      if (mounted) setState(() => _mapMarkers = {});
+      if (mounted) setState(() => _mapMarkers = []);
     }
   }
 

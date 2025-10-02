@@ -127,7 +127,7 @@ dependencies:
   flutter_email_sender: ^7.0.0
   #mapbox_gl: ^0.16.0
   cached_network_image:
-  google_maps_flutter:
+  # google_maps_flutter: # COMMENTED OUT - Using OpenStreetMap instead
   #flutter_reorderable_list:
   animated_reorderable_list:
   #another_telephony:
