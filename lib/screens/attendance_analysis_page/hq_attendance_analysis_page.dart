@@ -25,7 +25,6 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'dart:html' as html;
 
 
-import '../../widgets/drawer2.dart';
 import '../../widgets/drawer3.dart'; // Assuming a generic app drawer
 
 // (AnimatedNumberText widget remains the same)
@@ -175,7 +174,9 @@ class _ChartData {
   final String category;
   final double value;
   final Color? color;
-  _ChartData(this.category, this.value, [this.color]);
+
+  // This constructor now correctly initializes the optional 'color' field.
+  _ChartData(this.category, this.value, {this.color});
 }
 
 // --- MAIN WIDGET: HQAttendanceAnalysisPage ---
@@ -1216,7 +1217,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
                     return [
                       // Facility Header Row
                       DataRow(
-                        color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
+                        color: WidgetStateProperty.all(Colors.blue.withOpacity(0.1)),
                         cells: [
                           DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
                           ..._dateRangeForTables.map((date) {

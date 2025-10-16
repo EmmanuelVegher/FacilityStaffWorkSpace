@@ -80,15 +80,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (_isEditMode) {
       _initializeEditForm();
     } else {
-      // This form is for editing only, but if it were for creating,
-      // we would load the top-level lists here.
       _isInitializing = false;
     }
   }
 
   /// Fetches supervisors specifically from the "Program Management" department.
   Future<List<DropdownMenuItem<String>>> _fetchProgramManagers() async {
-    // This requires a state to be selected first
     if (_selectedStateId == null) return [];
 
     try {
@@ -102,7 +99,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
       if (snapshot.docs.isEmpty) return [];
 
       final managers = snapshot.docs.map((doc) {
-        // The supervisor's name is the document ID
         final supervisorName = doc.id;
         return DropdownMenuItem<String>(
           value: supervisorName,
@@ -110,10 +106,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
         );
       }).toList();
 
-      // Sort the list alphabetically by name
       managers.sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
       return managers;
-
     } catch (e) {
       debugPrint("Error fetching program managers: $e");
       return [];
@@ -136,17 +130,14 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
       final email = snapshot.data()?['email'] as String?;
 
-      // Return a list with a single item if the email exists
-      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
+      return email == null
+          ? []
+          : [DropdownMenuItem<String>(value: email, child: Text(email))];
     } catch (e) {
       debugPrint("Error fetching program manager email: $e");
       return [];
     }
   }
-
-
-  /// The main function to pre-fetch all data and set initial values for Edit Mode.
-// In _UserFormScreenState class
 
   /// The main function to pre-fetch all data and set initial values for Edit Mode.
   Future<void> _initializeEditForm() async {
@@ -157,8 +148,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _lastNameController.text = staff.lastName;
     _emailController.text = staff.emailAddress;
     _mobileNumberController.text = staff.mobile;
-    _accountNumberController.text = staff.accountNumber; // NEW
-    _sortCodeController.text = staff.sortCode; // NEW
+    _accountNumberController.text = staff.accountNumber;
+    _sortCodeController.text = staff.sortCode;
     _existingPhotoUrl = staff.photoUrl;
     _selectedGender = staff.gender;
     _selectedMaritalStatus = staff.maritalStatus;
@@ -175,9 +166,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _projectOptions = await _fetchStringList('Project', 'name');
     _departmentsList = await _fetchDepartments();
     _designationsList = await _fetchDesignations();
-    _banksList = await _fetchBanks(); // NEW
+    _banksList = await _fetchBanks();
 
-    // 3. Begin the sequential "waterfall" lookup and fetch for dependent dropdowns
+    // 3. Waterfall dependent dropdowns
     if (_selectedCategory != null) {
       _statesList = await _fetchStatesBasedOnCategory();
       final foundStateId = await _reverseLookupId('Location', 'name', staff.state);
@@ -185,38 +176,52 @@ class _UserFormScreenState extends State<UserFormScreen> {
         _selectedStateId = foundStateId;
         _programManagersList = await _fetchProgramManagers();
         _locationsList = await _fetchLocations();
-        final foundLocationId = await _reverseLookupId('Location/$_selectedStateId/$_selectedStateId', 'LocationName', staff.location);
+        final foundLocationId = await _reverseLookupId(
+          'Location/$_selectedStateId/$_selectedStateId',
+          'LocationName',
+          staff.location,
+        );
         if (foundLocationId != null) {
           _selectedLocationId = foundLocationId;
         }
       }
     }
 
-    // --- NEW: Pre-populate program manager email if a manager was loaded ---
+    // Program manager email pre-populate
     if (_selectedProgramManagerId != null) {
       _programManagerEmailsList = await _fetchProgramManagerEmails();
     }
 
-    // 4. Handle supervisor (which depends on state and department)
+    // Supervisors (depends on state and department)
     if (staff.supervisor.isNotEmpty && _selectedDepartmentName != null) {
-      // First, fetch all possible supervisors (from state and HQ if applicable)
       _supervisorsList = await _fetchSupervisors();
 
-      // --- NEW LOGIC TO FIND THE CORRECT SUPERVISOR ID ---
       String? supervisorToFind;
-      // Check if the supervisor is in the state-level list
-      final stateSupDoc = _selectedStateId != null ? await _firestore.collection("Supervisors").doc(_selectedStateId).collection(_selectedStateId!).doc(staff.supervisor).get() : null;
+      final stateSupDoc = _selectedStateId != null
+          ? await _firestore
+          .collection("Supervisors")
+          .doc(_selectedStateId)
+          .collection(_selectedStateId!)
+          .doc(staff.supervisor)
+          .get()
+          : null;
       if (stateSupDoc?.exists ?? false) {
-        // It's a regular state supervisor
         supervisorToFind = staff.supervisor;
       } else {
-        // It might be an HQ supervisor, check that list
-        final hqStateQuery = await _firestore.collection("Location").where("name", isEqualTo: "Federal Capital Territory").limit(1).get();
+        final hqStateQuery = await _firestore
+            .collection("Location")
+            .where("name", isEqualTo: "Federal Capital Territory")
+            .limit(1)
+            .get();
         if (hqStateQuery.docs.isNotEmpty) {
           final hqStateId = hqStateQuery.docs.first.id;
-          final hqSupDoc = await _firestore.collection("Supervisors").doc(hqStateId).collection(hqStateId).doc(staff.supervisor).get();
+          final hqSupDoc = await _firestore
+              .collection("Supervisors")
+              .doc(hqStateId)
+              .collection(hqStateId)
+              .doc(staff.supervisor)
+              .get();
           if (hqSupDoc.exists) {
-            // It's an HQ supervisor, create the composite ID
             supervisorToFind = "${staff.supervisor}|$hqStateId";
           }
         }
@@ -227,13 +232,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
         _supervisorEmailsList = await _fetchSupervisorEmails();
         _selectedSupervisorEmail = staff.supervisorEmail;
       } else {
-        // The supervisor was manually entered
         _supervisorNameController.text = staff.supervisor;
         _supervisorEmailController.text = staff.supervisorEmail;
       }
     }
 
-    // 5. All data is ready. Stop the main loading spinner and build the form.
     if (mounted) {
       setState(() {
         _isInitializing = false;
@@ -245,24 +248,33 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Future<List<DropdownMenuItem<String>>> _fetchBanks() async {
     try {
       final snapshot = await _firestore.collection("Bank").get();
-      return snapshot.docs.map((doc) => DropdownMenuItem<String>(
+      return snapshot.docs
+          .map((doc) => DropdownMenuItem<String>(
         value: doc['name'] as String,
         child: Text(doc['name'] as String),
-      )).toList()..sort((a, b) => a.value!.compareTo(b.value!));
+      ))
+          .toList()
+        ..sort((a, b) => a.value!.compareTo(b.value!));
     } catch (e) {
       debugPrint("Error fetching banks: $e");
       return [];
     }
   }
 
-
   /// Helper to find a document's ID from its human-readable name field.
-  Future<String?> _reverseLookupId(String collectionPath, String field, String value) async {
+  Future<String?> _reverseLookupId(
+      String collectionPath, String field, String value) async {
     if (value.isEmpty) return null;
     try {
-      final snapshot = await _firestore.collection(collectionPath).where(field, isEqualTo: value).limit(1).get();
+      final snapshot = await _firestore
+          .collection(collectionPath)
+          .where(field, isEqualTo: value)
+          .limit(1)
+          .get();
       return snapshot.docs.isNotEmpty ? snapshot.docs.first.id : null;
-    } catch (e) { return null; }
+    } catch (e) {
+      return null;
+    }
   }
 
   // --- DATA FETCHING METHODS ---
@@ -270,54 +282,105 @@ class _UserFormScreenState extends State<UserFormScreen> {
     try {
       final snapshot = await _firestore.collection(collection).get();
       return snapshot.docs.map((doc) => doc[field] as String).toList();
-    } catch (e) { return []; }
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchStatesBasedOnCategory() async {
     if (_selectedCategory == null) return [];
     try {
       Query query = _firestore.collection("Location");
-      if (_selectedCategory == "Facility Staff" || _selectedCategory == "State Office Staff" || _selectedCategory == "Facility Supervisor") {
+      if (_selectedCategory == "Facility Staff" ||
+          _selectedCategory == "State Office Staff" ||
+          _selectedCategory == "Facility Supervisor") {
         query = query.where('name', isNotEqualTo: "Federal Capital Territory");
       } else if (_selectedCategory == "HQ Staff") {
         query = query.where('name', isEqualTo: "Federal Capital Territory");
       }
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc['name'] as String? ?? ''))).toList();
-    } catch (e) { return []; }
+      return snapshot.docs
+          .map((doc) => DropdownMenuItem<String>(
+        value: doc.id,
+        child: Text(doc['name'] as String? ?? ''),
+      ))
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchLocations() async {
     if (_selectedStateId == null || _selectedCategory == null) return [];
     try {
-      String cat = (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor") ? "Facility" : (_selectedCategory == "State Office Staff" ? "State Office" : "HQ");
-      final snapshot = await _firestore.collection("Location").doc(_selectedStateId).collection(_selectedStateId!).where("category", isEqualTo: cat).get();
-      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc['LocationName'] as String? ?? ''))).toList();
-    } catch (e) { return []; }
+      String cat =
+      (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor")
+          ? "Facility"
+          : (_selectedCategory == "State Office Staff" ? "State Office" : "HQ");
+      final snapshot = await _firestore
+          .collection("Location")
+          .doc(_selectedStateId)
+          .collection(_selectedStateId!)
+          .where("category", isEqualTo: cat)
+          .get();
+      return snapshot.docs
+          .map((doc) => DropdownMenuItem<String>(
+        value: doc.id,
+        child: Text(doc['LocationName'] as String? ?? ''),
+      ))
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchDepartments() async {
     if (_selectedCategory == null) return [];
     try {
       final snapshot = await _firestore.collection("Designation").get();
-      List<String> allowedForFacility = ["Care and Treatment", "Preventions", "Admin", "Laboratory", "Strategic Information", "Pharmacy and Logistics", "Orphan and Vulnerable Children (OVC)"];
+      List<String> allowedForFacility = [
+        "Care and Treatment",
+        "Preventions",
+        "Admin",
+        "Laboratory",
+        "Strategic Information",
+        "Pharmacy and Logistics",
+        "Orphan and Vulnerable Children (OVC)"
+      ];
       return snapshot.docs
-          .where((doc) => _selectedCategory != "Facility Staff" && _selectedCategory != "Facility Supervisor" || allowedForFacility.contains(doc.id))
-          .map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc.id)))
+          .where((doc) =>
+      _selectedCategory != "Facility Staff" &&
+          _selectedCategory != "Facility Supervisor" ||
+          allowedForFacility.contains(doc.id))
+          .map((doc) =>
+          DropdownMenuItem<String>(value: doc.id, child: Text(doc.id)))
           .toList();
-    } catch (e) { return []; }
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchDesignations() async {
     if (_selectedDepartmentName == null) return [];
     try {
-      String designationCategory = (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor") ? "Facility Staff" : "Office Staff";
-      final snapshot = await _firestore.collection("Designation").doc(_selectedDepartmentName).collection(_selectedDepartmentName!).where("category", isEqualTo: designationCategory).get();
-      return snapshot.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text(doc.id))).toList();
-    } catch (e) { return []; }
+      String designationCategory =
+      (_selectedCategory == "Facility Staff" || _selectedCategory == "Facility Supervisor")
+          ? "Facility Staff"
+          : "Office Staff";
+      final snapshot = await _firestore
+          .collection("Designation")
+          .doc(_selectedDepartmentName)
+          .collection(_selectedDepartmentName!)
+          .where("category", isEqualTo: designationCategory)
+          .get();
+      return snapshot.docs
+          .map((doc) =>
+          DropdownMenuItem<String>(value: doc.id, child: Text(doc.id)))
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
-
-// In _UserFormScreenState class
 
   Future<List<DropdownMenuItem<String>>> _fetchSupervisors() async {
     if (_selectedDepartmentName == null) return [];
@@ -371,8 +434,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ..sort((a, b) => (a.child as Text).data!.compareTo((b.child as Text).data!));
 
       return sortedList;
-
-    } catch (e) { return []; }
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<DropdownMenuItem<String>>> _fetchSupervisorEmails() async {
@@ -400,19 +464,23 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
       if (!snapshot.exists) return [];
       final email = snapshot.data()?['email'] as String?;
-      return email == null ? [] : [DropdownMenuItem(value: email, child: Text(email))];
-    } catch (e) { return []; }
+      return email == null
+          ? []
+          : [DropdownMenuItem<String>(value: email, child: Text(email))];
+    } catch (e) {
+      return [];
+    }
   }
+
   // --- ACTIONS ---
 
   Future<void> _pickProfileImage() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    FilePickerResult? result =
+    await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
     if (result != null && result.files.isNotEmpty) {
       setState(() => _profileImageBytes = result.files.first.bytes);
     }
   }
-
-// In _UserFormScreenState class
 
   Future<void> _saveForm() async {
     if (!_formKey.currentState!.validate()) {
@@ -429,33 +497,43 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
       if (currentUser != null && currentUser.email != null) {
         createdByEmail = currentUser.email!;
-        // For a better user experience, user's name should be available from a state
-        // manager. A direct Firestore read here adds a small delay.
-        final staffDoc = await _firestore.collection('Staff').where('emailAddress', isEqualTo: currentUser.email!).limit(1).get();
+        final staffDoc = await _firestore
+            .collection('Staff')
+            .where('emailAddress', isEqualTo: currentUser.email!)
+            .limit(1)
+            .get();
         if (staffDoc.docs.isNotEmpty) {
           final staffData = staffDoc.docs.first.data();
           createdBy = '${staffData['firstName']} ${staffData['lastName']}';
         } else {
-          createdBy = currentUser.displayName ?? currentUser.email!; // Fallback
+          createdBy = currentUser.displayName ?? currentUser.email!;
         }
       }
 
       String? finalPhotoUrl = _existingPhotoUrl;
       if (_profileImageBytes != null) {
         String userId = widget.staff!.id;
-        final ref = firebase_storage.FirebaseStorage.instance.ref().child('profile_pics/$userId/profile.jpg');
+        final ref = firebase_storage.FirebaseStorage.instance
+            .ref()
+            .child('profile_pics/$userId/profile.jpg');
         await ref.putData(_profileImageBytes!);
         finalPhotoUrl = await ref.getDownloadURL();
       }
 
       String finalStateName = '';
       if (_selectedStateId != null) {
-        final doc = await _firestore.collection('Location').doc(_selectedStateId).get();
+        final doc =
+        await _firestore.collection('Location').doc(_selectedStateId).get();
         finalStateName = doc.data()?['name'] as String? ?? '';
       }
       String finalLocationName = '';
       if (_selectedStateId != null && _selectedLocationId != null) {
-        final doc = await _firestore.collection('Location').doc(_selectedStateId).collection(_selectedStateId!).doc(_selectedLocationId).get();
+        final doc = await _firestore
+            .collection('Location')
+            .doc(_selectedStateId)
+            .collection(_selectedStateId!)
+            .doc(_selectedLocationId)
+            .get();
         finalLocationName = doc.data()?['LocationName'] as String? ?? '';
       }
 
@@ -472,11 +550,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
         'location': finalLocationName,
         'department': _selectedDepartmentName ?? '',
         'designation': _selectedDesignationName ?? '',
-        // --- NEW LOGIC FOR SAVING SUPERVISOR NAME ---
         'supervisor': (_selectedSupervisorId?.contains('|') ?? false)
             ? _selectedSupervisorId!.split('|')[0]
             : (_selectedSupervisorId ?? _supervisorNameController.text.trim()),
-        'supervisorEmail': _selectedSupervisorEmail ?? _supervisorEmailController.text.trim(),
+        'supervisorEmail':
+        _selectedSupervisorEmail ?? _supervisorEmailController.text.trim(),
         'role': _selectedRole ?? '',
         'gender': _selectedGender ?? '',
         'maritalStatus': _selectedMaritalStatus ?? '',
@@ -484,13 +562,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
         'lastUpdateDate': FieldValue.serverTimestamp(),
         'programManager': _selectedProgramManagerId ?? '',
         'programManagerEmail': _selectedProgramManagerEmail ?? '',
-        'lastUpdatedBy': createdBy, // Using 'lastUpdatedBy' is better for edits
+        'lastUpdatedBy': createdBy,
         'lastUpdatedByEmail': createdByEmail,
       };
 
-      // The prompt requested 'createdBy', which is usually set once.
-      // In an edit form, we add it if it doesn't already exist.
-      final staffDocRef = _firestore.collection('Staff').doc(widget.staff!.id);
+      final staffDocRef =
+      _firestore.collection('Staff').doc(widget.staff!.id);
       final currentStaffDoc = await staffDocRef.get();
       if (!currentStaffDoc.exists || currentStaffDoc.data()?['createdBy'] == null) {
         dataToSave['createdBy'] = createdBy;
@@ -502,18 +579,19 @@ class _UserFormScreenState extends State<UserFormScreen> {
       await _showResultDialog(
           title: 'Success',
           content: 'User profile has been updated successfully.',
-          onOkPressed: () => Navigator.of(context).pop()
-      );
-
+          onOkPressed: () => Navigator.of(context).pop());
     } catch (e) {
-      await _showResultDialog(title: 'Error', content: 'An unexpected error occurred: ${e.toString()}');
+      await _showResultDialog(
+          title: 'Error', content: 'An unexpected error occurred: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-
-  Future<void> _showResultDialog({required String title, required String content, VoidCallback? onOkPressed}) async {
+  Future<void> _showResultDialog(
+      {required String title,
+        required String content,
+        VoidCallback? onOkPressed}) async {
     if (!mounted) return;
     return showDialog<void>(
       context: context,
@@ -548,84 +626,121 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? avatarImage;
+    if (_profileImageBytes != null) {
+      avatarImage = MemoryImage(_profileImageBytes!);
+    } else if ((_existingPhotoUrl ?? '').isNotEmpty) {
+      avatarImage = NetworkImage(_existingPhotoUrl!);
+    }
+
     return Scaffold(
-        appBar: AppBar(
-          title: Text(_isEditMode ? 'Edit Staff Profile' : 'Create Staff'),
-          backgroundColor: Colors.red.shade700,
-          foregroundColor: Colors.white,
-        ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.red.shade600, Colors.black87, Colors.white, Colors.yellow.shade600],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+      appBar: AppBar(
+        title: Text(_isEditMode ? 'Edit Staff Profile' : 'Create Staff'),
+        backgroundColor: Colors.red.shade700,
+        foregroundColor: Colors.white,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.red.shade600,
+              Colors.black87,
+              Colors.white,
+              Colors.yellow.shade600
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: _isInitializing
-              ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4))
-              : Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth > 760;
-                  final containerWidth = isDesktop ? 800.0 : constraints.maxWidth;
-                  return Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    elevation: 8,
-                    child: Container(
-                      width: containerWidth,
-                      padding: const EdgeInsets.all(32),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(_isEditMode ? 'Update Details for\n${widget.staff!.fullName}' : 'New Account', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                            const SizedBox(height: 24),
-                            GestureDetector(
-                              onTap: _pickProfileImage,
-                              child: CircleAvatar(
-                                radius: 60,
-                                backgroundColor: Colors.grey.shade200,
-                                backgroundImage: _profileImageBytes != null
-                                    ? MemoryImage(_profileImageBytes!)
-                                    : (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty
-                                    ? NetworkImage(_existingPhotoUrl!) : null) as ImageProvider?,
-                                child: _profileImageBytes == null && (_existingPhotoUrl == null || _existingPhotoUrl!.isEmpty)
-                                    ? Icon(Icons.camera_alt, size: 40, color: Colors.grey.shade700)
-                                    : null,
+        ),
+        child: _isInitializing
+            ? const Center(
+            child: CircularProgressIndicator(
+                color: Colors.white, strokeWidth: 4))
+            : Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+                vertical: 32.0, horizontal: 16.0),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth > 760;
+                final containerWidth =
+                isDesktop ? 800.0 : constraints.maxWidth;
+                return Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  elevation: 8,
+                  child: Container(
+                    width: containerWidth,
+                    padding: const EdgeInsets.all(32),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _isEditMode
+                                ? 'Update Details for\n${widget.staff!.fullName}'
+                                : 'New Account',
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          GestureDetector(
+                            onTap: _pickProfileImage,
+                            child: CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.grey.shade200,
+                              backgroundImage: avatarImage,
+                              child: avatarImage == null
+                                  ? Icon(Icons.camera_alt,
+                                  size: 40,
+                                  color: Colors.grey.shade700)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          if (isDesktop)
+                            _buildDesktopLayout()
+                          else
+                            _buildMobileLayout(),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _saveForm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange.shade700,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 18),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(12)),
+                              ),
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                                  : const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white),
                               ),
                             ),
-                            const SizedBox(height: 32),
-                            if (isDesktop) _buildDesktopLayout() else _buildMobileLayout(),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _saveForm,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade700,
-                                  padding: const EdgeInsets.symmetric(vertical: 18),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text(
-                                  'Save Changes',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 
   Widget _buildDesktopLayout() {
@@ -634,46 +749,112 @@ class _UserFormScreenState extends State<UserFormScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildStyledTextField(controller: _firstNameController, label: "First Name", icon: Icons.person)),
+            Expanded(
+                child: _buildStyledTextField(
+                    controller: _firstNameController,
+                    label: "First Name",
+                    icon: Icons.person)),
             const SizedBox(width: 20),
-            Expanded(child: _buildStyledTextField(controller: _lastNameController, label: "Last Name", icon: Icons.person)),
+            Expanded(
+                child: _buildStyledTextField(
+                    controller: _lastNameController,
+                    label: "Last Name",
+                    icon: Icons.person)),
           ],
         ),
         const SizedBox(height: 20),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildStyledTextField(controller: _emailController, label: "Email Address", icon: Icons.email, enabled: false)),
+            Expanded(
+                child: _buildStyledTextField(
+                    controller: _emailController,
+                    label: "Email Address",
+                    icon: Icons.email,
+                    enabled: false)),
             const SizedBox(width: 20),
-            Expanded(child: _buildStyledTextField(controller: _mobileNumberController, label: "Mobile Number", icon: Icons.phone_android, keyboardType: TextInputType.number)),
+            Expanded(
+                child: _buildStyledTextField(
+                    controller: _mobileNumberController,
+                    label: "Mobile Number",
+                    icon: Icons.phone_android,
+                    keyboardType: TextInputType.number)),
           ],
         ),
         const SizedBox(height: 20),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildStyledDropdown(label: "Gender", value: _selectedGender, items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(), onChanged: (v) => setState(() => _selectedGender = v))),
+            Expanded(
+              child: _buildStyledDropdown<String>(
+                label: "Gender",
+                value: _selectedGender,
+                items: _genderOptions
+                    .map((g) =>
+                    DropdownMenuItem<String>(value: g, child: Text(g)))
+                    .toList(),
+                onChanged: (String? v) =>
+                    setState(() => _selectedGender = v),
+              ),
+            ),
             const SizedBox(width: 20),
-            Expanded(child: _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v))),
+            Expanded(
+              child: _buildStyledDropdown<String>(
+                label: "Marital Status",
+                value: _selectedMaritalStatus,
+                items: _maritalStatusOptions
+                    .map((s) =>
+                    DropdownMenuItem<String>(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (String? v) =>
+                    setState(() => _selectedMaritalStatus = v),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 20),
-        // --- NEW: BANKING DETAILS ROW ---
-        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Text("Banking Information",
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
         const Divider(),
         const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(flex: 2, child: _buildStyledDropdown(label: "Bank Name", value: _selectedBankName, items: _banksList, onChanged: (v) => setState(() => _selectedBankName = v))),
+            Expanded(
+              flex: 2,
+              child: _buildStyledDropdown<String>(
+                label: "Bank Name",
+                value: _selectedBankName,
+                items: _banksList,
+                onChanged: (String? v) => setState(() => _selectedBankName = v),
+              ),
+            ),
             const SizedBox(width: 20),
-            Expanded(flex: 2, child: _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number)),
+            Expanded(
+              flex: 2,
+              child: _buildStyledTextField(
+                  controller: _accountNumberController,
+                  label: "Account Number",
+                  icon: Icons.numbers,
+                  keyboardType: TextInputType.number),
+            ),
             const SizedBox(width: 20),
-            Expanded(flex: 1, child: _buildStyledTextField(controller: _sortCodeController, label: "Sort Code", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null)), // Optional field
+            Expanded(
+              flex: 1,
+              child: _buildStyledTextField(
+                  controller: _sortCodeController,
+                  label: "Sort Code",
+                  icon: Icons.pin,
+                  keyboardType: TextInputType.number,
+                  validator: (v) => null),
+            ),
           ],
         ),
         const SizedBox(height: 20),
-        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Text("Professional Information",
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
         const Divider(),
         const SizedBox(height: 10),
         _buildDependentFields(),
@@ -684,32 +865,74 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Widget _buildMobileLayout() {
     return Column(
       children: [
-        _buildStyledTextField(controller: _firstNameController, label: "First Name", icon: Icons.person),
+        _buildStyledTextField(
+            controller: _firstNameController,
+            label: "First Name",
+            icon: Icons.person),
         const SizedBox(height: 20),
-        _buildStyledTextField(controller: _lastNameController, label: "Last Name", icon: Icons.person),
+        _buildStyledTextField(
+            controller: _lastNameController, label: "Last Name", icon: Icons.person),
         const SizedBox(height: 20),
-        _buildStyledTextField(controller: _emailController, label: "Email Address", icon: Icons.email, enabled: false),
+        _buildStyledTextField(
+            controller: _emailController,
+            label: "Email Address",
+            icon: Icons.email,
+            enabled: false),
         const SizedBox(height: 20),
-        _buildStyledTextField(controller: _mobileNumberController, label: "Mobile Number", icon: Icons.phone_android, keyboardType: TextInputType.number),
+        _buildStyledTextField(
+            controller: _mobileNumberController,
+            label: "Mobile Number",
+            icon: Icons.phone_android,
+            keyboardType: TextInputType.number),
         const SizedBox(height: 20),
-        _buildStyledDropdown(label: "Gender", value: _selectedGender, items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(), onChanged: (v) => setState(() => _selectedGender = v)),
+        _buildStyledDropdown<String>(
+          label: "Gender",
+          value: _selectedGender,
+          items: _genderOptions
+              .map((g) => DropdownMenuItem<String>(value: g, child: Text(g)))
+              .toList(),
+          onChanged: (String? v) => setState(() => _selectedGender = v),
+        ),
         const SizedBox(height: 20),
-        _buildStyledDropdown(label: "Marital Status", value: _selectedMaritalStatus, items: _maritalStatusOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => _selectedMaritalStatus = v)),
+        _buildStyledDropdown<String>(
+          label: "Marital Status",
+          value: _selectedMaritalStatus,
+          items: _maritalStatusOptions
+              .map((s) => DropdownMenuItem<String>(value: s, child: Text(s)))
+              .toList(),
+          onChanged: (String? v) => setState(() => _selectedMaritalStatus = v),
+        ),
         const SizedBox(height: 20),
-        // --- NEW: BANKING DETAILS FOR MOBILE ---
-        const Text("Banking Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Text("Banking Information",
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
         const Divider(),
         const SizedBox(height: 10),
-        _buildStyledDropdown(label: "Bank Name", value: _selectedBankName, items: _banksList, onChanged: (v) => setState(() => _selectedBankName = v)),
+        _buildStyledDropdown<String>(
+          label: "Bank Name",
+          value: _selectedBankName,
+          items: _banksList,
+          onChanged: (String? v) => setState(() => _selectedBankName = v),
+        ),
         const SizedBox(height: 20),
-        _buildStyledTextField(controller: _accountNumberController, label: "Account Number", icon: Icons.numbers, keyboardType: TextInputType.number),
+        _buildStyledTextField(
+            controller: _accountNumberController,
+            label: "Account Number",
+            icon: Icons.numbers,
+            keyboardType: TextInputType.number),
         const SizedBox(height: 20),
-        _buildStyledTextField(controller: _sortCodeController, label: "Sort Code (Optional)", icon: Icons.pin, keyboardType: TextInputType.number, validator: (v) => null),
+        _buildStyledTextField(
+            controller: _sortCodeController,
+            label: "Sort Code (Optional)",
+            icon: Icons.pin,
+            keyboardType: TextInputType.number,
+            validator: (v) => null),
         const SizedBox(height: 20),
-        const Text("Professional Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const Text("Professional Information",
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
         const Divider(),
         const SizedBox(height: 10),
-
         _buildDependentFields(),
       ],
     );
@@ -719,15 +942,27 @@ class _UserFormScreenState extends State<UserFormScreen> {
     return Column(
       children: [
         _buildStyledDropdown<String>(
-          label: "Staff Category", value: _selectedCategory,
-          items: _staffCategoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-          onChanged: (value) async {
+          label: "Staff Category",
+          value: _selectedCategory,
+          items: _staffCategoryOptions
+              .map((c) => DropdownMenuItem<String>(value: c, child: Text(c)))
+              .toList(),
+          onChanged: (String? value) async {
             setState(() {
-              _selectedCategory = value; _selectedRole = null; _selectedStateId = null; _selectedLocationId = null;
-              _selectedDepartmentName = null; _selectedDesignationName = null;
-              _selectedSupervisorId = null; _selectedSupervisorEmail = null;
-              _statesList = []; _locationsList = []; _departmentsList = [];
-              _designationsList = []; _supervisorsList = []; _supervisorEmailsList = [];
+              _selectedCategory = value;
+              _selectedRole = null;
+              _selectedStateId = null;
+              _selectedLocationId = null;
+              _selectedDepartmentName = null;
+              _selectedDesignationName = null;
+              _selectedSupervisorId = null;
+              _selectedSupervisorEmail = null;
+              _statesList = [];
+              _locationsList = [];
+              _departmentsList = [];
+              _designationsList = [];
+              _supervisorsList = [];
+              _supervisorEmailsList = [];
             });
             _statesList = await _fetchStatesBasedOnCategory();
             if (mounted) setState(() {});
@@ -735,38 +970,56 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ),
         const SizedBox(height: 20),
         _buildStyledDropdown<String>(
-          label: "Project", value: _selectedProject,
-          items: _projectOptions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-          onChanged: (value) => setState(() => _selectedProject = value),
+          label: "Project",
+          value: _selectedProject,
+          items: _projectOptions
+              .map((p) => DropdownMenuItem<String>(value: p, child: Text(p)))
+              .toList(),
+          onChanged: (String? value) =>
+              setState(() => _selectedProject = value),
         ),
         if (_selectedCategory != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "State", value: _selectedStateId, items: _statesList,
-            onChanged: (value) async {
+            label: "State",
+            value: _selectedStateId,
+            items: _statesList,
+            onChanged: (String? value) async {
               setState(() {
                 _selectedStateId = value;
-                _selectedLocationId = null; _selectedDepartmentName = null; _selectedDesignationName = null;
-                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
-                _locationsList = []; _departmentsList = []; _designationsList = [];
-                _supervisorsList = []; _supervisorEmailsList = [];
+                _selectedLocationId = null;
+                _selectedDepartmentName = null;
+                _selectedDesignationName = null;
+                _selectedSupervisorId = null;
+                _selectedSupervisorEmail = null;
+                _locationsList = [];
+                _departmentsList = [];
+                _designationsList = [];
+                _supervisorsList = [];
+                _supervisorEmailsList = [];
               });
               _locationsList = await _fetchLocations();
-              if(mounted) setState(() {});
+              if (mounted) setState(() {});
             },
           ),
         ],
         if (_selectedStateId != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Location", value: _selectedLocationId, items: _locationsList,
-            onChanged: (value) async {
+            label: "Location",
+            value: _selectedLocationId,
+            items: _locationsList,
+            onChanged: (String? value) async {
               setState(() {
                 _selectedLocationId = value;
-                _selectedDepartmentName = null; _selectedDesignationName = null;
-                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
-                _departmentsList = []; _designationsList = [];
-                _supervisorsList = []; _supervisorEmailsList = [];
+                _selectedDepartmentName = null;
+                _selectedDesignationName = null;
+                _selectedSupervisorId = null;
+                _selectedSupervisorEmail = null;
+                _departmentsList = [];
+                _designationsList = [];
+                _supervisorsList = [];
+                _supervisorEmailsList = [];
               });
               _departmentsList = await _fetchDepartments();
               if (mounted) setState(() {});
@@ -776,76 +1029,90 @@ class _UserFormScreenState extends State<UserFormScreen> {
         if (_selectedLocationId != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Department", value: _selectedDepartmentName, items: _departmentsList,
-            onChanged: (value) async {
+            label: "Department",
+            value: _selectedDepartmentName,
+            items: _departmentsList,
+            onChanged: (String? value) async {
               setState(() {
                 _selectedDepartmentName = value;
-                _selectedDesignationName = null; _selectedSupervisorId = null; _selectedSupervisorEmail = null;
-                _designationsList = []; _supervisorsList = []; _supervisorEmailsList = [];
+                _selectedDesignationName = null;
+                _selectedSupervisorId = null;
+                _selectedSupervisorEmail = null;
+                _designationsList = [];
+                _supervisorsList = [];
+                _supervisorEmailsList = [];
               });
               _designationsList = await _fetchDesignations();
-              if(mounted) setState(() {});
+              if (mounted) setState(() {});
             },
           ),
         ],
         if (_selectedDepartmentName != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Designation", value: _selectedDesignationName, items: _designationsList,
-            onChanged: (value) async {
+            label: "Designation",
+            value: _selectedDesignationName,
+            items: _designationsList,
+            onChanged: (String? value) async {
               setState(() {
                 _selectedDesignationName = value;
-                _selectedSupervisorId = null; _selectedSupervisorEmail = null;
-                _supervisorsList = []; _supervisorEmailsList = [];
+                _selectedSupervisorId = null;
+                _selectedSupervisorEmail = null;
+                _supervisorsList = [];
+                _supervisorEmailsList = [];
               });
               _supervisorsList = await _fetchSupervisors();
               if (mounted) setState(() {});
             },
           ),
         ],
-        if (_selectedDesignationName != null && _selectedCategory != 'Facility Supervisor') ...[
+        if (_selectedDesignationName != null &&
+            _selectedCategory != 'Facility Supervisor') ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Supervisor Name", value: _selectedSupervisorId, items: _supervisorsList,
-            onChanged: (value) async {
+            label: "Supervisor Name",
+            value: _selectedSupervisorId,
+            items: _supervisorsList,
+            onChanged: (String? value) async {
               setState(() {
                 _selectedSupervisorId = value;
                 _selectedSupervisorEmail = null;
                 _supervisorEmailsList = [];
               });
               _supervisorEmailsList = await _fetchSupervisorEmails();
-              if(mounted) setState(() {});
+              if (mounted) setState(() {});
             },
           ),
         ],
         if (_selectedSupervisorId != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Supervisor Email", value: _selectedSupervisorEmail, items: _supervisorEmailsList,
-            onChanged: (value) => setState(() => _selectedSupervisorEmail = value),
+            label: "Supervisor Email",
+            value: _selectedSupervisorEmail,
+            items: _supervisorEmailsList,
+            onChanged: (String? value) =>
+                setState(() => _selectedSupervisorEmail = value),
           ),
         ],
-        // --- ADD THE NEW PROGRAM MANAGER DROPDOWNS HERE ---
+        // Program manager dropdowns
         if (_selectedDesignationName != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
             label: "Program Manager Name",
             value: _selectedProgramManagerId,
             items: _programManagersList,
-            onChanged: (value) async {
+            onChanged: (String? value) async {
               setState(() {
                 _selectedProgramManagerId = value;
-                // Reset the dependent email dropdown
                 _selectedProgramManagerEmail = null;
                 _programManagerEmailsList = [];
               });
-              // Fetch the corresponding email
               _programManagerEmailsList = await _fetchProgramManagerEmails();
               if (_programManagerEmailsList.isNotEmpty) {
-                // Auto-select the email since there will only be one
-                _selectedProgramManagerEmail = _programManagerEmailsList.first.value;
+                _selectedProgramManagerEmail =
+                    _programManagerEmailsList.first.value;
               }
-              if(mounted) setState(() {});
+              if (mounted) setState(() {});
             },
           ),
         ],
@@ -855,60 +1122,103 @@ class _UserFormScreenState extends State<UserFormScreen> {
             label: "Program Manager Email",
             value: _selectedProgramManagerEmail,
             items: _programManagerEmailsList,
-            // This dropdown is auto-populated, so onChanged just updates state
-            onChanged: (value) => setState(() => _selectedProgramManagerEmail = value),
+            onChanged: (String? value) =>
+                setState(() => _selectedProgramManagerEmail = value),
           ),
         ],
-        // --- END OF NEW DROPDOWNS ---
         if (_selectedCategory == 'Facility Supervisor') ...[
           const SizedBox(height: 20),
-          _buildStyledTextField(controller: _supervisorNameController, label: 'Supervisor Name (Manual)', icon: Icons.person_search, validator: (v) => null),
+          _buildStyledTextField(
+              controller: _supervisorNameController,
+              label: 'Supervisor Name (Manual)',
+              icon: Icons.person_search,
+              validator: (v) => null),
           const SizedBox(height: 20),
-          _buildStyledTextField(controller: _supervisorEmailController, label: 'Supervisor Email (Manual)', icon: Icons.alternate_email, keyboardType: TextInputType.emailAddress, validator: (v) => null),
+          _buildStyledTextField(
+              controller: _supervisorEmailController,
+              label: 'Supervisor Email (Manual)',
+              icon: Icons.alternate_email,
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) => null),
         ],
-
         if (_selectedCategory != null) ...[
           const SizedBox(height: 20),
           _buildStyledDropdown<String>(
-            label: "Role", value: _selectedRole,
-            items: _getRoleOptions(_selectedCategory).map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
-            onChanged: (value) => setState(() => _selectedRole = value),
+            label: "Role",
+            value: _selectedRole,
+            items: _getRoleOptions(_selectedCategory)
+                .map((role) =>
+                DropdownMenuItem<String>(value: role, child: Text(role)))
+                .toList(),
+            onChanged: (String? value) =>
+                setState(() => _selectedRole = value),
           ),
         ]
       ],
     );
   }
 
-  Widget _buildStyledTextField({required TextEditingController controller, required String label, required IconData icon, bool enabled = true, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
+  Widget _buildStyledTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
     return TextFormField(
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,
-      validator: validator ?? (value) => (value == null || value.isEmpty) ? 'This field is required' : null,
+      validator: validator ??
+              (value) => (value == null || value.isEmpty) ? 'This field is required' : null,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
         filled: true,
         fillColor: enabled ? Colors.grey.shade100 : Colors.grey.shade200,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
       ),
     );
   }
 
-  Widget _buildStyledDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required void Function(T?)? onChanged, String? hint}) {
-    final bool isValueInItems = value != null && items.any((item) => item.value == value);
+  Widget _buildStyledDropdown<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?)? onChanged,
+    String? hint,
+  }) {
+    final bool isValueInItems =
+        value != null && items.any((item) => item.value == value);
+
+    final T? dropdownValue = (isValueInItems ? value : null) as T?;
+
     return DropdownButtonFormField<T>(
-      value: isValueInItems ? value : null,
+      value: dropdownValue,
       items: items,
       onChanged: onChanged,
       validator: (val) => val == null ? 'Please select an option' : null,
       decoration: InputDecoration(
-        labelText: label, hintText: hint, filled: true, fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
       ),
       isExpanded: true,
     );

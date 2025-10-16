@@ -51,7 +51,7 @@ class _EditableDepartmentTileState extends State<EditableDepartmentTile> {
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return
             DropdownButtonFormField<String>(
-              value: _selectedDepartment,
+              initialValue: _selectedDepartment,
               hint: const Text('Select Department'),
               decoration: const InputDecoration(
                 labelText:null,

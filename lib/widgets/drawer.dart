@@ -7,9 +7,7 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
-import '../screens/call_tracker/call_tracker_page.dart';
 import '../screens/call_tracker/report_page.dart';
-import '../screens/components/clock_attendance.dart';
 import '../screens/eac_tracker/report_eac_web_tab.dart';
 import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
@@ -21,7 +19,6 @@ import '../screens/timesheet/timesheet.dart';
 import '../screens/timesheet/upload_signature.dart';
 import '../screens/user_guide/user_guide.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
-import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
 
 
@@ -572,7 +569,7 @@ Widget drawer(
 
 
 
-_displayDialog(BuildContext context) async {
+Future<Future> _displayDialog(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -601,7 +598,7 @@ _displayDialog(BuildContext context) async {
       });
 }
 
-_displayDialogForDiffAcount(BuildContext context) async {
+Future<Future> _displayDialogForDiffAcount(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -686,7 +683,7 @@ void _switchAccountValidation(BuildContext context) async {
   // }
 }
 
-_showBottomSheet2(BuildContext context) {
+PersistentBottomSheetController _showBottomSheet2(BuildContext context) {
   return showBottomSheet(
       context: context,
       builder: (context) {
@@ -755,7 +752,7 @@ _showBottomSheet2(BuildContext context) {
       });
 }
 
-_bottomSheetButton(
+GestureDetector _bottomSheetButton(
     {required String label,
     required Function()? onTap,
     required Color clr,

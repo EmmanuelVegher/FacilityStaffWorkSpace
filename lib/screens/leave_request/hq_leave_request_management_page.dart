@@ -7,7 +7,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
-import '../../widgets/drawer2.dart';
 import '../../widgets/drawer3.dart'; // Assuming a generic app drawer
 
 // --- DATA MODEL (Unchanged, as it already handles string parsing) ---
@@ -47,7 +46,7 @@ class LeaveRequest {
   factory LeaveRequest.fromFirestore(DocumentSnapshot doc) {
     final map = doc.data() as Map<String, dynamic>;
 
-    DateTime _parseFirestoreDate(dynamic dateValue) {
+    DateTime parseFirestoreDate(dynamic dateValue) {
       if (dateValue == null) return DateTime.now();
       if (dateValue is Timestamp) return dateValue.toDate();
       if (dateValue is String) return DateTime.tryParse(dateValue) ?? DateTime.now();
@@ -62,8 +61,8 @@ class LeaveRequest {
       staffState: map['staffState'] ?? 'N/A',
       staffLocation: map['staffLocation'] ?? 'N/A',
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parseFirestoreDate(map['startDate']),
-      endDate: _parseFirestoreDate(map['endDate']),
+      startDate: parseFirestoreDate(map['startDate']),
+      endDate: parseFirestoreDate(map['endDate']),
       status: map['status'] ?? 'Pending',
       reason: map['reason'] as String?,
       supervisorName: map['selectedSupervisor'] ?? 'N/A', // NEW
@@ -90,8 +89,8 @@ class _LeaveRequestManagementPageState extends State<LeaveRequestManagementPage>
 
   List<String> _availableStates = [];
   List<String> _availableFacilities = [];
-  List<String> _availableLeaveTypes = ['All Types', 'Holiday', 'Annual', 'Sick', 'Maternity', 'Paternity', 'Unpaid', 'Other'];
-  List<String> _availableStatuses = ['All Statuses', 'Pending', 'Approved', 'Declined'];
+  final List<String> _availableLeaveTypes = ['All Types', 'Holiday', 'Annual', 'Sick', 'Maternity', 'Paternity', 'Unpaid', 'Other'];
+  final List<String> _availableStatuses = ['All Statuses', 'Pending', 'Approved', 'Declined'];
 
   List<String> _selectedStates = ['All States'];
   List<String> _selectedFacilities = ['All Facilities'];

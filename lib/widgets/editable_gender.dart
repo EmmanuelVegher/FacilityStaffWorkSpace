@@ -49,7 +49,7 @@ class _EditableGenderTileState extends State<EditableGenderTile> {
           return Text('Error: ${snapshot.error}');
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return DropdownButtonFormField<String>(
-            value: _selectedGender, // Start with no selected value
+            initialValue: _selectedGender, // Start with no selected value
             hint: const Text('Select Gender'),
             decoration: const InputDecoration(
               labelText: null,

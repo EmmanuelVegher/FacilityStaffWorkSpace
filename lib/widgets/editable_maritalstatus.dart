@@ -49,7 +49,7 @@ class _EditableMaritalStatusTileState extends State<EditableMaritalStatusTile> {
           return Text('Error: ${snapshot.error}');
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return DropdownButtonFormField<String>(
-            value: _selectedMaritalStatus, // Start with no selected value
+            initialValue: _selectedMaritalStatus, // Start with no selected value
             hint: const Text('Select Marital Status'),
             decoration: const InputDecoration(
               labelText: null,

@@ -504,8 +504,9 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
           icon: const Icon(Icons.file_download_outlined),
           tooltip: "Export Options",
           onSelected: (value) async {
-            if (value == 'csv') await _exportToCSV();
-            else if (value == 'pdf') await _exportToPDF();
+            if (value == 'csv') {
+              await _exportToCSV();
+            } else if (value == 'pdf') await _exportToPDF();
           },
           enabled: !isLoading && !_isInitialState && _filteredLogList.isNotEmpty,
           itemBuilder: (context) => [
@@ -1266,8 +1267,9 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     final lowerStatus = status.toLowerCase();
     Color color = _getStatusColor(status);
     Widget? icon;
-    if (lowerStatus.contains('answered')) icon = Icon(Icons.call_received, color: color, size: 16);
-    else if (lowerStatus.contains('failed') || lowerStatus.contains('missed')) icon = Icon(Icons.phone_missed, color: color, size: 16);
+    if (lowerStatus.contains('answered')) {
+      icon = Icon(Icons.call_received, color: color, size: 16);
+    } else if (lowerStatus.contains('failed') || lowerStatus.contains('missed')) icon = Icon(Icons.phone_missed, color: color, size: 16);
     if (icon != null) {
       return Row(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(width: 6), Flexible(child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)))]);
     }
@@ -1445,7 +1447,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
         children: [
           SingleChildScrollView(controller: _clientSummaryScrollController, scrollDirection: Axis.horizontal,
             child: Padding(padding: const EdgeInsets.all(8.0),
-              child: DataTable(columnSpacing: 15.0, headingRowColor: MaterialStateProperty.all(Colors.grey.shade200),
+              child: DataTable(columnSpacing: 15.0, headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
                 columns: const [DataColumn(label: Text('Client ART ID')), DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client Phone')), DataColumn(label: Text('Total Calls')), DataColumn(label: Text('Call Outcome Summary'))],
                 rows: clientSummaryMap.values.map((summary) {
                   final statusSummary = summary.statusCounts.entries.map((e) => '${e.key}: ${e.value}').join(', ');

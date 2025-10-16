@@ -101,7 +101,7 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
   bool _isExporting = false;
 
   // --- Filter State ---
-  List<String> _availableStates = ['All States'];
+  final List<String> _availableStates = ['All States'];
   List<String> _availableFacilities = ['All Facilities'];
   List<String> _selectedStates = ['All States'];
   List<String> _selectedFacilities = ['All Facilities'];
@@ -441,8 +441,9 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
 
     String appBarTitle = 'Viral Load Tracking';
     if(!_isInitialState) {
-      if (_selectedStates.contains("All States")) appBarTitle = 'National VL Report';
-      else if (_selectedStates.length == 1) appBarTitle = 'VL Report for ${_selectedStates.first}';
+      if (_selectedStates.contains("All States")) {
+        appBarTitle = 'National VL Report';
+      } else if (_selectedStates.length == 1) appBarTitle = 'VL Report for ${_selectedStates.first}';
       else appBarTitle = 'VL Report for ${_selectedStates.length} States';
     }
 
@@ -516,7 +517,7 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
             SizedBox(
               width: 200,
               child: DropdownButtonFormField<String>(
-                value: _selectedQuarter,
+                initialValue: _selectedQuarter,
                 hint: const Text('Select Quarter'),
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Quarter', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
                 items: _availableQuarters.map((q) => DropdownMenuItem(value: q, child: Text(q))).toList(),
@@ -694,7 +695,9 @@ class _VlTrackingPageWebState extends State<VlTrackingPageWeb> {
 
   String _formatDateWithSuffix(DateTime date) { String day = DateFormat('d').format(date); String suffix; if (day.endsWith('1') && !day.endsWith('11')) { suffix = 'st'; } else if (day.endsWith('2') && !day.endsWith('12')) { suffix = 'nd'; } else if (day.endsWith('3') && !day.endsWith('13')) { suffix = 'rd'; } else { suffix = 'th'; } return DateFormat("d'$suffix' MMMM yyyy").format(date); }
 
-  void _generateQuarterList() { List<String> quarters = []; DateTime date = DateTime.now(); for (int i = 0; i < 8; i++) { int year = date.year; int month = date.month; int fiscalYear = (month >= 10) ? year + 1 : year; String quarter; if (month >= 10) quarter = 'Q1'; else if (month >= 7) quarter = 'Q4'; else if (month >= 4) quarter = 'Q3'; else quarter = 'Q2'; quarters.add('$quarter (FY${fiscalYear.toString().substring(2)})'); date = DateTime(date.year, date.month - 3, 1); } if(mounted) setState(() { _availableQuarters = quarters.toSet().toList(); _selectedQuarter = _availableQuarters.first; }); }
+  void _generateQuarterList() { List<String> quarters = []; DateTime date = DateTime.now(); for (int i = 0; i < 8; i++) { int year = date.year; int month = date.month; int fiscalYear = (month >= 10) ? year + 1 : year; String quarter; if (month >= 10) {
+    quarter = 'Q1';
+  } else if (month >= 7) quarter = 'Q4'; else if (month >= 4) quarter = 'Q3'; else quarter = 'Q2'; quarters.add('$quarter (FY${fiscalYear.toString().substring(2)})'); date = DateTime(date.year, date.month - 3, 1); } if(mounted) setState(() { _availableQuarters = quarters.toSet().toList(); _selectedQuarter = _availableQuarters.first; }); }
 
   List<MapEntry<String, int>> _getCallOutcomesChartData() { Map<String, int> statusCounts = {}; for (var log in _masterLogList) { String status = log.callStatus?.trim() ?? 'N/A'; if (status.isEmpty) status = 'N/A'; statusCounts[status] = (statusCounts[status] ?? 0) + 1; } return statusCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value)); }
   String formatDuration(int totalSeconds) { if (totalSeconds <= 0) return '0s'; final int minutes = totalSeconds ~/ 60; final int seconds = totalSeconds % 60; List<String> parts = []; if (minutes > 0) parts.add('${minutes}m'); if (seconds > 0 || parts.isEmpty) parts.add('${seconds}s'); return parts.join(' '); }

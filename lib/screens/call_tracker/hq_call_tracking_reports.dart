@@ -343,8 +343,9 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
           icon: const Icon(Icons.file_download_outlined),
           tooltip: "Export Options",
           onSelected: (value) async {
-            if (value == 'csv') await _exportToCSV();
-            else if (value == 'pdf') await _exportToPDF();
+            if (value == 'csv') {
+              await _exportToCSV();
+            } else if (value == 'pdf') await _exportToPDF();
           },
           enabled: !isLoading && !_isInitialState && _filteredContactList.isNotEmpty,
           itemBuilder: (context) => [

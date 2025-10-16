@@ -51,7 +51,7 @@ class _EditableProjectTileState extends State<EditableProjectTile> {
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return
             DropdownButtonFormField<String>(
-              value: _selectedProjects,
+              initialValue: _selectedProjects,
               hint: const Text('Select Project'),
               decoration: const InputDecoration(
                 labelText:null,

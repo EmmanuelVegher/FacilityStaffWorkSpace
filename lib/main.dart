@@ -1,16 +1,15 @@
 import 'package:service_delivery_workspace/screens/delete_account/delete_account.dart';
 import 'package:service_delivery_workspace/screens/delete_account/delete_data.dart';
 import 'package:service_delivery_workspace/screens/login_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // <<<--- ADD THIS
-import 'package:firebase_auth/firebase_auth.dart'; // <<<--- ADD THIS
-import 'package:firebase_messaging/firebase_messaging.dart'; // <<<--- ADD THIS
-import 'package:flutter/foundation.dart'; // <<<--- ADD THIS
+// <<<--- ADD THIS
+// <<<--- ADD THIS
+// <<<--- ADD THIS
+// <<<--- ADD THIS
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'package:js/js.dart';
-import 'package:lottie/lottie.dart';
-import 'dart:developer'; // <<<--- ADD THIS
+// <<<--- ADD THIS
 
 import 'firebase_options.dart';
 

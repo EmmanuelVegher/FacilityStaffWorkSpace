@@ -51,7 +51,7 @@ class _EditableSupervisorTileState extends State<EditableSupervisorTile> {
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return
             DropdownButtonFormField<String>(
-              value: _selectedSupervisor,
+              initialValue: _selectedSupervisor,
               hint: const Text('Select Supervisor'),
               decoration: const InputDecoration(
                 labelText:null,

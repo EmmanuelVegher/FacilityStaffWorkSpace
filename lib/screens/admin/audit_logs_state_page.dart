@@ -174,7 +174,7 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Audit Logs (${_userState})', style: const TextStyle(color: Colors.white)),
+        title: Text('Audit Logs ($_userState)', style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [

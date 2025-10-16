@@ -6,7 +6,7 @@ import '../../models/payment_schedule_model.dart';
 import 'payment_schedule_page.dart';
 
 class PendingSchedulesPage extends StatefulWidget {
-  const PendingSchedulesPage({Key? key}) : super(key: key);
+  const PendingSchedulesPage({super.key});
 
   @override
   _PendingSchedulesPageState createState() => _PendingSchedulesPageState();

@@ -562,7 +562,7 @@ on userInfo.person_id = providerInfo.person_id
     return CallLog.get();
   }
 
-  getAvator(CallType callType){
+  CircleAvatar getAvator(CallType callType){
     switch(callType){
       case CallType.outgoing:
         return const CircleAvatar(maxRadius: 30,foregroundColor: Colors.green,backgroundColor: Colors.greenAccent);
@@ -577,7 +577,7 @@ on userInfo.person_id = providerInfo.person_id
     return DateFormat('d-MM-y H:m:s').format(dt);
   }
 
-  getTitle(CallLogEntry entry){
+  Text getTitle(CallLogEntry entry){
     if(entry.name == null) {
       return Text(entry.number!);
     }

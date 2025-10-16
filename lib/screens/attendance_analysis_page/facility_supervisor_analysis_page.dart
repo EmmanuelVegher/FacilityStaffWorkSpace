@@ -3,29 +3,22 @@
 // UPDATED TO INCLUDE RECOMMENDATION LOGS AND DETAILED STAFF ATTENDANCE VIEW
 
 import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 // import 'package:google_maps_flutter/google_maps_flutter.dart'; // COMMENTED OUT - Using OpenStreetMap instead
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-import '../../widgets/drawer.dart';
-import '../../widgets/drawer2.dart';
 import '../../widgets/drawer4.dart'; // Your custom drawer widget
 
 // --- DATA MODELS (Shared with state-level page) ---

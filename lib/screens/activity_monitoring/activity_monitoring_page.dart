@@ -5144,7 +5144,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
 
 
 // _addTaskToIsar (Modified for edit to UPDATE instead of INSERT)
-  _addTaskToIsar({bool isEditing = false}) async {
+  Future<void> _addTaskToIsar({bool isEditing = false}) async {
     String title = _taskTitleController.text;
     String description = _taskDescriptionController.text;
     FacilityStaffModel? reviewer = _selectedReviewer;
@@ -5508,7 +5508,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                 const SizedBox(height: 20),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Report Type*'),
-                  value: _selectedReportType,
+                  initialValue: _selectedReportType,
                   items: ["Daily"].map((String value) {
                     return DropdownMenuItem<String>(value: value, child: Text(value));
                   }).toList(),
@@ -5524,9 +5524,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                       });
                     }
                   },
-                  disabledHint: _selectedReportType != null
-                      ? Text(_selectedReportType)
-                      : null,
+                  disabledHint: Text(_selectedReportType),
                 ),
                 const SizedBox(height: 10),
                 if (_selectedReportType == "Daily")
@@ -5536,7 +5534,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     children: [
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'Reporting Month*'),
-                        value: _selectedMonthForWeekly,
+                        initialValue: _selectedMonthForWeekly,
                         items: _monthlyOptions.map((String value) {
                           return DropdownMenuItem<String>(
                               value: value, child: Text(value));
@@ -5557,7 +5555,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'Reporting Week*'),
-                        value: _selectedReportPeriod,
+                        initialValue: _selectedReportPeriod,
                         items: _reportPeriodOptions.map((String value) {
                           return DropdownMenuItem<String>(
                               value: value, child: Text(value));
@@ -5583,7 +5581,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     : DropdownButtonFormField<FacilityStaffModel>(
                   decoration:
                   const InputDecoration(labelText: 'Select Reviewer*'),
-                  value: _selectedReviewer,
+                  initialValue: _selectedReviewer,
                   hint: const Text("Select Reviewer*"),
                   validator: (value) =>
                   value == null ? 'Reviewer is required' : null,
@@ -6068,7 +6066,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   }
 
   // Date Bar
-  _addDateBar() {
+  Container _addDateBar() {
     DateTime threeYearsAgo = DateTime.now().subtract(const Duration(days: 3 * 365));
     DateTime now = DateTime.now();
     DateTime tomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
@@ -6215,13 +6213,13 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
     );
   }
 
-  _addTaskBar1() {
+  Container _addTaskBar1() {
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 20, top: 20),
       child: const SizedBox.shrink(),
     );
   }
-  _addTaskBar() {
+  Container _addTaskBar() {
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 20, top: 20),
       child:  Column( // Task input section moved to main page
@@ -6376,7 +6374,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
 
 
 
-  _showAddTaskBottomSheet(BuildContext context, {Task? taskToEdit}) {
+  void _showAddTaskBottomSheet(BuildContext context, {Task? taskToEdit}) {
     bool isEditing = taskToEdit != null;
     if (isEditing) {
       _taskTitleController.text = taskToEdit.taskTitle ?? '';
@@ -6619,7 +6617,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
   }
 
 
-  _deleteTask(Task task) async {
+  Future<void> _deleteTask(Task task) async {
     bool? confirmDelete = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {

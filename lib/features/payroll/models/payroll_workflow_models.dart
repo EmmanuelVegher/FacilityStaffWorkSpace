@@ -1,7 +1,6 @@
 // lib/features/payroll/models/payroll_workflow_models.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 
 // Represents an entry in the approval audit trail
 class ApprovalHistoryEntry {

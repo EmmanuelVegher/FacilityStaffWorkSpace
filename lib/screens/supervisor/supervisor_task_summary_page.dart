@@ -66,7 +66,7 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
     try {
       final docSnapshot = await FirebaseFirestore.instance.collection('Staff').doc(user.uid).get();
       if (docSnapshot.exists) {
-        final bio = BioModel.fromFirestore(docSnapshot as DocumentSnapshot<Map<String, dynamic>>, null);
+        final bio = BioModel.fromFirestore(docSnapshot, null);
         if (bio.state != null && bio.state!.isNotEmpty) {
           final stateDoc = await FirebaseFirestore.instance.collection('Location').where('name', isEqualTo: bio.state).limit(1).get();
           if(stateDoc.docs.isNotEmpty) {

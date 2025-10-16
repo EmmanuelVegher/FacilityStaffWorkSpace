@@ -4,7 +4,6 @@ import 'package:service_delivery_workspace/screens/forgot_password_page.dart';
 import 'package:service_delivery_workspace/screens/loading_screen.dart';
 
 // <<<--- ADD THIS IMPORT (As in original code)
-import 'package:service_delivery_workspace/main.dart';
 
 
 // --- Helper Classes for Custom Shapes (Keep these as they were) ---

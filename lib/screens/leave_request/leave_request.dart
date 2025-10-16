@@ -1345,7 +1345,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     }
   }
 
-  showDialogBox() => showCupertinoDialog<String>(
+  Future<String?> showDialogBox() => showCupertinoDialog<String>(
     context: Get.context!,
     builder: (BuildContext context) => CupertinoAlertDialog(
       title: const Text("Location Turned Off"),
@@ -1369,7 +1369,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
 
 
-  showDialogBox2() => showCupertinoDialog<String>(
+  Future<String?> showDialogBox2() => showCupertinoDialog<String>(
     context: Get.context!,
     builder: (BuildContext builderContext) => CupertinoAlertDialog(
       actions: <Widget>[

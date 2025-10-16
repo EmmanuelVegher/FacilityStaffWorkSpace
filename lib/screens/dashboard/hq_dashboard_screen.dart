@@ -80,12 +80,12 @@ class LeaveRequest {
   final DateTime startDate, endDate;
   LeaveRequest({ required this.staffName, required this.leaveType, required this.startDate, required this.endDate, required this.status });
   factory LeaveRequest.fromMap(Map<String, dynamic> map) {
-    DateTime _parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
+    DateTime parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
     return LeaveRequest(
       staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parse(map['startDate']),
-      endDate: _parse(map['endDate']),
+      startDate: parse(map['startDate']),
+      endDate: parse(map['endDate']),
       status: map['status'] ?? 'Pending',
     );
   }
@@ -463,7 +463,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                 tooltipBehavior: TooltipBehavior(enable: true, format: 'point.series.name: point.y'),
                 selectionType: SelectionType.point,
                 selectionGesture: ActivationMode.singleTap,
-                onSelectionChanged: (SelectionArgs args) { if (args.pointIndex != null) { _showStaffListDialog('Users in ${_attendanceByStateData[args.pointIndex!].state}', _staffMap.values.where((s) => s.state == _attendanceByStateData[args.pointIndex!].state).toList()); } },
+                onSelectionChanged: (SelectionArgs args) { _showStaffListDialog('Users in ${_attendanceByStateData[args.pointIndex].state}', _staffMap.values.where((s) => s.state == _attendanceByStateData[args.pointIndex].state).toList());  },
                 series: <CartesianSeries<StateAttendanceData, String>>[
                   ColumnSeries<StateAttendanceData, String>(dataSource: _attendanceByStateData, xValueMapper: (data, _) => data.state, yValueMapper: (data, _) => data.expectedAttendance, name: 'Expected', color: const Color(0xFFE57373), borderRadius: const BorderRadius.all(Radius.circular(8)), selectionBehavior: SelectionBehavior(enable: true), dataLabelSettings: const DataLabelSettings(isVisible: true, textStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12))),
                   ColumnSeries<StateAttendanceData, String>(dataSource: _attendanceByStateData, xValueMapper: (data, _) => data.state, yValueMapper: (data, _) => data.present, name: 'Present', color: const Color(0xFFFFB74D), borderRadius: const BorderRadius.all(Radius.circular(8)), selectionBehavior: SelectionBehavior(enable: true),

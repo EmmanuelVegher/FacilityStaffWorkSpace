@@ -40,7 +40,7 @@ class LeaveRequestModel {
   factory LeaveRequestModel.fromSnapshot(DocumentSnapshot snapshot) {
     final data = snapshot.data() as Map<String, dynamic>;
 
-    DateTime _parseDate(String? dateStr) {
+    DateTime parseDate(String? dateStr) {
       if (dateStr == null) return DateTime.now();
       try {
         return DateTime.parse(dateStr);
@@ -55,8 +55,8 @@ class LeaveRequestModel {
       staffName: '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim(),
       staffLocation: data['staffLocation'] ?? 'N/A',
       leaveType: data['type'] ?? 'N/A',
-      startDate: _parseDate(data['startDate']),
-      endDate: _parseDate(data['endDate']),
+      startDate: parseDate(data['startDate']),
+      endDate: parseDate(data['endDate']),
       leaveDuration: data['leaveDuration'] ?? 0,
       reason: data['reason'] ?? 'No reason provided.',
       status: data['status'] ?? 'Pending',
@@ -204,8 +204,8 @@ class _LeaveRequestReviewPageState extends State<LeaveRequestReviewPage> {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reason cannot be empty.")));
               }
             },
-            child: const Text("Reject"),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Reject"),
           ),
         ],
       ),
@@ -269,7 +269,7 @@ class _LeaveRequestReviewPageState extends State<LeaveRequestReviewPage> {
           children: [
             // Status Filter
             DropdownButtonFormField<String>(
-              value: _statusController.value,
+              initialValue: _statusController.value,
               decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
               items: ['All', 'Pending', 'Approved', 'Rejected'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
               onChanged: (value) => _statusController.add(value!),
@@ -277,7 +277,7 @@ class _LeaveRequestReviewPageState extends State<LeaveRequestReviewPage> {
             // Facility Filter
             if (_availableFacilities.isNotEmpty)
               DropdownButtonFormField<String>(
-                value: _facilityController.value,
+                initialValue: _facilityController.value,
                 decoration: const InputDecoration(labelText: 'Facility', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                 items: _availableFacilities.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                 onChanged: (value) => _facilityController.add(value!),

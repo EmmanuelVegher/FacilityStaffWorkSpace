@@ -485,7 +485,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       final monthName = DateFormat('MMMM').format(DateTime(yearNum, monthNum));
 
       // Reconstruct the ID, including the optional "_partX"
-      String docId = '${monthName}_${yearNum}';
+      String docId = '${monthName}_$yearNum';
       if (parts.length > 2) {
         docId += '_${parts.sublist(2).join('_')}'; // Handles "part1", "part2", etc.
       }
@@ -752,7 +752,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
                   DataCell(
                     Tooltip(
                       message: notesText,
-                      child: Container(
+                      child: SizedBox(
                         width: 350,
                         child: Text(notesText, maxLines: 2, overflow: TextOverflow.ellipsis),
                       ),
@@ -772,7 +772,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
 
   Widget _buildTimesheetCell(DateTime date, String category, String projectName) {
     // Helper to find the record for a specific day
-    Map<String, dynamic>? _getEntryForDate(DateTime date) {
+    Map<String, dynamic>? getEntryForDate(DateTime date) {
       final entries = widget.timesheetData['timesheetEntries'] as List<dynamic>?;
       if (entries == null) return null;
       final targetDateString = DateFormat('yyyy-MM-dd').format(date);
@@ -792,7 +792,7 @@ class _TimesheetDetailsScreen2State extends State<TimesheetDetailsScreen2> {
       );
     }
 
-    final recordForDay = _getEntryForDate(date);
+    final recordForDay = getEntryForDate(date);
 
     if (recordForDay == null) {
       return Container(
@@ -2459,7 +2459,7 @@ $selectedBioFirstName $selectedBioLastName
     // --- END OF FIX ---
 
     String rejectionReason = "";
-    final _formKey = GlobalKey<FormState>();
+    final formKey = GlobalKey<FormState>();
 
     await showDialog(
       context: context,
@@ -2467,7 +2467,7 @@ $selectedBioFirstName $selectedBioLastName
         return AlertDialog(
           title: const Text('Return Timesheet'),
           content: Form(
-            key: _formKey,
+            key: formKey,
             child: TextFormField(
               onChanged: (value) => rejectionReason = value,
               decoration: const InputDecoration(labelText: 'Reason for Returning Timesheet'),
@@ -2485,7 +2485,7 @@ $selectedBioFirstName $selectedBioLastName
             TextButton(
               child: const Text('Return'),
               onPressed: () async {
-                if (_formKey.currentState!.validate()) {
+                if (formKey.currentState!.validate()) {
                   try {
                     Map<String, dynamic> updateData = {};
                     if(selectedBioStaffCategory == "Facility Supervisor"){
@@ -3287,7 +3287,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     Row(
                                                       children: [
                                                         Container(width: 150, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.white, child: Text(projectName)),
-                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)).toList(),
+                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)),
                                                         Container(
                                                           width: 100,
                                                           alignment: Alignment.center,
@@ -3362,7 +3362,7 @@ $selectedBioFirstName $selectedBioLastName
                                                       return Row(
                                                         children: [
                                                           Container(width: 150, alignment: Alignment.center, padding: const EdgeInsets.all(8.0), color: Colors.white, child: Text(category, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)).toList(),
+                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)),
                                                           Container(
                                                             width: 100,
                                                             alignment: Alignment.center,

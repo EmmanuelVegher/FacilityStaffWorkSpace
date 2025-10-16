@@ -190,13 +190,12 @@ class PaymentSchedulePage extends StatefulWidget {
   final PaymentScheduleModel? scheduleModel; // New parameter for review mode
 
   const PaymentSchedulePage({
-    Key? key,
+    super.key,
     this.timesheets,
     this.year,
     this.month,
     this.scheduleModel,
-  })  : assert(timesheets != null || scheduleModel != null, "Either timesheets or a scheduleModel must be provided"),
-        super(key: key);
+  })  : assert(timesheets != null || scheduleModel != null, "Either timesheets or a scheduleModel must be provided");
 
   @override
   _PaymentSchedulePageState createState() => _PaymentSchedulePageState();
@@ -212,11 +211,11 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   // Data stores
   List<PaymentScheduleItem> _masterPaymentList = [];
   List<PaymentScheduleItem> _filteredPaymentList = [];
-  Map<String, StaffBankInfo> _staffBankDetailsCache = {};
+  final Map<String, StaffBankInfo> _staffBankDetailsCache = {};
 
   // Filter options
-  List<String> _availableStates = ['All States'];
-  List<String> _availableDesignations = ['All Designations'];
+  final List<String> _availableStates = ['All States'];
+  final List<String> _availableDesignations = ['All Designations'];
   List<String> _selectedStates = ['All States'];
   List<String> _selectedDesignations = ['All Designations'];
   final TextEditingController _searchController = TextEditingController();
@@ -801,7 +800,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<Map<String, String>>(
-                        value: _selectedApprover,
+                        initialValue: _selectedApprover,
                         decoration: const InputDecoration(
                           labelText: "Select Approver",
                           border: OutlineInputBorder(),
@@ -966,7 +965,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
   Widget _buildDropdown(List<String> items, String value, String label, ValueChanged<String?> onChanged) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1212,7 +1211,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
     // Initialize local state variables for the dialog
     bool isManualOverride = item.isEdited;
-    bool _isSaving = false;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -1393,7 +1392,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                   TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
 
                   // --- Animated Save Button with Progress Indicator ---
-                  _isSaving
+                  isSaving
                       ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: SizedBox(
@@ -1410,7 +1409,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                     onPressed: () async {
                       if (formKey.currentState!.validate()) {
                         // Show the loading indicator
-                        setDialogState(() { _isSaving = true; });
+                        setDialogState(() { isSaving = true; });
 
                         // Simulate a brief delay to make the loader visible
                         await Future.delayed(const Duration(milliseconds: 700));
@@ -1559,12 +1558,12 @@ class MultiSelectDialog extends StatefulWidget {
   final String allText;
 
   const MultiSelectDialog({
-    Key? key,
+    super.key,
     required this.title,
     required this.allOptions,
     required this.initialSelectedOptions,
     required this.allText,
-  }) : super(key: key);
+  });
 
   @override
   _MultiSelectDialogState createState() => _MultiSelectDialogState();

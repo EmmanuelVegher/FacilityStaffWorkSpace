@@ -14,7 +14,6 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:refreshable_widget/refreshable_widget.dart';
 
 import '../../models/attendance_model.dart';
 import '../../models/bio_model.dart';
@@ -742,7 +741,7 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
 
     if (selectedMonth == 8) { // September is month index 8
       monthYearDisplay = "September, $selectedYear (Part $_selectedTimesheetPart)";
-      monthYearFilename = "September_${selectedYear}_part${_selectedTimesheetPart}";
+      monthYearFilename = "September_${selectedYear}_part$_selectedTimesheetPart";
     } else {
       monthYearDisplay = DateFormat('MMMM, yyyy').format(DateTime(selectedYear, selectedMonth + 1));
       monthYearFilename = DateFormat('MMMM_yyyy').format(DateTime(selectedYear, selectedMonth + 1));
@@ -2445,7 +2444,7 @@ $selectedBioFirstName $selectedBioLastName
 
 
 
-  getDateFromUser() async {
+  Future<void> getDateFromUser() async {
     DateTime? pickerDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -3623,8 +3622,9 @@ $selectedBioFirstName $selectedBioLastName
                                                   attendanceForDay =
                                                       attendanceData.firstWhere(
                                                               (att) {
-                                                            if (att.date == null)
+                                                            if (att.date == null) {
                                                               return false;
+                                                            }
                                                             final attDate =
                                                             DateFormat(
                                                                 'dd-MMMM-yyyy')
@@ -3952,7 +3952,7 @@ $selectedBioFirstName $selectedBioLastName
                                       crossAxisAlignment:
                                       CrossAxisAlignment.start,
                                       children: [
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -3976,7 +3976,7 @@ $selectedBioFirstName $selectedBioLastName
                                             ],
                                           ),
                                         ),
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4051,7 +4051,7 @@ $selectedBioFirstName $selectedBioLastName
                                             ],
                                           ),
                                         ),
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4107,7 +4107,7 @@ $selectedBioFirstName $selectedBioLastName
                                       crossAxisAlignment:
                                       CrossAxisAlignment.start,
                                       children: [
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4152,7 +4152,7 @@ $selectedBioFirstName $selectedBioLastName
                                           ),
                                         ),
                                         // <<< MODIFICATION START: Project Coordinator Signature/Status >>>
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4232,7 +4232,7 @@ $selectedBioFirstName $selectedBioLastName
                                           ),
                                         ),
                                         // <<< MODIFICATION END >>>
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4286,7 +4286,7 @@ $selectedBioFirstName $selectedBioLastName
                                       crossAxisAlignment:
                                       CrossAxisAlignment.start,
                                       children: [
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4331,7 +4331,7 @@ $selectedBioFirstName $selectedBioLastName
                                           ),
                                         ),
                                         // <<< MODIFICATION START: CARITAS Supervisor Signature/Status >>>
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4421,7 +4421,7 @@ $selectedBioFirstName $selectedBioLastName
                                           ),
                                         ),
                                         // <<< MODIFICATION END >>>
-                                        Container(
+                                        SizedBox(
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
@@ -4740,7 +4740,7 @@ $selectedBioFirstName $selectedBioLastName
     final String timesheetDocumentId = _timesheetDocId;
     final String monthFieldIdentifier = selectedMonth == 8
         ? '${selectedMonth}_${selectedYear}_part$_selectedTimesheetPart'
-        : '${selectedMonth}_${selectedYear}';
+        : '${selectedMonth}_$selectedYear';
 
     try {
       log("Start Pushing timesheet with doc ID: $timesheetDocumentId");

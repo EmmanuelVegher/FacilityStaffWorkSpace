@@ -1,10 +1,9 @@
 // A ROBUST PAGE FOR REVIEWING STAFF TIMESHEETS STATE-WIDE (FINAL ADVANCED VERSION)
 
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart' as material; // For TextSpan ambiguity
+// For TextSpan ambiguity
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -267,9 +266,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
 
     if (isSeptember) {
       // If it's September and the controller doesn't exist yet, create it.
-      if (_tabController == null) {
-        _tabController = TabController(length: 2, vsync: this, initialIndex: _selectedSeptemberPart - 1);
-      }
+      _tabController ??= TabController(length: 2, vsync: this, initialIndex: _selectedSeptemberPart - 1);
     } else {
       // If it's NOT September but the controller still exists, destroy it.
       if (_tabController != null) {
@@ -676,7 +673,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
                       if (item is TimesheetModel) return _buildTimesheetCard(item);
                       if (item is Map) return _buildNonSubmittedCard(item as Map<String, dynamic>);
                       return const SizedBox.shrink();
-                    }).toList(),
+                    }),
                   ] else if (!_isLoading)
                     Center(
                       child: Padding(
@@ -706,7 +703,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       SizedBox(
         width: 150,
         child: DropdownButtonFormField<int>(
-          value: _selectedMonth,
+          initialValue: _selectedMonth,
           decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
           items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(0, m)))))
               .toList(),
@@ -725,7 +722,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       SizedBox(
         width: 120,
         child: DropdownButtonFormField<int>(
-          value: _selectedYear,
+          initialValue: _selectedYear,
           decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
           items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
               .toList(),
@@ -741,7 +738,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       SizedBox(
         width: 250,
         child: DropdownButtonFormField<String>(
-          value: _selectedStatusFilter,
+          initialValue: _selectedStatusFilter,
           decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
           items: _statusFilters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
           onChanged: (value) {
@@ -1099,7 +1096,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
 
       final String csv = const ListToCsvConverter().convert(rows);
       final bytes = utf8.encode(csv);
-      _triggerDownload(Uint8List.fromList(bytes), 'Timesheet_Summary_${_userState}_${_selectedMonth}_${_selectedYear}.csv');
+      _triggerDownload(Uint8List.fromList(bytes), 'Timesheet_Summary_${_userState}_${_selectedMonth}_$_selectedYear.csv');
     } catch(e) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating CSV: $e")));
     } finally {
@@ -1149,7 +1146,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
 
       final fileBytes = excel.save();
       if(fileBytes != null) {
-        _triggerDownload(Uint8List.fromList(fileBytes), 'Timesheet_Summary_${_userState}_${_selectedMonth}_${_selectedYear}.xlsx');
+        _triggerDownload(Uint8List.fromList(fileBytes), 'Timesheet_Summary_${_userState}_${_selectedMonth}_$_selectedYear.xlsx');
       }
 
     } catch(e, stack) {
@@ -1563,7 +1560,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
           final double cappedHours = dailyHours > 8.0 ? 8.0 : dailyHours;
           final bool isOffDay = summary['isOffDay']!;
           return DataRow(
-              color: MaterialStateProperty.resolveWith<Color?>((s) => isOffDay ? Colors.blue.withOpacity(0.05) : null),
+              color: WidgetStateProperty.resolveWith<Color?>((s) => isOffDay ? Colors.blue.withOpacity(0.05) : null),
               cells: [DataCell(Text(date)), DataCell(Text(cappedHours.toStringAsFixed(2)))]
           );
         }).toList(),
@@ -1645,7 +1642,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
     final logoImage = pw.MemoryImage((await rootBundle.load('assets/image/ccfn_logo.png')).buffer.asUint8List());
     pdf.addPage(await _createSingleTimesheetPage(timesheet, logoImage, ttf, ttfBold));
     final pdfBytes = await pdf.save();
-    _triggerDownload(pdfBytes, 'Timesheet_${timesheet.staffName.replaceAll(' ','_')}_${_selectedMonth}_${_selectedYear}.pdf');
+    _triggerDownload(pdfBytes, 'Timesheet_${timesheet.staffName.replaceAll(' ','_')}_${_selectedMonth}_$_selectedYear.pdf');
     setState(() => _isExporting = false);
   }
 
@@ -1689,7 +1686,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       if (!_selectedFacilities.contains('All Facilities')) {
         selectionName = _selectedFacilities.join('_').replaceAll(' ', '_');
       }
-      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${_userState}_${selectionName}_${_selectedMonth}_${_selectedYear}.pdf');
+      _triggerDownload(pdfBytes, 'Bulk_Timesheets_${_userState}_${selectionName}_${_selectedMonth}_$_selectedYear.pdf');
 
     } catch (e, stack) {
       debugPrint("Error generating bulk PDF: $e\n$stack");

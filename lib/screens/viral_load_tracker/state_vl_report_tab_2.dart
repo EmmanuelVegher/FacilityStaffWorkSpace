@@ -8,7 +8,6 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -102,7 +101,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
 
   // Filter State
   String? _currentUserState;
-  List<String> _availableFacilities = ['All Facilities'];
+  final List<String> _availableFacilities = ['All Facilities'];
   List<String> _selectedFacilities = ['All Facilities'];
   List<String> _availableQuarters = [];
   String? _selectedQuarter;
@@ -187,8 +186,9 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
       int month = date.month;
       int fiscalYear = (month >= 10) ? year + 1 : year;
       String quarter;
-      if (month >= 10) quarter = 'Q1';
-      else if (month >= 7) quarter = 'Q4';
+      if (month >= 10) {
+        quarter = 'Q1';
+      } else if (month >= 7) quarter = 'Q4';
       else if (month >= 4) quarter = 'Q3';
       else quarter = 'Q2';
       quarters.add('FY${fiscalYear.toString().substring(2)} $quarter');
@@ -486,7 +486,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
             SizedBox(
               width: 200,
               child: DropdownButtonFormField<String>(
-                value: _selectedQuarter,
+                initialValue: _selectedQuarter,
                 hint: const Text('Select Quarter'),
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Quarter', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
                 items: _availableQuarters.map((q) => DropdownMenuItem(value: q, child: Text(q))).toList(),

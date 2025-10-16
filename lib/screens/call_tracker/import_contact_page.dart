@@ -1117,7 +1117,7 @@ ON Tb1.patient_id = patient.patient_id
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>( // Appointment Type
                         decoration: const InputDecoration(labelText: 'Appointment Type', border: OutlineInputBorder()),
-                        value: _selectedAppointmentType,
+                        initialValue: _selectedAppointmentType,
                         items: ["Actual Next Appointment", "Calculated Next Appointment"].map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
                         onChanged: (v) => setState(() => _selectedAppointmentType = v),
                       ),
@@ -1125,7 +1125,7 @@ ON Tb1.patient_id = patient.patient_id
                       // State Dropdown (using fetched _statesList)
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'State', border: OutlineInputBorder()),
-                        value: _selectedState,
+                        initialValue: _selectedState,
                         items: _statesList.map((state) => DropdownMenuItem(value: state, child: Text(state))).toList(),
                         onChanged: (newValue) {
                           setState(() {
@@ -1139,7 +1139,7 @@ ON Tb1.patient_id = patient.patient_id
                       // Facility Dropdown (filtered by state)
                       DropdownButtonFormField<String>(
                         decoration: const InputDecoration(labelText: 'Facility Name', border: OutlineInputBorder()),
-                        value: _selectedFacilityName,
+                        initialValue: _selectedFacilityName,
                         // Use facilities from _facilitiesMap based on selected state
                         items: (_selectedState != null && _facilitiesMap.containsKey(_selectedState))
                             ? _facilitiesMap[_selectedState]!.map((facility) => DropdownMenuItem(value: facility, child: Text(facility))).toList()

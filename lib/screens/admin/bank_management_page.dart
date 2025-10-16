@@ -21,7 +21,7 @@ class Bank {
 
 
 class BankManagementPage extends StatefulWidget {
-  const BankManagementPage({Key? key}) : super(key: key);
+  const BankManagementPage({super.key});
 
   @override
   _BankManagementPageState createState() => _BankManagementPageState();
@@ -188,7 +188,7 @@ class _BankManagementPageState extends State<BankManagementPage> {
                     if (mounted) {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Bank '${bankName}' ${isEditMode ? 'updated' : 'added'} successfully.")),
+                        SnackBar(content: Text("Bank '$bankName' ${isEditMode ? 'updated' : 'added'} successfully.")),
                       );
                     }
                   } catch (e) {

@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../widgets/button.dart';
-import '../../widgets/drawer2.dart';
 import '../../widgets/drawer3.dart';
 
 class CreateActivityPage extends StatefulWidget {
@@ -338,7 +337,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
             children: [
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'For which department'),
-                value: _selectedThematicDepartment,
+                initialValue: _selectedThematicDepartment,
                 items: _departments.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -362,7 +361,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Designation'),
-                value: _selectedThematicDesignation,
+                initialValue: _selectedThematicDesignation,
                 items: _designations.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -380,7 +379,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Report Type'),
-                value: _selectedReportType,
+                initialValue: _selectedReportType,
                 items: _reportTypes.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -409,7 +408,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Response Type'),
-                value: _selectedResponseType,
+                initialValue: _selectedResponseType,
                 items: _responseTypes.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -484,7 +483,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Assign Department'),
-                value: _selectedAssignedDepartment,
+                initialValue: _selectedAssignedDepartment,
                 items: _departments.map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -503,7 +502,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Select Facility'),
-                value: _selectedFacilityName,
+                initialValue: _selectedFacilityName,
                 items: _facilityNames.map((String facility) {
                   return DropdownMenuItem<String>(
                     value: facility,

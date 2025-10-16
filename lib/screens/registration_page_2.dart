@@ -7,7 +7,6 @@ import 'dart:typed_data';
 
 // Assuming you have this file for your styled input fields.
 // If not, replace MyInputField with standard TextFormField or DropdownButtonFormField.
-import '../utils/my_input_field.dart';
 import 'login_screen.dart';
 
 
@@ -722,7 +721,7 @@ class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
 
   Widget _buildStyledDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required void Function(T?)? onChanged, String? hint}) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       items: items,
       onChanged: onChanged,
       validator: (val) => val == null ? 'Please select an option' : null,

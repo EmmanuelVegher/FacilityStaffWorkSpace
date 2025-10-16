@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 import '../../widgets/drawer3.dart';
 
@@ -112,7 +111,7 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
       // Add search filter - search by fullName, firstName, lastName, and email
       _searchQueries[currentStatus] = baseQuery
           .where('fullName', isGreaterThanOrEqualTo: searchTerm)
-          .where('fullName', isLessThanOrEqualTo: searchTerm + '\uf8ff')
+          .where('fullName', isLessThanOrEqualTo: '$searchTerm\uf8ff')
           .orderBy('state')
           .limit(500);
     }
@@ -147,7 +146,7 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
       // Add search filter - search by fullName, firstName, lastName, and email
       _searchQueries[status] = baseQuery
           .where('fullName', isGreaterThanOrEqualTo: searchTerm)
-          .where('fullName', isLessThanOrEqualTo: searchTerm + '\uf8ff')
+          .where('fullName', isLessThanOrEqualTo: '$searchTerm\uf8ff')
           .orderBy('state')
           .limit(500);
     }
@@ -313,6 +312,8 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
         excel.TextCellValue('State'),
         excel.TextCellValue('Location'),
         excel.TextCellValue('Status'),
+        excel.TextCellValue('Account Number'),
+        excel.TextCellValue('Bank Name'),
       ]);
 
       // Add data rows
@@ -328,6 +329,8 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
           excel.TextCellValue((data['state'] ?? 'N/A').toString()),
           excel.TextCellValue((data['location'] ?? 'N/A').toString()),
           excel.TextCellValue((data['accountStatus'] ?? 'N/A').toString()),
+          excel.TextCellValue((data['accountNumber'] ?? 'N/A').toString()),
+          excel.TextCellValue((data['bankName'] ?? 'N/A').toString()),
         ]);
       }
       final bytes = excelInstance.save();
@@ -433,7 +436,7 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedState,
+                        initialValue: _selectedState,
                         decoration: const InputDecoration(
                           labelText: 'State',
                           border: OutlineInputBorder(),
@@ -454,7 +457,7 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedCategory,
+                        initialValue: _selectedCategory,
                         decoration: const InputDecoration(
                           labelText: 'Category',
                           border: OutlineInputBorder(),

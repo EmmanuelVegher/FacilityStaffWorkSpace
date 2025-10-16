@@ -2,7 +2,6 @@ import 'package:service_delivery_workspace/widgets/drawer3.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../widgets/drawer2.dart';
 
 class ForgotPasswordPage3 extends StatefulWidget {
   const ForgotPasswordPage3({super.key});

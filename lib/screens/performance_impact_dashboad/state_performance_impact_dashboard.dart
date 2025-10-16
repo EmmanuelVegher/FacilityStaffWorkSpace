@@ -5,7 +5,6 @@
 // regarding platform adoption, behavioral change, staff performance, and programmatic impact.
 // ** VERSION 1.1: FIXED DATA FETCHING FOR ATTENDANCE & INACTIVITY ANALYSIS **
 
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -145,7 +144,7 @@ class _StatePerformanceImpactDashboardPageState
   DateTime _startDate = DateTime(
       DateTime.now().year - 1, DateTime.now().month, DateTime.now().day);
   DateTime _endDate = DateTime.now();
-  List<String> _availableFacilities = ['All Facilities'];
+  final List<String> _availableFacilities = ['All Facilities'];
   List<String> _selectedFacilities = ['All Facilities'];
 
   // --- Current State (determined from user context) ---
@@ -275,8 +274,9 @@ class _StatePerformanceImpactDashboardPageState
 
       final userDoc = await _firestore.collection('Staff').doc(user.uid).get();
       final userState = userDoc.data()?['state'] as String?;
-      if (userState == null || userState.isEmpty)
+      if (userState == null || userState.isEmpty) {
         throw Exception("Unable to determine user's state");
+      }
 
       if (mounted) setState(() => _currentState = userState);
       await _loadFacilitiesForState(userState);
@@ -284,8 +284,9 @@ class _StatePerformanceImpactDashboardPageState
       // Automatically load data on initial load
       await _loadDashboardData();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _errorMessage = "Error initializing dashboard: $e");
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -365,21 +366,22 @@ class _StatePerformanceImpactDashboardPageState
       final results = await Future.wait(futures);
 
       final allRecordsSnapshot =
-          results[0] as QuerySnapshot<Map<String, dynamic>>;
+          results[0];
       final allLeaveSnapshot =
-          results[1] as QuerySnapshot<Map<String, dynamic>>;
+          results[1];
       final callLogsSnapshot =
-          results[2] as QuerySnapshot<Map<String, dynamic>>;
-      final eacLogsSnapshot = results[3] as QuerySnapshot<Map<String, dynamic>>;
-      final vlLogsSnapshot = results[4] as QuerySnapshot<Map<String, dynamic>>;
+          results[2];
+      final eacLogsSnapshot = results[3];
+      final vlLogsSnapshot = results[4];
 
       _processAllData(filteredStaffDetailsMap, allRecordsSnapshot,
           allLeaveSnapshot, callLogsSnapshot, eacLogsSnapshot, vlLogsSnapshot);
     } catch (e, s) {
       debugPrint("Error loading report data: $e\n$s");
-      if (mounted)
+      if (mounted) {
         setState(() => _errorMessage =
             "An error occurred. Check for missing data fields or required indexes.");
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -672,22 +674,25 @@ class _StatePerformanceImpactDashboardPageState
       final state = staffStateMap[doc.data()['trackedById']] ??
           doc.data()['trackerFacilityState'];
       final facility = doc.data()['trackerFacilityLocation'] as String?;
-      if (state != null && facility != null && facility.isNotEmpty)
+      if (state != null && facility != null && facility.isNotEmpty) {
         callFacsByState.putIfAbsent(state, () => {}).add(facility);
+      }
     }
     for (var doc in eacDocs) {
       final state = staffStateMap[doc.data()['trackedById']] ??
           doc.data()['trackerState'];
       final facility = doc.data()['trackerFacilityLocation'] as String?;
-      if (state != null && facility != null && facility.isNotEmpty)
+      if (state != null && facility != null && facility.isNotEmpty) {
         eacFacsByState.putIfAbsent(state, () => {}).add(facility);
+      }
     }
     for (var doc in vlDocs) {
       final state = staffStateMap[doc.data()['trackedById']] ??
           doc.data()['trackerState'];
       final facility = doc.data()['trackerFacility'] as String?;
-      if (state != null && facility != null && facility.isNotEmpty)
+      if (state != null && facility != null && facility.isNotEmpty) {
         vlFacsByState.putIfAbsent(state, () => {}).add(facility);
+      }
     }
 
     // Update data for current state only
@@ -731,10 +736,11 @@ class _StatePerformanceImpactDashboardPageState
           record.clockInTime.month, record.clockInTime.day, 8, 0, 1);
       final counter =
           dailyPunctuality.putIfAbsent(dateKey, () => _PunctualityCounter());
-      if (record.clockInTime.isBefore(eightAm))
+      if (record.clockInTime.isBefore(eightAm)) {
         counter.early++;
-      else
+      } else {
         counter.late++;
+      }
     }
     _punctualityTrend = dailyPunctuality.entries.map((entry) {
       return _PunctualityTrendData(
@@ -1247,8 +1253,9 @@ class _StatePerformanceImpactDashboardPageState
 
   Widget _buildActiveFacilitiesTable(Map<String, List<String>> data) {
     final tabs = data.keys.toList();
-    if (tabs.isEmpty)
+    if (tabs.isEmpty) {
       return const Center(child: Text("No module activity data."));
+    }
     return DefaultTabController(
       length: tabs.length,
       child: Column(
@@ -1481,8 +1488,9 @@ class _StatePerformanceImpactDashboardPageState
     List<String> parts = [];
     if (hours > 0) parts.add('${hours}h');
     if (minutes > 0) parts.add('${minutes}m');
-    if (remainingSeconds > 0 || parts.isEmpty)
+    if (remainingSeconds > 0 || parts.isEmpty) {
       parts.add('${remainingSeconds}s');
+    }
     return parts.join(' ');
   }
 

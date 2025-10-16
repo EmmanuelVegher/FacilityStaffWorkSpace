@@ -49,7 +49,7 @@ class _EditableLocationTileState extends State<EditableLocationTile> {
           return Text('Error: ${snapshot.error}');
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return DropdownButtonFormField<String>(
-            value: _selectedLocation, // Start with no selected value
+            initialValue: _selectedLocation, // Start with no selected value
             hint: const Text('Select Location'),
             decoration: const InputDecoration(
               labelText: null,

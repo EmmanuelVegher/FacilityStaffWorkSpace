@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 import '../../widgets/drawer2.dart';
 
@@ -91,7 +90,7 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
       // Add search filter - search by fullName
       _searchQueries[status] = baseQuery
           .where('fullName', isGreaterThanOrEqualTo: searchTerm)
-          .where('fullName', isLessThanOrEqualTo: searchTerm + '\uf8ff')
+          .where('fullName', isLessThanOrEqualTo: '$searchTerm\uf8ff')
           .orderBy('state')
           .limit(500);
     }
@@ -237,6 +236,8 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
         excel.TextCellValue('State'),
         excel.TextCellValue('Location'),
         excel.TextCellValue('Status'),
+        excel.TextCellValue('Account Number'),
+        excel.TextCellValue('Bank Name'),
       ]);
       for (final d in snap.docs) {
         final data = d.data() as Map<String, dynamic>? ?? {};
@@ -250,6 +251,8 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
           excel.TextCellValue((data['state'] ?? 'N/A').toString()),
           excel.TextCellValue((data['location'] ?? 'N/A').toString()),
           excel.TextCellValue((data['accountStatus'] ?? 'N/A').toString()),
+          excel.TextCellValue((data['accountNumber'] ?? 'N/A').toString()),
+          excel.TextCellValue((data['bankName'] ?? 'N/A').toString()),
         ]);
       }
       final bytes = excelInstance.save();
@@ -351,7 +354,7 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Staff Status (${_userState})', style: const TextStyle(color: Colors.white)),
+        title: Text('Staff Status ($_userState)', style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [

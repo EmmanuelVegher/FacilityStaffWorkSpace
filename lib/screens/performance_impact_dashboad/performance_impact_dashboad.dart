@@ -90,7 +90,7 @@ class _PerformanceImpactDashboardPageState extends State<PerformanceImpactDashbo
   DateTime _startDate = DateTime(DateTime.now().year, 1, 1); // Default to start of year
   DateTime _endDate = DateTime.now();
 
-  List<String> _availableStates = ['All States'];
+  final List<String> _availableStates = ['All States'];
   List<String> _availableFacilities = ['All Facilities'];
   List<String> _selectedStates = ['All States'];
   List<String> _selectedFacilities = ['All Facilities'];

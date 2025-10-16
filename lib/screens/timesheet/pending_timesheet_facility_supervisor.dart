@@ -538,7 +538,7 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       final monthName = DateFormat('MMMM').format(DateTime(yearNum, monthNum));
 
       // Reconstruct the ID, including the optional "_partX"
-      String docId = '${monthName}_${yearNum}';
+      String docId = '${monthName}_$yearNum';
       if (parts.length > 2) {
         docId += '_${parts.sublist(2).join('_')}'; // Handles "part1", "part2", etc.
       }
@@ -806,7 +806,7 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                         color: Colors.black.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Container(
+                      child: SizedBox(
                         width: 350, // Constrain the width for consistent layout
                         child: Text(
                           notesText,
@@ -2517,7 +2517,7 @@ $selectedBioFirstName $selectedBioLastName
 
     String rejectionReason = "";
     // Use a Form key for better validation
-    final _formKey = GlobalKey<FormState>();
+    final formKey = GlobalKey<FormState>();
 
     await showDialog(
       context: context,
@@ -2525,7 +2525,7 @@ $selectedBioFirstName $selectedBioLastName
         return AlertDialog(
           title: const Text('Return Timesheet'),
           content: Form( // Wrap with a Form
-            key: _formKey,
+            key: formKey,
             child: TextFormField(
               onChanged: (value) {
                 rejectionReason = value;
@@ -2552,7 +2552,7 @@ $selectedBioFirstName $selectedBioLastName
             TextButton(
               onPressed: () async {
                 // Validate the form
-                if (_formKey.currentState!.validate()) {
+                if (formKey.currentState!.validate()) {
                   try {
                     Map<String, dynamic> updateData = {};
                     if (selectedBioStaffCategory == "Facility Supervisor") {
@@ -3388,7 +3388,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           color: Colors.white,
                                                           child: Text(projectName),
                                                         ),
-                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)).toList(),
+                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)),
                                                         Container(
                                                           width: 100,
                                                           alignment: Alignment.center,
@@ -3438,7 +3438,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             color: Colors.white,
                                                             child: Text(category, style: const TextStyle(fontWeight: FontWeight.bold)),
                                                           ),
-                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)).toList(),
+                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)),
                                                           Container(
                                                             width: 100,
                                                             alignment: Alignment.center,
@@ -3461,7 +3461,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           ),
                                                         ],
                                                       );
-                                                    }).toList(),
+                                                    }),
 
                                                     // Total Row (This part remains the same)
                                                     Row(
@@ -3773,7 +3773,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           if (status == "Approved" && signatureUrl != null) {
                                                             return Column(
                                                               children: [
-                                                                Container(
+                                                                SizedBox(
                                                                   height: 80,
                                                                   child: Image.network(
                                                                     signatureUrl,
@@ -3831,7 +3831,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               // YES -> Show their signature as a preview of what will be applied.
                                                               return Column(
                                                                 children: [
-                                                                  Container(
+                                                                  SizedBox(
                                                                     height: 80,
                                                                     child: Image.network(
                                                                       selectedSignatureLink2!, // Show the logged-in supervisor's signature
@@ -3856,7 +3856,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             } else {
                                                               // NO -> The supervisor has no signature. Show a helpful prompt.
                                                               // This PREVENTS the "infinite loading" bug.
-                                                              return Container(
+                                                              return SizedBox(
                                                                 height: 100,
                                                                 child: Column(
                                                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -4035,7 +4035,7 @@ $selectedBioFirstName $selectedBioLastName
                                                           if (status == "Approved" && signatureUrl != null) {
                                                             return Column(
                                                               children: [
-                                                                Container(
+                                                                SizedBox(
                                                                   height: 80,
                                                                   child: Image.network(
                                                                     signatureUrl,
@@ -4093,7 +4093,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               // YES -> Show their signature as a preview of what will be applied.
                                                               return Column(
                                                                 children: [
-                                                                  Container(
+                                                                  SizedBox(
                                                                     height: 80,
                                                                     child: Image.network(
                                                                       selectedSignatureLink2!, // Show the logged-in supervisor's signature
@@ -4118,7 +4118,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             } else {
                                                               // NO -> The supervisor has no signature. Show a helpful prompt.
                                                               // This PREVENTS the "infinite loading" bug.
-                                                              return Container(
+                                                              return SizedBox(
                                                                 height: 100,
                                                                 child: Column(
                                                                   mainAxisAlignment: MainAxisAlignment.center,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../services/isar_service.dart';
 import '../../widgets/drawer.dart';
 
 // NEW: A dedicated widget to display an image in full screen.

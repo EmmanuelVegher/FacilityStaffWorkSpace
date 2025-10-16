@@ -64,7 +64,7 @@ class SalaryScale {
 
 
 class SalaryScalePage extends StatefulWidget {
-  const SalaryScalePage({Key? key}) : super(key: key);
+  const SalaryScalePage({super.key});
 
   @override
   _SalaryScalePageState createState() => _SalaryScalePageState();
@@ -271,7 +271,7 @@ class _SalaryScalePageState extends State<SalaryScalePage> {
 class SalaryScaleFormDialog extends StatefulWidget {
   final SalaryScale? scale;
 
-  const SalaryScaleFormDialog({Key? key, this.scale}) : super(key: key);
+  const SalaryScaleFormDialog({super.key, this.scale});
 
   @override
   _SalaryScaleFormDialogState createState() => _SalaryScaleFormDialogState();

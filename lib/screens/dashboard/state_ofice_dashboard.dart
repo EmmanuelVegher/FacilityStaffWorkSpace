@@ -66,12 +66,12 @@ class LeaveRequest {
   LeaveRequest({required this.staffName, required this.leaveType, required this.startDate, required this.endDate, required this.status});
 
   factory LeaveRequest.fromMap(Map<String, dynamic> map) {
-    DateTime _parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
+    DateTime parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
     return LeaveRequest(
       staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parse(map['startDate']),
-      endDate: _parse(map['endDate']),
+      startDate: parse(map['startDate']),
+      endDate: parse(map['endDate']),
       status: map['status'] ?? 'Pending',
     );
   }
@@ -105,7 +105,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   final StreamController<TimesheetMetrics> _timesheetStreamController = StreamController.broadcast();
   bool _isTimesheetLoading = false;
   late Timer _timer;
-  String _liveTime = '';
+  final String _liveTime = '';
 
   @override
   void initState() {

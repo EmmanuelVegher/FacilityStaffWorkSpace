@@ -280,7 +280,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
-                      value: _selectedMonth,
+                      initialValue: _selectedMonth,
                       menuMaxHeight: screenHeight * dropdownMenuMaxHeightFactor, // Increased menu height
                       items: _months.map((month) {
                         return DropdownMenuItem<String>(
@@ -304,7 +304,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
-                      value: _selectedYear,
+                      initialValue: _selectedYear,
                       menuMaxHeight: screenHeight * dropdownMenuMaxHeightFactor, // Increased menu height
                       items: _years.map((year) {
                         return DropdownMenuItem<String>(
@@ -657,7 +657,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  _showAttendanceOptionsDialog(BuildContext context, String date) {
+  void _showAttendanceOptionsDialog(BuildContext context, String date) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -685,7 +685,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
 
-  _showDeleteConfirmationDialog(BuildContext context, String date) {
+  void _showDeleteConfirmationDialog(BuildContext context, String date) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -741,7 +741,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
 
-  syncCompleteData(String date) async {
+  Future<void> syncCompleteData(String date) async {
     if (firebaseAuthId == null) {
       Fluttertoast.showToast(
         msg: "User ID not found. Please logout and login again.",

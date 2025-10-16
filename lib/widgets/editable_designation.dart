@@ -52,7 +52,7 @@ class _EditableDesignationTileState extends State<EditableDesignationTile> {
 
           return
             DropdownButtonFormField<String>(
-              value: _selectedDesignation,
+              initialValue: _selectedDesignation,
               hint: const Text('Select Designation'),
               decoration: const InputDecoration(
                 labelText:null,

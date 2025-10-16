@@ -5,18 +5,13 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
-import '../features/payroll/ui/payroll_review_page.dart';
-import '../features/payroll/ui/payroll_workflow_page.dart';
-import '../features/payroll/ui/salary_management_page.dart';
 import '../screens/account_management/my_state_screen.dart';
-import '../screens/activity_monitoring/create_activity_page.dart';
 import '../screens/admin/pending_schedules_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
 import '../screens/forgot_password2.dart';
-import '../screens/leave_request/leave_request_review_page.dart';
 import '../screens/leave_request/state_leave_request_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approvals.dart';
@@ -27,8 +22,6 @@ import '../screens/supervisor/supervisor_task_summary_page.dart';
 import '../screens/timesheet/timesheet_management_dashboard.dart';
 import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
-import '../screens/viral_load_tracker/vl_reports_page.dart';
-import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import '../screens/admin/audit_logs_state_page.dart';
 import '../screens/admin/staff_status_report_state_page.dart';
 import 'app_button.dart';
@@ -267,6 +260,33 @@ Widget drawer2(
               );
             },
           ),
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+
+
+          ListTile(
+            leading: Icon(
+              Icons.pending_actions, // Changed Icon
+              size: drawerIconSize,
+              color: Colors.blue,
+            ),
+            title: Text(
+              'Pending Leave Requests',
+              style: TextStyle(
+                  fontSize: drawerFontSize,
+                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StateLeaveRequestManagementPage()),
+              );
+            },
+          ),
+
 
 
           const Divider(
@@ -274,10 +294,13 @@ Widget drawer2(
             height: 1,
           ),
           ListTile(
-            leading: Icon(Icons.pending,
-                size: drawerIconSize, color: Colors.red),
+            leading: Icon(
+              Icons.schedule, // Changed Icon
+              size: drawerIconSize,
+              color: Colors.red,
+            ),
             title: Text(
-              'Pending Approval',
+              'Pending Timesheets',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -436,7 +459,7 @@ Widget drawer2(
               color: Colors.blue,
             ),
             title: Text(
-              'View Timesheets',
+              'View Submitted Timesheets',
               style: TextStyle(
                   fontSize: drawerFontSize,
                   color: Get.isDarkMode ? Colors.white : Colors.brown),
@@ -478,33 +501,6 @@ Widget drawer2(
 
 
 
-          const Divider(
-            color: Colors.grey,
-            height: 1,
-          ),
-
-
-          ListTile(
-            leading: Icon(
-              Icons.holiday_village,
-              size: drawerIconSize,
-              color: Colors.blue,
-            ),
-            title: Text(
-              'View Leave Requests',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const StateLeaveRequestManagementPage()),
-
-              );
-            },
-          ),
 
           const Divider(
             color: Colors.grey,
@@ -734,7 +730,7 @@ Widget drawer2(
 
 
 
-_displayDialog(BuildContext context) async {
+Future<Future> _displayDialog(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -763,7 +759,7 @@ _displayDialog(BuildContext context) async {
       });
 }
 
-_displayDialogForDiffAcount(BuildContext context) async {
+Future<Future> _displayDialogForDiffAcount(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -848,7 +844,7 @@ void _switchAccountValidation(BuildContext context) async {
   // }
 }
 
-_showBottomSheet2(BuildContext context) {
+PersistentBottomSheetController _showBottomSheet2(BuildContext context) {
   return showBottomSheet(
       context: context,
       builder: (context) {
@@ -917,7 +913,7 @@ _showBottomSheet2(BuildContext context) {
       });
 }
 
-_bottomSheetButton(
+GestureDetector _bottomSheetButton(
     {required String label,
       required Function()? onTap,
       required Color clr,

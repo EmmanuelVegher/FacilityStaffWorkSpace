@@ -18,7 +18,6 @@ import 'package:location/location.dart' as locationPkg;
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 import 'package:http/http.dart' as http; // Import http package
 import '../../services/location_services.dart';
-import '../../team_survey/team_survey.dart';
 import '../../widgets/drawer.dart';
 import '../../widgets/geo_utils.dart';
 import '../../widgets/header_widget.dart';
@@ -2356,7 +2355,7 @@ class ClockAttendanceWebController extends GetxController {
 
 
 
-  showDialogBox() => showCupertinoDialog<String>(
+  Future<String?> showDialogBox() => showCupertinoDialog<String>(
     context: Get.context!,
     builder: (BuildContext context) => CupertinoAlertDialog(
       title: const Text("Location Turned Off"),

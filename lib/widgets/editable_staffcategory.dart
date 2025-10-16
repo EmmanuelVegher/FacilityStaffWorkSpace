@@ -49,7 +49,7 @@ class _EditableStaffCategoryTileState extends State<EditableStaffCategoryTile> {
           return Text('Error: ${snapshot.error}');
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return DropdownButtonFormField<String>(
-            value: _selectedStaffCategory, // Start with no selected value
+            initialValue: _selectedStaffCategory, // Start with no selected value
             hint: const Text('Select Staff Category'),
             decoration: const InputDecoration(
               labelText: null,

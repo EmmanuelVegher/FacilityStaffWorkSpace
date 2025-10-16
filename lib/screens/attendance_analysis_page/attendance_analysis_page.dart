@@ -3,7 +3,6 @@
 // REWRITTEN BY GEMINI WITH INTERACTIVE CHARTS AND ROBUST ERROR HANDLING
 
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -39,13 +38,13 @@ class AnimatedNumberText extends StatelessWidget {
   final String suffix;
 
   const AnimatedNumberText(
-      this.value, {
-        super.key,
-        this.style,
-        this.duration = const Duration(milliseconds: 1200),
-        this.fractionDigits = 1,
-        this.suffix = '',
-      });
+    this.value, {
+    super.key,
+    this.style,
+    this.duration = const Duration(milliseconds: 1200),
+    this.fractionDigits = 1,
+    this.suffix = '',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -98,15 +97,14 @@ class StaffInfo {
   });
 }
 
-
 class FacilityDetails {
   final String name;
   final GeoPoint coordinates;
   final double radius; // in meters
 
-  FacilityDetails({required this.name, required this.coordinates, required this.radius});
+  FacilityDetails(
+      {required this.name, required this.coordinates, required this.radius});
 }
-
 
 // EXPANDED AttendanceRecord to include string values for the export
 class AttendanceRecord {
@@ -126,7 +124,6 @@ class AttendanceRecord {
   final String? clockInLocationString;
   final String? clockOutLocationString;
   final String? durationWorked;
-
 
   AttendanceRecord({
     required this.recordId,
@@ -177,7 +174,8 @@ class AggregatedSummary {
   // The getter can now calculate total hours from either data source.
   double get totalHours {
     if (dailyRecords.isNotEmpty) {
-      return dailyRecords.values.fold(0.0, (sum, record) => sum + record.hoursWorked);
+      return dailyRecords.values
+          .fold(0.0, (sum, record) => sum + record.hoursWorked);
     }
     return dailyHours.values.fold(0.0, (sum, hours) => sum + hours);
   }
@@ -189,7 +187,9 @@ class _ChartData {
   final String category;
   final double value;
   final Color? color;
-  _ChartData(this.category, this.value, [this.color]);
+
+  // This constructor now correctly initializes the optional 'color' field.
+  _ChartData(this.category, this.value, {this.color});
 }
 
 // --- MAIN WIDGET ---
@@ -250,17 +250,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   // --- Map and Outlier State ---
   // GoogleMapController? _mapController; // COMMENTED OUT - Using OpenStreetMap instead
   MapController? _mapController;
-  List<Marker> _mapMarkers = []; // Changed from Set<Marker> to List<Marker> for flutter_map
+  List<Marker> _mapMarkers =
+      []; // Changed from Set<Marker> to List<Marker> for flutter_map
   Map<String, FacilityDetails> _facilityDetails = {};
   List<OutlierRecord> _outlierRecords = [];
   // static const CameraPosition _initialCameraPosition = CameraPosition( // COMMENTED OUT - Using OpenStreetMap instead
   //   target: LatLng(9.0820, 8.6753), // Center of Nigeria
   //   zoom: 5.5,
   // );
-  static const latlng.LatLng _initialMapCenter = latlng.LatLng(9.0820, 8.6753); // Center of Nigeria
+  static const latlng.LatLng _initialMapCenter =
+      latlng.LatLng(9.0820, 8.6753); // Center of Nigeria
   String? _currentUserEmail;
   Map<String, StaffInfo> _staffInfoByNameMap = {};
-
 
   @override
   void initState() {
@@ -285,18 +286,17 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     super.dispose();
   }
 
-
   Future<void> _initializeFilters() async {
     try {
       final user = _firebaseAuth.currentUser;
       if (user == null) throw Exception("User not logged in.");
       final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
-      if(mounted) {
+      if (mounted) {
         setState(() {
           _userState = staffDoc.data()?['state'] as String?;
         });
 
-        if(_userState != null) {
+        if (_userState != null) {
           // Fetch available facilities and their details
           final facilitiesSnapshot = await _firestore
               .collection('Facilities')
@@ -314,7 +314,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             final lonString = data['Longitude'] as String?;
             final radiusString = data['Radius'] as String?;
 
-            if (name != null && latString != null && lonString != null && radiusString != null) {
+            if (name != null &&
+                latString != null &&
+                lonString != null &&
+                radiusString != null) {
               final lat = double.tryParse(latString);
               final lon = double.tryParse(lonString);
               final radius = double.tryParse(radiusString);
@@ -334,7 +337,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           // Fetch available designations
           final designations = await _getUniqueFieldValues('designation');
 
-          if(mounted) {
+          if (mounted) {
             // Set the available options and default selections
             setState(() {
               _availableFacilities = facilities;
@@ -355,15 +358,17 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           }
         }
       }
-    } catch(e) {
-      if(mounted) setState(() => _errorMessage = "Error initializing filters: $e");
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = "Error initializing filters: $e");
+      }
     }
   }
 
-
   Future<List<String>> _getUniqueFieldValues(String field) async {
-    if(_userState == null) return [];
-    final snapshot = await _firestore.collection('Staff')
+    if (_userState == null) return [];
+    final snapshot = await _firestore
+        .collection('Staff')
         .where('state', isEqualTo: _userState)
         .where('staffCategory', isEqualTo: "Facility Staff")
         .where('accountStatus', isEqualTo: 'Active')
@@ -384,7 +389,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         .where('state', isEqualTo: _userState)
         .where('accountStatus', isEqualTo: 'Active');
 
-    if (_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30) {
+    if (_selectedDesignations.isNotEmpty &&
+        _selectedDesignations.length <= 30) {
       query = query.where('designation', whereIn: _selectedDesignations);
     }
 
@@ -426,11 +432,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
   }
 
-
   Future<void> _loadDashboardData() async {
     if (_userState == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User state not found.")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("User state not found.")));
       return;
     }
     setState(() {
@@ -449,8 +454,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       // Apply optional dropdown filters
       if (_selectedStaffIds.isNotEmpty) {
         if (_selectedStaffIds.length <= 30) {
-          staffQuery =
-              staffQuery.where(FieldPath.documentId, whereIn: _selectedStaffIds);
+          staffQuery = staffQuery.where(FieldPath.documentId,
+              whereIn: _selectedStaffIds);
         }
       } else if (_selectedDesignations.isNotEmpty) {
         if (_selectedDesignations.length <= 30) {
@@ -458,7 +463,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               staffQuery.where('designation', whereIn: _selectedDesignations);
         }
       }
-
 
       final staffSnapshot = await staffQuery.get();
       // Create the comprehensive list of StaffInfo objects with all new fields
@@ -484,7 +488,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
       if (_selectedFacilities.isNotEmpty) {
         staffList.retainWhere(
-                (staff) => _selectedFacilities.contains(staff.location));
+            (staff) => _selectedFacilities.contains(staff.location));
       }
 
       if (staffList.isEmpty) {
@@ -494,14 +498,17 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       }
 
       // Create lookup maps for efficiency
-      final staffInfoByNameMap = {for (var staff in staffList) staff.name: staff};
+      final staffInfoByNameMap = {
+        for (var staff in staffList) staff.name: staff
+      };
       final filteredStaffIds = staffList.map((s) => s.id).toSet();
       final staffInfoMap = {for (var s in staffList) s.id: s};
 
       final recordsSnapshot = await _firestore
           .collectionGroup('Record')
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
-          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
+          .where('timestamp',
+              isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
           .get();
 
       List<AttendanceRecord> allRecords = [];
@@ -516,7 +523,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
           RecommendationInfo? recommendation;
           if (data['recommendation'] != null && data['recommendation'] is Map) {
-            recommendation = RecommendationInfo.fromMap(data['recommendation'] as Map<String, dynamic>);
+            recommendation = RecommendationInfo.fromMap(
+                data['recommendation'] as Map<String, dynamic>);
           }
 
           final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
@@ -534,50 +542,49 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             clockOutPoint = GeoPoint(clockOutLat, clockOutLon);
           }
 
-          allRecords.add(
-              AttendanceRecord(
-                recordId: recordDoc.id,
-                staffId: staffId,
-                staffName: staffInfo.name,
-                assignedFacility: staffInfo.location,
-                date: recordTimestamp,
-                hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
-                clockInLocation: clockInPoint,
-                clockOutLocation: clockOutPoint,
-                deductionStatus: data['deductionStatus'] as String? ?? 'None',
-                recommendation: recommendation,
-                clockInTime: data['clockIn'] as String?,
-                clockOutTime: data['clockOut'] as String?,
-                clockInLocationString: data['clockInLocation'] as String?,
-                clockOutLocationString: data['clockOutLocation'] as String?,
-                durationWorked: data['durationWorked'] as String?,
-              )
-          );
+          allRecords.add(AttendanceRecord(
+            recordId: recordDoc.id,
+            staffId: staffId,
+            staffName: staffInfo.name,
+            assignedFacility: staffInfo.location,
+            date: recordTimestamp,
+            hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
+            clockInLocation: clockInPoint,
+            clockOutLocation: clockOutPoint,
+            deductionStatus: data['deductionStatus'] as String? ?? 'None',
+            recommendation: recommendation,
+            clockInTime: data['clockIn'] as String?,
+            clockOutTime: data['clockOut'] as String?,
+            clockInLocationString: data['clockInLocation'] as String?,
+            clockOutLocationString: data['clockOutLocation'] as String?,
+            durationWorked: data['durationWorked'] as String?,
+          ));
         }
       }
 
       final dateRange = List.generate(
           _endDate.difference(_startDate).inDays + 1,
-              (i) => _startDate.add(Duration(days: i)));
+          (i) => _startDate.add(Duration(days: i)));
 
-      _processAndAggregateData(allRecords, staffList, dateRange, staffInfoByNameMap);
-
+      _processAndAggregateData(
+          allRecords, staffList, dateRange, staffInfoByNameMap);
     } catch (e, stack) {
       debugPrint("Error loading dashboard data: $e\n$stack");
       if (mounted) {
-        setState(() => _errorMessage = "An error occurred. Check Firestore indexes. Error: $e");
+        setState(() => _errorMessage =
+            "An error occurred. Check Firestore indexes. Error: $e");
       }
     } finally {
-      if(mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _processAndAggregateData(
-      List<AttendanceRecord> records,
-      List<StaffInfo> staff,
-      List<DateTime> dateRange,
-      Map<String, StaffInfo> staffInfoByNameMap, // <-- ACCEPT THE MAP
-      ) {
+    List<AttendanceRecord> records,
+    List<StaffInfo> staff,
+    List<DateTime> dateRange,
+    Map<String, StaffInfo> staffInfoByNameMap, // <-- ACCEPT THE MAP
+  ) {
     final facilityData = <String, AggregatedSummary>{};
     final designationData = <String, AggregatedSummary>{};
     final facilityStaffData = <String, Map<String, AggregatedSummary>>{};
@@ -587,23 +594,32 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       final staffInfo = staffMap[record.staffId];
       if (staffInfo == null) continue;
 
-      final day = DateTime(record.date.year, record.date.month, record.date.day);
+      final day =
+          DateTime(record.date.year, record.date.month, record.date.day);
 
-      final facilitySummary = facilityData.putIfAbsent(staffInfo.location, () => AggregatedSummary(name: staffInfo.location));
-      facilitySummary.dailyHours[day] = (facilitySummary.dailyHours[day] ?? 0) + record.hoursWorked;
+      final facilitySummary = facilityData.putIfAbsent(staffInfo.location,
+          () => AggregatedSummary(name: staffInfo.location));
+      facilitySummary.dailyHours[day] =
+          (facilitySummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      final designationSummary = designationData.putIfAbsent(staffInfo.designation, () => AggregatedSummary(name: staffInfo.designation));
-      designationSummary.dailyHours[day] = (designationSummary.dailyHours[day] ?? 0) + record.hoursWorked;
+      final designationSummary = designationData.putIfAbsent(
+          staffInfo.designation,
+          () => AggregatedSummary(name: staffInfo.designation));
+      designationSummary.dailyHours[day] =
+          (designationSummary.dailyHours[day] ?? 0) + record.hoursWorked;
 
-      final staffMapForFacility = facilityStaffData.putIfAbsent(staffInfo.location, () => {});
-      final staffSummary = staffMapForFacility.putIfAbsent(staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
+      final staffMapForFacility =
+          facilityStaffData.putIfAbsent(staffInfo.location, () => {});
+      final staffSummary = staffMapForFacility.putIfAbsent(
+          staffInfo.name, () => AggregatedSummary(name: staffInfo.name));
       staffSummary.dailyRecords[day] = record;
     }
 
     _generateMapMarkers(records);
     _findOutliers(records);
 
-    final recommendations = records.where((r) => r.deductionStatus != 'None').toList();
+    final recommendations =
+        records.where((r) => r.deductionStatus != 'None').toList();
     recommendations.sort((a, b) => b.date.compareTo(a.date));
 
     // --- FINAL STATE UPDATE ---
@@ -617,8 +633,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         _facilityStaffSummaries = facilityStaffData;
         _dateRangeForTables = dateRange;
         _totalHoursAll = records.fold(0.0, (sum, r) => sum + r.hoursWorked);
-        _staffInfoByNameMap = staffInfoByNameMap; // <-- SAVE THE MAP TO STATE HERE
-        _staffDetailsMap = staffMap; // Make detailed staff data available for export
+        _staffInfoByNameMap =
+            staffInfoByNameMap; // <-- SAVE THE MAP TO STATE HERE
+        _staffDetailsMap =
+            staffMap; // Make detailed staff data available for export
       });
     }
   }
@@ -633,7 +651,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
 
     setState(() => _isExporting = true);
-    await Future.delayed(const Duration(milliseconds: 100)); // Allow UI to update
+    await Future.delayed(
+        const Duration(milliseconds: 100)); // Allow UI to update
 
     try {
       List<List<dynamic>> rows = [];
@@ -705,7 +724,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         ]);
       }
 
-
       String csvData = const ListToCsvConverter().convert(rows);
       _triggerDownload(
         utf8.encode(csvData),
@@ -748,22 +766,40 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         textWrapping: xls.TextWrapping.WrapText,
         verticalAlign: xls.VerticalAlign.Center,
         horizontalAlign: xls.HorizontalAlign.Center,
-       // backgroundColorHex: '#FFD3D3D3', // Light grey background
+        // backgroundColorHex: '#FFD3D3D3', // Light grey background
       );
 
       // 3. Create the list of headers
       List<String> headers = [
-        'First Name', 'Last Name', 'State', 'Department', 'Designation',
-        'Assigned Facility', 'Mobile', 'Email Address', 'Staff Category', 'Date',
-        'Clock In Time', 'Clock Out Time', 'Hours Worked', 'Duration Worked',
-        'Clock In Location', 'Clock In Latitude', 'Clock In Longitude',
-        'Clock Out Location', 'Clock Out Latitude', 'Clock Out Longitude',
-        'Deduction Status', 'Comments/Reason', 'Recommended By'
+        'First Name',
+        'Last Name',
+        'State',
+        'Department',
+        'Designation',
+        'Assigned Facility',
+        'Mobile',
+        'Email Address',
+        'Staff Category',
+        'Date',
+        'Clock In Time',
+        'Clock Out Time',
+        'Hours Worked',
+        'Duration Worked',
+        'Clock In Location',
+        'Clock In Latitude',
+        'Clock In Longitude',
+        'Clock Out Location',
+        'Clock Out Latitude',
+        'Clock Out Longitude',
+        'Deduction Status',
+        'Comments/Reason',
+        'Recommended By'
       ];
 
       // 4. Apply headers and their style to the first row
       for (var i = 0; i < headers.length; i++) {
-        var cell = sheetObject.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        var cell = sheetObject
+            .cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
         cell.value = xls.TextCellValue(headers[i]);
         cell.cellStyle = headerStyle;
       }
@@ -796,14 +832,16 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           xls.TextCellValue(DateFormat('yyyy-MM-dd').format(record.date)),
           xls.TextCellValue(record.clockInTime ?? 'N/A'),
           xls.TextCellValue(record.clockOutTime ?? 'N/A'),
-          xls.DoubleCellValue(record.hoursWorked), // Use DoubleCellValue for numbers
+          xls.DoubleCellValue(
+              record.hoursWorked), // Use DoubleCellValue for numbers
           xls.TextCellValue(record.durationWorked ?? 'N/A'),
           xls.TextCellValue(record.clockInLocationString ?? 'N/A'),
           xls.TextCellValue(record.clockInLocation?.latitude.toString() ?? ''),
           xls.TextCellValue(record.clockInLocation?.longitude.toString() ?? ''),
           xls.TextCellValue(record.clockOutLocationString ?? 'N/A'),
           xls.TextCellValue(record.clockOutLocation?.latitude.toString() ?? ''),
-          xls.TextCellValue(record.clockOutLocation?.longitude.toString() ?? ''),
+          xls.TextCellValue(
+              record.clockOutLocation?.longitude.toString() ?? ''),
           xls.TextCellValue(record.deductionStatus),
           xls.TextCellValue(record.recommendation?.notes ?? ''),
           xls.TextCellValue(record.recommendation?.recommenderName ?? '')
@@ -820,12 +858,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
       // Define headers for the new sheet
       List<String> facilityHeaders = [
-        'Facility Name', 'LGA', 'State', 'Latitude', 'Longitude', 'Radius (meters)'
+        'Facility Name',
+        'LGA',
+        'State',
+        'Latitude',
+        'Longitude',
+        'Radius (meters)'
       ];
 
       // Apply headers and style to the first row of the new sheet
       for (var i = 0; i < facilityHeaders.length; i++) {
-        var cell = facilitySheet.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        var cell = facilitySheet
+            .cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
         cell.value = xls.TextCellValue(facilityHeaders[i]);
         cell.cellStyle = headerStyle;
       }
@@ -872,7 +916,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
       }
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -921,7 +964,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           "Recommendations Log",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
         ),
-        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
+        subtitle: Text(
+            "${_recordsWithRecommendations.length} record(s) with an action taken"),
         children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -941,7 +985,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 // Use a switch for clarity
                 switch (record.deductionStatus) {
                   case 'Partial':
-                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                    statusText =
+                        'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
                     statusColor = Colors.orange.shade800;
                     break;
                   case 'Full':
@@ -949,9 +994,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     statusColor = Colors.red.shade800;
                     break;
                   case 'ApprovedPartial':
-                  // --- THE FIX ---
-                  // Read from the main hours field, which is now the source of truth for approved time.
-                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                    // --- THE FIX ---
+                    // Read from the main hours field, which is now the source of truth for approved time.
+                    statusText =
+                        'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
                     statusColor = Colors.blue.shade800;
                     break;
                   case 'ApprovedFull':
@@ -959,7 +1005,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     statusColor = Colors.indigo.shade800;
                     break;
                   default:
-                  // Fallback for any other status
+                    // Fallback for any other status
                     statusText = record.deductionStatus;
                     break;
                 }
@@ -975,7 +1021,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     DataCell(Text(DateFormat.yMd().format(record.date))),
                     DataCell(Text(
                       statusText,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: statusColor),
                     )),
                     DataCell(Text(recommenderText)),
                     DataCell(Text(notesText)),
@@ -1016,12 +1063,14 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             InkWell(
               onTap: () {
                 // Open YouTube link in new tab
-                html.window.open('https://youtu.be/I_D7rWG3PiQ', 'youtube_tutorial');
+                html.window
+                    .open('https://youtu.be/I_D7rWG3PiQ', 'youtube_tutorial');
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.play_circle_fill, color: Colors.red.shade600, size: 20),
+                  Icon(Icons.play_circle_fill,
+                      color: Colors.red.shade600, size: 20),
                   const SizedBox(width: 4),
                   Text(
                     'View Tutorial',
@@ -1038,10 +1087,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         ),
         actions: <Widget>[
           TextButton(
-            child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('DISMISS',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             onPressed: () {
               setState(() {
-                _isUpdateBannerVisible = false; // Hide the banner for this session
+                _isUpdateBannerVisible =
+                    false; // Hide the banner for this session
               });
             },
           ),
@@ -1057,18 +1108,23 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance Analysis Dashboard", style: TextStyle(color: Colors.white)),
+        title: const Text("Attendance Analysis Dashboard",
+            style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          if(_isExporting)
-            const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
+          if (_isExporting)
+            const Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(color: Colors.white))
           else
             PopupMenuButton<String>(
               icon: const Icon(Icons.download_outlined),
               tooltip: "Download Options",
               onSelected: (value) {
-                if (value == 'excel_list') _exportAttendanceListToExcel(); // Call new Excel method
+                if (value == 'excel_list') {
+                  _exportAttendanceListToExcel(); // Call new Excel method
+                }
                 if (value == 'csv_list') _exportAttendanceListToCsv();
                 if (value == 'csv_summary') _exportSummaryToCsv();
                 if (value == 'pdf') _exportChartsToPdf();
@@ -1122,7 +1178,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 if (_isLoading)
                   Container(
                     color: Colors.black.withOpacity(0.5),
-                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white)),
                   ),
                 if (_errorMessage != null)
                   Container(
@@ -1132,7 +1189,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                         margin: const EdgeInsets.all(24),
                         child: Padding(
                           padding: const EdgeInsets.all(24.0),
-                          child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16)),
+                          child: Text(_errorMessage!,
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 16)),
                         ),
                       ),
                     ),
@@ -1152,7 +1211,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Wrap(
-          spacing: 16, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, alignment: WrapAlignment.center,
+          spacing: 16,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.center,
           children: [
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
@@ -1161,16 +1223,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 '${DateFormat("MMMM d,yyyy").format(_startDate)} - ${DateFormat("MMMM d,yyyy").format(_endDate)}',
               ),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
-
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField(
                 items: [
-                  MultiSelectItem<String>(_allFacilitiesOption, _allFacilitiesOption),
-                  ..._availableFacilities.map((f) => MultiSelectItem<String>(f, f)),
+                  MultiSelectItem<String>(
+                      _allFacilitiesOption, _allFacilitiesOption),
+                  ..._availableFacilities
+                      .map((f) => MultiSelectItem<String>(f, f)),
                 ],
                 initialValue: _selectedFacilities,
                 title: const Text("Select Facilities"),
@@ -1182,11 +1246,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 ),
                 buttonIcon: const Icon(Icons.location_city, color: Colors.teal),
                 buttonText: Text(
-                  _selectedFacilities.length == _availableFacilities.length && _availableFacilities.isNotEmpty
+                  _selectedFacilities.length == _availableFacilities.length &&
+                          _availableFacilities.isNotEmpty
                       ? "All Facilities Selected"
                       : _selectedFacilities.isEmpty
-                      ? "Facility"
-                      : "${_selectedFacilities.length} Facilit${_selectedFacilities.length == 1 ? 'y' : 'ies'} selected",
+                          ? "Facility"
+                          : "${_selectedFacilities.length} Facilit${_selectedFacilities.length == 1 ? 'y' : 'ies'} selected",
                   style: TextStyle(color: Colors.teal[800], fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1196,7 +1261,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     final castedResults = results.cast<String>();
                     // If "All Facilities" is selected, select everything.
                     if (castedResults.contains(_allFacilitiesOption)) {
-                      _selectedFacilities = List<String>.from(_availableFacilities);
+                      _selectedFacilities =
+                          List<String>.from(_availableFacilities);
                     } else {
                       // Otherwise, just take the specific selections.
                       _selectedFacilities = castedResults;
@@ -1212,31 +1278,36 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               constraints: const BoxConstraints(maxWidth: 400),
               child: MultiSelectDialogField<String>(
                 items: [
-                  MultiSelectItem<String>(_allDesignationsOption, _allDesignationsOption),
-                  ..._availableDesignations.map((d) => MultiSelectItem<String>(d, d)),
+                  MultiSelectItem<String>(
+                      _allDesignationsOption, _allDesignationsOption),
+                  ..._availableDesignations
+                      .map((d) => MultiSelectItem<String>(d, d)),
                 ],
                 initialValue: _selectedDesignations,
                 title: const Text("Select Designations"),
-                buttonIcon: Icon(Icons.work_outline, color: Colors.grey.shade700),
+                buttonIcon:
+                    Icon(Icons.work_outline, color: Colors.grey.shade700),
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.all(Radius.circular(8)),
                   border: Border.all(color: Colors.grey.shade600, width: 1),
                 ),
                 buttonText: Text(
-                    _selectedDesignations.length == _availableDesignations.length && _availableDesignations.isNotEmpty
+                    _selectedDesignations.length ==
+                                _availableDesignations.length &&
+                            _availableDesignations.isNotEmpty
                         ? "All Designations Selected"
                         : _selectedDesignations.isEmpty
-                        ? "Designation"
-                        : "${_selectedDesignations.length} Selected",
+                            ? "Designation"
+                            : "${_selectedDesignations.length} Selected",
                     style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-                    overflow: TextOverflow.ellipsis
-                ),
+                    overflow: TextOverflow.ellipsis),
                 onConfirm: (values) {
                   setState(() {
                     final castedValues = values.cast<String>();
                     // If "All Designations" is selected, select everything.
                     if (castedValues.contains(_allDesignationsOption)) {
-                      _selectedDesignations = List<String>.from(_availableDesignations);
+                      _selectedDesignations =
+                          List<String>.from(_availableDesignations);
                     } else {
                       // Otherwise, just take the specific selections.
                       _selectedDesignations = castedValues;
@@ -1252,21 +1323,24 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               child: MultiSelectDialogField<String>(
                 items: [
                   MultiSelectItem<String>(_allStaffOption, "All Staff"),
-                  ..._availableStaff.map((s) => MultiSelectItem<String>(s.id, s.name)),
+                  ..._availableStaff
+                      .map((s) => MultiSelectItem<String>(s.id, s.name)),
                 ],
                 initialValue: _selectedStaffIds,
                 title: const Text("Select Staff"),
-                buttonIcon: Icon(Icons.person_outline, color: Colors.grey.shade700),
+                buttonIcon:
+                    Icon(Icons.person_outline, color: Colors.grey.shade700),
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.all(Radius.circular(8)),
                   border: Border.all(color: Colors.grey.shade600, width: 1),
                 ),
                 buttonText: Text(
-                  _selectedStaffIds.length == _availableStaff.length && _availableStaff.isNotEmpty
+                  _selectedStaffIds.length == _availableStaff.length &&
+                          _availableStaff.isNotEmpty
                       ? "All Staff Selected"
                       : _selectedStaffIds.isEmpty
-                      ? "Staff"
-                      : "${_selectedStaffIds.length} Selected",
+                          ? "Staff"
+                          : "${_selectedStaffIds.length} Selected",
                   style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1275,7 +1349,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     final castedValues = values.cast<String>();
                     // If "All Staff" is selected, select all available staff IDs.
                     if (castedValues.contains(_allStaffOption)) {
-                      _selectedStaffIds = _availableStaff.map((s) => s.id).toList();
+                      _selectedStaffIds =
+                          _availableStaff.map((s) => s.id).toList();
                     } else {
                       // Otherwise, just take the specific selections.
                       _selectedStaffIds = castedValues;
@@ -1289,7 +1364,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               icon: const Icon(Icons.bar_chart_rounded),
               label: const Text('Load Dashboard'),
               onPressed: _isLoading ? null : _loadDashboardData,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -1303,7 +1380,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       builder: (context) => AlertDialog(
         title: const Text('Select Date Range'),
         content: SizedBox(
-          width: 350, height: 350,
+          width: 350,
+          height: 350,
           child: SfDateRangePicker(
             selectionMode: DateRangePickerSelectionMode.range,
             initialSelectedRange: PickerDateRange(_startDate, _endDate),
@@ -1327,8 +1405,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
   Widget _buildDashboardBody() {
     final bool hasLoadedData = _allRecords.isNotEmpty || _errorMessage != null;
-    final top15Facilities = _facilitySummaries.values.toList()..sort((a,b) => b.totalHours.compareTo(a.totalHours));
-    final chartData = top15Facilities.take(15).map((s) => _ChartData(s.name, s.totalHours)).toList();
+    final top15Facilities = _facilitySummaries.values.toList()
+      ..sort((a, b) => b.totalHours.compareTo(a.totalHours));
+    final chartData = top15Facilities
+        .take(15)
+        .map((s) => _ChartData(s.name, s.totalHours))
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -1341,7 +1423,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               child: Center(
                 child: Text(
                   "Please select filters and click 'Load Dashboard' to view analysis.",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                 ),
               ),
             ),
@@ -1355,7 +1438,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             const SizedBox(height: 24),
             _buildOutlierAnalysisSection(),
             const SizedBox(height: 24),
-            _buildChartCard("Top 15 Facilities by Hours",
+            _buildChartCard(
+                "Top 15 Facilities by Hours",
                 SfCartesianChart(
                     key: _barChartKey,
                     tooltipBehavior: _tooltipBehavior,
@@ -1365,20 +1449,22 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                       labelIntersectAction: AxisLabelIntersectAction.rotate45,
                       labelStyle: const TextStyle(fontSize: 10),
                     ),
-                    primaryYAxis: NumericAxis(majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5,5])),
+                    primaryYAxis: NumericAxis(
+                        majorGridLines: const MajorGridLines(
+                            width: 0.5, dashArray: [5, 5])),
                     series: <CartesianSeries>[
                       BarSeries<_ChartData, String>(
                           dataSource: chartData,
-                          xValueMapper: (d,_) => d.category,
-                          yValueMapper: (d,_) => d.value,
+                          xValueMapper: (d, _) => d.category,
+                          yValueMapper: (d, _) => d.value,
                           name: "Hours",
-                          dataLabelSettings: const DataLabelSettings(isVisible: true, labelAlignment: ChartDataLabelAlignment.top),
+                          dataLabelSettings: const DataLabelSettings(
+                              isVisible: true,
+                              labelAlignment: ChartDataLabelAlignment.top),
                           color: Colors.teal,
-                          borderRadius: const BorderRadius.all(Radius.circular(5))
-                      )
-                    ]
-                )
-            ),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(5)))
+                    ])),
             const SizedBox(height: 24),
             _buildFacilitySummaryTable(),
             const SizedBox(height: 24),
@@ -1399,7 +1485,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text("Clock-in & Clock-out Locations", style: Theme.of(context).textTheme.headlineSmall),
+            child: Text("Clock-in & Clock-out Locations",
+                style: Theme.of(context).textTheme.headlineSmall),
           ),
           SizedBox(
             height: 450,
@@ -1441,12 +1528,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             const SizedBox(height: 16),
             Text(
               'Map temporarily unavailable',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 8),
             Text(
               'Location data is still available in the detailed records below.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1469,12 +1562,16 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           "Outlier Analysis",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
         ),
-        subtitle: const Text("Clock events outside any recognized facility radius"),
+        subtitle:
+            const Text("Clock events outside any recognized facility radius"),
         children: [
           if (_outlierRecords.isEmpty)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Center(child: Text("No significant outliers found for the selected criteria.", style: TextStyle(fontStyle: FontStyle.italic))),
+              child: Center(
+                  child: Text(
+                      "No significant outliers found for the selected criteria.",
+                      style: TextStyle(fontStyle: FontStyle.italic))),
             )
           else
             SingleChildScrollView(
@@ -1487,15 +1584,22 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   DataColumn(label: Text('Assigned Facility')),
                   DataColumn(label: Text('Distance (meters)')),
                 ],
-                rows: _outlierRecords.map((outlier) => DataRow(
-                  cells: [
-                    DataCell(Text(outlier.staffName)),
-                    DataCell(Text(DateFormat.yMd().format(outlier.date))),
-                    DataCell(Text(outlier.type)),
-                    DataCell(Text(outlier.assignedFacility)),
-                    DataCell(Text(outlier.distanceInMeters.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red))),
-                  ],
-                )).toList(),
+                rows: _outlierRecords
+                    .map((outlier) => DataRow(
+                          cells: [
+                            DataCell(Text(outlier.staffName)),
+                            DataCell(
+                                Text(DateFormat.yMd().format(outlier.date))),
+                            DataCell(Text(outlier.type)),
+                            DataCell(Text(outlier.assignedFacility)),
+                            DataCell(Text(
+                                outlier.distanceInMeters.toStringAsFixed(0),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red))),
+                          ],
+                        ))
+                    .toList(),
               ),
             ),
           const SizedBox(height: 16),
@@ -1504,18 +1608,28 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     );
   }
 
-  Widget _buildKpiSection(){
+  Widget _buildKpiSection() {
     return Wrap(
-      spacing: 16, runSpacing: 16, alignment: WrapAlignment.center,
+      spacing: 16,
+      runSpacing: 16,
+      alignment: WrapAlignment.center,
       children: [
-        _buildKpiCard("Total Hours Logged", _totalHoursAll, Icons.timer_rounded, Colors.blue.shade800, fractionDigits: 1),
-        _buildKpiCard("Active Staff", _allRecords.map((r) => r.staffId).toSet().length, Icons.person_4_rounded, Colors.green.shade700),
-        _buildKpiCard("Facilities Reporting", _facilitySummaries.keys.length, Icons.location_city_rounded, Colors.purple.shade700),
+        _buildKpiCard("Total Hours Logged", _totalHoursAll, Icons.timer_rounded,
+            Colors.blue.shade800,
+            fractionDigits: 1),
+        _buildKpiCard(
+            "Active Staff",
+            _allRecords.map((r) => r.staffId).toSet().length,
+            Icons.person_4_rounded,
+            Colors.green.shade700),
+        _buildKpiCard("Facilities Reporting", _facilitySummaries.keys.length,
+            Icons.location_city_rounded, Colors.purple.shade700),
       ],
     );
   }
 
-  Widget _buildKpiCard(String title, num value, IconData icon, Color color, {int fractionDigits = 0, String suffix = ''}) {
+  Widget _buildKpiCard(String title, num value, IconData icon, Color color,
+      {int fractionDigits = 0, String suffix = ''}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1527,16 +1641,21 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(radius: 24, backgroundColor: color.withOpacity(0.1), child: Icon(icon, size: 28, color: color)),
+              CircleAvatar(
+                  radius: 24,
+                  backgroundColor: color.withOpacity(0.1),
+                  child: Icon(icon, size: 28, color: color)),
               const SizedBox(height: 16),
               AnimatedNumberText(
                 value,
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color),
+                style: TextStyle(
+                    fontSize: 32, fontWeight: FontWeight.bold, color: color),
                 fractionDigits: fractionDigits,
                 suffix: suffix,
               ),
               const SizedBox(height: 4),
-              Text(title, style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+              Text(title,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
             ],
           ),
         ),
@@ -1556,7 +1675,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               SizedBox(height: 350, child: chartWidget),
             ],
@@ -1566,30 +1687,42 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     );
   }
 
-  Widget _buildSummaryPieChart(String title, Map<String, AggregatedSummary> summaryMap, {Key? key}) {
+  Widget _buildSummaryPieChart(
+      String title, Map<String, AggregatedSummary> summaryMap,
+      {Key? key}) {
     if (summaryMap.isEmpty) return const SizedBox.shrink();
-    final sortedList = summaryMap.values.toList()..sort((a,b) => b.totalHours.compareTo(a.totalHours));
+    final sortedList = summaryMap.values.toList()
+      ..sort((a, b) => b.totalHours.compareTo(a.totalHours));
     List<_ChartData> chartData = [];
     double othersHours = 0;
-    for (int i=0; i < sortedList.length; i++) {
-      if (i < 6) { chartData.add(_ChartData(sortedList[i].name, sortedList[i].totalHours)); }
-      else { othersHours += sortedList[i].totalHours; }
+    for (int i = 0; i < sortedList.length; i++) {
+      if (i < 6) {
+        chartData.add(_ChartData(sortedList[i].name, sortedList[i].totalHours));
+      } else {
+        othersHours += sortedList[i].totalHours;
+      }
     }
-    if (othersHours > 0) { chartData.add(_ChartData("Others", othersHours)); }
-    return _buildChartCard(title,
+    if (othersHours > 0) {
+      chartData.add(_ChartData("Others", othersHours));
+    }
+    return _buildChartCard(
+      title,
       SfCircularChart(
           tooltipBehavior: _tooltipBehavior,
-          legend: const Legend(isVisible: true, overflowMode: LegendItemOverflowMode.wrap),
+          legend: const Legend(
+              isVisible: true, overflowMode: LegendItemOverflowMode.wrap),
           series: <CircularSeries>[
             PieSeries<_ChartData, String>(
               dataSource: chartData,
-              xValueMapper: (d,_) => d.category,
-              yValueMapper: (d,_) => d.value,
-              dataLabelMapper: (d,_) => '${d.category}\n${d.value.toStringAsFixed(1)} hrs',
-              dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside),
+              xValueMapper: (d, _) => d.category,
+              yValueMapper: (d, _) => d.value,
+              dataLabelMapper: (d, _) =>
+                  '${d.category}\n${d.value.toStringAsFixed(1)} hrs',
+              dataLabelSettings: const DataLabelSettings(
+                  isVisible: true,
+                  labelPosition: ChartDataLabelPosition.outside),
             )
-          ]
-      ),
+          ]),
       key: key,
     );
   }
@@ -1600,7 +1733,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Attendance by Facility", style: Theme.of(context).textTheme.headlineSmall),
+        Text("Attendance by Facility",
+            style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Card(
           clipBehavior: Clip.antiAlias,
@@ -1615,26 +1749,40 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     const DataColumn(label: Text('Location / Staff')),
                     ..._dateRangeForTables.map((date) => DataColumn(
                         label: Text(DateFormat('EEE\nMMM dd').format(date)),
-                        numeric: true
-                    )),
+                        numeric: true)),
                     const DataColumn(label: Text('Total'), numeric: true),
                   ],
                   rows: sortedFacilities.expand((facility) {
                     final staffSummaries = _facilityStaffSummaries[facility]!;
                     final sortedStaff = staffSummaries.keys.toList()..sort();
-                    final facilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + s.totalHours);
+                    final facilityTotal = staffSummaries.values
+                        .fold(0.0, (sum, s) => sum + s.totalHours);
 
                     return [
                       // Facility Header Row
                       DataRow(
-                        color: MaterialStateProperty.all(Colors.blue.withOpacity(0.1)),
+                        color: WidgetStateProperty.all(
+                            Colors.blue.withOpacity(0.1)),
                         cells: [
-                          DataCell(Text(facility, style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(Text(facility,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold))),
                           ..._dateRangeForTables.map((date) {
-                            final dailyFacilityTotal = staffSummaries.values.fold(0.0, (sum, s) => sum + (s.dailyRecords[date]?.hoursWorked ?? 0.0));
-                            return DataCell(Text(dailyFacilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)));
+                            final dailyFacilityTotal = staffSummaries.values
+                                .fold(
+                                    0.0,
+                                    (sum, s) =>
+                                        sum +
+                                        (s.dailyRecords[date]?.hoursWorked ??
+                                            0.0));
+                            return DataCell(Text(
+                                dailyFacilityTotal.toStringAsFixed(2),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)));
                           }),
-                          DataCell(Text(facilityTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(Text(facilityTotal.toStringAsFixed(2),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold))),
                         ],
                       ),
 
@@ -1644,11 +1792,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
                         // --- NEW: PERMISSION CHECK ---
                         final staffDetails = _staffInfoByNameMap[staffName];
-                        final bool canEdit = staffDetails?.supervisorEmail == _currentUserEmail;
+                        final bool canEdit =
+                            staffDetails?.supervisorEmail == _currentUserEmail;
 
                         return DataRow(cells: [
-                          DataCell(Padding(padding: const EdgeInsets.only(left: 16.0), child: Text(staffName))),
-
+                          DataCell(Padding(
+                              padding: const EdgeInsets.only(left: 16.0),
+                              child: Text(staffName))),
                           ..._dateRangeForTables.map((date) {
                             final recordForDay = summary.dailyRecords[date];
 
@@ -1657,21 +1807,35 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                               return DataCell(
                                 Center(
                                   child: IconButton(
-                                    icon: Icon(Icons.add_comment_outlined, size: 20, color: canEdit ? Colors.blue.shade300 : Colors.grey.shade400),
-                                    tooltip: canEdit ? "Create & Approve Record" : "You are not this staff's supervisor",
-                                    onPressed: canEdit ? () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (context) => DailyRecordManagementPage(
-                                            staffId: staffDetails!.id, // Use reliable ID
-                                            recordId: null,
-                                            date: date,
-                                          ),
-                                        ),
-                                      ).then((madeChanges) {
-                                        if (madeChanges == true) _loadDashboardData();
-                                      });
-                                    } : null, // Disable if no permission
+                                    icon: Icon(Icons.add_comment_outlined,
+                                        size: 20,
+                                        color: canEdit
+                                            ? Colors.blue.shade300
+                                            : Colors.grey.shade400),
+                                    tooltip: canEdit
+                                        ? "Create & Approve Record"
+                                        : "You are not this staff's supervisor",
+                                    onPressed: canEdit
+                                        ? () {
+                                            Navigator.of(context)
+                                                .push(
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DailyRecordManagementPage(
+                                                  staffId: staffDetails!
+                                                      .id, // Use reliable ID
+                                                  recordId: null,
+                                                  date: date,
+                                                ),
+                                              ),
+                                            )
+                                                .then((madeChanges) {
+                                              if (madeChanges == true) {
+                                                _loadDashboardData();
+                                              }
+                                            });
+                                          }
+                                        : null, // Disable if no permission
                                   ),
                                 ),
                               );
@@ -1686,7 +1850,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
                               switch (recordForDay.deductionStatus) {
                                 case 'Partial':
-                                  backgroundColor = Colors.orange.withOpacity(0.1);
+                                  backgroundColor =
+                                      Colors.orange.withOpacity(0.1);
                                   statusIcon = Icons.warning_amber_rounded;
                                   iconColor = Colors.orange.shade700;
                                   break;
@@ -1696,12 +1861,14 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                                   iconColor = Colors.red.shade700;
                                   break;
                                 case 'ApprovedPartial':
-                                  backgroundColor = Colors.blue.withOpacity(0.1);
+                                  backgroundColor =
+                                      Colors.blue.withOpacity(0.1);
                                   statusIcon = Icons.thumb_up_alt_rounded;
                                   iconColor = Colors.blue.shade700;
                                   break;
                                 case 'ApprovedFull':
-                                  backgroundColor = Colors.green.withOpacity(0.1);
+                                  backgroundColor =
+                                      Colors.green.withOpacity(0.1);
                                   statusIcon = Icons.verified_user_rounded;
                                   iconColor = Colors.green.shade700;
                                   break;
@@ -1710,29 +1877,50 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                               return DataCell(
                                 Container(
                                   color: backgroundColor,
-                                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
-                                      if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
+                                      if (statusIcon != null)
+                                        Icon(statusIcon,
+                                            size: 16, color: iconColor),
                                       const SizedBox(width: 4),
                                       Text(hours.toStringAsFixed(2)),
                                       IconButton(
-                                        icon: Icon(Icons.edit_note_outlined, size: 20, color: canEdit ? Theme.of(context).textTheme.bodyMedium?.color : Colors.grey.shade400),
-                                        tooltip: canEdit ? "Manage Record" : "You are not this staff's supervisor",
-                                        onPressed: canEdit ? () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (context) => DailyRecordManagementPage(
-                                                staffId: recordForDay.staffId,
-                                                recordId: recordForDay.recordId,
-                                                date: date,
-                                              ),
-                                            ),
-                                          ).then((madeChanges) {
-                                            if (madeChanges == true) _loadDashboardData();
-                                          });
-                                        } : null, // Disable if no permission
+                                        icon: Icon(Icons.edit_note_outlined,
+                                            size: 20,
+                                            color: canEdit
+                                                ? Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.color
+                                                : Colors.grey.shade400),
+                                        tooltip: canEdit
+                                            ? "Manage Record"
+                                            : "You are not this staff's supervisor",
+                                        onPressed: canEdit
+                                            ? () {
+                                                Navigator.of(context)
+                                                    .push(
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        DailyRecordManagementPage(
+                                                      staffId:
+                                                          recordForDay.staffId,
+                                                      recordId:
+                                                          recordForDay.recordId,
+                                                      date: date,
+                                                    ),
+                                                  ),
+                                                )
+                                                    .then((madeChanges) {
+                                                  if (madeChanges == true) {
+                                                    _loadDashboardData();
+                                                  }
+                                                });
+                                              }
+                                            : null, // Disable if no permission
                                       ),
                                     ],
                                   ),
@@ -1754,12 +1942,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
                     tooltip: "Scroll Left",
-                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                    onPressed: () => _facilityTableController.animateTo(
+                        _facilityTableController.offset - 300,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward),
                     tooltip: "Scroll Right",
-                    onPressed: () => _facilityTableController.animateTo(_facilityTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                    onPressed: () => _facilityTableController.animateTo(
+                        _facilityTableController.offset + 300,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut),
                   ),
                 ],
               ),
@@ -1767,44 +1961,73 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildSummaryPieChart("Facility Hours Distribution", _facilitySummaries, key: _facilityPieChartKey),
+        _buildSummaryPieChart("Facility Hours Distribution", _facilitySummaries,
+            key: _facilityPieChartKey),
       ],
     );
   }
 
   Widget _buildDesignationSummaryTable() {
     final sortedDesignations = _designationSummaries.keys.toList()..sort();
-    return Column( crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text("Attendance by Designation", style: Theme.of(context).textTheme.headlineSmall),
-      const SizedBox(height: 8),
-      Card( clipBehavior: Clip.antiAlias, child: Column( children: [
-        SingleChildScrollView( controller: _designationTableController, scrollDirection: Axis.horizontal, child: DataTable(
-          columns: [
-            const DataColumn(label: Text('Designation')),
-            ..._dateRangeForTables.map((date) => DataColumn(label: Text(DateFormat('EEE\nMMM dd').format(date)), numeric: true)),
-            const DataColumn(label: Text('Total'), numeric: true),
-          ],
-          rows: sortedDesignations.map((designation) {
-            final summary = _designationSummaries[designation]!;
-            return DataRow(cells: [
-              DataCell(Text(summary.name, style: const TextStyle(fontWeight: FontWeight.bold))),
-              ..._dateRangeForTables.map((date) => DataCell(Text((summary.dailyHours[date] ?? 0).toStringAsFixed(2)))),
-              DataCell(Text(summary.totalHours.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
-            ]);
-          }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Attendance by Designation",
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              SingleChildScrollView(
+                controller: _designationTableController,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: [
+                    const DataColumn(label: Text('Designation')),
+                    ..._dateRangeForTables.map((date) => DataColumn(
+                        label: Text(DateFormat('EEE\nMMM dd').format(date)),
+                        numeric: true)),
+                    const DataColumn(label: Text('Total'), numeric: true),
+                  ],
+                  rows: sortedDesignations.map((designation) {
+                    final summary = _designationSummaries[designation]!;
+                    return DataRow(cells: [
+                      DataCell(Text(summary.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold))),
+                      ..._dateRangeForTables.map((date) => DataCell(Text(
+                          (summary.dailyHours[date] ?? 0).toStringAsFixed(2)))),
+                      DataCell(Text(summary.totalHours.toStringAsFixed(2),
+                          style: const TextStyle(fontWeight: FontWeight.bold))),
+                    ]);
+                  }).toList(),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => _designationTableController.animateTo(
+                          _designationTableController.offset - 300,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut)),
+                  IconButton(
+                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: () => _designationTableController.animateTo(
+                          _designationTableController.offset + 300,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut)),
+                ],
+              )
+            ],
+          ),
         ),
-        ),
-        Row( mainAxisAlignment: MainAxisAlignment.end, children: [
-          IconButton( icon: const Icon(Icons.arrow_back), onPressed: () => _designationTableController.animateTo( _designationTableController.offset - 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-          IconButton( icon: const Icon(Icons.arrow_forward), onPressed: () => _designationTableController.animateTo( _designationTableController.offset + 300, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
-        ],
-        )
+        const SizedBox(height: 16),
+        _buildSummaryPieChart(
+            "Designation Hours Distribution", _designationSummaries,
+            key: _designationPieChartKey),
       ],
-      ),
-      ),
-      const SizedBox(height: 16),
-      _buildSummaryPieChart("Designation Hours Distribution", _designationSummaries, key: _designationPieChartKey),
-    ],
     );
   }
 
@@ -1814,14 +2037,15 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     try {
       final List<Marker> markers = [];
       if (records.isEmpty) {
-        if(mounted) setState(() => _mapMarkers = []);
+        if (mounted) setState(() => _mapMarkers = []);
         return;
       }
 
       for (final record in records) {
         if (record.clockInLocation != null) {
           markers.add(Marker(
-            point: latlng.LatLng(record.clockInLocation!.latitude, record.clockInLocation!.longitude),
+            point: latlng.LatLng(record.clockInLocation!.latitude,
+                record.clockInLocation!.longitude),
             child: Icon(
               Icons.location_on,
               color: Colors.green,
@@ -1831,7 +2055,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         }
         if (record.clockOutLocation != null) {
           markers.add(Marker(
-            point: latlng.LatLng(record.clockOutLocation!.latitude, record.clockOutLocation!.longitude),
+            point: latlng.LatLng(record.clockOutLocation!.latitude,
+                record.clockOutLocation!.longitude),
             child: Icon(
               Icons.location_on,
               color: Colors.red,
@@ -1869,7 +2094,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         }
 
         if (!isWithinAnyFacility) {
-          final assignedFacilityDetails = _facilityDetails[record.assignedFacility];
+          final assignedFacilityDetails =
+              _facilityDetails[record.assignedFacility];
           if (assignedFacilityDetails != null) {
             final distanceToAssigned = Geolocator.distanceBetween(
               assignedFacilityDetails.coordinates.latitude,
@@ -1904,7 +2130,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         }
 
         if (!isWithinAnyFacility) {
-          final assignedFacilityDetails = _facilityDetails[record.assignedFacility];
+          final assignedFacilityDetails =
+              _facilityDetails[record.assignedFacility];
           if (assignedFacilityDetails != null) {
             final distanceToAssigned = Geolocator.distanceBetween(
               assignedFacilityDetails.coordinates.latitude,
@@ -1942,7 +2169,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       rows.add([key, value.totalHours.toStringAsFixed(2)]);
     });
     String csvData = const ListToCsvConverter().convert(rows);
-    _triggerDownload(utf8.encode(csvData), 'attendance_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
+    _triggerDownload(utf8.encode(csvData),
+        'attendance_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
     setState(() => _isExporting = false);
   }
 
@@ -1951,48 +2179,68 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     try {
       final barChartBytes = await _captureChartPng(_barChartKey);
       final facilityPieBytes = await _captureChartPng(_facilityPieChartKey);
-      final designationPieBytes = await _captureChartPng(_designationPieChartKey);
+      final designationPieBytes =
+          await _captureChartPng(_designationPieChartKey);
       final pdf = pw.Document();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         header: (context) => pw.Header(text: "Attendance Charts Report"),
         build: (context) => [
-          pw.Text("Filters Applied", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
-          pw.Text("Date Range: ${DateFormat('dd/MM/yyyy').format(_startDate)} to ${DateFormat('dd/MM/yyyy').format(_endDate)}"),
-          pw.Text("Facility: ${_selectedFacilities.length == _availableFacilities.length ? 'All' : _selectedFacilities.join(', ')}"),
-          pw.Text("Designation: ${_selectedDesignations.length == _availableDesignations.length ? 'All' : _selectedDesignations.join(', ')}"),
+          pw.Text("Filters Applied",
+              style:
+                  pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+          pw.Text(
+              "Date Range: ${DateFormat('dd/MM/yyyy').format(_startDate)} to ${DateFormat('dd/MM/yyyy').format(_endDate)}"),
+          pw.Text(
+              "Facility: ${_selectedFacilities.length == _availableFacilities.length ? 'All' : _selectedFacilities.join(', ')}"),
+          pw.Text(
+              "Designation: ${_selectedDesignations.length == _availableDesignations.length ? 'All' : _selectedDesignations.join(', ')}"),
           pw.Divider(height: 20),
           if (barChartBytes != null) ...[
-            pw.Text("Top 15 Facilities by Hours", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Image(pw.MemoryImage(barChartBytes), fit: pw.BoxFit.contain, height: 250),
+            pw.Text("Top 15 Facilities by Hours",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Image(pw.MemoryImage(barChartBytes),
+                fit: pw.BoxFit.contain, height: 250),
             pw.SizedBox(height: 20),
           ],
           if (facilityPieBytes != null) ...[
-            pw.Text("Facility Hours Distribution", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Image(pw.MemoryImage(facilityPieBytes), fit: pw.BoxFit.contain, height: 250),
+            pw.Text("Facility Hours Distribution",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Image(pw.MemoryImage(facilityPieBytes),
+                fit: pw.BoxFit.contain, height: 250),
             pw.SizedBox(height: 20),
           ],
           if (designationPieBytes != null) ...[
-            pw.Text("Designation Hours Distribution", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Image(pw.MemoryImage(designationPieBytes), fit: pw.BoxFit.contain, height: 250),
+            pw.Text("Designation Hours Distribution",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Image(pw.MemoryImage(designationPieBytes),
+                fit: pw.BoxFit.contain, height: 250),
           ],
         ],
       ));
       final pdfBytes = await pdf.save();
-      _triggerDownload(pdfBytes, 'attendance_charts_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf', 'application/pdf');
-    } catch(e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
+      _triggerDownload(
+          pdfBytes,
+          'attendance_charts_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+          'application/pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
+      }
     } finally {
-      if(mounted) setState(() => _isExporting = false);
+      if (mounted) setState(() => _isExporting = false);
     }
   }
 
   Future<Uint8List?> _captureChartPng(GlobalKey key) async {
     try {
       if (key.currentContext == null) return null;
-      RenderRepaintBoundary boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      RenderRepaintBoundary boundary =
+          key.currentContext!.findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
       debugPrint("Error capturing chart: $e");
@@ -2000,7 +2248,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     }
   }
 
-  void _triggerDownload(List<int> bytes, String filename, [String mimeType = 'text/csv']) {
+  void _triggerDownload(List<int> bytes, String filename,
+      [String mimeType = 'text/csv']) {
     final blob = html.Blob([bytes], mimeType);
     final url = html.Url.createObjectUrlFromBlob(blob);
     final anchor = html.document.createElement('a') as html.AnchorElement

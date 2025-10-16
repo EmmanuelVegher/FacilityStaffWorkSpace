@@ -8,7 +8,6 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -87,7 +86,7 @@ class UserFacilityVlTrackingPageWeb extends StatefulWidget {
 class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPageWeb> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  bool _isFacilitiesLoading = false;
+  final bool _isFacilitiesLoading = false;
 
   // --- Core Data & UI State ---
   List<VlCallLog> _masterLogList = [];
@@ -445,7 +444,7 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
             SizedBox(
               width: 200,
               child: DropdownButtonFormField<String>(
-                value: _selectedQuarter,
+                initialValue: _selectedQuarter,
                 hint: const Text('Select Quarter'),
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Quarter', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
                 items: _availableQuarters.map((q) => DropdownMenuItem(value: q, child: Text(q))).toList(),
@@ -618,7 +617,9 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
 
   void _generateQuarterList() { List<String> quarters = []; DateTime date = DateTime.now(); for (int i = 0; i < 8; i++) { quarters.add(_getQuarterString(date)); date = DateTime(date.year, date.month - 3, 1); } setState(() { _availableQuarters = quarters.toSet().toList(); _selectedQuarter = _availableQuarters.first; }); }
 
-  String _getQuarterString(DateTime date) { int year = date.year; int month = date.month; int fiscalYear = (month >= 10) ? year + 1 : year; String quarter; if (month >= 10) quarter = 'Q1'; else if (month >= 7) quarter = 'Q4'; else if (month >= 4) quarter = 'Q3'; else quarter = 'Q2'; return '$quarter (FY${fiscalYear.toString().substring(2)})'; }
+  String _getQuarterString(DateTime date) { int year = date.year; int month = date.month; int fiscalYear = (month >= 10) ? year + 1 : year; String quarter; if (month >= 10) {
+    quarter = 'Q1';
+  } else if (month >= 7) quarter = 'Q4'; else if (month >= 4) quarter = 'Q3'; else quarter = 'Q2'; return '$quarter (FY${fiscalYear.toString().substring(2)})'; }
 
   List<MapEntry<String, int>> _getCallOutcomesChartData() { Map<String, int> statusCounts = {}; for (var log in _masterLogList) { String status = log.callStatus?.trim() ?? 'N/A'; if (status.isEmpty) status = 'N/A'; statusCounts[status] = (statusCounts[status] ?? 0) + 1; } return statusCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value)); }
 

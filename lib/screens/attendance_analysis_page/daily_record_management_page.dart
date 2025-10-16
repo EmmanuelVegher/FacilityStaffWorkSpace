@@ -14,11 +14,11 @@ class DailyRecordManagementPage extends StatefulWidget {
   final DateTime date;
 
   const DailyRecordManagementPage({
-    Key? key,
+    super.key,
     required this.staffId,
     this.recordId,
     required this.date,
-  }) : super(key: key);
+  });
 
   @override
   _DailyRecordManagementPageState createState() => _DailyRecordManagementPageState();
@@ -264,7 +264,7 @@ class _DailyRecordManagementPageState extends State<DailyRecordManagementPage> {
       // --- NEW: Construct the detailed deduction summary string ---
       if (deductedHoursForMap > 0) {
         final double percentage = (deductedHoursForMap / 8.0) * 100;
-        deductionSummaryString = "\n\nSystem Note: ${deductedHoursForMap}/8 hours recommended for deduction (${percentage.toStringAsFixed(0)}% of daily pay).";
+        deductionSummaryString = "\n\nSystem Note: $deductedHoursForMap/8 hours recommended for deduction (${percentage.toStringAsFixed(0)}% of daily pay).";
       }
 
       final attributionString = "\n\n- Action by: $recommenderName ($recommenderDesignation)";

@@ -1,7 +1,5 @@
 // A STATE-LEVEL PAGE FOR MANAGING STAFF LEAVE REQUESTS
 
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,28 +8,28 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
 import '../../widgets/drawer2.dart'; // Assuming a state-level drawer (drawer2)
 
-// --- DATA MODEL (Unchanged from previous version) ---
-// --- DATA MODEL (UPDATED) ---
+// --- DATA MODEL (Unchanged) ---
 class LeaveRequest {
-  final String id; // Document ID for updates
+  final String id;
   final String staffId;
   final String staffName;
-  final String staffEmail; // NEW
+  final String staffEmail;
   final String staffState;
   final String staffLocation;
   final String leaveType;
   final DateTime startDate;
   final DateTime endDate;
-  String status; // Made non-final to allow in-app state changes
+  String status;
   final String? reason;
-  final String supervisorName; // NEW
-  final String supervisorEmail; // NEW
+  String? reasonsForRejectedLeave;
+  final String supervisorName;
+  final String supervisorEmail;
 
   LeaveRequest({
     required this.id,
     required this.staffId,
     required this.staffName,
-    required this.staffEmail, // NEW
+    required this.staffEmail,
     required this.staffState,
     required this.staffLocation,
     required this.leaveType,
@@ -39,14 +37,15 @@ class LeaveRequest {
     required this.endDate,
     required this.status,
     this.reason,
-    required this.supervisorName, // NEW
-    required this.supervisorEmail, // NEW
+    this.reasonsForRejectedLeave,
+    required this.supervisorName,
+    required this.supervisorEmail,
   });
 
   factory LeaveRequest.fromFirestore(DocumentSnapshot doc) {
     final map = doc.data() as Map<String, dynamic>;
 
-    DateTime _parseFirestoreDate(dynamic dateValue) {
+    DateTime parseFirestoreDate(dynamic dateValue) {
       if (dateValue == null) return DateTime.now();
       if (dateValue is Timestamp) return dateValue.toDate();
       if (dateValue is String) return DateTime.tryParse(dateValue) ?? DateTime.now();
@@ -57,16 +56,17 @@ class LeaveRequest {
       id: doc.id,
       staffId: map['staffId'] ?? 'N/A',
       staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
-      staffEmail: map['staffEmail'] ?? 'N/A', // NEW
+      staffEmail: map['staffEmail'] ?? 'N/A',
       staffState: map['staffState'] ?? 'N/A',
       staffLocation: map['staffLocation'] ?? 'N/A',
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parseFirestoreDate(map['startDate']),
-      endDate: _parseFirestoreDate(map['endDate']),
+      startDate: parseFirestoreDate(map['startDate']),
+      endDate: parseFirestoreDate(map['endDate']),
       status: map['status'] ?? 'Pending',
       reason: map['reason'] as String?,
-      supervisorName: map['selectedSupervisor'] ?? 'N/A', // NEW
-      supervisorEmail: map['selectedSupervisorEmail'] ?? 'N/A', // NEW
+      reasonsForRejectedLeave: map['reasonsForRejectedLeave'] as String?,
+      supervisorName: map['selectedSupervisor'] ?? 'N/A',
+      supervisorEmail: map['selectedSupervisorEmail'] ?? 'N/A',
     );
   }
 }
@@ -90,13 +90,13 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   bool _isLoading = false;
   String? _errorMessage;
 
-  // --- MODIFIED: State is now a single string, not a list ---
   String? _userState;
+  String? _userDepartment;
 
   // --- Filter State ---
   List<String> _availableFacilities = [];
-  List<String> _availableLeaveTypes = ['All Types', 'Holiday', 'Annual', 'Sick', 'Maternity', 'Paternity', 'Unpaid', 'Other'];
-  List<String> _availableStatuses = ['All Statuses', 'Pending', 'Approved', 'Declined'];
+  final List<String> _availableLeaveTypes = ['All Types', 'Holiday', 'Annual', 'Sick', 'Maternity', 'Paternity', 'Unpaid', 'Other'];
+  final List<String> _availableStatuses = ['All Statuses', 'Pending', 'Approved', 'Returned'];
 
   List<String> _selectedFacilities = ['All Facilities'];
   List<String> _selectedLeaveTypes = ['All Types'];
@@ -114,8 +114,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     _initializeUserStateAndFilters();
   }
 
-  // MODIFIED: Fetches the user's state and then populates filters for that state.
-  // MODIFIED: Fetches the user's state, populates filters, and now also triggers the initial data load.
   Future<void> _initializeUserStateAndFilters() async {
     setState(() => _isFilterLoading = true);
     try {
@@ -123,20 +121,20 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
       if (user == null) throw Exception("User not logged in.");
 
       final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
-      final userState = staffDoc.data()?['state'] as String?;
+      final userData = staffDoc.data();
+
+      final userState = userData?['state'] as String?;
+      final userDepartment = userData?['department'] as String?;
 
       if (userState == null || userState.isEmpty) {
         throw Exception("State not found in your user profile.");
       }
 
       _userState = userState;
-      await _loadFacilitiesForState(userState);
+      _userDepartment = userDepartment;
 
-      // --- ADDED THIS LINE ---
-      // After successfully initializing the state and filters,
-      // automatically load the leave requests for the default date range.
+      await _loadFacilitiesForState(userState);
       await _loadLeaveRequests();
-      // -----------------------
 
     } catch (e) {
       if (mounted) setState(() => _errorMessage = "Error initializing page: $e");
@@ -145,7 +143,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     }
   }
 
-  // MODIFIED: Loads facilities for a single, specific state.
   Future<void> _loadFacilitiesForState(String state) async {
     try {
       final Set<String> facilityNames = {'All Facilities'};
@@ -173,7 +170,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     }
   }
 
-  // MODIFIED: Query is now automatically scoped to the user's state.
   Future<void> _loadLeaveRequests() async {
     if (_startDate == null || _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a valid date range.")));
@@ -191,8 +187,22 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     });
 
     try {
-      Query query = _firestore.collectionGroup('Leave Request')
-          .where('staffState', isEqualTo: _userState); // Automatically filter by user's state
+      final user = _auth.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User not logged in.")));
+        return;
+      }
+      final userEmail = (user.email ?? '').toLowerCase();
+
+      Query query = _firestore.collectionGroup('Leave Request');
+
+      if (_userDepartment == 'Program Management') {
+        query = query.where('staffState', isEqualTo: _userState);
+      } else {
+        query = query
+            .where('staffState', isEqualTo: _userState)
+            .where('selectedSupervisorEmail', isEqualTo: userEmail);
+      }
 
       final snapshot = await query.get();
 
@@ -218,7 +228,7 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
       debugPrint('Error loading leave requests: $e\n$stack');
       if (mounted) {
         if (e is FirebaseException && e.code == 'failed-precondition') {
-          _errorMessage = 'Firestore Index Required: An index on "staffState" for the "Leave Request" collection group is needed.';
+          _errorMessage = 'Firestore Index Required: An index is needed for this query. Please check the Firestore console.';
         } else {
           _errorMessage = "Failed to load leave requests: $e";
         }
@@ -247,21 +257,30 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     });
   }
 
-  Future<void> _updateLeaveStatus(LeaveRequest request, String newStatus) async {
+  Future<void> _updateLeaveStatus(LeaveRequest request, String newStatus, {String? reasonForReturn}) async {
     try {
+      final updateData = <String, dynamic>{'status': newStatus};
+      if (reasonForReturn != null) {
+        updateData['reasonsForRejectedLeave'] = reasonForReturn;
+      }
+
       await _firestore
           .collection('Staff')
           .doc(request.staffId)
           .collection('Leave Request')
           .doc(request.id)
-          .update({'status': newStatus});
+          .update(updateData);
 
       setState(() {
         request.status = newStatus;
+        if (reasonForReturn != null) {
+          request.reasonsForRejectedLeave = reasonForReturn;
+        }
+
         if (!_selectedStatuses.contains('All Statuses') && !_selectedStatuses.contains(newStatus)) {
           _masterLeaveList.removeWhere((item) => item.id == request.id);
-          _applyFilters();
         }
+        _applyFilters();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("${request.staffName}'s leave has been ${newStatus.toLowerCase()}."), backgroundColor: Colors.green),
@@ -273,14 +292,69 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     }
   }
 
+  Future<void> _showReturnReasonDialog(LeaveRequest request) async {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reason for Returning Leave'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: ListBody(
+                children: <Widget>[
+                  Text('Please provide a reason for returning this leave request for ${request.staffName}.'),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason',
+                      border: OutlineInputBorder(),
+                      hintText: 'e.g., conflicting dates, more info needed...',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Reason cannot be empty.';
+                      }
+                      return null;
+                    },
+                    maxLines: 4,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Submit'),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  _updateLeaveStatus(request, 'Returned', reasonForReturn: reasonController.text.trim());
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // --- UI BUILDER METHODS ---
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // MODIFIED: Title reflects the user's state
-        title: Text("${_userState ?? 'State'} Leave Management", style: const TextStyle(color: Colors.white)),
+        title: Text("Leave Request", style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -301,7 +375,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     );
   }
 
-
   Widget _buildFilterBar() {
     return Card(
       margin: const EdgeInsets.all(8.0),
@@ -313,7 +386,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
           alignment: WrapAlignment.center,
           children: [
             if (_isFilterLoading) const Text("Loading filters...") else ...[
-              // MODIFIED: State filter is removed. Facility filter is first.
               _buildMultiSelectDialogButton("Facility", _selectedFacilities, _availableFacilities, (results) { setState(() => _selectedFacilities = results); _applyFilters(); }),
               _buildMultiSelectDialogButton("Leave Type", _selectedLeaveTypes, _availableLeaveTypes, (results) { setState(() => _selectedLeaveTypes = results); _applyFilters(); }),
               _buildMultiSelectDialogButton("Status", _selectedStatuses, _availableStatuses, (results) { setState(() => _selectedStatuses = results); _applyFilters(); }),
@@ -335,7 +407,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     );
   }
 
-// --- UI BUILDER METHOD (UPDATED) ---
   Widget _buildLeaveRequestList() {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -351,6 +422,7 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(
@@ -362,39 +434,20 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
                         ],
                       ),
                     ),
-                    _buildStatusChip(request.status),
+                    _buildStatusWidget(request),
                   ],
                 ),
                 const Divider(height: 16),
-                // --- NEW FIELDS DISPLAYED HERE ---
                 _buildInfoRow(Icons.email_outlined, "Staff Email:", request.staffEmail),
                 _buildInfoRow(Icons.person_outline, "Supervisor:", request.supervisorName),
                 _buildInfoRow(Icons.alternate_email, "Supervisor Email:", request.supervisorEmail),
                 const SizedBox(height: 4),
-                // --- END OF NEW FIELDS ---
                 _buildInfoRow(Icons.calendar_today_outlined, "Leave Type:", request.leaveType),
                 _buildInfoRow(Icons.date_range, "Dates:", '${DateFormat.yMMMMd().format(request.startDate)} to ${DateFormat.yMMMMd().format(request.endDate)}'),
                 if (request.reason != null && request.reason!.isNotEmpty)
-                  _buildInfoRow(Icons.notes, "Reason:", request.reason!),
-                const SizedBox(height: 8),
-                // if (request.status == 'Pending')
-                //   Row(
-                //     mainAxisAlignment: MainAxisAlignment.end,
-                //     children: [
-                //       TextButton.icon(
-                //         icon: const Icon(Icons.close, color: Colors.red),
-                //         label: const Text("Decline", style: TextStyle(color: Colors.red)),
-                //         onPressed: () => _updateLeaveStatus(request, 'Declined'),
-                //       ),
-                //       const SizedBox(width: 8),
-                //       ElevatedButton.icon(
-                //         icon: const Icon(Icons.check, color: Colors.white),
-                //         label: const Text("Approve"),
-                //         style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                //         onPressed: () => _updateLeaveStatus(request, 'Approved'),
-                //       ),
-                //     ],
-                //   ),
+                  _buildInfoRow(Icons.notes, "Staff Reason:", request.reason!),
+                if (request.reasonsForRejectedLeave != null && request.reasonsForRejectedLeave!.isNotEmpty)
+                  _buildInfoRow(Icons.comment_bank_outlined, "Return Reason:", request.reasonsForRejectedLeave!),
               ],
             ),
           ),
@@ -404,6 +457,50 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   }
 
   // --- HELPER & UI WIDGETS ---
+
+  // MODIFIED: This widget now conditionally renders a clickable menu or a static chip
+  // based on the user's department.
+  Widget _buildStatusWidget(LeaveRequest request) {
+    // Show a static (non-clickable) chip if:
+    // 1. The status is anything other than 'Pending'.
+    // 2. The logged-in user is from 'Program Management' (read-only view).
+    if (request.status != 'Pending' || _userDepartment == 'Program Management') {
+      return _buildStatusChip(request.status);
+    }
+
+    // Otherwise (status is 'Pending' AND user is a standard supervisor), show the clickable menu.
+    return PopupMenuButton<String>(
+      onSelected: (String result) {
+        if (result == 'Approve') {
+          _updateLeaveStatus(request, 'Approved');
+        } else if (result == 'Return') {
+          _showReturnReasonDialog(request);
+        }
+      },
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'Approve',
+          child: ListTile(
+            leading: Icon(Icons.check_circle_outline, color: Colors.green),
+            title: Text('Approve'),
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'Return',
+          child: ListTile(
+            leading: Icon(Icons.undo_outlined, color: Colors.blueAccent),
+            title: Text('Return'),
+          ),
+        ),
+      ],
+      child: Chip(
+        label: const Text('Pending', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.orange,
+        avatar: const Icon(Icons.arrow_drop_down, color: Colors.white),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      ),
+    );
+  }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
@@ -425,6 +522,7 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     Color color;
     switch(status) {
       case 'Approved': color = Colors.green; break;
+      case 'Returned': color = Colors.blue; break;
       case 'Declined': color = Colors.red; break;
       default: color = Colors.orange;
     }
@@ -465,13 +563,12 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
 
   Widget _buildMultiSelectDialogButton(String title, List<String> selectedOptions, List<String> allOptions, Function(List<String>) onConfirm) {
     String getButtonText() {
-      final allKeyword = "All ${title}s";
       if (title == "Facility" && selectedOptions.contains("All Facilities")) return "All Facilities";
       if (title == "Leave Type" && selectedOptions.contains("All Types")) return "All Types";
       if (title == "Status" && selectedOptions.contains("All Statuses")) return "All Statuses";
 
       if (selectedOptions.length == 1) return selectedOptions.first;
-      if (selectedOptions.isEmpty) return "Select ${title}"; // Fallback
+      if (selectedOptions.isEmpty) return "Select $title";
       return '${selectedOptions.length} ${title}s Selected';
     }
 
@@ -489,7 +586,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
 
   Future<void> _showMultiSelectDialog(String title, List<String> selectedOptions, List<String> allOptions, Function(List<String>) onConfirm) async {
     List<String> tempSelected = List.from(selectedOptions);
-    final allKeyword = "All ${title}s";
 
     await showDialog(
       context: context,

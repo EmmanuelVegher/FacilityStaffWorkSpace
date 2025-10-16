@@ -411,7 +411,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
-              value: _selectedFacility,
+              initialValue: _selectedFacility,
               items: [
                 DropdownMenuItem(value: null, child: Text('All Facilities', style: TextStyle(fontStyle: FontStyle.italic))),
                 ..._availableFacilities.map((f) => DropdownMenuItem(value: f, child: Text(f))),
@@ -445,7 +445,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
-      value: value,
+      initialValue: value,
       isExpanded: true,
       items: [
         DropdownMenuItem<String>(
@@ -554,7 +554,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
 // --- DATA SOURCE FOR THE PAGINATED TABLE ---
 
 class _CallLogDataSource extends DataTableSource {
-  List<VlCallLogModel> _data;
+  final List<VlCallLogModel> _data;
   final BuildContext context;
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 

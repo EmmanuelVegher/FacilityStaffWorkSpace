@@ -12,9 +12,8 @@ import 'package:syncfusion_flutter_gauges/gauges.dart' as gauges;
 // Import your project's relevant pages and widgets.
 // These paths might need to be adjusted for your project structure.
 import '../../models/facility_staff_model.dart';
-import '../../widgets/drawer2.dart'; // Assuming drawer2 is for State/Supervisor level
+// Assuming drawer2 is for State/Supervisor level
 import '../../widgets/drawer4.dart';
-import '../attendance_analysis_page/attendance_analysis_page.dart';
 import '../attendance_analysis_page/facility_supervisor_analysis_page.dart';
 import '../leave_request/state_leave_request_page.dart';
 import '../timesheet/timesheet_management_dashboard.dart';
@@ -78,12 +77,12 @@ class LeaveRequest {
   LeaveRequest({required this.staffName, required this.leaveType, required this.startDate, required this.endDate, required this.status});
 
   factory LeaveRequest.fromMap(Map<String, dynamic> map) {
-    DateTime _parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
+    DateTime parse(dynamic date) => (date is Timestamp) ? date.toDate() : DateTime.tryParse(date ?? '') ?? DateTime.now();
     return LeaveRequest(
       staffName: '${map['firstName'] ?? ''} ${map['lastName'] ?? 'Unknown'}'.trim(),
       leaveType: map['type'] ?? 'N/A',
-      startDate: _parse(map['startDate']),
-      endDate: _parse(map['endDate']),
+      startDate: parse(map['startDate']),
+      endDate: parse(map['endDate']),
       status: map['status'] ?? 'Pending',
     );
   }

@@ -268,11 +268,11 @@ class _StateLevelEngagementReportPageState
       ];
       final results = await Future.wait(futures);
 
-      final allRecordsSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
-      final allLeaveSnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>;
-      final callLogsSnapshot = results[2] as QuerySnapshot<Map<String, dynamic>>;
-      final eacLogsSnapshot = results[3] as QuerySnapshot<Map<String, dynamic>>;
-      final vlLogsSnapshot = results[4] as QuerySnapshot<Map<String, dynamic>>;
+      final allRecordsSnapshot = results[0];
+      final allLeaveSnapshot = results[1];
+      final callLogsSnapshot = results[2];
+      final eacLogsSnapshot = results[3];
+      final vlLogsSnapshot = results[4];
 
       _processAllData(
           filteredStaffDetailsMap, allRecordsSnapshot, allLeaveSnapshot,

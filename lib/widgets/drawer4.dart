@@ -5,35 +5,14 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
-import '../features/payroll/ui/payroll_review_page.dart';
-import '../features/payroll/ui/payroll_workflow_page.dart';
-import '../features/payroll/ui/salary_management_page.dart';
-import '../screens/account_management/my_state_screen.dart';
-import '../screens/activity_monitoring/create_activity_page.dart';
-import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
 import '../screens/attendance_analysis_page/facility_supervisor_analysis_page.dart';
-import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/facility_supervisor_dashboard.dart';
-import '../screens/dashboard/state_ofice_dashboard.dart';
-import '../screens/eac_tracker/state_eac_report_tab.dart';
-import '../screens/forgot_password2.dart';
 import '../screens/forgot_password4.dart';
-import '../screens/leave_request/leave_request_review_page.dart';
-import '../screens/leave_request/state_leave_request_page.dart';
 import '../screens/login_screen.dart';
 import '../screens/pending_approval_facility_supervisor.dart';
-import '../screens/pending_approvals.dart';
 import '../screens/profile4.dart';
-import '../screens/profile_page2.dart';
-import '../screens/psychological_survey_analysis_page/PsychologicalSurveyAnalysisPage.dart';
 import '../screens/psychological_survey_analysis_page/facility_supervisor_survey_page.dart';
-import '../screens/supervisor/supervisor_task_summary_page.dart';
-import '../screens/timesheet/timesheet_management_dashboard.dart';
-import '../screens/upload_signature2.dart';
 import '../screens/upload_signature4.dart';
-import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
-import '../screens/viral_load_tracker/vl_reports_page.dart';
-import '../screens/viral_load_tracker/state_vl_reports_page_web.dart';
 import 'app_button.dart';
 
 
@@ -344,7 +323,7 @@ Widget drawer4(
 
 
 
-_displayDialog(BuildContext context) async {
+Future<Future> _displayDialog(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -373,7 +352,7 @@ _displayDialog(BuildContext context) async {
       });
 }
 
-_displayDialogForDiffAcount(BuildContext context) async {
+Future<Future> _displayDialogForDiffAcount(BuildContext context) async {
   return showDialog(
       context: context,
       builder: (context) {
@@ -458,7 +437,7 @@ void _switchAccountValidation(BuildContext context) async {
   // }
 }
 
-_showBottomSheet2(BuildContext context) {
+PersistentBottomSheetController _showBottomSheet2(BuildContext context) {
   return showBottomSheet(
       context: context,
       builder: (context) {
@@ -527,7 +506,7 @@ _showBottomSheet2(BuildContext context) {
       });
 }
 
-_bottomSheetButton(
+GestureDetector _bottomSheetButton(
     {required String label,
       required Function()? onTap,
       required Color clr,

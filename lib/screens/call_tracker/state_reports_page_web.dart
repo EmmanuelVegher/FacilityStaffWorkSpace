@@ -707,8 +707,8 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     if (totalSeconds == 0) return '0s';
     final int minutes = totalSeconds ~/ 60;
     final int remainingSeconds = totalSeconds % 60;
-    String minuteString = minutes > 0 ? '${minutes} minute(s)' : '';
-    String secondString = remainingSeconds > 0 ? ' ${remainingSeconds} second(s)' : '';
+    String minuteString = minutes > 0 ? '$minutes minute(s)' : '';
+    String secondString = remainingSeconds > 0 ? ' $remainingSeconds second(s)' : '';
     return (minuteString + secondString).trim();
   }
 
@@ -1066,7 +1066,7 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
     final totalDuration = trackedContacts.fold<int>(0, (sum, item) => sum + (item.callDuration ?? 0));
 
     final int facilityCount = _selectedFacilities.contains('All Facilities')
-        ? _availableFacilities.length > 0 ? _availableFacilities.length - 1 : 0
+        ? _availableFacilities.isNotEmpty ? _availableFacilities.length - 1 : 0
         : _selectedFacilities.length;
 
     return Card(
@@ -1519,8 +1519,9 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
               icon: const Icon(Icons.file_download_outlined),
               tooltip: "Export Options",
               onSelected: (value) async {
-                if (value == 'csv') await _exportToCSV();
-                else if (value == 'pdf') await _exportToPDF();
+                if (value == 'csv') {
+                  await _exportToCSV();
+                } else if (value == 'pdf') await _exportToPDF();
               },
               enabled: !isLoading && !_isInitialState && trackedContacts.isNotEmpty,
               itemBuilder: (context) => [

@@ -166,7 +166,7 @@ class _SupervisorFormScreenState extends State<SupervisorFormScreen> {
                       ),
                       const SizedBox(height: 20),
                       DropdownButtonFormField<String>(
-                        value: _selectedDepartment,
+                        initialValue: _selectedDepartment,
                         items: _departmentOptions,
                         onChanged: (value) => setState(() => _selectedDepartment = value),
                         decoration: const InputDecoration(labelText: 'Department', border: OutlineInputBorder()),
