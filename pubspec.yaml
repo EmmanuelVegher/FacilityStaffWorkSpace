@@ -74,7 +74,6 @@ dependencies:
   geocoding:
   timezone:
   syncfusion_flutter_pdfviewer: ^29.2.11
-  firebase_ml_vision:
   google_mlkit_image_labeling:
   #awesome_notifications: ^0.9.3+1
   #flutter_barcode_scanner:

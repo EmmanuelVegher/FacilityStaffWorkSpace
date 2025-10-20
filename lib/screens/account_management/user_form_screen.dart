@@ -1202,7 +1202,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final T? dropdownValue = (isValueInItems ? value : null) as T?;
 
     return DropdownButtonFormField<T>(
-      value: dropdownValue,
+      initialValue: dropdownValue,
       items: items,
       onChanged: onChanged,
       validator: (val) => val == null ? 'Please select an option' : null,

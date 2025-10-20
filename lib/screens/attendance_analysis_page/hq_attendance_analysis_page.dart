@@ -21,8 +21,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'dart:html' as html show Blob, Url, document, AnchorElement, window;
 
 
 import '../../widgets/drawer3.dart'; // Assuming a generic app drawer
@@ -175,7 +176,6 @@ class _ChartData {
   final double value;
   final Color? color;
 
-  // This constructor now correctly initializes the optional 'color' field.
   _ChartData(this.category, this.value, {this.color});
 }
 
@@ -1558,15 +1558,19 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   }
 
   void _triggerDownload(List<int> bytes, String filename, [String mimeType = 'text/csv']) {
-    final blob = html.Blob([bytes], mimeType);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
-    html.document.body!.children.add(anchor);
-    anchor.click();
-    html.document.body!.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], mimeType);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+    } else {
+      throw UnsupportedError('Download not supported on this platform');
+    }
   }
 }
