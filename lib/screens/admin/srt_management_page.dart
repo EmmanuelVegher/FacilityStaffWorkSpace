@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:service_delivery_workspace/widgets/drawer3.dart';
 
 class SRTManagementPage extends StatefulWidget {
   const SRTManagementPage({super.key});
@@ -12,61 +12,30 @@ class SRTManagementPage extends StatefulWidget {
 class _SRTManagementPageState extends State<SRTManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final List<String> _srtOptions = ['A', 'B', 'C', 'D'];
-  bool _isAdmin = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkUserRole();
-  }
-
-  Future<void> _checkUserRole() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await _firestore.collection('Staff').doc(user.uid).get();
-      if (doc.exists) {
-        final data = doc.data();
-        final department = data?['department']?.toString().toLowerCase();
-        setState(() {
-          _isAdmin = department == 'program management' || department == 'internal audit' || department == 'compliance' || department == 'finance';
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SRT Management'),
-        backgroundColor: const Color(0xFF722F37),
-        elevation: 0,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _isAdmin ? Colors.green : Colors.blue,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _isAdmin ? 'Admin View' : 'State View',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+         title: const Text(
+            'SRT Management - HQ',
+            style: TextStyle(
+              color: Colors.white,
             ),
           ),
-        ],
+        backgroundColor: const Color(0xFF722F37),
+        elevation: 0,
       ),
+      drawer: drawer3(context),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: _isAdmin
-                ? [Colors.purple.shade50, Colors.white, Colors.orange.shade50]
-                : [Colors.blue.shade50, Colors.white],
+            colors: [Colors.purple.shade50, Colors.white, Colors.orange.shade50],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: _isAdmin ? _buildAdminView() : _buildStateView(),
+        child: _buildAdminView(),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddDialog,
@@ -253,125 +222,6 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
     );
   }
 
-  Widget _buildStateView() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore.collection('Staff').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
-      builder: (context, userSnapshot) {
-        if (userSnapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
-          return const Center(child: Text('Error loading user data'));
-        }
-
-        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-        final userState = userData['state'];
-
-        return StreamBuilder<QuerySnapshot>(
-          stream: _firestore.collection('Staff').where('state', isEqualTo: userState).snapshots(),
-          builder: (context, staffSnapshot) {
-            if (staffSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (staffSnapshot.hasError) {
-              return Center(child: Text('Error: ${staffSnapshot.error}'));
-            }
-
-            final staffDocs = staffSnapshot.data?.docs ?? [];
-            final Set<String> locations = {};
-
-            for (var doc in staffDocs) {
-              final data = doc.data() as Map<String, dynamic>;
-              final location = data['location'] ?? 'Unknown';
-              locations.add(location);
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: locations.length,
-              itemBuilder: (context, index) {
-                final location = locations.elementAt(index);
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: StreamBuilder<DocumentSnapshot>(
-                      stream: _firestore.collection('SRTAssignments').doc('$userState-$location').snapshots(),
-                      builder: (context, srtSnapshot) {
-                        String currentSRT = 'Not Assigned';
-                        if (srtSnapshot.hasData && srtSnapshot.data!.exists) {
-                          final data = srtSnapshot.data!.data() as Map<String, dynamic>;
-                          currentSRT = data['srt'] ?? 'Not Assigned';
-                        }
-
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    location,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF722F37),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Current SRT: $currentSRT',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: currentSRT == 'Not Assigned' ? Colors.grey : Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DropdownButton<String>(
-                              value: currentSRT == 'Not Assigned' ? null : currentSRT,
-                              items: _srtOptions.map((srt) {
-                                return DropdownMenuItem(
-                                  value: srt,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: _getSRTColor(srt),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      srt,
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _updateSRT(userState, location, value);
-                                }
-                              },
-                              hint: const Text('Select SRT'),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
 
   Color _getSRTColor(String srt) {
     switch (srt) {
