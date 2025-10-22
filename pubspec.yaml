@@ -115,11 +115,12 @@ dependencies:
   firebase_analytics: ^12.0.2
   firebase_app_check: ^0.4.1
   action_slider: ^0.7.0
-  syncfusion_flutter_pdf:
+  syncfusion_flutter_pdf: ^29.2.11
   #open_file:
   open_filex:
   percent_indicator:
   uuid: ^4.5.1
+  xml: ^6.5.0
   mailer:
   signature:
   feedback:
@@ -135,8 +136,7 @@ dependencies:
   flutter_facebook_auth: ^7.1.1
   camera:
   google_ml_kit:
-  js:
-  universal_html:
+  js: ^0.6.7
   syncfusion_flutter_gauges:
   rename: ^3.0.2
   share_plus:

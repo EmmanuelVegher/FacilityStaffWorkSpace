@@ -1,4 +1,5 @@
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -335,18 +336,28 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
       }
       final bytes = excelInstance.save();
       if (bytes != null) {
-        final safeState = _selectedState.replaceAll(RegExp(r'[\\/*?:"<>|]'), '');
-        final filename = 'Staff_${status}_${safeState.isEmpty ? 'AllStates' : safeState}.xlsx';
-        final blob = html.Blob([bytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.document.createElement('a') as html.AnchorElement
-          ..href = url
-          ..style.display = 'none'
-          ..download = filename;
-        html.document.body!.children.add(anchor);
-        anchor.click();
-        html.document.body!.children.remove(anchor);
-        html.Url.revokeObjectUrl(url);
+        if (kIsWeb) {
+          final safeState = _selectedState.replaceAll(RegExp(r'[\\/*?:"<>|]'), '');
+          final filename = 'Staff_${status}_${safeState.isEmpty ? 'AllStates' : safeState}.xlsx';
+          final blob = html.Blob([bytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..style.display = 'none'
+            ..download = filename;
+          html.document.body!.children.add(anchor);
+          anchor.click();
+          html.document.body!.children.remove(anchor);
+          html.Url.revokeObjectUrl(url);
+        } else {
+          // Mobile platform - show message that download is not supported
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Excel download is only supported on web platform'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;

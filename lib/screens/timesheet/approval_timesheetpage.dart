@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'dart:html' as html; // Import for web-specific APIs
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert'; // For base64 encoding if needed
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http; // Import the http package
@@ -335,24 +336,35 @@ class _TimesheetDetailsScreen1State extends State<TimesheetDetailsScreen1> {
       // **Web-compatible download logic:**
       final pdfData = await pdf.save(); // Get PDF as Uint8List
 
-      // Create a Blob from the PDF data
-      final blob = html.Blob([pdfData], 'application/pdf');
+      if (kIsWeb) {
+        // Create a Blob from the PDF data
+        final blob = html.Blob([pdfData], 'application/pdf');
 
-      // Create a download URL
-      final url = html.Url.createObjectUrlFromBlob(blob);
+        // Create a download URL
+        final url = html.Url.createObjectUrlFromBlob(blob);
 
-      // Create a temporary anchor element to trigger the download
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none' // Make it invisible
-        ..download = 'timesheet_${monthYear1}_$staffName.pdf'; // Set filename
+        // Create a temporary anchor element to trigger the download
+        final anchor = html.document.createElement('a') as html.AnchorElement
+          ..href = url
+          ..style.display = 'none' // Make it invisible
+          ..download = 'timesheet_${monthYear1}_$staffName.pdf'; // Set filename
 
-      html.document.body!.children.add(anchor);
-      anchor.click();
+        html.document.body!.children.add(anchor);
+        anchor.click();
 
-      // Clean up: remove the anchor and revoke the ObjectURL
-      html.document.body!.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
+        // Clean up: remove the anchor and revoke the ObjectURL
+        html.document.body!.children.remove(anchor);
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile platform - show message that download is not supported
+        Fluttertoast.showToast(
+          msg: "PDF download is only supported on web platform",
+          toastLength: Toast.LENGTH_LONG,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
 
 
     } catch (e) {

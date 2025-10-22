@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:html' as html; // For web download
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -116,13 +117,23 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
 
       String csv = const ListToCsvConverter().convert(csvData);
 
-      final bytes = utf8.encode(csv);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", fileName)
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      if (kIsWeb) {
+        final bytes = utf8.encode(csv);
+        final blob = html.Blob([bytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile platform - show message that download is not supported
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('CSV download is only supported on web platform'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error generating CSV: $e'), backgroundColor: Colors.red));

@@ -1,6 +1,7 @@
 // HQ CALL TRACKER REPORTS PAGE - COMPLETE AND CORRECTED
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -731,17 +732,22 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   }
 
   void _triggerDownload(List<int> bytes, String filename, String mimeType) {
-    final blob = html.Blob([bytes], mimeType);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], mimeType);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
 
-    html.document.body!.children.add(anchor);
-    anchor.click();
-    html.document.body!.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+    } else {
+      // Mobile platform - show message that download is not supported
+      _showSnackBar('File download is only supported on web platform');
+    }
   }
 
   List<MapEntry<String, int>> _getCallStatusData() {

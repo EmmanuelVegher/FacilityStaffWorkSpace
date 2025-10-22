@@ -1,6 +1,7 @@
 // REWRITTEN FOR FLUTTER WEB & FACILITY-LEVEL FILTERING (PATH-BASED COMPATIBLE VERSION)
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -516,20 +517,26 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
 
       String csvData = const ListToCsvConverter().convert(rows);
       final bytes = utf8.encode(csvData);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final filename = 'call_tracker_report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none'
-        ..download = filename;
 
-      html.document.body!.children.add(anchor);
-      anchor.click();
-      html.document.body!.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
+      if (kIsWeb) {
+        final blob = html.Blob([bytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final filename = 'call_tracker_report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+        final anchor = html.document.createElement('a') as html.AnchorElement
+          ..href = url
+          ..style.display = 'none'
+          ..download = filename;
 
-      _showSnackBar('CSV download started.');
+        html.document.body!.children.add(anchor);
+        anchor.click();
+        html.document.body!.children.remove(anchor);
+        html.Url.revokeObjectUrl(url);
+
+        _showSnackBar('CSV download started.');
+      } else {
+        // Mobile platform - show message that download is not supported
+        _showSnackBar('CSV download is only supported on web platform');
+      }
 
     } catch (e) {
       _showSnackBar('Error exporting CSV: $e');
@@ -615,20 +622,26 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       );
 
       final Uint8List pdfBytes = await pdf.save();
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final filename = 'call_tracker_charts_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none'
-        ..download = filename;
 
-      html.document.body!.children.add(anchor);
-      anchor.click();
-      html.document.body!.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
+      if (kIsWeb) {
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final filename = 'call_tracker_charts_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+        final anchor = html.document.createElement('a') as html.AnchorElement
+          ..href = url
+          ..style.display = 'none'
+          ..download = filename;
 
-      _showSnackBar('PDF download started.');
+        html.document.body!.children.add(anchor);
+        anchor.click();
+        html.document.body!.children.remove(anchor);
+        html.Url.revokeObjectUrl(url);
+
+        _showSnackBar('PDF download started.');
+      } else {
+        // Mobile platform - show message that download is not supported
+        _showSnackBar('PDF download is only supported on web platform');
+      }
 
     } catch (e) {
       _showSnackBar('Error exporting PDF: $e');

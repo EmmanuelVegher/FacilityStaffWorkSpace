@@ -14,6 +14,7 @@ import '../screens/admin/bank_management_page.dart';
 import '../screens/admin/salary_scale_page.dart';
 import '../screens/admin/audit_logs_page.dart';
 import '../screens/admin/staff_status_report_page.dart';
+import '../screens/admin/srt_management_page.dart';
 import '../screens/attendance_analysis_page/hq_attendance_analysis_page.dart';
 import '../screens/call_tracker/hq_call_tracking_reports.dart';
 import '../screens/dashboard/hq_dashboard_screen.dart';
@@ -531,6 +532,20 @@ Widget drawer3(
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const StaffStatusReportPage()),
+                      );
+                    },
+                  ),
+                  const Divider(color: Colors.grey, height: 1),
+
+                  // SRT Management
+                  ListTile(
+                    leading: const Icon(Icons.location_city, color: Colors.purple),
+                    title: const Text('SRT Management'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SRTManagementPage()),
                       );
                     },
                   ),

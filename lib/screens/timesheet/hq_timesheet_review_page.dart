@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show Uint8List, rootBundle;
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
@@ -1135,16 +1136,26 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
   }
 
   void _triggerDownload(Uint8List data, String filename) {
-    final blob = html.Blob([data]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement
-      ..href = url
-      ..style.display = 'none'
-      ..download = filename;
-    html.document.body!.children.add(anchor);
-    anchor.click();
-    html.document.body!.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
+    if (kIsWeb) {
+      final blob = html.Blob([data]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.document.createElement('a') as html.AnchorElement
+        ..href = url
+        ..style.display = 'none'
+        ..download = filename;
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+    } else {
+      // Mobile platform - show message that download is not supported
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('File download is only supported on web platform'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   Widget _buildStateFacilitySummaryTable() {

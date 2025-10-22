@@ -6,6 +6,7 @@ import '../../models/staff.dart';
 import 'user_form_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:excel/excel.dart';
 
 class LocationStaffListScreen extends StatefulWidget {
@@ -138,26 +139,36 @@ class _LocationStaffListScreenState extends State<LocationStaffListScreen> {
       // 5. Save the file and trigger the download (for web)
       final excelBytes = excel.save();
       if (excelBytes != null) {
-        final blob = html.Blob([
-          excelBytes
-        ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        // Sanitize filename to remove invalid characters
-        final safeCategory =
-            widget.staffCategory.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
-        final safeState =
-            widget.stateName.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute(
-              "download", "${safeState}_${safeCategory}_Staff_List.xlsx")
-          ..click();
-        html.Url.revokeObjectUrl(url);
+        if (kIsWeb) {
+          // Web platform - use blob download
+          final blob = html.Blob([
+            excelBytes
+          ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          // Sanitize filename to remove invalid characters
+          final safeCategory =
+              widget.staffCategory.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+          final safeState =
+              widget.stateName.replaceAll(RegExp(r'[\\/*?:"<>|]'), "");
+          final anchor = html.AnchorElement(href: url)
+            ..setAttribute(
+                "download", "${safeState}_${safeCategory}_Staff_List.xlsx")
+            ..click();
+          html.Url.revokeObjectUrl(url);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Download started!'),
-              backgroundColor: Colors.green),
-        );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Download started!'),
+                backgroundColor: Colors.green),
+          );
+        } else {
+          // Mobile platform - show message that download is not supported
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Excel download is only supported on web platform'),
+                backgroundColor: Colors.orange),
+          );
+        }
       } else {
         throw Exception("Failed to save the Excel file.");
       }

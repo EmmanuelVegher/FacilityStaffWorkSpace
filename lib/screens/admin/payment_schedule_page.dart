@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:excel/excel.dart' as xls hide TextSpan;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import '../../models/payment_schedule_model.dart';
@@ -63,6 +64,7 @@ class PaymentScheduleItem {
   final TimesheetModel timesheet;
   final SalaryScale baseSalary;
   final double expectedHours;
+  final String? srt;
 
   // Calculated fields based on the new logic
   double actualHoursWorked;
@@ -81,10 +83,10 @@ class PaymentScheduleItem {
   String? deductionReason;
   String comments = '';
 
-  PaymentScheduleItem({ required this.timesheet, required this.baseSalary, required this.expectedHours,})
-      : actualHoursWorked = 0, percentageWorked = 0, payeFromGrossBase = 0,
-        totalDeductedHoursFromTimesheet = 0, otherDeductionsAmount = 0,
-        grossAfterDeductions = 0, proratedNet = 0 {
+  PaymentScheduleItem({ required this.timesheet, required this.baseSalary, required this.expectedHours, this.srt,})
+       : actualHoursWorked = 0, percentageWorked = 0, payeFromGrossBase = 0,
+         totalDeductedHoursFromTimesheet = 0, otherDeductionsAmount = 0,
+         grossAfterDeductions = 0, proratedNet = 0 {
     actualHoursWorked = timesheet.totalHours;
     calculateProratedSalary();
   }
@@ -155,6 +157,7 @@ class PaymentScheduleItem {
       timesheet: partialTimesheet,
       baseSalary: salary,
       expectedHours: (json['expectedHours'] as num).toDouble(),
+      srt: json['srt'],
     );
 
     // We overwrite the initial calculated values with the ones saved in the JSON.
@@ -178,6 +181,7 @@ class PaymentScheduleItem {
       'baseSalaryGross': baseSalary.grossPay, 'baseSalaryNet': baseSalary.netPay, 'expectedHours': expectedHours,
       'isEdited': isEdited, 'deductionAmount': deductionAmount, 'deductionReason': deductionReason,
       'additionAmount': additionAmount, 'additionReason': additionReason, 'proratedNet': proratedNet,
+      'srt': srt,
     };
   }
 }
@@ -272,6 +276,15 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
       final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
 
+      // Fetch SRT Assignments
+      final srtSnapshot = await FirebaseFirestore.instance.collection('SRTAssignments').get();
+      final Map<String, String> srtMap = {};
+      for (var doc in srtSnapshot.docs) {
+        final data = doc.data();
+        final key = '${data['state']}-${data['location']}';
+        srtMap[key] = data['srt'] ?? 'N/A';
+      }
+
       final List<dynamic> jsonData = jsonDecode(widget.scheduleModel!.scheduleDataJson);
       final List<PaymentScheduleItem> items = jsonData.map((itemJson) {
         return PaymentScheduleItem.fromJson(itemJson as Map<String, dynamic>, salaryScales);
@@ -305,14 +318,36 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
       final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
 
+      // Fetch SRT Assignments
+      final srtSnapshot = await FirebaseFirestore.instance.collection('SRTAssignments').get();
+      final Map<String, String> srtMap = {};
+      for (var doc in srtSnapshot.docs) {
+        final data = doc.data();
+        final key = '${data['state']}-${data['location']}';
+        srtMap[key] = data['srt'] ?? 'N/A';
+      }
+
       // 2. Calculate Expected Hours for the Month
-      final startDate = DateTime(widget.year!, widget.month! - 1, 20);
-      final endDate = DateTime(widget.year!, widget.month!, 19);
+      DateTime startDate;
+      DateTime endDate;
+      double totalExpectedHours;
+      SalaryScale adjustedSalary;
+
+      if (widget.month == 9) { // September: 20th to 30th
+        startDate = DateTime(widget.year!, 9, 20);
+        endDate = DateTime(widget.year!, 9, 30);
+      } else if (widget.month == 10) { // October: 1st to 19th
+        startDate = DateTime(widget.year!, 10, 1);
+        endDate = DateTime(widget.year!, 10, 19);
+      } else { // Other months: 20th of previous to 19th of current
+        startDate = DateTime(widget.year!, widget.month! - 1, 20);
+        endDate = DateTime(widget.year!, widget.month!, 19);
+      }
       final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
 
       // Calculate working days to determine total expected hours.
       final int workingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
-      final double totalExpectedHours = (workingDays * 8.0);
+      final double baseExpectedHours = (workingDays * 8.0);
 
       final List<PaymentScheduleItem> items = [];
 
@@ -320,11 +355,69 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       for (final timesheet in widget.timesheets!) {
         final salary = salaryScales[timesheet.designation.trim()];
         if (salary != null) {
+          SalaryScale effectiveSalary = salary;
+          double effectiveExpectedHours = baseExpectedHours;
+
+          if (widget.month == 9 || widget.month == 10) {
+            // Full period: Sep 20 to Oct 19
+            DateTime fullStart = DateTime(widget.year!, 9, 20);
+            DateTime fullEnd = DateTime(widget.year!, 10, 19);
+            List<DateTime> fullDays = List.generate(fullEnd.difference(fullStart).inDays + 1, (i) => fullStart.add(Duration(days: i)));
+            int fullWorkingDays = fullDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+
+            double dailyGross = salary.grossPay / fullWorkingDays;
+
+            if (widget.month == 9) {
+              // Sep 20-30
+              DateTime sepStart = DateTime(widget.year!, 9, 20);
+              DateTime sepEnd = DateTime(widget.year!, 9, 30);
+              List<DateTime> sepDays = List.generate(sepEnd.difference(sepStart).inDays + 1, (i) => sepStart.add(Duration(days: i)));
+              int sepWorkingDays = sepDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+              double effectiveGross = dailyGross * sepWorkingDays;
+              effectiveSalary = SalaryScale(
+                id: salary.id,
+                designation: salary.designation,
+                basic: salary.basic,
+                housing: salary.housing,
+                transport: salary.transport,
+                meal: salary.meal,
+                utility: salary.utility,
+                paye: salary.paye,
+                grossPay: effectiveGross,
+                netPay: effectiveGross * 0.98,
+              );
+              effectiveExpectedHours = sepWorkingDays * 8.0;
+            } else if (widget.month == 10) {
+              // Oct 1-19
+              DateTime octStart = DateTime(widget.year!, 10, 1);
+              DateTime octEnd = DateTime(widget.year!, 10, 19);
+              List<DateTime> octDays = List.generate(octEnd.difference(octStart).inDays + 1, (i) => octStart.add(Duration(days: i)));
+              int octWorkingDays = octDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+              double effectiveGross = dailyGross * octWorkingDays;
+              effectiveSalary = SalaryScale(
+                id: salary.id,
+                designation: salary.designation,
+                basic: salary.basic,
+                housing: salary.housing,
+                transport: salary.transport,
+                meal: salary.meal,
+                utility: salary.utility,
+                paye: salary.paye,
+                grossPay: effectiveGross,
+                netPay: effectiveGross * 0.98,
+              );
+              effectiveExpectedHours = octWorkingDays * 8.0;
+            }
+          }
+
+          final key = '${timesheet.state}-${timesheet.location}';
+          final srt = srtMap[key] ?? 'N/A';
           // The new constructor now handles ALL calculations, including deductions from timesheet entries.
           final paymentItem = PaymentScheduleItem(
             timesheet: timesheet,
-            baseSalary: salary,
-            expectedHours: totalExpectedHours,
+            baseSalary: effectiveSalary,
+            expectedHours: effectiveExpectedHours,
+            srt: srt,
           );
           items.add(paymentItem);
         } else {
@@ -710,12 +803,22 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   Widget build(BuildContext context) {
     final monthName = DateFormat('MMMM').format(DateTime(0, _isReviewMode ? widget.scheduleModel!.month : widget.month!));
     final year = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
+    final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
     final double totalNetPayroll = _filteredPaymentList.fold(0.0, (sum, item) => sum + item.proratedNet);
+
+    String title;
+    if (currentMonth == 9) {
+      title = "Payment Schedule - September Part Two $year";
+    } else if (currentMonth == 10) {
+      title = "Payment Schedule - October $year";
+    } else {
+      title = "Payment Schedule - $monthName $year";
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text("Payment Schedule - $monthName $year", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -732,6 +835,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         child: Column(
           children: [
             if (!_isReviewMode) _buildFilterBar(),
+            if (currentMonth == 9 || currentMonth == 10) _buildDescriptionCard(),
             _buildKpiHeader(totalNetPayroll),
             if (!_isLoading && _filteredPaymentList.isNotEmpty) _buildChartsSection(),
             // --- MODIFIED: Removed Expanded and Padding, now directly in the Column ---
@@ -976,6 +1080,44 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
     );
   }
 
+  Widget _buildDescriptionCard() {
+    final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+    String description;
+    if (currentMonth == 9) {
+      description = "This is September Part Two (20th-30th). The gross pay is calculated based on the last period of September from 20th to 30th, prorated for the partial period.";
+    } else if (currentMonth == 10) {
+      description = "This is October (1st-19th). The gross pay is calculated based on the prorated period from October 1st to October 19th, prorated for the partial period. To get the full October payment schedule, download both September Part Two (20th-30th) and October which would complete the full circle.";
+    } else {
+      description = "";
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Card(
+        color: Colors.orange.withOpacity(0.1),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.orange.withOpacity(0.3))
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.orange),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  description,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildKpiHeader(double totalNetPayroll) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1041,7 +1183,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
               columnSpacing: 24,
               columns: const [
                 DataColumn(label: Text('S/No')), DataColumn(label: Text('Staff Name')), DataColumn(label: Text('Designation')),
-                DataColumn(label: Text('State')), DataColumn(label: Text('Bank Name')), DataColumn(label: Text('Account Number')),
+                DataColumn(label: Text('State')), DataColumn(label: Text('SRT')), DataColumn(label: Text('Bank Name')), DataColumn(label: Text('Account Number')),
                 DataColumn(label: Text('Sort Code')), DataColumn(label: Text('Expected Hrs'), numeric: true),
                 DataColumn(label: Text('Hrs Worked'), numeric: true), DataColumn(label: Text('% Worked'), numeric: true),
                 DataColumn(label: Text('Gross Pay (Base)'), numeric: true),
@@ -1076,7 +1218,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                       Text(item.timesheet.staffName),
                     ])),
                     DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
-                    DataCell(Text(item.timesheet.state)), DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
+                    DataCell(Text(item.timesheet.state)), DataCell(Text(item.srt ?? 'N/A')), DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
                     DataCell(Text(bankInfo.accountNumber)), DataCell(Text(bankInfo.sortCode)),
                     DataCell(Text(item.expectedHours.toStringAsFixed(2))), DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
                     DataCell(_buildPercentageChip(item.percentageWorked)), DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
@@ -1239,16 +1381,42 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                 final int currentYear = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
                 final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
 
-                // Recalculate the number of working days in the month using the non-nullable variables
-                final startDate = DateTime(currentYear, currentMonth - 1, 20);
-                final endDate = DateTime(currentYear, currentMonth, 19);
-                // --- END OF FIX ---
-                final daysInRange = List.generate(endDate.difference(startDate).inDays + 1, (i) => startDate.add(Duration(days: i)));
+                // For Sep and Oct, use full period for calculation
+                DateTime calcStartDate;
+                DateTime calcEndDate;
+                double originalNetPay;
+
+                if (currentMonth == 9 || currentMonth == 10) {
+                  // Full period: Sep 20 to Oct 19
+                  calcStartDate = DateTime(currentYear, 9, 20);
+                  calcEndDate = DateTime(currentYear, 10, 19);
+
+                  // Calculate partial working days
+                  DateTime partialStart = currentMonth == 9 ? DateTime(currentYear, 9, 20) : DateTime(currentYear, 10, 1);
+                  DateTime partialEnd = currentMonth == 9 ? DateTime(currentYear, 9, 30) : DateTime(currentYear, 10, 19);
+                  List<DateTime> partialDays = List.generate(partialEnd.difference(partialStart).inDays + 1, (i) => partialStart.add(Duration(days: i)));
+                  int partialWorkingDays = partialDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+
+                  // Calculate full working days
+                  List<DateTime> fullDays = List.generate(calcEndDate.difference(calcStartDate).inDays + 1, (i) => calcStartDate.add(Duration(days: i)));
+                  int fullWorkingDays = fullDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+
+                  // Original gross pay
+                  double originalGrossPay = item.baseSalary.grossPay / (partialWorkingDays / fullWorkingDays);
+                  originalNetPay = originalGrossPay * 0.98;
+                } else {
+                  // Other months: 20th of previous to 19th of current
+                  calcStartDate = DateTime(currentYear, currentMonth - 1, 20);
+                  calcEndDate = DateTime(currentYear, currentMonth, 19);
+                  originalNetPay = item.baseSalary.netPay;
+                }
+
+                final daysInRange = List.generate(calcEndDate.difference(calcStartDate).inDays + 1, (i) => calcStartDate.add(Duration(days: i)));
                 final int totalWorkingDays = daysInRange.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
 
                 if (totalWorkingDays > 0) {
                   final ratio = days / totalWorkingDays;
-                  final newNet = item.baseSalary.netPay * ratio;
+                  final newNet = originalNetPay * ratio;
                   netController.text = newNet.toStringAsFixed(2);
 
                   // When this feature is used, we assume it's a manual override of the system calculation.
@@ -1478,7 +1646,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
       // --- CHANGE: Renamed header ---
       const List<String> headers = [
-        'S/No', 'Staff Name', 'Designation', 'State', 'Location',
+        'S/No', 'Staff Name', 'Designation', 'State', 'SRT', 'Location',
         'Bank Name', 'Account Number', 'Sort Code',
         'Expected Hours', 'Hours Worked', '% Worked', 'Gross Pay (Base)',
         'Withholding Tax (WHT)', 'Other Deductions', 'Gross after Deductions',
@@ -1503,6 +1671,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
           xls.TextCellValue(item.timesheet.staffName),
           xls.TextCellValue(item.timesheet.designation),
           xls.TextCellValue(item.timesheet.state),
+          xls.TextCellValue(item.srt ?? 'N/A'),
           xls.TextCellValue(item.timesheet.location),
           xls.TextCellValue(bankInfo.bankName),
           xls.TextCellValue(bankInfo.accountNumber),
@@ -1523,16 +1692,26 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       }
       final fileBytes = excel.save();
       if (fileBytes != null) {
-        final blob = html.Blob([fileBytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.document.createElement('a') as html.AnchorElement
-          ..href = url
-          ..style.display = 'none'
-          ..download = 'Payment_Schedule_${widget.month}_${widget.year}.xlsx';
-        html.document.body!.children.add(anchor);
-        anchor.click();
-        html.document.body!.children.remove(anchor);
-        html.Url.revokeObjectUrl(url);
+        if (kIsWeb) {
+          final blob = html.Blob([fileBytes]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..style.display = 'none'
+            ..download = 'Payment_Schedule_${widget.month}_${widget.year}.xlsx';
+          html.document.body!.children.add(anchor);
+          anchor.click();
+          html.document.body!.children.remove(anchor);
+          html.Url.revokeObjectUrl(url);
+        } else {
+          // Mobile platform - show message that download is not supported
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Excel download is only supported on web platform'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e, stack) {
       debugPrint("Error generating Excel file: $e\n$stack");

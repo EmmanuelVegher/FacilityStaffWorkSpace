@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -712,13 +713,24 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
 
       final Uint8List pdfBytes = await pdf.save();
 
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", "Timesheet_${monthYear}_${selectedBioFirstName}_$selectedBioLastName.pdf")
-        ..click();
+      if (kIsWeb) {
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "Timesheet_${monthYear}_${selectedBioFirstName}_$selectedBioLastName.pdf")
+          ..click();
 
-      html.Url.revokeObjectUrl(url);
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile platform - show message that download is not supported
+        Fluttertoast.showToast(
+          msg: "PDF download is only supported on web platform",
+          toastLength: Toast.LENGTH_LONG,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
     } catch (e) {
       print("Error generating PDF: $e");
     }finally {
@@ -801,15 +813,27 @@ class _TimesheetScreenState extends State<TimesheetScreen> {
       }
 
       final Uint8List pdfBytes = await pdf.save();
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
 
-      // Use the new filename variable
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", "Timesheet_${monthYearFilename}_${selectedBioFirstName}_$selectedBioLastName.pdf")
-        ..click();
+      if (kIsWeb) {
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
 
-      html.Url.revokeObjectUrl(url);
+        // Use the new filename variable
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "Timesheet_${monthYearFilename}_${selectedBioFirstName}_$selectedBioLastName.pdf")
+          ..click();
+
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Mobile platform - show message that download is not supported
+        Fluttertoast.showToast(
+          msg: "PDF download is only supported on web platform",
+          toastLength: Toast.LENGTH_LONG,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
     } catch (e) {
       print("Error generating PDF: $e");
     } finally {
@@ -1185,9 +1209,20 @@ $selectedBioFirstName $selectedBioLastName
 
       attachments.clear();
 
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      attachments.add(url);
+      if (kIsWeb) {
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        attachments.add(url);
+      } else {
+        // Mobile platform - show message that attachment is not supported
+        Fluttertoast.showToast(
+          msg: "PDF attachment is only supported on web platform",
+          toastLength: Toast.LENGTH_LONG,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
 
       final Email email = Email(
         body: '''

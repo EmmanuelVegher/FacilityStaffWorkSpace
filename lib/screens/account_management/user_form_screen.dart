@@ -160,6 +160,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _selectedDesignationName = staff.designation;
     _selectedProgramManagerId = staff.programManager;
     _selectedProgramManagerEmail = staff.programManagerEmail;
+    _selectedBankName = staff.bankName;
 
     // 2. Fetch all top-level (non-dependent) dropdown lists
     _staffCategoryOptions = await _fetchStringList('StaffCategory', 'name');

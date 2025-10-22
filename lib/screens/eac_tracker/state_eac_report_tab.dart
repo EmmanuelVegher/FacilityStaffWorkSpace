@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:convert' show utf8;
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -706,13 +707,18 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
   }
 
   void _triggerDownload(List<int> bytes, String filename, String mimeType) {
-    final blob = html.Blob([bytes], mimeType);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.document.createElement('a') as html.AnchorElement..href = url..style.display = 'none'..download = filename;
-    html.document.body!.children.add(anchor);
-    anchor.click();
-    html.document.body!.children.remove(anchor);
-    html.Url.revokeObjectUrl(url);
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], mimeType);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.document.createElement('a') as html.AnchorElement..href = url..style.display = 'none'..download = filename;
+      html.document.body!.children.add(anchor);
+      anchor.click();
+      html.document.body!.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+    } else {
+      // Mobile platform - show message that download is not supported
+      _showSnackBar('CSV download is only supported on web platform');
+    }
   }
 
   // --- HELPER & UTILITY METHODS ---
