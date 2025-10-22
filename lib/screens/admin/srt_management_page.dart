@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SRTManagementPage extends StatefulWidget {
   const SRTManagementPage({super.key});
@@ -11,6 +12,27 @@ class SRTManagementPage extends StatefulWidget {
 class _SRTManagementPageState extends State<SRTManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final List<String> _srtOptions = ['A', 'B', 'C', 'D'];
+  bool _isAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole();
+  }
+
+  Future<void> _checkUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await _firestore.collection('Staff').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data();
+        final department = data?['department']?.toString().toLowerCase();
+        setState(() {
+          _isAdmin = department == 'program management' || department == 'internal audit' || department == 'compliance' || department == 'finance';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,74 +40,347 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
       appBar: AppBar(
         title: const Text('SRT Management'),
         backgroundColor: const Color(0xFF722F37),
+        elevation: 0,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isAdmin ? Colors.green : Colors.blue,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _isAdmin ? 'Admin View' : 'State View',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection('Staff').snapshots(),
-        builder: (context, staffSnapshot) {
-          if (staffSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (staffSnapshot.hasError) {
-            return Center(child: Text('Error: ${staffSnapshot.error}'));
-          }
-
-          final staffDocs = staffSnapshot.data?.docs ?? [];
-          final Map<String, Set<String>> stateLocations = {};
-
-          for (var doc in staffDocs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final state = data['state'] ?? 'Unknown';
-            final location = data['location'] ?? 'Unknown';
-            stateLocations.putIfAbsent(state, () => {}).add(location);
-          }
-
-          return ListView.builder(
-            itemCount: stateLocations.keys.length,
-            itemBuilder: (context, index) {
-              final state = stateLocations.keys.elementAt(index);
-              final locations = stateLocations[state]!.toList();
-
-              return ExpansionTile(
-                title: Text(state),
-                children: locations.map((location) {
-                  return StreamBuilder<DocumentSnapshot>(
-                    stream: _firestore.collection('SRTAssignments').doc('$state-$location').snapshots(),
-                    builder: (context, srtSnapshot) {
-                      String currentSRT = 'Not Assigned';
-                      if (srtSnapshot.hasData && srtSnapshot.data!.exists) {
-                        final data = srtSnapshot.data!.data() as Map<String, dynamic>;
-                        currentSRT = data['srt'] ?? 'Not Assigned';
-                      }
-
-                      return ListTile(
-                        title: Text(location),
-                        subtitle: Text('SRT: $currentSRT'),
-                        trailing: DropdownButton<String>(
-                          value: currentSRT == 'Not Assigned' ? null : currentSRT,
-                          items: _srtOptions.map((srt) {
-                            return DropdownMenuItem(value: srt, child: Text(srt));
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              _updateSRT(state, location, value);
-                            }
-                          },
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              );
-            },
-          );
-        },
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: _isAdmin
+                ? [Colors.purple.shade50, Colors.white, Colors.orange.shade50]
+                : [Colors.blue.shade50, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: _isAdmin ? _buildAdminView() : _buildStateView(),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddDialog,
-        child: const Icon(Icons.add),
         backgroundColor: const Color(0xFF722F37),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Assignment'),
+        elevation: 8,
       ),
     );
+  }
+
+  Widget _buildAdminView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('Staff').snapshots(),
+      builder: (context, staffSnapshot) {
+        if (staffSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (staffSnapshot.hasError) {
+          return Center(child: Text('Error: ${staffSnapshot.error}'));
+        }
+
+        final staffDocs = staffSnapshot.data?.docs ?? [];
+        final Map<String, Set<String>> stateLocations = {};
+
+        for (var doc in staffDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final state = data['state'] ?? 'Unknown';
+          final location = data['location'] ?? 'Unknown';
+          stateLocations.putIfAbsent(state, () => {}).add(location);
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: stateLocations.keys.length,
+          itemBuilder: (context, index) {
+            final state = stateLocations.keys.elementAt(index);
+            final locations = stateLocations[state]!.toList();
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 20),
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    colors: [Colors.white, Colors.grey.shade50],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: ExpansionTile(
+                  title: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF722F37),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            state,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${locations.length} locations',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  children: locations.map((location) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.shade200,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: StreamBuilder<DocumentSnapshot>(
+                        stream: _firestore.collection('SRTAssignments').doc('$state-$location').snapshots(),
+                        builder: (context, srtSnapshot) {
+                          String currentSRT = 'Not Assigned';
+                          if (srtSnapshot.hasData && srtSnapshot.data!.exists) {
+                            final data = srtSnapshot.data!.data() as Map<String, dynamic>;
+                            currentSRT = data['srt'] ?? 'Not Assigned';
+                          }
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            title: Text(
+                              location,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF722F37),
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Current SRT: $currentSRT',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: currentSRT == 'Not Assigned' ? Colors.grey : _getSRTColor(currentSRT),
+                                fontWeight: currentSRT == 'Not Assigned' ? FontWeight.normal : FontWeight.bold,
+                              ),
+                            ),
+                            trailing: DropdownButton<String>(
+                              value: currentSRT == 'Not Assigned' ? null : currentSRT,
+                              items: _srtOptions.map((srt) {
+                                return DropdownMenuItem(
+                                  value: srt,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _getSRTColor(srt),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _getSRTColor(srt).withOpacity(0.3),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      srt,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _updateSRT(state, location, value);
+                                }
+                              },
+                              hint: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Select',
+                                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStateView() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestore.collection('Staff').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
+          return const Center(child: Text('Error loading user data'));
+        }
+
+        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+        final userState = userData['state'];
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: _firestore.collection('Staff').where('state', isEqualTo: userState).snapshots(),
+          builder: (context, staffSnapshot) {
+            if (staffSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (staffSnapshot.hasError) {
+              return Center(child: Text('Error: ${staffSnapshot.error}'));
+            }
+
+            final staffDocs = staffSnapshot.data?.docs ?? [];
+            final Set<String> locations = {};
+
+            for (var doc in staffDocs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final location = data['location'] ?? 'Unknown';
+              locations.add(location);
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: locations.length,
+              itemBuilder: (context, index) {
+                final location = locations.elementAt(index);
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream: _firestore.collection('SRTAssignments').doc('$userState-$location').snapshots(),
+                      builder: (context, srtSnapshot) {
+                        String currentSRT = 'Not Assigned';
+                        if (srtSnapshot.hasData && srtSnapshot.data!.exists) {
+                          final data = srtSnapshot.data!.data() as Map<String, dynamic>;
+                          currentSRT = data['srt'] ?? 'Not Assigned';
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    location,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF722F37),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Current SRT: $currentSRT',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: currentSRT == 'Not Assigned' ? Colors.grey : Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            DropdownButton<String>(
+                              value: currentSRT == 'Not Assigned' ? null : currentSRT,
+                              items: _srtOptions.map((srt) {
+                                return DropdownMenuItem(
+                                  value: srt,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _getSRTColor(srt),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      srt,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _updateSRT(userState, location, value);
+                                }
+                              },
+                              hint: const Text('Select SRT'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Color _getSRTColor(String srt) {
+    switch (srt) {
+      case 'A': return Colors.red.shade600;
+      case 'B': return Colors.blue.shade600;
+      case 'C': return Colors.green.shade600;
+      case 'D': return Colors.orange.shade600;
+      default: return Colors.grey;
+    }
   }
 
   void _updateSRT(String state, String location, String srt) async {
@@ -106,42 +401,75 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
 
         return AlertDialog(
           title: const Text('Add SRT Assignment'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('Staff').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const CircularProgressIndicator();
-                  final states = snapshot.data!.docs.map((doc) => doc['state'] as String).toSet().toList();
-                  return DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'State'),
-                    items: states.map((state) {
-                      return DropdownMenuItem(value: state, child: Text(state));
-                    }).toList(),
-                    onChanged: (value) {
-                      selectedState = value ?? '';
-                    },
-                  );
-                },
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Location'),
-                onChanged: (value) {
-                  selectedLocation = value;
-                },
-              ),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'SRT'),
-                value: selectedSRT,
-                items: _srtOptions.map((srt) {
-                  return DropdownMenuItem(value: srt, child: Text(srt));
-                }).toList(),
-                onChanged: (value) {
-                  selectedSRT = value ?? 'A';
-                },
-              ),
-            ],
+          content: Container(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('Staff').snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const CircularProgressIndicator();
+                    final states = snapshot.data!.docs.map((doc) => doc['state'] as String).toSet().toList();
+                    return DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: 'State',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                      items: states.map((state) {
+                        return DropdownMenuItem(value: state, child: Text(state));
+                      }).toList(),
+                      onChanged: (value) {
+                        selectedState = value ?? '';
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Location',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  onChanged: (value) {
+                    selectedLocation = value;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: 'SRT',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  value: selectedSRT,
+                  items: _srtOptions.map((srt) {
+                    return DropdownMenuItem(
+                      value: srt,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _getSRTColor(srt),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          srt,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    selectedSRT = value ?? 'A';
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -149,6 +477,10 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF722F37),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               onPressed: () {
                 if (selectedState.isNotEmpty && selectedLocation.isNotEmpty) {
                   _updateSRT(selectedState, selectedLocation, selectedSRT);

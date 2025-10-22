@@ -24,6 +24,7 @@ import '../screens/upload_signature2.dart';
 import '../screens/viral_load_tracker/state_vl_report_tab_2.dart';
 import '../screens/admin/audit_logs_state_page.dart';
 import '../screens/admin/staff_status_report_state_page.dart';
+import '../screens/admin/srt_management_page.dart';
 import 'app_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -593,6 +594,17 @@ Widget drawer2(
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AuditLogsStatePage()),
+              );
+            },
+          ),
+          const Divider(color: Colors.grey, height: 1),
+          ListTile(
+            leading: const Icon(Icons.location_city, color: Colors.purple),
+            title: const Text('SRT Management'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SRTManagementPage()),
               );
             },
           ),
