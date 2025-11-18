@@ -102,15 +102,10 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   List<String> _selectedLeaveTypes = ['All Types'];
   List<String> _selectedStatuses = ['Pending'];
 
-  DateTime? _startDate;
-  DateTime? _endDate;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0);
     _initializeUserStateAndFilters();
   }
 
@@ -171,10 +166,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   }
 
   Future<void> _loadLeaveRequests() async {
-    if (_startDate == null || _endDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a valid date range.")));
-      return;
-    }
     if (_userState == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User state not found. Cannot load requests.")));
       return;
@@ -194,14 +185,10 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
       }
       final userEmail = (user.email ?? '').toLowerCase();
 
-      Query query = _firestore.collectionGroup('Leave Request');
+      Query query = _firestore.collectionGroup('Leave Request').where('status', isEqualTo: 'Pending');
 
-      if (_userDepartment == 'Program Management') {
-        query = query.where('staffState', isEqualTo: _userState);
-      } else {
-        query = query
-            .where('staffState', isEqualTo: _userState)
-            .where('selectedSupervisorEmail', isEqualTo: userEmail);
+      if (_userDepartment != 'Program Management') {
+        query = query.where('selectedSupervisorEmail', isEqualTo: userEmail);
       }
 
       final snapshot = await query.get();
@@ -209,17 +196,8 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
       if (mounted) {
         List<LeaveRequest> allFetchedRequests = snapshot.docs.map((doc) => LeaveRequest.fromFirestore(doc)).toList();
 
-        final clientFilteredRequests = allFetchedRequests.where((req) {
-          final reqStartDate = DateUtils.dateOnly(req.startDate);
-          final filterStartDate = DateUtils.dateOnly(_startDate!);
-          final filterEndDate = DateUtils.dateOnly(_endDate!);
-
-          return (reqStartDate.isAfter(filterStartDate) || reqStartDate.isAtSameMomentAs(filterStartDate)) &&
-              (reqStartDate.isBefore(filterEndDate) || reqStartDate.isAtSameMomentAs(filterEndDate));
-        }).toList();
-
         setState(() {
-          _masterLeaveList = clientFilteredRequests;
+          _masterLeaveList = allFetchedRequests;
           _applyFilters();
           _isLoading = false;
         });
@@ -390,11 +368,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
               _buildMultiSelectDialogButton("Leave Type", _selectedLeaveTypes, _availableLeaveTypes, (results) { setState(() => _selectedLeaveTypes = results); _applyFilters(); }),
               _buildMultiSelectDialogButton("Status", _selectedStatuses, _availableStatuses, (results) { setState(() => _selectedStatuses = results); _applyFilters(); }),
             ],
-            OutlinedButton.icon(
-              onPressed: _showDateRangePicker,
-              icon: const Icon(Icons.date_range_outlined),
-              label: Text('${DateFormat.yMd().format(_startDate!)} - ${DateFormat.yMd().format(_endDate!)}'),
-            ),
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
               label: const Text('Apply Filter'),
@@ -533,33 +506,6 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
     );
   }
 
-  void _showDateRangePicker() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Date Range'),
-        content: SizedBox(
-          width: 350,
-          height: 400,
-          child: SfDateRangePicker(
-            selectionMode: DateRangePickerSelectionMode.range,
-            initialSelectedRange: PickerDateRange(_startDate, _endDate),
-            showActionButtons: true,
-            onSubmit: (Object? value) {
-              if (value is PickerDateRange && value.startDate != null) {
-                setState(() {
-                  _startDate = value.startDate;
-                  _endDate = value.endDate ?? value.startDate;
-                });
-              }
-              Navigator.pop(context);
-            },
-            onCancel: () => Navigator.pop(context),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildMultiSelectDialogButton(String title, List<String> selectedOptions, List<String> allOptions, Function(List<String>) onConfirm) {
     String getButtonText() {

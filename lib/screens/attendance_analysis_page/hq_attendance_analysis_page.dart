@@ -174,9 +174,9 @@ class AggregatedSummary {
 class _ChartData {
   final String category;
   final double value;
-  final Color? color;
+  final Color? color = null;
 
-  _ChartData(this.category, this.value, {this.color});
+  _ChartData(this.category, this.value);
 }
 
 // --- MAIN WIDGET: HQAttendanceAnalysisPage ---

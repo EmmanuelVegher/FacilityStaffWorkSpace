@@ -20,6 +20,8 @@ import * as admin from "firebase-admin";
 import * as https from "https";
 // --- FIX: Import the 'defineString' function for environment variables ---
 import { defineString } from "firebase-functions/params";
+// --- Import for scheduled functions ---
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 admin.initializeApp();
 
@@ -153,3 +155,56 @@ export const deleteUser = functions.https.onCall(
       throw new functions.https.HttpsError("unknown", "An unexpected error occurred.");
     }
   });
+
+// --- Scheduled Function to Reset Annual Leave Balances ---
+export const resetAnnualLeave = onSchedule({
+  schedule: "0 0 1 10 *",
+  timeZone: "Africa/Lagos"
+}, async (event) => {
+  console.log("Starting annual leave reset for all staff on October 1st.");
+
+  try {
+    // Get all staff documents
+    const staffCollection = admin.firestore().collection('Staff');
+    const staffSnapshot = await staffCollection.get();
+
+    const batch = admin.firestore().batch();
+    let resetCount = 0;
+
+    for (const staffDoc of staffSnapshot.docs) {
+      const staffData = staffDoc.data();
+      const gender = staffData['gender'] as string;
+      const staffId = staffDoc.id;
+
+      // Determine leave balances based on gender
+      const annualLeave = 10;
+      const maternityLeave = (gender === 'Female') ? 30 : 0;
+      const paternityLeave = 0; // Not used as per code
+      const holidayLeave = 0;
+
+      // Reference to RemainingLeave document
+      const remainingLeaveRef = staffCollection.doc(staffId).collection('RemainingLeave').doc('remainingLeaveDoc');
+
+      // Update the document
+      batch.set(remainingLeaveRef, {
+        staffId: staffId,
+        annualLeaveBalance: annualLeave,
+        maternityLeaveBalance: maternityLeave,
+        paternityLeaveBalance: paternityLeave,
+        holidayLeaveBalance: holidayLeave,
+        dateUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      resetCount++;
+      console.log(`Prepared reset for staff: ${staffId} (${gender})`);
+    }
+
+    // Commit the batch
+    await batch.commit();
+
+    console.log(`Annual leave reset completed for ${resetCount} staff members.`);
+  } catch (error) {
+    console.error("Error resetting annual leave:", error);
+    throw new Error("Failed to reset annual leave balances.");
+  }
+});

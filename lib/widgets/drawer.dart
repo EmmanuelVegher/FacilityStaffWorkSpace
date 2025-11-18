@@ -9,7 +9,6 @@ import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
 import '../screens/call_tracker/report_page.dart';
 import '../screens/eac_tracker/report_eac_web_tab.dart';
-import '../screens/facial_recognition/Facial_recognition_page.dart';
 import '../screens/forgot_password_page.dart';
 import '../screens/leave_request/leave_request.dart';
 import '../screens/login_screen.dart';
@@ -21,6 +20,7 @@ import '../screens/user_guide/user_guide.dart';
 import '../screens/viral_load_tracker/vl_reports_page.dart';
 import 'app_button.dart';
 
+import '../screens/components/clock_attendance.dart';
 
 
 Widget drawer(
@@ -184,7 +184,7 @@ Widget drawer(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const FacialRecognitionPage()),
+                    builder: (context) => const ClockAttendanceWeb()),
               );
             },
           ),

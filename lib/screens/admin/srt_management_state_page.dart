@@ -234,7 +234,7 @@ class _SRTManagementStatePageState extends State<SRTManagementStatePage> {
               ),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'SRT'),
-                value: selectedSRT,
+                initialValue: selectedSRT,
                 items: _srtOptions.map((srt) {
                   return DropdownMenuItem(
                     value: srt,

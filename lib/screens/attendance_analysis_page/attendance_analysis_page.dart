@@ -187,9 +187,9 @@ class AggregatedSummary {
 class _ChartData {
   final String category;
   final double value;
-  final Color? color;
+  final Color? color = null;
 
-  _ChartData(this.category, this.value, {this.color});
+  _ChartData(this.category, this.value);
 }
 
 // --- MAIN WIDGET ---
@@ -1128,6 +1128,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 }
                 if (value == 'csv_list') _exportAttendanceListToCsv();
                 if (value == 'csv_summary') _exportSummaryToCsv();
+                if (value == 'absent_csv') _downloadAbsentStaffList();
                 if (value == 'pdf') _exportChartsToPdf();
               },
               enabled: !_isLoading && _allRecords.isNotEmpty,
@@ -1156,6 +1157,13 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   ),
                 ),
 
+                const PopupMenuItem(
+                  value: 'absent_csv',
+                  child: ListTile(
+                    leading: Icon(Icons.person_off_outlined, color: Colors.red),
+                    title: Text("Download Absent Staff (CSV)"),
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'pdf',
                   child: ListTile(
@@ -2228,6 +2236,79 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Error generating PDF: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _downloadAbsentStaffList() async {
+    // Show date picker to select the date
+    DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+
+    if (selectedDate == null) return;
+
+    setState(() => _isExporting = true);
+
+    try {
+      // Fetch all active staff in the user's state
+      final staffQuery = _firestore
+          .collection('Staff')
+          .where('state', isEqualTo: _userState)
+          .where('accountStatus', isEqualTo: 'Active');
+
+      final staffSnapshot = await staffQuery.get();
+      final allStaffIds = staffSnapshot.docs.map((doc) => doc.id).toSet();
+      final staffMap = {for (var doc in staffSnapshot.docs) doc.id: doc.data()};
+
+      // Fetch attendance records for the selected date
+      final recordsQuery = _firestore
+          .collectionGroup('Record')
+          .where('timestamp', isGreaterThanOrEqualTo: selectedDate)
+          .where('timestamp', isLessThan: selectedDate.add(const Duration(days: 1)));
+
+      final recordsSnapshot = await recordsQuery.get();
+      final presentStaffIds = recordsSnapshot.docs
+          .map((doc) => doc.reference.parent.parent!.id)
+          .toSet();
+
+      // Determine absent staff
+      final absentStaffIds = allStaffIds.difference(presentStaffIds);
+
+      // Generate CSV
+      List<List<dynamic>> rows = [];
+      rows.add(['First Name', 'Last Name', 'Email', 'Location', 'Designation', 'Department', 'Mobile']);
+
+      for (var id in absentStaffIds) {
+        final data = staffMap[id];
+        if (data != null) {
+          rows.add([
+            data['firstName'] ?? '',
+            data['lastName'] ?? '',
+            data['emailAddress'] ?? '',
+            data['location'] ?? '',
+            data['designation'] ?? '',
+            data['department'] ?? '',
+            data['mobile'] ?? '',
+          ]);
+        }
+      }
+
+      String csvData = const ListToCsvConverter().convert(rows);
+      _triggerDownload(
+        utf8.encode(csvData),
+        'absent_staff_${DateFormat('yyyyMMdd').format(selectedDate)}.csv',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error generating absent staff CSV: $e")),
+        );
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);

@@ -251,7 +251,7 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
 
         return AlertDialog(
           title: const Text('Add SRT Assignment'),
-          content: Container(
+          content: SizedBox(
             width: 400,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -297,7 +297,7 @@ class _SRTManagementPageState extends State<SRTManagementPage> {
                     filled: true,
                     fillColor: Colors.grey.shade50,
                   ),
-                  value: selectedSRT,
+                  initialValue: selectedSRT,
                   items: _srtOptions.map((srt) {
                     return DropdownMenuItem(
                       value: srt,

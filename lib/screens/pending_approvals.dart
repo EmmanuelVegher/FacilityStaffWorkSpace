@@ -1084,7 +1084,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                   const Divider(height: 20),
                 ],
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

@@ -216,6 +216,9 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   List<PaymentScheduleItem> _masterPaymentList = [];
   List<PaymentScheduleItem> _filteredPaymentList = [];
   final Map<String, StaffBankInfo> _staffBankDetailsCache = {};
+  
+  // September Part 2 data cache
+  final Map<String, Map<String, dynamic>> _septPart2DataCache = {};
 
   // Filter options
   final List<String> _availableStates = ['All States'];
@@ -237,6 +240,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   Map<String, String>? _selectedApprover;
   List<Map<String, String>> _approverList = [];
   bool _approversLoading = false;
+  bool _isCombinedView = false;
 
   @override
   void initState() {
@@ -273,6 +277,11 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   Future<void> _loadDataFromModel() async {
     setState(() => _isLoading = true);
     try {
+      debugPrint("=== LOADING DATA FROM MODEL ===");
+      debugPrint("Schedule model month: ${widget.scheduleModel?.month}");
+      debugPrint("Schedule model year: ${widget.scheduleModel?.year}");
+      debugPrint("Schedule model state: ${widget.scheduleModel?.state}");
+      
       final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
       final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
 
@@ -294,11 +303,34 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       await _fetchStaffBankDetails(staffIds);
       _setupFilters(items);
 
+      debugPrint("Loaded ${items.length} items from model");
       setState(() {
         _masterPaymentList = items;
         _filteredPaymentList = items;
         _isLoading = false;
       });
+      debugPrint("Set master payment list with ${_masterPaymentList.length} items from model");
+      debugPrint("Review mode schedule month: ${widget.scheduleModel!.month}");
+
+      // Fetch September Part 2 data if this is October and in review mode
+      if (widget.scheduleModel!.month == 10) {
+        debugPrint("Review mode October schedule detected, calling _fetchSeptPart2DataForAllStaff()");
+        await _fetchSeptPart2DataForAllStaff();
+        debugPrint("Review mode September Part 2 cache size after fetch: ${_septPart2DataCache.length}");
+
+        // If no data was found, try comprehensive search for review mode too
+        if (_septPart2DataCache.isEmpty) {
+          debugPrint("No data found in review mode. Trying comprehensive search...");
+          await _comprehensiveSeptPart2Search(staffIds, widget.scheduleModel!.year);
+
+          // If still no data, try state collection approach for review mode
+          if (_septPart2DataCache.isEmpty) {
+            debugPrint("No data found in comprehensive search for review mode. Trying state collection...");
+            await _fetchSeptPart2FromStateCollection(staffIds, widget.scheduleModel!.year);
+          }
+        }
+      }
+
       _paginateData(); // --- NEW: Paginate initial data
       _getApproversForCurrentStep();
     } catch (e) {
@@ -314,6 +346,12 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   Future<void> _preparePaymentData() async {
     setState(() => _isLoading = true);
     try {
+      debugPrint("=== PREPARING PAYMENT DATA ===");
+      debugPrint("Is review mode: $_isReviewMode");
+      debugPrint("Widget month: ${widget.month}");
+      debugPrint("Widget year: ${widget.year}");
+      debugPrint("Widget timesheets length: ${widget.timesheets?.length}");
+      
       // 1. Fetch Salary Scales
       final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
       final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
@@ -428,6 +466,20 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
       // 4. Fetch bank details and finalize the list
       final List<String> staffIds = widget.timesheets!.map((ts) => ts.staffId).toList();
       await _fetchStaffBankDetails(staffIds);
+      
+      // Fetch September Part 2 data if this is October (to show side-by-side)
+      final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+      debugPrint("Current month: $currentMonth, Is October: ${currentMonth == 10}");
+      debugPrint("Master payment list length before Sept fetch: ${_masterPaymentList.length}");
+      if (currentMonth == 10) {
+        debugPrint("Calling _fetchSeptPart2DataForAllStaff() for October schedule");
+        await _fetchSeptPart2DataForAllStaff();
+        debugPrint("September Part 2 cache size after fetch: ${_septPart2DataCache.length}");
+      } else {
+        debugPrint("Not October schedule, skipping September Part 2 data fetch");
+      }
+      
+      debugPrint("Created ${items.length} payment items");
       items.sort((a, b) => a.timesheet.staffName.compareTo(b.timesheet.staffName));
       _setupFilters(items);
 
@@ -436,6 +488,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         _filteredPaymentList = items;
         _isLoading = false;
       });
+      debugPrint("Set master payment list with ${_masterPaymentList.length} items");
       _paginateData();
       _getApproversForCurrentStep();
 
@@ -464,6 +517,12 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   // --- NEW WORKFLOW METHODS ---
   String get _currentState {
     return (_isReviewMode ? widget.scheduleModel!.state : _masterPaymentList.first.timesheet.state);
+  }
+
+  bool get _isOctoberSchedule {
+    final result = (_isReviewMode ? widget.scheduleModel!.month == 10 : widget.month == 10);
+    debugPrint("Is October schedule: $result (review mode: $_isReviewMode, model month: ${widget.scheduleModel?.month}, widget month: ${widget.month})");
+    return result;
   }
 
   Future<void> _getApproversForCurrentStep() async {
@@ -806,11 +865,19 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
     final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
     final double totalNetPayroll = _filteredPaymentList.fold(0.0, (sum, item) => sum + item.proratedNet);
 
+    debugPrint("=== BUILD METHOD ===");
+    debugPrint("Current month: $currentMonth");
+    debugPrint("Is October: ${currentMonth == 10}");
+    debugPrint("Master payment list length: ${_masterPaymentList.length}");
+    debugPrint("Filtered payment list length: ${_filteredPaymentList.length}");
+
     String title;
-    if (currentMonth == 9) {
-      title = "Payment Schedule - September Part Two $year";
+    if (_isCombinedView) {
+      title = "Combined Payment Schedule - Sep 20 to Oct 19, $year";
+    } else if (currentMonth == 9) {
+      title = "Payment Schedule - September Part 2 $year";
     } else if (currentMonth == 10) {
-      title = "Payment Schedule - October $year";
+      title = "Payment Schedule - October $year (with September Part 2)";
     } else {
       title = "Payment Schedule - $monthName $year";
     }
@@ -824,6 +891,11 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         actions: [
           if (_isExporting) const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
           else IconButton(icon: const Icon(Icons.download_rounded), tooltip: "Export to Excel", onPressed: _masterPaymentList.isEmpty ? null : _exportToExcel),
+          if (_isOctoberSchedule) IconButton(
+            icon: const Icon(Icons.merge_rounded),
+            tooltip: "Combine Sep Part 2 + Oct",
+            onPressed: _combineSepPart2AndOct,
+          ),
         ],
       ),
       // --- MODIFIED: Wrapped the body's Column in a SingleChildScrollView ---
@@ -835,7 +907,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         child: Column(
           children: [
             if (!_isReviewMode) _buildFilterBar(),
-            if (currentMonth == 9 || currentMonth == 10) _buildDescriptionCard(),
+            if ((currentMonth == 9 || currentMonth == 10) || _isCombinedView) _buildDescriptionCard(),
             _buildKpiHeader(totalNetPayroll),
             if (!_isLoading && _filteredPaymentList.isNotEmpty) _buildChartsSection(),
             // --- MODIFIED: Removed Expanded and Padding, now directly in the Column ---
@@ -1081,14 +1153,18 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   }
 
   Widget _buildDescriptionCard() {
-    final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
     String description;
-    if (currentMonth == 9) {
-      description = "This is September Part Two (20th-30th). The gross pay is calculated based on the last period of September from 20th to 30th, prorated for the partial period.";
-    } else if (currentMonth == 10) {
-      description = "This is October (1st-19th). The gross pay is calculated based on the prorated period from October 1st to October 19th, prorated for the partial period. To get the full October payment schedule, download both September Part Two (20th-30th) and October which would complete the full circle.";
+    if (_isCombinedView) {
+      description = "This is a combined payment schedule from September 20th to October 19th. The data has been merged from September Part 2 and October schedules. All hours, deductions, and payments have been summed accordingly.";
     } else {
-      description = "";
+      final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+      if (currentMonth == 9) {
+        description = "This is September Part 2 (20th-30th). The gross pay is calculated based on the last period of September from 20th to 30th, prorated for the partial period.";
+      } else if (currentMonth == 10) {
+        description = "This is October (1st-19th) with September Part 2 data. The table shows both September Part 2 data (20th-30th) and October data (1st-19th) side-by-side. The gross pay for October is calculated based on the prorated period from October 1st to October 19th.";
+      } else {
+        description = "";
+      }
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1151,6 +1227,273 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
   }
 
 
+  List<DataColumn> _getDataTableColumns() {
+    final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+
+    if (currentMonth == 9) {
+      // September Part 2 - show only September columns
+      return const [
+        DataColumn(label: Text('S/No')),
+        DataColumn(label: Text('Staff Name')),
+        DataColumn(label: Text('Designation')),
+        DataColumn(label: Text('State')),
+        DataColumn(label: Text('SRT')),
+        DataColumn(label: Text('Bank Name')),
+        DataColumn(label: Text('Account Number')),
+        DataColumn(label: Text('Sort Code')),
+        DataColumn(label: Text('Expected Hrs'), numeric: true),
+        DataColumn(label: Text('Hrs Worked'), numeric: true),
+        DataColumn(label: Text('% Worked'), numeric: true),
+        DataColumn(label: Text('Gross Pay'), numeric: true),
+        DataColumn(label: Text('WHT'), numeric: true),
+        DataColumn(label: Text('Other Deductions'), numeric: true),
+        DataColumn(label: Text('Gross After Deductions'), numeric: true),
+        DataColumn(label: Text('Additions'), numeric: true),
+        DataColumn(label: Text('Final Net Pay'), numeric: true),
+        DataColumn(label: Text('Comments')),
+        DataColumn(label: Text('Action')),
+      ];
+    } else if (currentMonth == 10) {
+      // October - show both September and October columns
+      return const [
+        DataColumn(label: Text('S/No')),
+        DataColumn(label: Text('Staff Name')),
+        DataColumn(label: Text('Designation')),
+        DataColumn(label: Text('State')),
+        DataColumn(label: Text('SRT')),
+        DataColumn(label: Text('Bank Name')),
+        DataColumn(label: Text('Account Number')),
+        DataColumn(label: Text('Sort Code')),
+        DataColumn(label: Text('Sept Expected Hrs'), numeric: true),
+        DataColumn(label: Text('Oct Expected Hrs'), numeric: true),
+        DataColumn(label: Text('Sept Hrs Worked'), numeric: true),
+        DataColumn(label: Text('Oct Hrs Worked'), numeric: true),
+        DataColumn(label: Text('Sept % Worked'), numeric: true),
+        DataColumn(label: Text('Oct % Worked'), numeric: true),
+        DataColumn(label: Text('Sept Gross Pay'), numeric: true),
+        DataColumn(label: Text('Oct Gross Pay'), numeric: true),
+        DataColumn(label: Text('Sept WHT'), numeric: true),
+        DataColumn(label: Text('Oct WHT'), numeric: true),
+        DataColumn(label: Text('Sept Other Deductions'), numeric: true),
+        DataColumn(label: Text('Oct Other Deductions'), numeric: true),
+        DataColumn(label: Text('Sept Gross After Deductions'), numeric: true),
+        DataColumn(label: Text('Oct Gross After Deductions'), numeric: true),
+        DataColumn(label: Text('Sept Additions'), numeric: true),
+        DataColumn(label: Text('Oct Additions'), numeric: true),
+        DataColumn(label: Text('Sept Final Net Pay'), numeric: true),
+        DataColumn(label: Text('Oct Final Net Pay'), numeric: true),
+        DataColumn(label: Text('Comments')),
+        DataColumn(label: Text('Action')),
+      ];
+    } else {
+      // Other months - show only current month columns
+      return const [
+        DataColumn(label: Text('S/No')),
+        DataColumn(label: Text('Staff Name')),
+        DataColumn(label: Text('Designation')),
+        DataColumn(label: Text('State')),
+        DataColumn(label: Text('SRT')),
+        DataColumn(label: Text('Bank Name')),
+        DataColumn(label: Text('Account Number')),
+        DataColumn(label: Text('Sort Code')),
+        DataColumn(label: Text('Expected Hrs'), numeric: true),
+        DataColumn(label: Text('Hrs Worked'), numeric: true),
+        DataColumn(label: Text('% Worked'), numeric: true),
+        DataColumn(label: Text('Gross Pay'), numeric: true),
+        DataColumn(label: Text('WHT'), numeric: true),
+        DataColumn(label: Text('Other Deductions'), numeric: true),
+        DataColumn(label: Text('Gross After Deductions'), numeric: true),
+        DataColumn(label: Text('Additions'), numeric: true),
+        DataColumn(label: Text('Final Net Pay'), numeric: true),
+        DataColumn(label: Text('Comments')),
+        DataColumn(label: Text('Action')),
+      ];
+    }
+  }
+
+  List<DataCell> _getDataTableCells(int index, PaymentScheduleItem item, StaffBankInfo bankInfo, Map<String, dynamic> septData, String deductionText) {
+    final int currentMonth = _isReviewMode ? widget.scheduleModel!.month : widget.month!;
+
+    if (currentMonth == 9) {
+      // September Part 2 - show only current month data
+      return [
+        // 1. S/No
+        DataCell(Text((index + 1).toString())),
+        // 2. Staff Name
+        DataCell(Row(children: [
+          if (item.additionAmount > 0) Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
+          if (item.deductionAmount > 0) Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
+          if (item.isEdited) const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
+          if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited) const SizedBox(width: 4),
+          Text(item.timesheet.staffName),
+        ])),
+        // 3. Designation
+        DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
+        // 4. State
+        DataCell(Text(item.timesheet.state)),
+        // 5. SRT
+        DataCell(Text(item.srt ?? 'N/A')),
+        // 6. Bank Name
+        DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
+        // 7. Account Number
+        DataCell(Text(bankInfo.accountNumber)),
+        // 8. Sort Code
+        DataCell(Text(bankInfo.sortCode)),
+        // 9. Expected Hours
+        DataCell(Text(item.expectedHours.toStringAsFixed(2))),
+        // 10. Hours Worked
+        DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
+        // 11. % Worked
+        DataCell(_buildPercentageChip(item.percentageWorked)),
+        // 12. Gross Pay
+        DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
+        // 13. WHT
+        DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))),
+        // 14. Other Deductions
+        DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)),
+        // 15. Gross After Deductions
+        DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))),
+        // 16. Additions
+        DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))),
+        // 17. Final Net Pay
+        DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))),
+        // 18. Comments
+        DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))),
+        // 19. Action
+        DataCell(IconButton(
+          icon: const Icon(Icons.edit_note, size: 20),
+          color: _isReviewMode ? Colors.grey : Colors.blueAccent,
+          onPressed: _isReviewMode ? null : () => _showEditSalaryDialog(item),
+          tooltip: _isReviewMode ? 'Schedule Submitted (Read-only)' : 'Adjust Salary',
+        )),
+      ];
+    } else if (currentMonth == 10) {
+      // October - show both September and October data
+      return [
+        // 1. S/No
+        DataCell(Text((index + 1).toString())),
+        // 2. Staff Name
+        DataCell(Row(children: [
+          if (item.additionAmount > 0) Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
+          if (item.deductionAmount > 0) Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
+          if (item.isEdited) const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
+          if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited) const SizedBox(width: 4),
+          Text(item.timesheet.staffName),
+        ])),
+        // 3. Designation
+        DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
+        // 4. State
+        DataCell(Text(item.timesheet.state)),
+        // 5. SRT
+        DataCell(Text(item.srt ?? 'N/A')),
+        // 6. Bank Name
+        DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
+        // 7. Account Number
+        DataCell(Text(bankInfo.accountNumber)),
+        // 8. Sort Code
+        DataCell(Text(bankInfo.sortCode)),
+        // 9. Sept Expected Hours
+        DataCell(Text(septData['expectedHours'].toStringAsFixed(2))),
+        // 10. Oct Expected Hours
+        DataCell(Text(item.expectedHours.toStringAsFixed(2))),
+        // 11. Sept Hrs Worked
+        DataCell(Text(septData['hoursWorked'].toStringAsFixed(2))),
+        // 12. Oct Hrs Worked
+        DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
+        // 13. Sept % Worked
+        DataCell(_buildPercentageChip(septData['percentageWorked'])),
+        // 14. Oct % Worked
+        DataCell(_buildPercentageChip(item.percentageWorked)),
+        // 15. Sept Gross Pay
+        DataCell(Text(_currencyFormat.format(septData['grossPay']))),
+        // 16. Oct Gross Pay
+        DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
+        // 17. Sept WHT
+        DataCell(Text(_currencyFormat.format(septData['wht']))),
+        // 18. Oct WHT
+        DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))),
+        // 19. Sept Other Deductions
+        DataCell(Text(_currencyFormat.format(septData['otherDeductions']))),
+        // 20. Oct Other Deductions
+        DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)),
+        // 21. Sept Gross After Deductions
+        DataCell(Text(_currencyFormat.format(septData['grossAfterDeductions']))),
+        // 22. Oct Gross After Deductions
+        DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))),
+        // 23. Sept Additions
+        DataCell(Text(_currencyFormat.format(septData['additions']), style: TextStyle(color: septData['additions'] > 0 ? Colors.green.shade700 : Colors.grey))),
+        // 24. Oct Additions
+        DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))),
+        // 25. Sept Final Net Pay
+        DataCell(Text(_currencyFormat.format(septData['finalNetPay']), style: const TextStyle(fontWeight: FontWeight.bold))),
+        // 26. Oct Final Net Pay
+        DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))),
+        // 27. Comments
+        DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))),
+        // 28. Action
+        DataCell(IconButton(
+          icon: const Icon(Icons.edit_note, size: 20),
+          color: _isReviewMode ? Colors.grey : Colors.blueAccent,
+          onPressed: _isReviewMode ? null : () => _showEditSalaryDialog(item),
+          tooltip: _isReviewMode ? 'Schedule Submitted (Read-only)' : 'Adjust Salary',
+        )),
+      ];
+    } else {
+      // Other months - show only current month data
+      return [
+        // 1. S/No
+        DataCell(Text((index + 1).toString())),
+        // 2. Staff Name
+        DataCell(Row(children: [
+          if (item.additionAmount > 0) Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
+          if (item.deductionAmount > 0) Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
+          if (item.isEdited) const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
+          if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited) const SizedBox(width: 4),
+          Text(item.timesheet.staffName),
+        ])),
+        // 3. Designation
+        DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
+        // 4. State
+        DataCell(Text(item.timesheet.state)),
+        // 5. SRT
+        DataCell(Text(item.srt ?? 'N/A')),
+        // 6. Bank Name
+        DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
+        // 7. Account Number
+        DataCell(Text(bankInfo.accountNumber)),
+        // 8. Sort Code
+        DataCell(Text(bankInfo.sortCode)),
+        // 9. Expected Hours
+        DataCell(Text(item.expectedHours.toStringAsFixed(2))),
+        // 10. Hours Worked
+        DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
+        // 11. % Worked
+        DataCell(_buildPercentageChip(item.percentageWorked)),
+        // 12. Gross Pay
+        DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
+        // 13. WHT
+        DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))),
+        // 14. Other Deductions
+        DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)),
+        // 15. Gross After Deductions
+        DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))),
+        // 16. Additions
+        DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))),
+        // 17. Final Net Pay
+        DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))),
+        // 18. Comments
+        DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))),
+        // 19. Action
+        DataCell(IconButton(
+          icon: const Icon(Icons.edit_note, size: 20),
+          color: _isReviewMode ? Colors.grey : Colors.blueAccent,
+          onPressed: _isReviewMode ? null : () => _showEditSalaryDialog(item),
+          tooltip: _isReviewMode ? 'Schedule Submitted (Read-only)' : 'Adjust Salary',
+        )),
+      ];
+    }
+  }
+
   Widget _buildDataTableCard() {
     const double scrollAmount = 300.0;
     return Card(
@@ -1181,26 +1524,15 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columnSpacing: 24,
-              columns: const [
-                DataColumn(label: Text('S/No')), DataColumn(label: Text('Staff Name')), DataColumn(label: Text('Designation')),
-                DataColumn(label: Text('State')), DataColumn(label: Text('SRT')), DataColumn(label: Text('Bank Name')), DataColumn(label: Text('Account Number')),
-                DataColumn(label: Text('Sort Code')), DataColumn(label: Text('Expected Hrs'), numeric: true),
-                DataColumn(label: Text('Hrs Worked'), numeric: true), DataColumn(label: Text('% Worked'), numeric: true),
-                DataColumn(label: Text('Gross Pay (Base)'), numeric: true),
-                // --- CHANGE: Renamed column header ---
-                DataColumn(label: Text('Withholding Tax (WHT)'), numeric: true),
-                DataColumn(label: Text('Other Deductions'), numeric: true),
-                DataColumn(label: Text('Gross after Deductions'), numeric: true),
-                DataColumn(label: Text('Additions'), numeric: true),
-                DataColumn(label: Text('Final Net Pay'), numeric: true),
-                DataColumn(label: Text('Comments')),
-                DataColumn(label: Text('Action')),
-              ],
+              columns: _getDataTableColumns(),
               rows: _paginatedList.asMap().entries.map((entry) {
                 int index = (_currentPage * _rowsPerPage) + entry.key;
                 PaymentScheduleItem item = entry.value;
 
                 final bankInfo = _staffBankDetailsCache[item.timesheet.staffId] ?? StaffBankInfo();
+                
+                // Get September Part 2 data if available
+                final septData = _getSeptPart2DataForStaff(item.timesheet.staffId);
 
                 double deductedPercentage = (item.expectedHours > 0) ? (item.totalDeductedHoursFromTimesheet / item.expectedHours * 100) : 0;
                 String deductionText = item.otherDeductionsAmount > 0
@@ -1208,33 +1540,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                     : _currencyFormat.format(0);
 
                 return DataRow(
-                  cells: [
-                    DataCell(Text((index + 1).toString())),
-                    DataCell(Row(children: [
-                      if (item.additionAmount > 0) Tooltip(message: "Addition: ${item.additionReason ?? ''}", child: Icon(Icons.arrow_upward, size: 14, color: Colors.green.shade700)),
-                      if (item.deductionAmount > 0) Tooltip(message: "Deduction: ${item.deductionReason ?? ''}", child: Icon(Icons.arrow_downward, size: 14, color: Colors.red.shade700)),
-                      if (item.isEdited) const Tooltip(message: 'Manually Edited', child: Icon(Icons.push_pin, size: 14, color: Colors.orange)),
-                      if (item.additionAmount > 0 || item.deductionAmount > 0 || item.isEdited) const SizedBox(width: 4),
-                      Text(item.timesheet.staffName),
-                    ])),
-                    DataCell(SizedBox(width: 200, child: Text(item.timesheet.designation, overflow: TextOverflow.ellipsis))),
-                    DataCell(Text(item.timesheet.state)), DataCell(Text(item.srt ?? 'N/A')), DataCell(SizedBox(width: 150, child: Text(bankInfo.bankName, overflow: TextOverflow.ellipsis))),
-                    DataCell(Text(bankInfo.accountNumber)), DataCell(Text(bankInfo.sortCode)),
-                    DataCell(Text(item.expectedHours.toStringAsFixed(2))), DataCell(Text(item.actualHoursWorked.toStringAsFixed(2))),
-                    DataCell(_buildPercentageChip(item.percentageWorked)), DataCell(Text(_currencyFormat.format(item.baseSalary.grossPay))),
-                    DataCell(Text(_currencyFormat.format(item.payeFromGrossBase))),
-                    DataCell(Text(deductionText, style: TextStyle(color: item.otherDeductionsAmount > 0 ? Colors.red.shade700 : Colors.grey), textAlign: TextAlign.right)),
-                    DataCell(Text(_currencyFormat.format(item.grossAfterDeductions))),
-                    DataCell(Text(_currencyFormat.format(item.additionAmount), style: TextStyle(color: item.additionAmount > 0 ? Colors.green.shade700 : Colors.grey))),
-                    DataCell(Text(_currencyFormat.format(item.proratedNet), style: const TextStyle(fontWeight: FontWeight.bold))),
-                    DataCell(SizedBox(width: 250, child: Text(item.comments, overflow: TextOverflow.ellipsis))),
-                    DataCell(IconButton(
-                      icon: const Icon(Icons.edit_note, size: 20),
-                      color: _isReviewMode ? Colors.grey : Colors.blueAccent,
-                      onPressed: _isReviewMode ? null : () => _showEditSalaryDialog(item),
-                      tooltip: _isReviewMode ? 'Schedule Submitted (Read-only)' : 'Adjust Salary',
-                    )),
-                  ],
+                  cells: _getDataTableCells(index, item, bankInfo, septData, deductionText),
                 );
               }).toList(),
             ),
@@ -1333,6 +1639,521 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
         ),
       ),
     );
+  }
+
+  // Helper method to get September Part 2 data for a specific staff
+  Map<String, dynamic> _getSeptPart2DataForStaff(String staffId) {
+    final data = _septPart2DataCache[staffId] ?? _createEmptySeptDataForTable();
+    debugPrint("Getting September Part 2 data for staff $staffId: ${data['expectedHours']}, ${data['hoursWorked']}, ${data['finalNetPay']}");
+    return data;
+  }
+
+  // Helper method to create empty September Part 2 data
+  Map<String, dynamic> _createEmptySeptDataForTable() {
+    return {
+      'expectedHours': 0,
+      'hoursWorked': 0,
+      'percentageWorked': 0,
+      'grossPay': 0,
+      'wht': 0,
+      'otherDeductions': 0,
+      'grossAfterDeductions': 0,
+      'additions': 0,
+      'finalNetPay': 0,
+    };
+  }
+
+  // Helper method to create empty September Part 2 data
+  Map<String, dynamic> _createEmptySeptData() {
+    return {
+      'expectedHours': 0,
+      'hoursWorked': 0,
+      'percentageWorked': 0,
+      'grossPay': 0,
+      'wht': 0,
+      'otherDeductions': 0,
+      'grossAfterDeductions': 0,
+      'additions': 0,
+      'finalNetPay': 0,
+    };
+  }
+
+  // Method to fetch September Part 2 data for all staff
+  Future<void> _fetchSeptPart2DataForAllStaff() async {
+    try {
+      final currentYear = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
+      
+      // Clear existing cache
+      _septPart2DataCache.clear();
+      
+      // Get all staff IDs from the current payment list
+      final List<String> staffIds = _masterPaymentList.map((item) => item.timesheet.staffId).toList();
+      
+      debugPrint("=== FETCHING SEPTEMBER PART 2 DATA ===");
+      debugPrint("Current year: $currentYear");
+      debugPrint("Master payment list length: ${_masterPaymentList.length}");
+      debugPrint("Fetching September Part 2 data for ${staffIds.length} staff members");
+      debugPrint("Staff IDs: $staffIds");
+      
+      // Try multiple collection name variations
+      final List<String> possibleCollectionNames = [
+        "September_${currentYear}_part2",
+        "September_${currentYear}_part_2",
+        "september_${currentYear}_part2",
+        "september_${currentYear}_part_2",
+        "September_${currentYear}_Part2",
+        "September_${currentYear}_Part_2",
+        "September $currentYear part2",
+        "September $currentYear part_2",
+        "September${currentYear}part2",
+        "September${currentYear}part_2",
+      ];
+      
+      String? foundCollectionName;
+      
+      // First, try to find a valid collection name by checking the first staff member
+      if (staffIds.isNotEmpty) {
+        final sampleStaffRef = FirebaseFirestore.instance.collection('Staff').doc(staffIds.first);
+        
+        // Try each possible collection name
+        for (final collectionName in possibleCollectionNames) {
+          debugPrint("Trying collection name: $collectionName");
+          final sampleTimesheetsRef = sampleStaffRef.collection('TimeSheets').doc(collectionName);
+          final sampleSnapshot = await sampleTimesheetsRef.get();
+          
+          if (sampleSnapshot.exists) {
+            foundCollectionName = collectionName;
+            debugPrint("Found valid collection name: $collectionName");
+            break;
+          }
+        }
+        
+        // If no specific collection name found, try to find any document with 'september' and 'part' in the name
+        if (foundCollectionName == null) {
+          debugPrint("No specific collection name found. Searching for any document with 'september' and 'part' in name");
+          final timesheetsCollection = await sampleStaffRef.collection('TimeSheets').get();
+
+          debugPrint("Found ${timesheetsCollection.docs.length} total documents in TimeSheets collection");
+          for (var doc in timesheetsCollection.docs) {
+            final docId = doc.id.toLowerCase();
+            debugPrint("Checking document ID: $docId");
+
+            if (docId.contains('september') && (docId.contains('part2') || docId.contains('part_2') || docId.contains('part'))) {
+              foundCollectionName = doc.id;
+              debugPrint("Found matching document: $docId");
+              break;
+            }
+          }
+
+          // If still not found, try a broader search for any document containing 'sept'
+          if (foundCollectionName == null) {
+            debugPrint("No 'september' document found. Trying broader search for 'sept'");
+            for (var doc in timesheetsCollection.docs) {
+              final docId = doc.id.toLowerCase();
+              debugPrint("Checking document ID: $docId");
+
+              if (docId.contains('sept')) {
+                foundCollectionName = doc.id;
+                debugPrint("Found document with 'sept': $docId");
+                break;
+              }
+            }
+          }
+
+          // Final fallback: try to find any document that might contain timesheet data for September
+          if (foundCollectionName == null) {
+            debugPrint("No September-related document found. Trying to find any recent timesheet document");
+            // Look for documents that might be from September based on creation date or content
+            for (var doc in timesheetsCollection.docs) {
+              final docId = doc.id.toLowerCase();
+              final data = doc.data();
+
+              // Check if the document contains timesheet entries and might be from September
+              if (data.containsKey('timesheetEntries') && data['timesheetEntries'] is List) {
+                final entries = data['timesheetEntries'] as List;
+                if (entries.isNotEmpty) {
+                  // Check if any entry has a date in September
+                  for (var entry in entries) {
+                    if (entry is Map && entry.containsKey('date')) {
+                      final dateStr = entry['date'].toString();
+                      if (dateStr.contains('2024-09') || dateStr.contains('09/') || dateStr.contains('/09/')) {
+                        foundCollectionName = doc.id;
+                        debugPrint("Found document with September data: $docId");
+                        break;
+                      }
+                    }
+                  }
+                  if (foundCollectionName != null) break;
+                }
+              }
+            }
+          }
+        }
+        
+        // If we found a collection name, fetch data for all staff
+        if (foundCollectionName != null) {
+          debugPrint("Using collection name: $foundCollectionName");
+          
+          for (final staffId in staffIds) {
+            try {
+              debugPrint("Processing staff ID: $staffId");
+              
+              final staffRef = FirebaseFirestore.instance.collection('Staff').doc(staffId);
+              final timesheetsRef = staffRef.collection('TimeSheets').doc(foundCollectionName);
+              
+              final docSnapshot = await timesheetsRef.get();
+              
+              debugPrint("Document exists for staff $staffId: ${docSnapshot.exists}");
+              
+              if (docSnapshot.exists) {
+                final data = docSnapshot.data() as Map<String, dynamic>;
+                debugPrint("Data for staff $staffId: ${data.keys}");
+                
+                // Calculate total hours worked from timesheetEntries
+                double totalHoursWorked = 0;
+                if (data['timesheetEntries'] != null) {
+                  final entries = data['timesheetEntries'] as List;
+                  debugPrint("Found ${entries.length} timesheet entries for staff $staffId");
+                  for (var entry in entries) {
+                    totalHoursWorked += (entry['noOfHours'] as num).toDouble();
+                    debugPrint("Added ${entry['noOfHours']} hours, total: $totalHoursWorked");
+                  }
+                }
+                
+                // Calculate expected hours for September Part 2 (Sep 20-30)
+                DateTime sepStart = DateTime(currentYear, 9, 20);
+                DateTime sepEnd = DateTime(currentYear, 9, 30);
+                List<DateTime> sepDays = List.generate(sepEnd.difference(sepStart).inDays + 1, (i) => sepStart.add(Duration(days: i)));
+                int sepWorkingDays = sepDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+                double expectedHours = sepWorkingDays * 8.0;
+                
+                debugPrint("Staff $staffId - Expected hours: $expectedHours, Working days: $sepWorkingDays");
+                
+                // Calculate percentage worked
+                double percentageWorked = expectedHours > 0 ? (totalHoursWorked / expectedHours * 100) : 0;
+                if (percentageWorked > 100) percentageWorked = 100;
+                
+                // Get staff's salary scale to calculate pay
+                final designation = data['designation'] ?? _masterPaymentList.firstWhere(
+                  (item) => item.timesheet.staffId == staffId,
+                  orElse: () => _masterPaymentList.first,
+                ).timesheet.designation;
+                
+                debugPrint("Staff $staffId - Designation: $designation");
+                
+                double grossPay = 0;
+                double wht = 0;
+                double netPay = 0;
+                
+                final salaryScaleSnapshot = await FirebaseFirestore.instance
+                    .collection('SalaryScales')
+                    .where('designation', isEqualTo: designation)
+                    .get();
+                
+                debugPrint("Found ${salaryScaleSnapshot.docs.length} salary scales for designation $designation");
+                
+                if (salaryScaleSnapshot.docs.isNotEmpty) {
+                  final salaryData = salaryScaleSnapshot.docs.first.data();
+                  final baseGrossPay = (salaryData['grossPay'] as num).toDouble();
+                  
+                  debugPrint("Staff $staffId - Base gross pay: $baseGrossPay");
+                  
+                  // For September Part 2, we need to prorate the salary
+                  // Full period: Sep 20 to Oct 19
+                  DateTime fullStart = DateTime(currentYear, 9, 20);
+                  DateTime fullEnd = DateTime(currentYear, 10, 19);
+                  List<DateTime> fullDays = List.generate(fullEnd.difference(fullStart).inDays + 1, (i) => fullStart.add(Duration(days: i)));
+                  int fullWorkingDays = fullDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+                  
+                  double dailyGross = baseGrossPay / fullWorkingDays;
+                  grossPay = dailyGross * sepWorkingDays;
+                  wht = grossPay * 0.02; // 2% WHT
+                  netPay = grossPay - wht;
+                  
+                  debugPrint("Staff $staffId - Gross pay: $grossPay, WHT: $wht, Net pay: $netPay");
+                }
+                
+                // Cache the calculated September Part 2 data
+                _septPart2DataCache[staffId] = {
+                  'expectedHours': expectedHours,
+                  'hoursWorked': totalHoursWorked,
+                  'percentageWorked': percentageWorked,
+                  'grossPay': grossPay,
+                  'wht': wht,
+                  'otherDeductions': 0, // No other deductions for now
+                  'grossAfterDeductions': grossPay - wht,
+                  'additions': 0, // No additions for now
+                  'finalNetPay': netPay,
+                };
+                
+                debugPrint("Cached September Part 2 data for staff $staffId: ${{
+                  'expectedHours': expectedHours,
+                  'hoursWorked': totalHoursWorked,
+                  'percentageWorked': percentageWorked,
+                  'grossPay': grossPay,
+                  'wht': wht,
+                  'finalNetPay': netPay,
+                }}");
+              } else {
+                debugPrint("No September Part 2 data found for staff $staffId");
+              }
+            } catch (e) {
+              debugPrint("Error fetching September Part 2 data for staff $staffId: $e");
+            }
+          }
+        } else {
+          debugPrint("No September Part 2 collection found for any staff member");
+        }
+      }
+      
+      debugPrint("Final cache size: ${_septPart2DataCache.length}");
+      debugPrint("Fetched September Part 2 data for ${_septPart2DataCache.length} staff members");
+
+      // If no data was found, try a more comprehensive search
+      if (_septPart2DataCache.isEmpty && staffIds.isNotEmpty) {
+        debugPrint("No data found with standard approach. Trying comprehensive search...");
+        await _comprehensiveSeptPart2Search(staffIds, currentYear);
+
+        // If still no data, try state-level collection approach
+        if (_septPart2DataCache.isEmpty) {
+          debugPrint("No data found in comprehensive search. Trying state-level collection...");
+          await _fetchSeptPart2FromStateCollection(staffIds, currentYear);
+        }
+      }
+
+    } catch (e) {
+      debugPrint("Error fetching September Part 2 data: $e");
+      // Don't show error to user, just continue with empty data
+    }
+  }
+
+  // Comprehensive search for September Part 2 data across all staff
+  Future<void> _comprehensiveSeptPart2Search(List<String> staffIds, int currentYear) async {
+    debugPrint("=== COMPREHENSIVE SEPTEMBER PART 2 SEARCH ===");
+
+    for (final staffId in staffIds) {
+      try {
+        debugPrint("Searching for September data for staff: $staffId");
+
+        final staffRef = FirebaseFirestore.instance.collection('Staff').doc(staffId);
+        final timesheetsCollection = await staffRef.collection('TimeSheets').get();
+
+        debugPrint("Staff $staffId has ${timesheetsCollection.docs.length} timesheet documents");
+
+        for (var doc in timesheetsCollection.docs) {
+          final docId = doc.id;
+          final data = doc.data();
+
+          debugPrint("Checking document: $docId");
+          debugPrint("Document keys: ${data.keys.toList()}");
+
+          // Check if this document has timesheet entries
+          if (data.containsKey('timesheetEntries') && data['timesheetEntries'] is List) {
+            final entries = data['timesheetEntries'] as List;
+            debugPrint("Document has ${entries.length} timesheet entries");
+
+            if (entries.isNotEmpty) {
+              // Check if any entry has a date in September
+              bool hasSeptemberData = false;
+              double totalHoursWorked = 0;
+
+              for (var entry in entries) {
+                if (entry is Map && entry.containsKey('date')) {
+                  final dateStr = entry['date'].toString();
+                  debugPrint("Entry date: $dateStr");
+
+                  // Check for September dates in various formats
+                  if (dateStr.contains('2024-09') ||
+                      dateStr.contains('09/') ||
+                      dateStr.contains('/09/') ||
+                      dateStr.contains('September') ||
+                      dateStr.contains('Sept')) {
+                    hasSeptemberData = true;
+                    debugPrint("Found September data in entry: $dateStr");
+                  }
+
+                  // Sum up hours worked
+                  if (entry.containsKey('noOfHours')) {
+                    totalHoursWorked += (entry['noOfHours'] as num).toDouble();
+                  }
+                }
+              }
+
+              if (hasSeptemberData) {
+                debugPrint("Found September data in document: $docId");
+                debugPrint("Total hours worked: $totalHoursWorked");
+
+                // Calculate expected hours for September Part 2 (Sep 20-30)
+                DateTime sepStart = DateTime(currentYear, 9, 20);
+                DateTime sepEnd = DateTime(currentYear, 9, 30);
+                List<DateTime> sepDays = List.generate(sepEnd.difference(sepStart).inDays + 1, (i) => sepStart.add(Duration(days: i)));
+                int sepWorkingDays = sepDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+                double expectedHours = sepWorkingDays * 8.0;
+
+                // Calculate percentage worked
+                double percentageWorked = expectedHours > 0 ? (totalHoursWorked / expectedHours * 100) : 0;
+                if (percentageWorked > 100) percentageWorked = 100;
+
+                // Get staff's salary scale to calculate pay
+                final designation = data['designation'] ?? _masterPaymentList.firstWhere(
+                  (item) => item.timesheet.staffId == staffId,
+                  orElse: () => _masterPaymentList.first,
+                ).timesheet.designation;
+
+                double grossPay = 0;
+                double wht = 0;
+                double netPay = 0;
+
+                final salaryScaleSnapshot = await FirebaseFirestore.instance
+                    .collection('SalaryScales')
+                    .where('designation', isEqualTo: designation)
+                    .get();
+
+                if (salaryScaleSnapshot.docs.isNotEmpty) {
+                  final salaryData = salaryScaleSnapshot.docs.first.data();
+                  final baseGrossPay = (salaryData['grossPay'] as num).toDouble();
+
+                  // For September Part 2, we need to prorate the salary
+                  DateTime fullStart = DateTime(currentYear, 9, 20);
+                  DateTime fullEnd = DateTime(currentYear, 10, 19);
+                  List<DateTime> fullDays = List.generate(fullEnd.difference(fullStart).inDays + 1, (i) => fullStart.add(Duration(days: i)));
+                  int fullWorkingDays = fullDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+
+                  double dailyGross = baseGrossPay / fullWorkingDays;
+                  grossPay = dailyGross * sepWorkingDays;
+                  wht = grossPay * 0.02; // 2% WHT
+                  netPay = grossPay - wht;
+
+                  debugPrint("Calculated pay for staff $staffId: gross=$grossPay, wht=$wht, net=$netPay");
+                }
+
+                // Cache the calculated September Part 2 data
+                _septPart2DataCache[staffId] = {
+                  'expectedHours': expectedHours,
+                  'hoursWorked': totalHoursWorked,
+                  'percentageWorked': percentageWorked,
+                  'grossPay': grossPay,
+                  'wht': wht,
+                  'otherDeductions': 0,
+                  'grossAfterDeductions': grossPay - wht,
+                  'additions': 0,
+                  'finalNetPay': netPay,
+                };
+
+                debugPrint("Successfully cached comprehensive September Part 2 data for staff $staffId");
+                break; // Found data for this staff, move to next staff
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("Error in comprehensive search for staff $staffId: $e");
+      }
+    }
+
+    debugPrint("Comprehensive search completed. Final cache size: ${_septPart2DataCache.length}");
+  }
+
+  // Fetch September Part 2 data from state-level collection (like the combine schedules functionality)
+  Future<void> _fetchSeptPart2FromStateCollection(List<String> staffIds, int currentYear) async {
+    debugPrint("=== FETCHING SEPTEMBER PART 2 FROM STATE COLLECTION ===");
+
+    try {
+      // Get unique states from the current payment list
+      final Set<String> states = {};
+      for (var item in _masterPaymentList) {
+        states.add(item.timesheet.state);
+      }
+
+      debugPrint("Found ${states.length} unique states: $states");
+
+      for (final stateId in states) {
+        debugPrint("Searching in state: $stateId");
+
+        final collectionName = "September_${currentYear}_part_2";
+        final stateRef = FirebaseFirestore.instance.collection('states').doc(stateId);
+        final schedulesRef = stateRef.collection(collectionName);
+
+        debugPrint("Looking in collection: states/$stateId/$collectionName");
+
+        final snapshot = await schedulesRef.get();
+        debugPrint("Found ${snapshot.docs.length} documents in state collection");
+
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          final staffId = data['staffId'] as String?;
+
+          debugPrint("Document ${doc.id} has staffId: $staffId");
+
+          if (staffId != null && staffIds.contains(staffId)) {
+            debugPrint("Found September Part 2 data for staff $staffId in state collection");
+
+            // Calculate expected hours for September Part 2 (Sep 20-30)
+            DateTime sepStart = DateTime(currentYear, 9, 20);
+            DateTime sepEnd = DateTime(currentYear, 9, 30);
+            List<DateTime> sepDays = List.generate(sepEnd.difference(sepStart).inDays + 1, (i) => sepStart.add(Duration(days: i)));
+            int sepWorkingDays = sepDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+            double expectedHours = sepWorkingDays * 8.0;
+
+            // Calculate percentage worked
+            double percentageWorked = expectedHours > 0 ? ((data['hoursWorked'] as num?)?.toDouble() ?? 0) / expectedHours * 100 : 0;
+            if (percentageWorked > 100) percentageWorked = 100;
+
+            // Get staff's salary scale to calculate pay
+            final designation = data['designation'] as String?;
+
+            double grossPay = 0;
+            double wht = 0;
+            double netPay = 0;
+
+            if (designation != null) {
+              final salaryScaleSnapshot = await FirebaseFirestore.instance
+                  .collection('SalaryScales')
+                  .where('designation', isEqualTo: designation)
+                  .get();
+
+              if (salaryScaleSnapshot.docs.isNotEmpty) {
+                final salaryData = salaryScaleSnapshot.docs.first.data();
+                final baseGrossPay = (salaryData['grossPay'] as num).toDouble();
+
+                // For September Part 2, we need to prorate the salary
+                DateTime fullStart = DateTime(currentYear, 9, 20);
+                DateTime fullEnd = DateTime(currentYear, 10, 19);
+                List<DateTime> fullDays = List.generate(fullEnd.difference(fullStart).inDays + 1, (i) => fullStart.add(Duration(days: i)));
+                int fullWorkingDays = fullDays.where((d) => d.weekday != DateTime.saturday && d.weekday != DateTime.sunday).length;
+
+                double dailyGross = baseGrossPay / fullWorkingDays;
+                grossPay = dailyGross * sepWorkingDays;
+                wht = grossPay * 0.02; // 2% WHT
+                netPay = grossPay - wht;
+
+                debugPrint("Calculated pay for staff $staffId from state collection: gross=$grossPay, wht=$wht, net=$netPay");
+              }
+            }
+
+            // Cache the calculated September Part 2 data
+            _septPart2DataCache[staffId] = {
+              'expectedHours': expectedHours,
+              'hoursWorked': (data['hoursWorked'] as num?)?.toDouble() ?? 0,
+              'percentageWorked': percentageWorked,
+              'grossPay': grossPay,
+              'wht': wht,
+              'otherDeductions': (data['otherDeductions'] as num?)?.toDouble() ?? 0,
+              'grossAfterDeductions': grossPay - wht,
+              'additions': (data['additions'] as num?)?.toDouble() ?? 0,
+              'finalNetPay': netPay,
+            };
+
+            debugPrint("Successfully cached state collection September Part 2 data for staff $staffId");
+          }
+        }
+      }
+
+      debugPrint("State collection search completed. Final cache size: ${_septPart2DataCache.length}");
+
+    } catch (e) {
+      debugPrint("Error fetching from state collection: $e");
+    }
   }
 
   // --- LOGIC & HELPER FUNCTIONS ---
@@ -1723,6 +2544,585 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
     } finally {
       if(mounted) {
         setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  Future<void> _combineSepPart2AndOct() async {
+    try {
+      setState(() => _isLoading = true);
+
+      // Get current year
+      final currentYear = _isReviewMode ? widget.scheduleModel!.year : widget.year!;
+
+      // Find September Part 2 and October schedules for the same state
+      final currentState = _currentState;
+      
+      // First try to find October schedule in main collection
+      final schedulesSnapshot = await FirebaseFirestore.instance
+          .collection('PaymentSchedules')
+          .where('state', isEqualTo: currentState)
+          .get();
+
+      DocumentSnapshot? octSchedule;
+      DocumentSnapshot? sepPart2Schedule;
+
+      for (var doc in schedulesSnapshot.docs) {
+        final docId = doc.id.toLowerCase();
+        final data = doc.data();
+        final status = data['status'] as String?;
+
+        // Check for October
+        if (docId.contains('october') || data['month'] == 10) {
+          octSchedule = doc;
+        }
+      }
+
+      // If October schedule found, fetch September Part 2 from sub-collection
+      if (octSchedule != null) {
+        final octData = octSchedule.data() as Map<String, dynamic>;
+        final octStaffIds = List<String>.from(jsonDecode(octData['scheduleDataJson']).map((item) => item['staffId']));
+        
+        // Fetch September Part 2 from sub-collection for each staff
+        final septPart2Data = await _fetchSeptPart2FromSubCollection(currentState, octStaffIds, currentYear);
+        
+        if (septPart2Data.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("No September Part 2 data found in sub-collection.")),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        // Create side-by-side view
+        await _createSideBySideView(octData, septPart2Data, currentYear);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("October schedule not found.")),
+          );
+        }
+        setState(() => _isLoading = false);
+      }
+
+    } catch (e) {
+      debugPrint("Error combining schedules: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error combining schedules: $e")),
+        );
+      }
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchSeptPart2FromSubCollection(
+      String stateId, List<String> staffIds, int year) async {
+    
+    final collectionName = "September_${year}_part_2";
+    final stateRef = FirebaseFirestore.instance.collection('states').doc(stateId);
+    final schedulesRef = stateRef.collection(collectionName);
+    
+    final snapshot = await schedulesRef.get();
+    final septPart2Data = <Map<String, dynamic>>[];
+    
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      if (staffIds.contains(data['staffId'])) {
+        septPart2Data.add({
+          'id': doc.id,
+          'staffId': data['staffId'],
+          'staffName': data['staffName'],
+          'designation': data['designation'],
+          'expectedHours': data['expectedHours'],
+          'hoursWorked': data['hoursWorked'],
+          'percentageWorked': data['percentageWorked'],
+          'grossPay': data['grossPay'],
+          'wht': data['wht'],
+          'otherDeductions': data['otherDeductions'],
+          'grossAfterDeductions': data['grossAfterDeductions'],
+          'additions': data['additions'],
+          'finalNetPay': data['finalNetPay'],
+        });
+      }
+    }
+    
+    return septPart2Data;
+  }
+
+  Future<void> _createSideBySideView(
+      Map<String, dynamic> octData,
+      List<Map<String, dynamic>> septPart2Data,
+      int year) async {
+    
+    // Fetch salary scales for processing
+    final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
+    final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
+
+    // Process October data
+    final List<dynamic> octJsonData = jsonDecode(octData['scheduleDataJson']);
+    final octItems = octJsonData.map((itemJson) => PaymentScheduleItem.fromJson(itemJson as Map<String, dynamic>, salaryScales)).toList();
+
+    // Create side-by-side data structure
+    final sideBySideData = <Map<String, dynamic>>[];
+    
+    // Add header row
+    sideBySideData.add({
+      'type': 'header',
+      'staffName': 'Staff Name',
+      'designation': 'Designation',
+      'septExpectedHours': 'Sept Expected Hours',
+      'octExpectedHours': 'Oct Expected Hours',
+      'septHoursWorked': 'Sept Hours Worked',
+      'octHoursWorked': 'Oct Hours Worked',
+      'septPercentageWorked': 'Sept % Worked',
+      'octPercentageWorked': 'Oct % Worked',
+      'septGrossPay': 'Sept Gross Pay',
+      'octGrossPay': 'Oct Gross Pay',
+      'septWHT': 'Sept WHT',
+      'octWHT': 'Oct WHT',
+      'septOtherDeductions': 'Sept Other Deductions',
+      'octOtherDeductions': 'Oct Other Deductions',
+      'septGrossAfterDeductions': 'Sept Gross After Deductions',
+      'octGrossAfterDeductions': 'Oct Gross After Deductions',
+      'septAdditions': 'Sept Additions',
+      'octAdditions': 'Oct Additions',
+      'septFinalNetPay': 'Sept Final Net Pay',
+      'octFinalNetPay': 'Oct Final Net Pay',
+    });
+
+    // Add staff rows
+    for (var octItem in octItems) {
+      final septData = septPart2Data.firstWhere(
+        (sept) => sept['staffId'] == octItem.timesheet.staffId,
+        orElse: () => _createEmptySeptData(),
+      );
+
+      sideBySideData.add({
+        'type': 'staff',
+        'staffName': octItem.timesheet.staffName,
+        'designation': octItem.timesheet.designation,
+        'septExpectedHours': septData['expectedHours'],
+        'octExpectedHours': octItem.expectedHours,
+        'septHoursWorked': septData['hoursWorked'],
+        'octHoursWorked': octItem.actualHoursWorked,
+        'septPercentageWorked': '${septData['percentageWorked']}%',
+        'octPercentageWorked': '${octItem.percentageWorked.toStringAsFixed(1)}%',
+        'septGrossPay': '\$${septData['grossPay'].toStringAsFixed(2)}',
+        'octGrossPay': '\$${octItem.baseSalary.grossPay.toStringAsFixed(2)}',
+        'septWHT': '\$${septData['wht'].toStringAsFixed(2)}',
+        'octWHT': '\$${octItem.payeFromGrossBase.toStringAsFixed(2)}',
+        'septOtherDeductions': '\$${septData['otherDeductions'].toStringAsFixed(2)}',
+        'octOtherDeductions': '\$${octItem.otherDeductionsAmount.toStringAsFixed(2)}',
+        'septGrossAfterDeductions': '\$${septData['grossAfterDeductions'].toStringAsFixed(2)}',
+        'octGrossAfterDeductions': '\$${octItem.grossAfterDeductions.toStringAsFixed(2)}',
+        'septAdditions': '\$${septData['additions'].toStringAsFixed(2)}',
+        'octAdditions': '\$${octItem.additionAmount.toStringAsFixed(2)}',
+        'septFinalNetPay': '\$${septData['finalNetPay'].toStringAsFixed(2)}',
+        'octFinalNetPay': '\$${octItem.proratedNet.toStringAsFixed(2)}',
+      });
+    }
+
+    // Add totals row
+    sideBySideData.add({
+      'type': 'total',
+      'staffName': 'TOTAL',
+      'designation': '',
+      'septExpectedHours': _calculateTotal(septPart2Data, 'expectedHours'),
+      'octExpectedHours': _calculateTotal(octItems, 'expectedHours'),
+      'septHoursWorked': _calculateTotal(septPart2Data, 'hoursWorked'),
+      'octHoursWorked': _calculateTotal(octItems, 'actualHoursWorked'),
+      'septPercentageWorked': '100%',
+      'octPercentageWorked': '100%',
+      'septGrossPay': _calculateTotal(septPart2Data, 'grossPay'),
+      'octGrossPay': _calculateTotal(octItems, 'baseSalary.grossPay'),
+      'septWHT': _calculateTotal(septPart2Data, 'wht'),
+      'octWHT': _calculateTotal(octItems, 'payeFromGrossBase'),
+      'septOtherDeductions': _calculateTotal(septPart2Data, 'otherDeductions'),
+      'octOtherDeductions': _calculateTotal(octItems, 'otherDeductionsAmount'),
+      'septGrossAfterDeductions': _calculateTotal(septPart2Data, 'grossAfterDeductions'),
+      'octGrossAfterDeductions': _calculateTotal(octItems, 'grossAfterDeductions'),
+      'septAdditions': _calculateTotal(septPart2Data, 'additions'),
+      'octAdditions': _calculateTotal(octItems, 'additionAmount'),
+      'septFinalNetPay': _calculateTotal(septPart2Data, 'finalNetPay'),
+      'octFinalNetPay': _calculateTotal(octItems, 'proratedNet'),
+    });
+
+    // Update the UI to show side-by-side view
+    setState(() {
+      _masterPaymentList = []; // Clear current payment list
+      _isCombinedView = true;
+      _isLoading = false;
+    });
+
+    // Show the side-by-side table
+    if (mounted) {
+      _showSideBySideDialog(sideBySideData, year);
+    }
+  }
+
+
+  String _calculateTotal(List<dynamic> data, String field) {
+    if (data.isEmpty) return '\$0.00';
+    
+    double total = 0;
+    if (data.first is Map<String, dynamic>) {
+      // For septPart2Data
+      total = data.fold(0, (sum, item) => sum + (item[field] as num).toDouble());
+    } else {
+      // For octItems (PaymentScheduleItem)
+      total = data.fold(0, (sum, item) {
+        if (field == 'expectedHours') return sum + item.expectedHours;
+        if (field == 'actualHoursWorked') return sum + item.actualHoursWorked;
+        if (field == 'baseSalary.grossPay') return sum + item.baseSalary.grossPay;
+        if (field == 'payeFromGrossBase') return sum + item.payeFromGrossBase;
+        if (field == 'otherDeductionsAmount') return sum + item.otherDeductionsAmount;
+        if (field == 'grossAfterDeductions') return sum + item.grossAfterDeductions;
+        if (field == 'additionAmount') return sum + item.additionAmount;
+        if (field == 'proratedNet') return sum + item.proratedNet;
+        return sum;
+      });
+    }
+    
+    return '\$${total.toStringAsFixed(2)}';
+  }
+
+  void _showSideBySideDialog(List<Map<String, dynamic>> data, int year) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Combined Payment Schedule - September Part 2 + October $year'),
+        content: SizedBox(
+          width: 1200,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: [
+                DataColumn(label: Text('Staff Name')),
+                DataColumn(label: Text('Designation')),
+                DataColumn(label: Text('Sept Expected Hours')),
+                DataColumn(label: Text('Oct Expected Hours')),
+                DataColumn(label: Text('Sept Hours Worked')),
+                DataColumn(label: Text('Oct Hours Worked')),
+                DataColumn(label: Text('Sept % Worked')),
+                DataColumn(label: Text('Oct % Worked')),
+                DataColumn(label: Text('Sept Gross Pay')),
+                DataColumn(label: Text('Oct Gross Pay')),
+                DataColumn(label: Text('Sept WHT')),
+                DataColumn(label: Text('Oct WHT')),
+                DataColumn(label: Text('Sept Other Deductions')),
+                DataColumn(label: Text('Oct Other Deductions')),
+                DataColumn(label: Text('Sept Gross After Deductions')),
+                DataColumn(label: Text('Oct Gross After Deductions')),
+                DataColumn(label: Text('Sept Additions')),
+                DataColumn(label: Text('Oct Additions')),
+                DataColumn(label: Text('Sept Final Net Pay')),
+                DataColumn(label: Text('Oct Final Net Pay')),
+              ],
+              rows: data.map((row) {
+                if (row['type'] == 'header') {
+                  return DataRow(
+                    color: WidgetStateProperty.all(Colors.grey[300]),
+                    cells: [
+                      DataCell(Text(row['staffName']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['designation']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septExpectedHours']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octExpectedHours']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septHoursWorked']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octHoursWorked']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septPercentageWorked']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octPercentageWorked']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septGrossPay']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octGrossPay']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septWHT']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octWHT']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septOtherDeductions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octOtherDeductions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septGrossAfterDeductions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octGrossAfterDeductions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septAdditions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octAdditions']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['septFinalNetPay']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['octFinalNetPay']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                  );
+                } else if (row['type'] == 'total') {
+                  return DataRow(
+                    color: WidgetStateProperty.all(Colors.grey[200]),
+                    cells: [
+                      DataCell(Text(row['staffName']!, style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(row['designation']!)),
+                      DataCell(Text(row['septExpectedHours']!)),
+                      DataCell(Text(row['octExpectedHours']!)),
+                      DataCell(Text(row['septHoursWorked']!)),
+                      DataCell(Text(row['octHoursWorked']!)),
+                      DataCell(Text(row['septPercentageWorked']!)),
+                      DataCell(Text(row['octPercentageWorked']!)),
+                      DataCell(Text(row['septGrossPay']!)),
+                      DataCell(Text(row['octGrossPay']!)),
+                      DataCell(Text(row['septWHT']!)),
+                      DataCell(Text(row['octWHT']!)),
+                      DataCell(Text(row['septOtherDeductions']!)),
+                      DataCell(Text(row['octOtherDeductions']!)),
+                      DataCell(Text(row['septGrossAfterDeductions']!)),
+                      DataCell(Text(row['octGrossAfterDeductions']!)),
+                      DataCell(Text(row['septAdditions']!)),
+                      DataCell(Text(row['octAdditions']!)),
+                      DataCell(Text(row['septFinalNetPay']!)),
+                      DataCell(Text(row['octFinalNetPay']!)),
+                    ],
+                  );
+                } else {
+                  return DataRow(cells: [
+                    DataCell(Text(row['staffName']!)),
+                    DataCell(Text(row['designation']!)),
+                    DataCell(Text(row['septExpectedHours'].toString())),
+                    DataCell(Text(row['octExpectedHours'].toString())),
+                    DataCell(Text(row['septHoursWorked'].toString())),
+                    DataCell(Text(row['octHoursWorked'].toString())),
+                    DataCell(Text(row['septPercentageWorked'].toString())),
+                    DataCell(Text(row['octPercentageWorked'].toString())),
+                    DataCell(Text(row['septGrossPay'].toString())),
+                    DataCell(Text(row['octGrossPay'].toString())),
+                    DataCell(Text(row['septWHT'].toString())),
+                    DataCell(Text(row['octWHT'].toString())),
+                    DataCell(Text(row['septOtherDeductions'].toString())),
+                    DataCell(Text(row['octOtherDeductions'].toString())),
+                    DataCell(Text(row['septGrossAfterDeductions'].toString())),
+                    DataCell(Text(row['octGrossAfterDeductions'].toString())),
+                    DataCell(Text(row['septAdditions'].toString())),
+                    DataCell(Text(row['octAdditions'].toString())),
+                    DataCell(Text(row['septFinalNetPay'].toString())),
+                    DataCell(Text(row['octFinalNetPay'].toString())),
+                  ]);
+                }
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _exportSideBySideToExcel(data, year);
+            },
+            child: Text('Export to Excel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _exportSideBySideToExcel(List<Map<String, dynamic>> data, int year) async {
+    try {
+      final excel = xls.Excel.createExcel();
+      final String defaultSheetName = excel.sheets.keys.first;
+      final xls.Sheet sheet = excel.sheets[defaultSheetName]!;
+
+      // Add headers
+      sheet.appendRow([
+        xls.TextCellValue('Staff Name'),
+        xls.TextCellValue('Designation'),
+        xls.TextCellValue('Sept Expected Hours'),
+        xls.TextCellValue('Oct Expected Hours'),
+        xls.TextCellValue('Sept Hours Worked'),
+        xls.TextCellValue('Oct Hours Worked'),
+        xls.TextCellValue('Sept % Worked'),
+        xls.TextCellValue('Oct % Worked'),
+        xls.TextCellValue('Sept Gross Pay'),
+        xls.TextCellValue('Oct Gross Pay'),
+        xls.TextCellValue('Sept WHT'),
+        xls.TextCellValue('Oct WHT'),
+        xls.TextCellValue('Sept Other Deductions'),
+        xls.TextCellValue('Oct Other Deductions'),
+        xls.TextCellValue('Sept Gross After Deductions'),
+        xls.TextCellValue('Oct Gross After Deductions'),
+        xls.TextCellValue('Sept Additions'),
+        xls.TextCellValue('Oct Additions'),
+        xls.TextCellValue('Sept Final Net Pay'),
+        xls.TextCellValue('Oct Final Net Pay'),
+      ]);
+
+      // Style for header row
+      for (var i = 0; i < 20; i++) {
+        var cell = sheet.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.cellStyle = xls.CellStyle(
+          bold: true,
+          backgroundColorHex: xls.ExcelColor.fromHexString("#722F37"),
+          fontColorHex: xls.ExcelColor.fromHexString("#FFFFFF"),
+        );
+      }
+
+      // Add data rows
+      for (int i = 0; i < data.length; i++) {
+        final row = data[i];
+        if (row['type'] == 'header' || row['type'] == 'total') continue; // Skip header and total rows for now
+
+        sheet.appendRow([
+          xls.TextCellValue(row['staffName'].toString()),
+          xls.TextCellValue(row['designation'].toString()),
+          xls.TextCellValue(row['septExpectedHours'].toString()),
+          xls.TextCellValue(row['octExpectedHours'].toString()),
+          xls.TextCellValue(row['septHoursWorked'].toString()),
+          xls.TextCellValue(row['octHoursWorked'].toString()),
+          xls.TextCellValue(row['septPercentageWorked'].toString()),
+          xls.TextCellValue(row['octPercentageWorked'].toString()),
+          xls.TextCellValue(row['septGrossPay'].toString()),
+          xls.TextCellValue(row['octGrossPay'].toString()),
+          xls.TextCellValue(row['septWHT'].toString()),
+          xls.TextCellValue(row['octWHT'].toString()),
+          xls.TextCellValue(row['septOtherDeductions'].toString()),
+          xls.TextCellValue(row['octOtherDeductions'].toString()),
+          xls.TextCellValue(row['septGrossAfterDeductions'].toString()),
+          xls.TextCellValue(row['octGrossAfterDeductions'].toString()),
+          xls.TextCellValue(row['septAdditions'].toString()),
+          xls.TextCellValue(row['octAdditions'].toString()),
+          xls.TextCellValue(row['septFinalNetPay'].toString()),
+          xls.TextCellValue(row['octFinalNetPay'].toString()),
+        ]);
+      }
+
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        if (kIsWeb) {
+          final blob = html.Blob([fileBytes]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..style.display = 'none'
+            ..download = 'Combined_Payment_Schedule_Sep2_Oct_$year.xlsx';
+          html.document.body!.children.add(anchor);
+          anchor.click();
+          html.document.body!.children.remove(anchor);
+          html.Url.revokeObjectUrl(url);
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Combined schedule exported successfully!')),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error exporting side-by-side data: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error exporting: $e")),
+        );
+      }
+    }
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
+  }
+
+  Future<void> _combineSchedules(List<DocumentSnapshot> schedules) async {
+    try {
+      // Validate that we have September Part 2 and October
+      final schedule1 = schedules[0].data() as Map<String, dynamic>;
+      final schedule2 = schedules[1].data() as Map<String, dynamic>;
+
+      final month1 = schedule1['month'] as int?;
+      final month2 = schedule2['month'] as int?;
+      final year1 = schedule1['year'] as int?;
+      final year2 = schedule2['year'] as int?;
+
+      bool isValidCombination = false;
+      if ((month1 == 9 && month2 == 10) || (month1 == 10 && month2 == 9)) {
+        isValidCombination = true;
+      }
+
+      if (!isValidCombination) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Can only combine September Part 2 and October schedules.")),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isLoading = true);
+
+      // Fetch salary scales
+      final scaleSnapshot = await FirebaseFirestore.instance.collection('SalaryScales').get();
+      final salaryScales = { for (var doc in scaleSnapshot.docs) (doc.data()['designation'] as String): SalaryScale.fromFirestore(doc) };
+
+      // Fetch SRT assignments
+      final srtSnapshot = await FirebaseFirestore.instance.collection('SRTAssignments').get();
+      final Map<String, String> srtMap = {};
+      for (var doc in srtSnapshot.docs) {
+        final data = doc.data();
+        final key = '${data['state']}-${data['location']}';
+        srtMap[key] = data['srt'] ?? 'N/A';
+      }
+
+      // Combine the schedules
+      final List<dynamic> jsonData1 = jsonDecode(schedule1['scheduleDataJson']);
+      final List<dynamic> jsonData2 = jsonDecode(schedule2['scheduleDataJson']);
+
+      final Map<String, PaymentScheduleItem> combinedItems = {};
+
+      // Process first schedule
+      for (var itemJson in jsonData1) {
+        final item = PaymentScheduleItem.fromJson(itemJson as Map<String, dynamic>, salaryScales);
+        final key = '${item.timesheet.staffId}-${item.timesheet.designation}';
+        combinedItems[key] = item;
+      }
+
+      // Process second schedule and merge
+      for (var itemJson in jsonData2) {
+        final item = PaymentScheduleItem.fromJson(itemJson as Map<String, dynamic>, salaryScales);
+        final key = '${item.timesheet.staffId}-${item.timesheet.designation}';
+
+        if (combinedItems.containsKey(key)) {
+          // Merge the items
+          final existingItem = combinedItems[key]!;
+          existingItem.actualHoursWorked += item.actualHoursWorked;
+          existingItem.additionAmount += item.additionAmount;
+          existingItem.deductionAmount += item.deductionAmount;
+          existingItem.calculateProratedSalary();
+        } else {
+          combinedItems[key] = item;
+        }
+      }
+
+      // Update the current payment list with combined data
+      final combinedList = combinedItems.values.toList();
+      combinedList.sort((a, b) => a.timesheet.staffName.compareTo(b.timesheet.staffName));
+
+      setState(() {
+        _masterPaymentList = combinedList;
+        _filteredPaymentList = combinedList;
+        _isCombinedView = true;
+        _isLoading = false;
+      });
+
+      _paginateData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Combined ${combinedList.length} staff records from the selected schedules.")),
+        );
+      }
+
+    } catch (e) {
+      debugPrint("Error combining schedules: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error combining schedules: $e")),
+        );
       }
     }
   }

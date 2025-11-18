@@ -194,15 +194,17 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
           await _firestore.collection('Staff').doc(user.uid).get();
       if (docSnapshot.exists && mounted) {
         final state = docSnapshot.data()?['state'] as String?;
-        if (state == null || state.isEmpty)
+        if (state == null || state.isEmpty) {
           throw Exception("Your profile is missing a 'state' field.");
+        }
         setState(() => _currentUserState = state);
       } else {
         throw Exception("Your user profile was not found.");
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _errorMessage = "Could not load user profile: $e");
+      }
     }
   }
 
@@ -273,9 +275,10 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
         }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() =>
             _errorMessage = "An error occurred while loading reports: $e");
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -326,9 +329,10 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
       }
       if (mounted) setState(() => _summaries = summaries);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
             () => _summaryErrorMessage = "Failed to load some VL summaries.");
+      }
     }
   }
 
@@ -444,25 +448,29 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   String _maskClientName(String? name) {
-    if (_allCellsGloballyUnlocked || name == null || name.isEmpty)
+    if (_allCellsGloballyUnlocked || name == null || name.isEmpty) {
       return name ?? 'N/A';
+    }
     List<String> parts = name.split(' ');
-    if (parts.isNotEmpty && parts[0].isNotEmpty)
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
       return '${parts[0][0]}. (Hidden)';
+    }
     return 'Hidden';
   }
 
   String _maskPhoneNumber(String? phone) {
-    if (_allCellsGloballyUnlocked || phone == null || phone.isEmpty)
+    if (_allCellsGloballyUnlocked || phone == null || phone.isEmpty) {
       return phone ?? 'N/A';
+    }
     return phone.length > 4
         ? '...${phone.substring(phone.length - 4)}'
         : '****';
   }
 
   String _maskArtId(String? artId) {
-    if (_allCellsGloballyUnlocked || artId == null || artId.isEmpty)
+    if (_allCellsGloballyUnlocked || artId == null || artId.isEmpty) {
       return artId ?? 'N/A';
+    }
     return artId.length > 4
         ? '...${artId.substring(artId.length - 4)}'
         : '****';
@@ -595,8 +603,9 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   Widget _buildFilterBar() {
-    if (_isFilterLoading || _currentUserState == null)
+    if (_isFilterLoading || _currentUserState == null) {
       return const SizedBox.shrink();
+    }
     String facilityButtonText = _selectedFacilities.contains('All Facilities')
         ? 'All Facilities'
         : _selectedFacilities.length == 1
@@ -894,9 +903,10 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     bool proceed = _allCellsGloballyUnlocked;
     if (!_allCellsGloballyUnlocked) {
       proceed = await _promptForPasswordAndReauthenticate();
-      if (!proceed)
+      if (!proceed) {
         _showSnackBar(
             'Authentication failed. Export will contain masked data.');
+      }
     }
     try {
       List<List<dynamic>> rows = [];
