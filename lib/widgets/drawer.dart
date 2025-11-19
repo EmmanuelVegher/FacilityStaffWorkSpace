@@ -4,9 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
+import '../screens/attendance_analysis_page/low_attendance_staff_page.dart';
 import '../screens/call_tracker/report_page.dart';
 import '../screens/eac_tracker/report_eac_web_tab.dart';
 import '../screens/forgot_password_page.dart';
@@ -22,13 +25,27 @@ import 'app_button.dart';
 
 import '../screens/components/clock_attendance.dart';
 
+Future<String?> _getUserLocation() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final staffDoc = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(user.uid)
+          .get();
+      if (staffDoc.exists) {
+        return staffDoc.data()?['location'] as String?;
+      }
+    }
+  } catch (e) {
+    debugPrint('Error fetching user location: $e');
+  }
+  return null;
+}
 
 Widget drawer(
   BuildContext context,
-
 ) {
-
-
   //final DataBaseService _dataBaseService = DataBaseService();
   double drawerIconSize = 24;
   double drawerFontSize = 17;
@@ -206,6 +223,40 @@ Widget drawer(
                 context,
                 MaterialPageRoute(builder: (context) => const FacilityAttendanceAnalysisPage()),
               );
+            },
+          ),
+
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          FutureBuilder<String?>(
+            future: _getUserLocation(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox.shrink(); // Don't show while loading
+              }
+              final userLocation = snapshot.data;
+              // Only show for facility users (users with a location field)
+              if (userLocation != null && userLocation.isNotEmpty) {
+                return ListTile(
+                  leading: Icon(Icons.warning,
+                      size: drawerIconSize, color: Colors.redAccent),
+                  title: Text(
+                    'Low Attendance Staff',
+                    style: TextStyle(
+                        fontSize: drawerFontSize,
+                        color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LowAttendanceStaffPage(isHqMode: false)),
+                    );
+                  },
+                );
+              }
+              return const SizedBox.shrink(); // Hide for users without location
             },
           ),
 

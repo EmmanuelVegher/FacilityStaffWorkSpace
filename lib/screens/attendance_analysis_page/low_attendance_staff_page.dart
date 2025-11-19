@@ -68,6 +68,7 @@ class _LowAttendanceStaffPageState extends State<LowAttendanceStaffPage> {
 
       final staffDoc = await _firestore.collection('Staff').doc(user.uid).get();
       _userState = staffDoc.data()?['state'] as String?;
+      final userLocation = staffDoc.data()?['location'] as String?;
 
       if (_userState == null) throw Exception("User state not found.");
 
@@ -76,6 +77,10 @@ class _LowAttendanceStaffPageState extends State<LowAttendanceStaffPage> {
         _selectedStates = List.from(_availableStates);
       } else {
         _selectedStates = _userState != null ? [_userState!] : [];
+        // For facility users, pre-select their specific location
+        if (userLocation != null && userLocation.isNotEmpty) {
+          _selectedFacilities = [userLocation];
+        }
       }
 
       await _loadFilters();
@@ -124,8 +129,10 @@ class _LowAttendanceStaffPageState extends State<LowAttendanceStaffPage> {
       setState(() {
         _availableFacilities = facilities..sort();
         _availableDesignations = designations..sort();
-        _selectedFacilities = List.from(_availableFacilities);
-        _selectedDesignations = List.from(_availableDesignations);
+        // For facility users, keep their location pre-selected but allow them to change if needed
+        if (_selectedFacilities.isEmpty && _availableFacilities.isNotEmpty) {
+          _selectedFacilities = List.from(_availableFacilities);
+        }
       });
     }
   }
@@ -503,20 +510,21 @@ class _LowAttendanceStaffPageState extends State<LowAttendanceStaffPage> {
               icon: const Icon(Icons.date_range_outlined),
               label: Text('${DateFormat("MMM d, yyyy").format(_startDate)} - ${DateFormat("MMM d, yyyy").format(_endDate)}'),
             ),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: MultiSelectDialogField(
-                items: _availableFacilities.map((f) => MultiSelectItem<String>(f, f)).toList(),
-                initialValue: _selectedFacilities,
-                title: const Text("Select Facilities"),
-                buttonText: Text(_selectedFacilities.isEmpty ? "Facility" : "${_selectedFacilities.length} selected"),
-                chipDisplay: MultiSelectChipDisplay.none(),
-                onConfirm: (values) {
-                  setState(() => _selectedFacilities = values.cast<String>());
-                  _loadLowAttendanceData();
-                },
+            if (widget.isHqMode)
+              Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: MultiSelectDialogField(
+                  items: _availableFacilities.map((f) => MultiSelectItem<String>(f, f)).toList(),
+                  initialValue: _selectedFacilities,
+                  title: const Text("Select Facilities"),
+                  buttonText: Text(_selectedFacilities.isEmpty ? "Facility" : "${_selectedFacilities.length} selected"),
+                  chipDisplay: MultiSelectChipDisplay.none(),
+                  onConfirm: (values) {
+                    setState(() => _selectedFacilities = values.cast<String>());
+                    _loadLowAttendanceData();
+                  },
+                ),
               ),
-            ),
             Container(
               constraints: const BoxConstraints(maxWidth: 300),
               child: MultiSelectDialogField(
