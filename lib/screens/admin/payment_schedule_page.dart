@@ -97,8 +97,8 @@ class PaymentScheduleItem {
     percentageWorked = rawPercentage > 100.0 ? 100.0 : rawPercentage;
     final ratio = percentageWorked / 100.0;
 
-    // --- CHANGE: Updated from 5% (0.05) to 2% (0.02) ---
-    payeFromGrossBase = baseSalary.grossPay * 0.02;
+    // --- CHANGE: Updated from 2% (0.02) to 5% (0.05) ---
+    payeFromGrossBase = baseSalary.grossPay * 0.05;
 
     totalDeductedHoursFromTimesheet = 0;
 
@@ -1867,7 +1867,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
                   
                   double dailyGross = baseGrossPay / fullWorkingDays;
                   grossPay = dailyGross * sepWorkingDays;
-                  wht = grossPay * 0.02; // 2% WHT
+                  wht = grossPay * 0.05; // 5% WHT
                   netPay = grossPay - wht;
                   
                   debugPrint("Staff $staffId - Gross pay: $grossPay, WHT: $wht, Net pay: $netPay");
@@ -2021,7 +2021,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
                   double dailyGross = baseGrossPay / fullWorkingDays;
                   grossPay = dailyGross * sepWorkingDays;
-                  wht = grossPay * 0.02; // 2% WHT
+                  wht = grossPay * 0.05; // 5% WHT
                   netPay = grossPay - wht;
 
                   debugPrint("Calculated pay for staff $staffId: gross=$grossPay, wht=$wht, net=$netPay");
@@ -2124,7 +2124,7 @@ class _PaymentSchedulePageState extends State<PaymentSchedulePage> {
 
                 double dailyGross = baseGrossPay / fullWorkingDays;
                 grossPay = dailyGross * sepWorkingDays;
-                wht = grossPay * 0.02; // 2% WHT
+                wht = grossPay * 0.05; // 5% WHT
                 netPay = grossPay - wht;
 
                 debugPrint("Calculated pay for staff $staffId from state collection: gross=$grossPay, wht=$wht, net=$netPay");

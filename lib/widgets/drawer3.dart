@@ -16,6 +16,7 @@ import '../screens/admin/audit_logs_page.dart';
 import '../screens/admin/staff_status_report_page.dart';
 import '../screens/admin/srt_management_page.dart';
 import '../screens/attendance_analysis_page/hq_attendance_analysis_page.dart';
+import '../screens/attendance_analysis_page/low_attendance_staff_page.dart';
 import '../screens/call_tracker/hq_call_tracking_reports.dart';
 import '../screens/dashboard/hq_dashboard_screen.dart';
 import '../screens/eac_tracker/hq_eac_report.dart';
@@ -207,6 +208,24 @@ Widget drawer3(
             },
           ),
 
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.person_off_outlined,
+                size: drawerIconSize, color: Colors.red),
+            title: const Text(
+              'Low Attendance Staff',
+              style: TextStyle(fontSize: 17, color: Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LowAttendanceStaffPage(isHqMode: true)),
+              );
+            },
+          ),
           const Divider(
             color: Colors.grey,
             height: 1,

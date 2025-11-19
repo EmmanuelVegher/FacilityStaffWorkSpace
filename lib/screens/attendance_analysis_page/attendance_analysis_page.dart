@@ -1128,7 +1128,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 }
                 if (value == 'csv_list') _exportAttendanceListToCsv();
                 if (value == 'csv_summary') _exportSummaryToCsv();
-                if (value == 'absent_csv') _downloadAbsentStaffList();
+                if (value == 'absent_excel') _downloadAbsentStaffList();
                 if (value == 'pdf') _exportChartsToPdf();
               },
               enabled: !_isLoading && _allRecords.isNotEmpty,
@@ -1158,10 +1158,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 ),
 
                 const PopupMenuItem(
-                  value: 'absent_csv',
+                  value: 'absent_excel',
                   child: ListTile(
                     leading: Icon(Icons.person_off_outlined, color: Colors.red),
-                    title: Text("Download Absent Staff (CSV)"),
+                    title: Text("Download Absent Staff (Excel)"),
                   ),
                 ),
                 const PopupMenuItem(
@@ -2256,11 +2256,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     setState(() => _isExporting = true);
 
     try {
-      // Fetch all active staff in the user's state
+      // Fetch all active facility staff in the user's state
       final staffQuery = _firestore
           .collection('Staff')
           .where('state', isEqualTo: _userState)
-          .where('accountStatus', isEqualTo: 'Active');
+          .where('accountStatus', isEqualTo: 'Active')
+          .where('staffCategory', isEqualTo: 'Facility Staff');
 
       final staffSnapshot = await staffQuery.get();
       final allStaffIds = staffSnapshot.docs.map((doc) => doc.id).toSet();
@@ -2280,34 +2281,60 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       // Determine absent staff
       final absentStaffIds = allStaffIds.difference(presentStaffIds);
 
-      // Generate CSV
-      List<List<dynamic>> rows = [];
-      rows.add(['First Name', 'Last Name', 'Email', 'Location', 'Designation', 'Department', 'Mobile']);
+      // Create Excel file
+      var excel = xls.Excel.createExcel();
+      xls.Sheet sheetObject = excel['Absent Staff'];
 
+      // Define header style
+      var headerStyle = xls.CellStyle(
+        bold: true,
+        textWrapping: xls.TextWrapping.WrapText,
+        verticalAlign: xls.VerticalAlign.Center,
+        horizontalAlign: xls.HorizontalAlign.Center,
+      );
+
+      // Headers
+      List<String> headers = ['First Name', 'Last Name', 'Email', 'Location', 'Designation', 'Department', 'Mobile'];
+
+      // Apply headers
+      for (var i = 0; i < headers.length; i++) {
+        var cell = sheetObject.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = xls.TextCellValue(headers[i]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // Populate data rows
+      int rowIndex = 1;
       for (var id in absentStaffIds) {
         final data = staffMap[id];
         if (data != null) {
-          rows.add([
-            data['firstName'] ?? '',
-            data['lastName'] ?? '',
-            data['emailAddress'] ?? '',
-            data['location'] ?? '',
-            data['designation'] ?? '',
-            data['department'] ?? '',
-            data['mobile'] ?? '',
-          ]);
+          List<xls.CellValue> rowData = [
+            xls.TextCellValue(data['firstName'] ?? ''),
+            xls.TextCellValue(data['lastName'] ?? ''),
+            xls.TextCellValue(data['emailAddress'] ?? ''),
+            xls.TextCellValue(data['location'] ?? ''),
+            xls.TextCellValue(data['designation'] ?? ''),
+            xls.TextCellValue(data['department'] ?? ''),
+            xls.TextCellValue(data['mobile'] ?? ''),
+          ];
+          sheetObject.insertRowIterables(rowData, rowIndex, startingColumn: 0);
+          rowIndex++;
         }
       }
 
-      String csvData = const ListToCsvConverter().convert(rows);
-      _triggerDownload(
-        utf8.encode(csvData),
-        'absent_staff_${DateFormat('yyyyMMdd').format(selectedDate)}.csv',
-      );
+      // Save and download
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        _triggerDownload(
+          fileBytes,
+          'absent_staff_${DateFormat('yyyyMMdd').format(selectedDate)}.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error generating absent staff CSV: $e")),
+          SnackBar(content: Text("Error generating absent staff Excel: $e")),
         );
       }
     } finally {

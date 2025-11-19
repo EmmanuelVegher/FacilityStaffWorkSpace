@@ -8,6 +8,7 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 import '../screens/account_management/my_state_screen.dart';
 import '../screens/admin/pending_schedules_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
+import '../screens/attendance_analysis_page/low_attendance_staff_page.dart';
 import '../screens/call_tracker/state_reports_page_web.dart';
 import '../screens/dashboard/state_ofice_dashboard.dart';
 import '../screens/eac_tracker/state_eac_report_tab.dart';
@@ -224,6 +225,24 @@ Widget drawer2(
             },
           ),
 
+          const Divider(
+            color: Colors.grey,
+            height: 1,
+          ),
+          ListTile(
+            leading: Icon(Icons.person_off_outlined,
+                size: drawerIconSize, color: Colors.red),
+            title: const Text(
+              'Low Attendance Staff',
+              style: TextStyle(fontSize: 17, color: Colors.brown),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LowAttendanceStaffPage()),
+              );
+            },
+          ),
           const Divider(
             color: Colors.grey,
             height: 1,
