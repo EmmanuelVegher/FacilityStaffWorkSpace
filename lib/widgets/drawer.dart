@@ -212,11 +212,26 @@ Widget drawer(
           ListTile(
             leading: Icon(Icons.timer,
                 size: drawerIconSize, color: Colors.orangeAccent),
-            title: Text(
-              'Attendance Analysis',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            title: Row(
+              children: [
+                Text(
+                  'Attendance Analysis',
+                  style: TextStyle(
+                      fontSize: drawerFontSize,
+                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                Chip(
+                  label: const Text(
+                    'Upd',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                  backgroundColor: Colors.orangeAccent,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -242,11 +257,26 @@ Widget drawer(
                 return ListTile(
                   leading: Icon(Icons.warning,
                       size: drawerIconSize, color: Colors.redAccent),
-                  title: Text(
-                    'Low Attendance Staff',
-                    style: TextStyle(
-                        fontSize: drawerFontSize,
-                        color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  title: Row(
+                    children: [
+                      Text(
+                        'Low Attendance Staff',
+                        style: TextStyle(
+                            fontSize: drawerFontSize,
+                            color: Get.isDarkMode ? Colors.white : Colors.brown),
+                      ),
+                      const SizedBox(width: 8),
+                      Chip(
+                        label: const Text(
+                          'New',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                   ),
                   onTap: () {
                     Navigator.push(

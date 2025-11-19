@@ -194,11 +194,26 @@ Widget drawer3(
           ListTile(
             leading: Icon(Icons.timer,
                 size: drawerIconSize, color: Colors.orangeAccent),
-            title: Text(
-              'Central Attendance Analysis',
-              style: TextStyle(
-                  fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+            title: Row(
+              children: [
+                Text(
+                  'Central Attendance Analysis',
+                  style: TextStyle(
+                      fontSize: drawerFontSize,
+                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                Chip(
+                  label: const Text(
+                    'Upd',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                  backgroundColor: Colors.orangeAccent,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -215,9 +230,24 @@ Widget drawer3(
           ListTile(
             leading: Icon(Icons.person_off_outlined,
                 size: drawerIconSize, color: Colors.red),
-            title: const Text(
-              'Low Attendance Staff',
-              style: TextStyle(fontSize: 17, color: Colors.brown),
+            title: Row(
+              children: [
+                const Text(
+                  'Low Attendance Staff',
+                  style: TextStyle(fontSize: 17, color: Colors.brown),
+                ),
+                const SizedBox(width: 8),
+                Chip(
+                  label: const Text(
+                    'New',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -497,24 +527,7 @@ Widget drawer3(
                   // Audit Logs
                   ListTile(
                     leading: const Icon(Icons.history, color: Colors.brown),
-                    title: Row(
-                      children: [
-                        const Text('Audit Logs'),
-                        const SizedBox(width: 8),
-                        // --- NEW: "NEW" FLAG FOR 30 DAYS ---
-                        if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
-                          Chip(
-                            label: const Text(
-                              'NEW',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                            ),
-                            backgroundColor: Colors.brown,
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
+                    title: const Text('Audit Logs'),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -528,24 +541,7 @@ Widget drawer3(
                   // Staff Status Report
                   ListTile(
                     leading: const Icon(Icons.group, color: Colors.teal),
-                    title: Row(
-                      children: [
-                        const Text('Staff Status Report'),
-                        const SizedBox(width: 8),
-                        // --- NEW: "NEW" FLAG FOR 30 DAYS ---
-                        if (DateTime.now().isBefore(DateTime(2025, 12, 31)))
-                          Chip(
-                            label: const Text(
-                              'NEW',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                            ),
-                            backgroundColor: Colors.teal,
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
+                    title: const Text('Staff Status Report'),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
