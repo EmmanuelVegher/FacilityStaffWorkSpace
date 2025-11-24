@@ -132,6 +132,65 @@ class ChartData {
   ChartData(this.category, this.value);
 }
 
+class _RecommendationsDataSource extends DataTableSource {
+  final List<AttendanceRecord> records;
+
+  _RecommendationsDataSource(this.records);
+
+  @override
+  DataRow? getRow(int index) {
+    if (index >= records.length) return null;
+    final record = records[index];
+    String statusText = record.deductionStatus;
+    Color statusColor = Colors.black;
+    final rec = record.recommendation;
+
+    switch (record.deductionStatus) {
+      case 'Partial':
+        statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+        statusColor = Colors.orange.shade800;
+        break;
+      case 'Full':
+        statusText = 'Full Deduction (8 hrs)';
+        statusColor = Colors.red.shade800;
+        break;
+      case 'ApprovedPartial':
+        statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+        statusColor = Colors.blue.shade800;
+        break;
+      case 'ApprovedFull':
+        statusText = 'Full Approval (8 hrs)';
+        statusColor = Colors.indigo.shade800;
+        break;
+      default:
+        statusText = record.deductionStatus;
+        break;
+    }
+
+    final recommenderText = rec != null ? '${rec.recommenderName}\n(${rec.recommenderDesignation})' : 'N/A';
+    final notesText = rec?.notes ?? 'No notes provided.';
+
+    return DataRow(
+      cells: [
+        DataCell(Text(record.staffName)),
+        DataCell(Text(DateFormat.yMd().format(record.date))),
+        DataCell(Text(statusText, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor))),
+        DataCell(Text(recommenderText)),
+        DataCell(Text(notesText)),
+      ],
+    );
+  }
+
+  @override
+  bool get isRowCountApproximate => false;
+
+  @override
+  int get rowCount => records.length;
+
+  @override
+  int get selectedRowCount => 0;
+}
+
 // --- MAIN WIDGET ---
 class FacilityAttendanceAnalysisPage extends StatefulWidget {
   const FacilityAttendanceAnalysisPage({super.key});
@@ -439,18 +498,18 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        leading: const Icon(Icons.playlist_add_check_circle_rounded),
-        title: Text(
-          "Recommendations Log",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
-        ),
-        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Recommendations Log",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+            ),
+            Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
+            const SizedBox(height: 16),
+            PaginatedDataTable(
               columns: const [
                 DataColumn(label: Text('Staff')),
                 DataColumn(label: Text('Date')),
@@ -458,55 +517,12 @@ class _FacilityAttendanceAnalysisPageState extends State<FacilityAttendanceAnaly
                 DataColumn(label: Text('Recommended By')),
                 DataColumn(label: Text('Reason / Notes')),
               ],
-              rows: _recordsWithRecommendations.map((record) {
-                String statusText = record.deductionStatus;
-                Color statusColor = Colors.black;
-                final rec = record.recommendation;
-
-                switch (record.deductionStatus) {
-                  case 'Partial':
-                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
-                    statusColor = Colors.orange.shade800;
-                    break;
-                  case 'Full':
-                    statusText = 'Full Deduction (8 hrs)';
-                    statusColor = Colors.red.shade800;
-                    break;
-                  case 'ApprovedPartial':
-                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
-                    statusColor = Colors.blue.shade800;
-                    break;
-                  case 'ApprovedFull':
-                    statusText = 'Full Approval (8 hrs)';
-                    statusColor = Colors.indigo.shade800;
-                    break;
-                  default:
-                    statusText = record.deductionStatus;
-                    break;
-                }
-
-                final recommenderText = rec != null
-                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
-                    : 'N/A';
-                final notesText = rec?.notes ?? 'No notes provided.';
-
-                return DataRow(
-                  cells: [
-                    DataCell(Text(record.staffName)),
-                    DataCell(Text(DateFormat.yMd().format(record.date))),
-                    DataCell(Text(
-                      statusText,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
-                    )),
-                    DataCell(Text(recommenderText)),
-                    DataCell(Text(notesText)),
-                  ],
-                );
-              }).toList(),
+              source: _RecommendationsDataSource(_recordsWithRecommendations),
+              rowsPerPage: 5,
+              showFirstLastButtons: true,
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          ],
+        ),
       ),
     );
   }

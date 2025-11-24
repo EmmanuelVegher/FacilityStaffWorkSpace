@@ -210,6 +210,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   final ScrollController _facilityTableController = ScrollController();
   final ScrollController _designationTableController = ScrollController();
   List<AttendanceRecord> _recordsWithRecommendations = [];
+  // --- Recommendations Pagination State ---
+  int _recommendationsCurrentPage = 0;
+  static const int _recommendationsItemsPerPage = 5;
   bool _isPageReady = false;
   bool _isLoading = false;
   bool _isExporting = false;
@@ -528,16 +531,50 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           }
 
           final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
+
+          // Parse hoursWorked safely
+          final noOfHoursRaw = data['noOfHours'];
+          double hoursWorked = 0.0;
+          if (noOfHoursRaw is num) {
+            hoursWorked = noOfHoursRaw.toDouble();
+          } else if (noOfHoursRaw is String) {
+            hoursWorked = double.tryParse(noOfHoursRaw) ?? 0.0;
+          }
+
           GeoPoint? clockInPoint;
-          final clockInLat = (data['clockInLatitude'] as num?)?.toDouble();
-          final clockInLon = (data['clockInLongitude'] as num?)?.toDouble();
+          final clockInLatRaw = data['clockInLatitude'];
+          double? clockInLat;
+          if (clockInLatRaw is num) {
+            clockInLat = clockInLatRaw.toDouble();
+          } else if (clockInLatRaw is String) {
+            clockInLat = double.tryParse(clockInLatRaw);
+          }
+          final clockInLonRaw = data['clockInLongitude'];
+          double? clockInLon;
+          if (clockInLonRaw is num) {
+            clockInLon = clockInLonRaw.toDouble();
+          } else if (clockInLonRaw is String) {
+            clockInLon = double.tryParse(clockInLonRaw);
+          }
           if (clockInLat != null && clockInLon != null) {
             clockInPoint = GeoPoint(clockInLat, clockInLon);
           }
 
           GeoPoint? clockOutPoint;
-          final clockOutLat = (data['clockOutLatitude'] as num?)?.toDouble();
-          final clockOutLon = (data['clockOutLongitude'] as num?)?.toDouble();
+          final clockOutLatRaw = data['clockOutLatitude'];
+          double? clockOutLat;
+          if (clockOutLatRaw is num) {
+            clockOutLat = clockOutLatRaw.toDouble();
+          } else if (clockOutLatRaw is String) {
+            clockOutLat = double.tryParse(clockOutLatRaw);
+          }
+          final clockOutLonRaw = data['clockOutLongitude'];
+          double? clockOutLon;
+          if (clockOutLonRaw is num) {
+            clockOutLon = clockOutLonRaw.toDouble();
+          } else if (clockOutLonRaw is String) {
+            clockOutLon = double.tryParse(clockOutLonRaw);
+          }
           if (clockOutLat != null && clockOutLon != null) {
             clockOutPoint = GeoPoint(clockOutLat, clockOutLon);
           }
@@ -548,7 +585,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             staffName: staffInfo.name,
             assignedFacility: staffInfo.location,
             date: recordTimestamp,
-            hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
+            hoursWorked: hoursWorked,
             clockInLocation: clockInPoint,
             clockOutLocation: clockOutPoint,
             deductionStatus: data['deductionStatus'] as String? ?? 'None',
@@ -571,8 +608,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     } catch (e, stack) {
       debugPrint("Error loading dashboard data: $e\n$stack");
       if (mounted) {
-        setState(() => _errorMessage =
-            "An error occurred. Check Firestore indexes. Error: $e");
+        setState(() => _errorMessage = "An error occurred while loading data: $e");
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -628,6 +664,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       setState(() {
         _allRecords = records;
         _recordsWithRecommendations = recommendations;
+        _recommendationsCurrentPage = 0; // Reset pagination to first page
         _facilitySummaries = facilityData;
         _designationSummaries = designationData;
         _facilityStaffSummaries = facilityStaffData;
@@ -948,8 +985,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     setState(() => _isExporting = false);
   }
 
-// --- NEW, FULLY CORRECTED WIDGET ---
-
   Widget _buildRecommendationsLogSection() {
     if (_recordsWithRecommendations.isEmpty) return const SizedBox.shrink();
 
@@ -964,72 +999,119 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           "Recommendations Log",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
         ),
-        subtitle: Text(
-            "${_recordsWithRecommendations.length} record(s) with an action taken"),
+        subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Staff')),
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Recommendation')),
-                DataColumn(label: Text('Recommended By')), // New column
-                DataColumn(label: Text('Reason / Notes')),
-              ],
-              rows: _recordsWithRecommendations.map((record) {
-                String statusText = record.deductionStatus;
-                Color statusColor = Colors.black;
-                final rec = record.recommendation;
+          // Pagination logic
+          Builder(
+            builder: (context) {
+              final totalPages = (_recordsWithRecommendations.length / _recommendationsItemsPerPage).ceil();
+              final startIndex = _recommendationsCurrentPage * _recommendationsItemsPerPage;
+              final endIndex = (startIndex + _recommendationsItemsPerPage).clamp(0, _recordsWithRecommendations.length);
+              final currentPageRecords = _recordsWithRecommendations.sublist(startIndex, endIndex);
 
-                // Use a switch for clarity
-                switch (record.deductionStatus) {
-                  case 'Partial':
-                    statusText =
-                        'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
-                    statusColor = Colors.orange.shade800;
-                    break;
-                  case 'Full':
-                    statusText = 'Full Deduction (8 hrs)';
-                    statusColor = Colors.red.shade800;
-                    break;
-                  case 'ApprovedPartial':
-                    // --- THE FIX ---
-                    // Read from the main hours field, which is now the source of truth for approved time.
-                    statusText =
-                        'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
-                    statusColor = Colors.blue.shade800;
-                    break;
-                  case 'ApprovedFull':
-                    statusText = 'Full Approval (8 hrs)';
-                    statusColor = Colors.indigo.shade800;
-                    break;
-                  default:
-                    // Fallback for any other status
-                    statusText = record.deductionStatus;
-                    break;
-                }
+              return Column(
+                children: [
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: currentPageRecords.length,
+                    itemBuilder: (context, index) {
+                      final record = currentPageRecords[index];
+                      String statusText = record.deductionStatus;
+                      Color statusColor = Colors.black;
+                      final rec = record.recommendation;
 
-                final recommenderText = rec != null
-                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
-                    : 'N/A';
-                final notesText = rec?.notes ?? 'No notes provided.';
+                      switch (record.deductionStatus) {
+                        case 'Partial':
+                          statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                          statusColor = Colors.orange.shade800;
+                          break;
+                        case 'Full':
+                          statusText = 'Full Deduction (8 hrs)';
+                          statusColor = Colors.red.shade800;
+                          break;
+                        case 'ApprovedPartial':
+                          statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                          statusColor = Colors.blue.shade800;
+                          break;
+                        case 'ApprovedFull':
+                          statusText = 'Full Approval (8 hrs)';
+                          statusColor = Colors.indigo.shade800;
+                          break;
+                        default:
+                          statusText = record.deductionStatus;
+                          break;
+                      }
 
-                return DataRow(
-                  cells: [
-                    DataCell(Text(record.staffName)),
-                    DataCell(Text(DateFormat.yMd().format(record.date))),
-                    DataCell(Text(
-                      statusText,
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, color: statusColor),
-                    )),
-                    DataCell(Text(recommenderText)),
-                    DataCell(Text(notesText)),
-                  ],
-                );
-              }).toList(),
-            ),
+                      final recommenderText = rec != null
+                          ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
+                          : 'N/A';
+                      final notesText = rec?.notes ?? 'No notes provided.';
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Staff: ${record.staffName}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat.yMd().format(record.date),
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Recommendation: $statusText',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Recommended By: $recommenderText'),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Reason / Notes: $notesText',
+                                softWrap: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  if (totalPages > 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back),
+                            onPressed: _recommendationsCurrentPage > 0
+                                ? () => setState(() => _recommendationsCurrentPage--)
+                                : null,
+                          ),
+                          Text('Page ${_recommendationsCurrentPage + 1} of $totalPages'),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: _recommendationsCurrentPage < totalPages - 1
+                                ? () => setState(() => _recommendationsCurrentPage++)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
         ],

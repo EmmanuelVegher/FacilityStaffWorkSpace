@@ -152,6 +152,10 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
   String? _userFacility; // The facility of the logged-in user
   FacilityDetails? _facilityDetails;
 
+  // --- Recommendations Pagination State ---
+  int _recommendationsCurrentPage = 0;
+  static const int _recommendationsItemsPerPage = 5;
+
   // --- Filter State ---
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
@@ -423,6 +427,7 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
       setState(() {
         _allRecords = records;
         _recordsWithRecommendations = recommendations; // Set the new state variable
+        _recommendationsCurrentPage = 0; // Reset pagination to first page
         _staffSummaries = staffData;
         _designationSummaries = designationData;
         _dateRangeForTables = dateRange;
@@ -674,62 +679,117 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
         ),
         subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Staff')),
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Recommendation')),
-                DataColumn(label: Text('Recommended By')),
-                DataColumn(label: Text('Reason / Notes')),
-              ],
-              rows: _recordsWithRecommendations.map((record) {
-                String statusText = record.deductionStatus;
-                Color statusColor = Colors.black;
-                final rec = record.recommendation;
+          // Pagination logic
+          Builder(
+            builder: (context) {
+              final totalPages = (_recordsWithRecommendations.length / _recommendationsItemsPerPage).ceil();
+              final startIndex = _recommendationsCurrentPage * _recommendationsItemsPerPage;
+              final endIndex = (startIndex + _recommendationsItemsPerPage).clamp(0, _recordsWithRecommendations.length);
+              final currentPageRecords = _recordsWithRecommendations.sublist(startIndex, endIndex);
 
-                switch (record.deductionStatus) {
-                  case 'Partial':
-                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
-                    statusColor = Colors.orange.shade800;
-                    break;
-                  case 'Full':
-                    statusText = 'Full Deduction (8 hrs)';
-                    statusColor = Colors.red.shade800;
-                    break;
-                  case 'ApprovedPartial':
-                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
-                    statusColor = Colors.blue.shade800;
-                    break;
-                  case 'ApprovedFull':
-                    statusText = 'Full Approval (8 hrs)';
-                    statusColor = Colors.indigo.shade800;
-                    break;
-                  default:
-                    statusText = record.deductionStatus;
-                    break;
-                }
+              return Column(
+                children: [
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: currentPageRecords.length,
+                    itemBuilder: (context, index) {
+                      final record = currentPageRecords[index];
+                      String statusText = record.deductionStatus;
+                      Color statusColor = Colors.black;
+                      final rec = record.recommendation;
 
-                final recommenderText = rec != null
-                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
-                    : 'N/A';
-                final notesText = rec?.notes ?? 'No notes provided.';
+                      switch (record.deductionStatus) {
+                        case 'Partial':
+                          statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                          statusColor = Colors.orange.shade800;
+                          break;
+                        case 'Full':
+                          statusText = 'Full Deduction (8 hrs)';
+                          statusColor = Colors.red.shade800;
+                          break;
+                        case 'ApprovedPartial':
+                          statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                          statusColor = Colors.blue.shade800;
+                          break;
+                        case 'ApprovedFull':
+                          statusText = 'Full Approval (8 hrs)';
+                          statusColor = Colors.indigo.shade800;
+                          break;
+                        default:
+                          statusText = record.deductionStatus;
+                          break;
+                      }
 
-                return DataRow(
-                  cells: [
-                    DataCell(Text(record.staffName)),
-                    DataCell(Text(DateFormat.yMd().format(record.date))),
-                    DataCell(Text(
-                      statusText,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
-                    )),
-                    DataCell(Text(recommenderText)),
-                    DataCell(Text(notesText)),
-                  ],
-                );
-              }).toList(),
-            ),
+                      final recommenderText = rec != null
+                          ? '${rec.recommenderName} (${rec.recommenderDesignation})'
+                          : 'N/A';
+                      final notesText = rec?.notes ?? 'No notes provided.';
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Staff: ${record.staffName}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat.yMd().format(record.date),
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Recommendation: $statusText',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Recommended By: $recommenderText'),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Reason / Notes: $notesText',
+                                softWrap: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  if (totalPages > 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back),
+                            onPressed: _recommendationsCurrentPage > 0
+                                ? () => setState(() => _recommendationsCurrentPage--)
+                                : null,
+                          ),
+                          Text('Page ${_recommendationsCurrentPage + 1} of $totalPages'),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: _recommendationsCurrentPage < totalPages - 1
+                                ? () => setState(() => _recommendationsCurrentPage++)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
         ],

@@ -195,7 +195,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1>
   final RxInt _usedAnnualLeaves = 0.obs;
   final RxInt _usedPaternityLeaves = 0.obs;
   final RxInt _usedMaternityLeaves = 0.obs;
-  final RxInt _remainingPaternityLeaveBalance = 0.obs;
+  final RxInt _remainingPaternityLeaveBalance = 0.obs; 
   final RxInt _remainingMaternityLeaveBalance = 0.obs;
   final RxInt _remainingAnnualLeaveBalance = 0.obs;
   RxInt expandedPanelIndex = (-1).obs;

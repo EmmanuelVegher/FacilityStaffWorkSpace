@@ -195,6 +195,8 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
 
   // --- NEW: State variable for recommendations ---
   List<AttendanceRecord> _recordsWithRecommendations = [];
+  int _currentPage = 0;
+  static const int _itemsPerPage = 5;
 
   bool _isPageReady = false;
   bool _isLoading = false;
@@ -544,6 +546,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       setState(() {
         _allRecords = records;
         _recordsWithRecommendations = recommendations; // Set new state
+        _currentPage = 0;
         _facilitySummaries = facilityData;
         _designationSummaries = designationData;
         _facilityStaffSummaries = facilityStaffData;
@@ -902,6 +905,11 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   Widget _buildRecommendationsLogSection() {
     if (_recordsWithRecommendations.isEmpty) return const SizedBox.shrink();
 
+    final totalPages = (_recordsWithRecommendations.length / _itemsPerPage).ceil();
+    final startIndex = _currentPage * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, _recordsWithRecommendations.length);
+    final paginatedRecords = _recordsWithRecommendations.sublist(startIndex, endIndex);
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -915,62 +923,78 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
         ),
         subtitle: Text("${_recordsWithRecommendations.length} record(s) with an action taken"),
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Staff')),
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Recommendation')),
-                DataColumn(label: Text('Recommended By')),
-                DataColumn(label: Text('Reason / Notes')),
-              ],
-              rows: _recordsWithRecommendations.map((record) {
-                String statusText = record.deductionStatus;
-                Color statusColor = Colors.black;
-                final rec = record.recommendation;
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: paginatedRecords.length,
+            itemBuilder: (context, index) {
+              final record = paginatedRecords[index];
+              String statusText = record.deductionStatus;
+              Color statusColor = Colors.black;
+              final rec = record.recommendation;
 
-                switch (record.deductionStatus) {
-                  case 'Partial':
-                    statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
-                    statusColor = Colors.orange.shade800;
-                    break;
-                  case 'Full':
-                    statusText = 'Full Deduction (8 hrs)';
-                    statusColor = Colors.red.shade800;
-                    break;
-                  case 'ApprovedPartial':
-                    statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
-                    statusColor = Colors.blue.shade800;
-                    break;
-                  case 'ApprovedFull':
-                    statusText = 'Full Approval (8 hrs)';
-                    statusColor = Colors.indigo.shade800;
-                    break;
-                  default:
-                    statusText = record.deductionStatus;
-                    break;
-                }
+              switch (record.deductionStatus) {
+                case 'Partial':
+                  statusText = 'Partial Deduction (${rec?.deductedHours ?? 0} hrs)';
+                  statusColor = Colors.orange.shade800;
+                  break;
+                case 'Full':
+                  statusText = 'Full Deduction (8 hrs)';
+                  statusColor = Colors.red.shade800;
+                  break;
+                case 'ApprovedPartial':
+                  statusText = 'Partial Approval (${record.hoursWorked.toInt()} hr${record.hoursWorked == 1 ? '' : 's'})';
+                  statusColor = Colors.blue.shade800;
+                  break;
+                case 'ApprovedFull':
+                  statusText = 'Full Approval (8 hrs)';
+                  statusColor = Colors.indigo.shade800;
+                  break;
+                default:
+                  statusText = record.deductionStatus;
+                  break;
+              }
 
-                final recommenderText = rec != null
-                    ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
-                    : 'N/A';
-                final notesText = rec?.notes ?? 'No notes provided.';
+              final recommenderText = rec != null
+                  ? '${rec.recommenderName}\n(${rec.recommenderDesignation})'
+                  : 'N/A';
+              final notesText = rec?.notes ?? 'No notes provided.';
 
-                return DataRow(
-                  cells: [
-                    DataCell(Text(record.staffName)),
-                    DataCell(Text(DateFormat.yMd().format(record.date))),
-                    DataCell(Text(
-                      statusText,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
-                    )),
-                    DataCell(Text(recommenderText)),
-                    DataCell(Text(notesText)),
-                  ],
-                );
-              }).toList(),
-            ),
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Staff: ${record.staffName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('Date: ${DateFormat.yMd().format(record.date)}'),
+                      const SizedBox(height: 4),
+                      Text('Recommendation: $statusText', style: TextStyle(color: statusColor, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text('Recommended By: $recommenderText'),
+                      const SizedBox(height: 4),
+                      Text('Reason/Notes: $notesText'),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+              ),
+              Text('${_currentPage + 1} / $totalPages'),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
         ],
