@@ -16,16 +16,17 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html show Blob, Url, document, AnchorElement;
 
-
 class FacilityLowAttendanceStaffPage extends StatefulWidget {
   final bool isHqMode;
   const FacilityLowAttendanceStaffPage({super.key, this.isHqMode = false});
 
   @override
-  _FacilityLowAttendanceStaffPageState createState() => _FacilityLowAttendanceStaffPageState();
+  _FacilityLowAttendanceStaffPageState createState() =>
+      _FacilityLowAttendanceStaffPageState();
 }
 
-class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceStaffPage> {
+class _FacilityLowAttendanceStaffPageState
+    extends State<FacilityLowAttendanceStaffPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -45,7 +46,7 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
   List<String> _selectedFacilities = [];
   List<String> _availableDesignations = [];
   List<String> _selectedDesignations = [];
-  double _attendanceThreshold = 95.0;
+  double _attendanceThreshold = 99.0;
   late TextEditingController _thresholdController;
   late ScrollController _tableScrollController;
 
@@ -55,7 +56,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
   @override
   void initState() {
     super.initState();
-    _thresholdController = TextEditingController(text: _attendanceThreshold.toString());
+    _thresholdController =
+        TextEditingController(text: _attendanceThreshold.toString());
     _tableScrollController = ScrollController();
     _initializePage();
   }
@@ -171,8 +173,10 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
           .where('staffCategory', isEqualTo: 'Facility Staff')
           .where('accountStatus', isEqualTo: 'Active');
 
-      if (_selectedDesignations.isNotEmpty && _selectedDesignations.length <= 30) {
-        staffQuery = staffQuery.where('designation', whereIn: _selectedDesignations);
+      if (_selectedDesignations.isNotEmpty &&
+          _selectedDesignations.length <= 30) {
+        staffQuery =
+            staffQuery.where('designation', whereIn: _selectedDesignations);
       }
 
       final staffSnapshot = await staffQuery.get();
@@ -190,12 +194,16 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
       }).toList();
 
       // Filter by selected states in code
-      final staffList = allStaff.where((staff) => _selectedStates.contains(staff['state'])).toList();
+      final staffList = allStaff
+          .where((staff) => _selectedStates.contains(staff['state']))
+          .toList();
 
       // Filter by facilities
       final filteredStaff = _selectedFacilities.isEmpty
           ? staffList
-          : staffList.where((s) => _selectedFacilities.contains(s['facility'])).toList();
+          : staffList
+              .where((s) => _selectedFacilities.contains(s['facility']))
+              .toList();
 
       // Calculate expected days (weekdays)
       final expectedDays = _calculateExpectedDays(_startDate, _endDate);
@@ -218,7 +226,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
       final lowAttendance = <Map<String, dynamic>>[];
       for (final staff in filteredStaff) {
         final actual = attendanceCount[staff['id']] ?? 0;
-        final percentage = expectedDays > 0 ? (actual / expectedDays) * 100 : 0.0;
+        final percentage =
+            expectedDays > 0 ? (actual / expectedDays) * 100 : 0.0;
         if (percentage < _attendanceThreshold) {
           lowAttendance.add({
             ...staff,
@@ -243,7 +252,9 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
 
   int _calculateExpectedDays(DateTime start, DateTime end) {
     int count = 0;
-    for (DateTime date = start; date.isBefore(end.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+    for (DateTime date = start;
+        date.isBefore(end.add(const Duration(days: 1)));
+        date = date.add(const Duration(days: 1))) {
       if (date.weekday >= DateTime.monday && date.weekday <= DateTime.friday) {
         count++;
       }
@@ -256,7 +267,18 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
 
     try {
       List<List<dynamic>> rows = [];
-      rows.add(['Name', 'Designation', 'Facility', 'State', 'Email', 'Phone', 'Expected Days', 'Actual Days', 'Attendance %', 'Status']);
+      rows.add([
+        'Name',
+        'Designation',
+        'Facility',
+        'State',
+        'Email',
+        'Phone',
+        'Expected Days',
+        'Actual Days',
+        'Attendance %',
+        'Status'
+      ]);
 
       for (final staff in _lowAttendanceStaff) {
         final percentage = staff['percentage'];
@@ -308,10 +330,22 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
 
       var headerStyle = xls.CellStyle(bold: true);
 
-      List<String> headers = ['Name', 'Designation', 'Facility', 'State', 'Email', 'Phone', 'Expected Days', 'Actual Days', 'Attendance %', 'Status'];
+      List<String> headers = [
+        'Name',
+        'Designation',
+        'Facility',
+        'State',
+        'Email',
+        'Phone',
+        'Expected Days',
+        'Actual Days',
+        'Attendance %',
+        'Status'
+      ];
 
       for (var i = 0; i < headers.length; i++) {
-        var cell = sheetObject.cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        var cell = sheetObject
+            .cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
         cell.value = xls.TextCellValue(headers[i]);
         cell.cellStyle = headerStyle;
       }
@@ -362,7 +396,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
     }
   }
 
-  void _triggerDownload(List<int> bytes, String filename, [String mimeType = 'text/csv']) {
+  void _triggerDownload(List<int> bytes, String filename,
+      [String mimeType = 'text/csv']) {
     if (kIsWeb) {
       final blob = html.Blob([bytes], mimeType);
       final url = html.Url.createObjectUrlFromBlob(blob);
@@ -411,7 +446,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Low Attendance Staff", style: TextStyle(color: Colors.white)),
+        title: const Text("Low Attendance Staff",
+            style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF722F37),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -458,7 +494,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(color: Colors.red)),
                   ),
                 if (_isLoading)
                   const Padding(
@@ -468,7 +505,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
                 else if (_lowAttendanceStaff.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: Center(child: Text("No staff with low attendance found.")),
+                    child: Center(
+                        child: Text("No staff with low attendance found.")),
                   ),
               ],
             ),
@@ -493,10 +531,14 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
               Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: MultiSelectDialogField(
-                  items: _availableStates.map((state) => MultiSelectItem<String>(state, state)).toList(),
+                  items: _availableStates
+                      .map((state) => MultiSelectItem<String>(state, state))
+                      .toList(),
                   initialValue: _selectedStates,
                   title: const Text("Select States"),
-                  buttonText: Text(_selectedStates.isEmpty ? "State" : "${_selectedStates.length} selected"),
+                  buttonText: Text(_selectedStates.isEmpty
+                      ? "State"
+                      : "${_selectedStates.length} selected"),
                   chipDisplay: MultiSelectChipDisplay.none(),
                   onConfirm: (values) {
                     setState(() => _selectedStates = values.cast<String>());
@@ -508,16 +550,21 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text('${DateFormat("MMM d, yyyy").format(_startDate)} - ${DateFormat("MMM d, yyyy").format(_endDate)}'),
+              label: Text(
+                  '${DateFormat("MMM d, yyyy").format(_startDate)} - ${DateFormat("MMM d, yyyy").format(_endDate)}'),
             ),
             if (widget.isHqMode)
               Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: MultiSelectDialogField(
-                  items: _availableFacilities.map((f) => MultiSelectItem<String>(f, f)).toList(),
+                  items: _availableFacilities
+                      .map((f) => MultiSelectItem<String>(f, f))
+                      .toList(),
                   initialValue: _selectedFacilities,
                   title: const Text("Select Facilities"),
-                  buttonText: Text(_selectedFacilities.isEmpty ? "Facility" : "${_selectedFacilities.length} selected"),
+                  buttonText: Text(_selectedFacilities.isEmpty
+                      ? "Facility"
+                      : "${_selectedFacilities.length} selected"),
                   chipDisplay: MultiSelectChipDisplay.none(),
                   onConfirm: (values) {
                     setState(() => _selectedFacilities = values.cast<String>());
@@ -528,10 +575,14 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
             Container(
               constraints: const BoxConstraints(maxWidth: 300),
               child: MultiSelectDialogField(
-                items: _availableDesignations.map((d) => MultiSelectItem<String>(d, d)).toList(),
+                items: _availableDesignations
+                    .map((d) => MultiSelectItem<String>(d, d))
+                    .toList(),
                 initialValue: _selectedDesignations,
                 title: const Text("Select Designations"),
-                buttonText: Text(_selectedDesignations.isEmpty ? "Designation" : "${_selectedDesignations.length} selected"),
+                buttonText: Text(_selectedDesignations.isEmpty
+                    ? "Designation"
+                    : "${_selectedDesignations.length} selected"),
                 chipDisplay: MultiSelectChipDisplay.none(),
                 onConfirm: (values) {
                   setState(() => _selectedDesignations = values.cast<String>());
@@ -550,7 +601,9 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
                     controller: _thresholdController,
                     onSubmitted: (value) {
                       final newThreshold = double.tryParse(value);
-                      if (newThreshold != null && newThreshold >= 0 && newThreshold <= 100) {
+                      if (newThreshold != null &&
+                          newThreshold >= 0 &&
+                          newThreshold <= 100) {
                         setState(() => _attendanceThreshold = newThreshold);
                         _thresholdController.text = newThreshold.toString();
                         _loadLowAttendanceData();
@@ -621,7 +674,11 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
                 ],
                 rows: _lowAttendanceStaff.map((staff) {
                   final percentage = staff['percentage'];
-                  Color color = percentage < 50 ? Colors.red : percentage < 80 ? Colors.orange : Colors.yellow;
+                  Color color = percentage < 50
+                      ? Colors.red
+                      : percentage < 80
+                          ? Colors.orange
+                          : Colors.yellow;
                   return DataRow(
                     cells: [
                       DataCell(Text(staff['name'])),
@@ -634,7 +691,8 @@ class _FacilityLowAttendanceStaffPageState extends State<FacilityLowAttendanceSt
                       DataCell(Text(staff['actual'].toString())),
                       DataCell(
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
