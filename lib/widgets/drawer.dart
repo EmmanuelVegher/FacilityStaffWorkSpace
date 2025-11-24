@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:service_delivery_workspace/screens/attendance_analysis_page/facility_low_attendance_staff_page.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
@@ -281,7 +282,7 @@ Widget drawer(
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const LowAttendanceStaffPage(isHqMode: false)),
+                      MaterialPageRoute(builder: (context) => const FacilityLowAttendanceStaffPage(isHqMode: false)),
                     );
                   },
                 );
