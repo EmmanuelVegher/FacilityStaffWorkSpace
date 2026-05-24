@@ -739,12 +739,7 @@ class _ProfilePage3State extends State<ProfilePage3> {
   }
 
   Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance

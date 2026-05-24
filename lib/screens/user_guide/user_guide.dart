@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/drawer.dart';
 
@@ -39,8 +40,8 @@ class FullScreenImageViewer extends StatelessWidget {
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: Colors.black,
-                      child: const Center(
-                        child: Column(
+                      child: Center( // Removed const
+                        child: Column( // Removed const
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
@@ -51,7 +52,7 @@ class FullScreenImageViewer extends StatelessWidget {
                             SizedBox(height: 16),
                             Text(
                               "Image not found",
-                              style: TextStyle(color: Colors.white, fontSize: 18),
+                              style: GoogleFonts.poppins(color: Colors.white, fontSize: 18),
                             ),
                           ],
                         ),
@@ -90,17 +91,18 @@ class UserGuidePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "📘 CARITAS Nigeria Service Delivery WorkSpace User Guide",
-          style: TextStyle(color: Colors.white, fontSize: 20),
+        title: Text(
+          "📘 WorkSpace User Guide",
+          style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFF722F37),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       drawer: drawer(context),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: SelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           _buildHeader(
               "Welcome to the CARITAS Nigeria Service Delivery WorkSpace App!"),
           _buildParagraph(
@@ -281,8 +283,49 @@ class UserGuidePage extends StatelessWidget {
               context,
               "assets/screens/attendance_restore_dialog.png",
               "Restore Data Options Dialog. "),
+          _buildSubHeader("11. Automatic Updates"),
           _buildParagraph(
-              "**Automatic Updates:** The app periodically checks for new app versions and updates to essential data like office locations. You may be prompted if an update is required."),
+              "The app periodically checks for new app versions and updates to essential data like office locations. You may be prompted if an update is required."),
+
+          _buildSection("📈 Attendance Analysis Module"),
+          _buildParagraph(
+              "The Attendance Analysis module provides advanced, facility-wide insights into staff performance. It allows managers to identify trends, verify records, and detect location outliers."),
+          _buildSubHeader("1. Key Metrics & Filtering"),
+          _buildParagraph(
+              "Filter data by Date Range, Designation, and specific Staff Members. The dashboard instantly updates to show:\n"
+              "•  **Total Hours Worked:** Aggregated hours for the selected group.\n"
+              "•  **Active Staff Count:** Number of staff with records in the period.\n"
+              "•  **Designation Distribution:** Pie and Bar charts showing which departments are logging the most time."),
+          _buildSubHeader("2. Performance Table"),
+          _buildParagraph(
+              "A comprehensive grid showing daily hours for every staff member. \n"
+              "•  **Horizontal Scrolling:** Swipe left/right to view the entire date range.\n"
+              "•  **Grand Totals:** Each staff member's total hours are summed at the end of the row."),
+          _buildSubHeader("3. Location Map & Outlier Detection"),
+          _buildParagraph(
+              "The app cross-references clock-in/out GPS coordinates with the facility's official location:\n"
+              "•  **Interactive Map:** View the spread of clock-in points relative to the facility center.\n"
+              "•  **Outliers List:** Automatically flags records where the user was outside the recognized geofence, showing the exact distance (in meters) from the facility."),
+
+          _buildSection("📉 Low Attendance Tracking"),
+          _buildParagraph(
+              "This specialized module identifies staff members whose attendance falls below a required threshold (e.g., 95% or 99%)."),
+          _buildBulletPoints([
+              "**Attendance Threshold:** You can manually adjust the target percentage (e.g., set to 90% to see everyone below that mark).",
+              "**Expected vs. Actual:** The system calculates 'Expected Days' by counting all weekdays (Mon-Fri) in the selected period. 'Actual Days' is the count of unique days the staff member clocked in.",
+              "**Status Indicators:** Staff are categorized as 'Critical', 'Warning', or 'Caution' based on how far they are from the threshold.",
+              "**Reporting:** Export the list of low-attendance staff to CSV or Excel for further administrative action."
+          ]),
+
+          _buildSection("✅ Attendance Verification"),
+          _buildParagraph(
+              "Verification ensures that reported hours are accurate and reviewed by supervisors."),
+          _buildSubHeader("1. Verifiers List"),
+          _buildParagraph(
+              "In the Attendance Analysis Performance Table, you may see a blue checkmark icon (✅) or a 'Verifiers' button. Tapping this opens a dialog listing every supervisor who has reviewed and verified that specific day's record."),
+          _buildSubHeader("2. Verification Summary"),
+          _buildParagraph(
+              "The Analysis page includes a 'Verification Details' section that summarizes all verification actions in the selected period, ensuring a clear audit trail of who is reviewing the team's work."),
 
           _buildSection("📝 Leave Request Module"),
           _buildParagraph(
@@ -913,7 +956,7 @@ class UserGuidePage extends StatelessWidget {
           Center(
             child: Text(
               "Need help? Reach out to your admin or support team.",
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: Colors.grey.shade700,
               ),
@@ -922,15 +965,16 @@ class UserGuidePage extends StatelessWidget {
           const SizedBox(height: 16),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildHeader(String text) => Text(
     text,
-    style: const TextStyle(
+    style: GoogleFonts.poppins(
       fontSize: 26,
       fontWeight: FontWeight.bold,
-      color: Colors.teal,
+      color: const Color(0xFF5C1A2E),
     ),
   );
 
@@ -938,10 +982,10 @@ class UserGuidePage extends StatelessWidget {
     padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
     child: Text(
       text,
-      style: const TextStyle(
+      style: GoogleFonts.poppins(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: Colors.blueGrey,
+        color: const Color(0xFFD4A03C),
       ),
     ),
   );
@@ -950,7 +994,7 @@ class UserGuidePage extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 12.0),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 16, height: 1.5),
+      style: GoogleFonts.poppins(fontSize: 16, height: 1.5),
       textAlign: TextAlign.justify,
     ),
   );
@@ -959,10 +1003,10 @@ class UserGuidePage extends StatelessWidget {
     padding: const EdgeInsets.only(top: 24, bottom: 8),
     child: Text(
       title,
-      style: const TextStyle(
+      style: GoogleFonts.poppins(
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          color: Colors.deepPurple),
+          color: const Color(0xFF5C1A2E)),
     ),
   );
 
@@ -985,7 +1029,7 @@ class UserGuidePage extends StatelessWidget {
               Expanded(
                 child: Text(
                   point,
-                  style: const TextStyle(fontSize: 16, height: 1.4),
+                  style: GoogleFonts.poppins(fontSize: 16, height: 1.4),
                   textAlign: TextAlign.justify,
                 ),
               )
@@ -1083,7 +1127,7 @@ class UserGuidePage extends StatelessWidget {
           child: Text(
             caption,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: GoogleFonts.poppins(
                 fontSize: 14, color: Colors.grey, fontStyle: FontStyle.italic),
           ),
         ),

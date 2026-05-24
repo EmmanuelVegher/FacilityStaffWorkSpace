@@ -7,6 +7,7 @@ import 'package:refreshable_widget/refreshable_widget.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:service_delivery_workspace/screens/attendance_analysis_page/facility_low_attendance_staff_page.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../screens/activity_monitoring/activity_monitoring_page.dart';
 import '../screens/attendance_analysis_page/facility_attendance_analysis_page.dart';
@@ -51,6 +52,8 @@ Widget drawer(
   double drawerIconSize = 24;
   double drawerFontSize = 17;
   //final _taskController = Get.put(TaskController());
+  const Color maroonPrimary = Color(0xFF5C1A2E);
+  const Color goldAccent = Color(0xFFD4A03C);
 
   return Drawer(
     child: Container(
@@ -73,24 +76,27 @@ Widget drawer(
           // Row(children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: Get.isDarkMode ? Colors.white : Colors.white,
+              color: maroonPrimary,
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 stops: [0.0, 1.0],
-                colors: [Colors.red, Colors.black],
+                colors: [maroonPrimary, Color(0xFF2E0215)],
               ),
             ),
             child: Container(
                 alignment: Alignment.bottomLeft,
                 child: Row(
                   children: [
-                    const Text(
-                      "Dashboard",
-                      style: TextStyle(
-                          fontSize: 25,
-                          color: Colors.white,
-                          fontFamily: "NexaBold"),
+                    Flexible(
+                      child: Text(
+                        "Dashboard",
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                            fontSize: 25,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
                     const SizedBox(
                       width: 30,
@@ -105,7 +111,7 @@ Widget drawer(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          color: Colors.redAccent,
+                          color: goldAccent,
                         ),
                         child: RefreshableWidget<List<Uint8List>?>(
                           refreshCall: () async {
@@ -141,15 +147,15 @@ Widget drawer(
 
           ListTile(
               leading: Icon(
-                Icons.screen_lock_landscape_rounded,
+                Icons.dashboard,
                 size: drawerIconSize,
-                color: Colors.red,
+                color: maroonPrimary,
               ),
               title: Text(
                 'DashBoard',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                     fontSize: drawerFontSize,
-                    color: Get.isDarkMode ? Colors.white : Colors.brown),
+                    color: Get.isDarkMode ? Colors.white : Colors.black87),
               ),
               onTap: () async {
               //  onTap();
@@ -171,13 +177,13 @@ Widget drawer(
             leading: Icon(
               Icons.book,
               size: drawerIconSize,
-              color: Colors.purple,
+              color: maroonPrimary,
             ),
             title: Text(
               'User Guide',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -192,10 +198,10 @@ Widget drawer(
           ),
           ListTile(
             leading:
-                Icon(Icons.work, size: drawerIconSize, color: Colors.orange),
+                Icon(Icons.work, size: drawerIconSize, color: maroonPrimary),
             title: Text(
               'Attendance',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
             ),
             onTap: () {
               // _taskController.getTasks();
@@ -212,14 +218,17 @@ Widget drawer(
           ),
           ListTile(
             leading: Icon(Icons.timer,
-                size: drawerIconSize, color: Colors.orangeAccent),
+                size: drawerIconSize, color: maroonPrimary),
             title: Row(
               children: [
-                Text(
-                  'Attendance Analysis',
-                  style: TextStyle(
-                      fontSize: drawerFontSize,
-                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                Flexible(
+                  child: Text(
+                    'Attendance Analysis',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        fontSize: drawerFontSize,
+                        color: Get.isDarkMode ? Colors.white : Colors.black87),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Chip(
@@ -257,14 +266,17 @@ Widget drawer(
               if (userLocation != null && userLocation.isNotEmpty) {
                 return ListTile(
                   leading: Icon(Icons.warning,
-                      size: drawerIconSize, color: Colors.redAccent),
+                      size: drawerIconSize, color: maroonPrimary),
                   title: Row(
                     children: [
-                      Text(
-                        'Low Attendance Staff',
-                        style: TextStyle(
-                            fontSize: drawerFontSize,
-                            color: Get.isDarkMode ? Colors.white : Colors.brown),
+                      Flexible(
+                        child: Text(
+                          'Low Attendance Staff',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                              fontSize: drawerFontSize,
+                              color: Get.isDarkMode ? Colors.white : Colors.black87),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Chip(
@@ -400,13 +412,13 @@ Widget drawer(
             leading: Icon(
               Icons.task,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Task Manager',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -425,12 +437,12 @@ Widget drawer(
           ),
           ListTile(
             leading: Icon(Icons.holiday_village_sharp,
-                size: drawerIconSize, color: Colors.red),
+                size: drawerIconSize, color: maroonPrimary),
             title: Text(
               'Leave Request',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -449,13 +461,13 @@ Widget drawer(
             leading: Icon(
               Icons.phone,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Call Tracker',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -475,13 +487,13 @@ Widget drawer(
             leading: Icon(
               Icons.art_track,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'EAC Tracker',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -501,13 +513,13 @@ Widget drawer(
             leading: Icon(
               Icons.biotech_outlined,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Viral Load Tracker',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -528,13 +540,13 @@ Widget drawer(
             leading: Icon(
               Icons.access_time,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'TimeSheet',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -556,13 +568,13 @@ Widget drawer(
             leading: Icon(
               Icons.draw,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Upload Signature',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -583,11 +595,11 @@ Widget drawer(
             leading: Icon(
               Icons.person,
               size: drawerIconSize,
-              color: Colors.red,
+              color: maroonPrimary,
             ),
             title: Text(
               'Profile Page',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -604,13 +616,13 @@ Widget drawer(
             leading: Icon(
               Icons.password_rounded,
               size: drawerIconSize,
-              color: Colors.purple,
+              color: maroonPrimary,
             ),
             title: Text(
               'Forgot Password',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -630,11 +642,11 @@ Widget drawer(
             leading: Icon(
               Icons.logout_rounded,
               size: drawerIconSize,
-              color: Colors.red,
+              color: maroonPrimary,
             ),
             title: Text(
               'Logout',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
             ),
             onTap: () {
               Navigator.pushReplacement(

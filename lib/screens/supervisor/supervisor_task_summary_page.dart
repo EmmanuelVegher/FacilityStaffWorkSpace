@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
 // Make sure to import your Report and BioModel classes
 // Adjust the path as per your project structure
@@ -238,20 +239,36 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Supervisor Summary', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Supervisor Summary',
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF5C1A2E),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           if (!_isLoading)
             IconButton(
-              tooltip: _tabController.index == 0 ? 'Download Daily Summary CSV' : 'Download Weekly Summary CSV',
+              tooltip: _tabController.index == 0
+                  ? 'Download Daily Summary CSV'
+                  : 'Download Weekly Summary CSV',
               onPressed: _isExporting ? null : _exportToCsv,
               icon: _isExporting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.download_for_offline_outlined),
             ),
           const SizedBox(width: 10),
@@ -259,35 +276,40 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
         bottom: _isLoading || _errorMessage.isNotEmpty
             ? null
             : TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.orangeAccent,
-          tabs: const [
-            Tab(icon: Icon(Icons.today_outlined), text: 'Daily Summary'),
-            Tab(icon: Icon(Icons.calendar_view_week_outlined), text: 'Weekly Summary'),
-          ],
-        ),
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: const Color(0xFFD4A03C), // Gold
+                tabs: const [
+                  Tab(icon: Icon(Icons.today_outlined), text: 'Daily Summary'),
+                  Tab(
+                      icon: Icon(Icons.calendar_view_week_outlined),
+                      text: 'Weekly Summary'),
+                ],
+              ),
       ),
       drawer: drawer2(context),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.red.shade600, Colors.black87, Colors.yellow.shade600],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      body: SelectionArea(
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFDFCFB), // Warm white background
           ),
+          child: SafeArea(child: _buildBody()),
         ),
-        child: SafeArea(child: _buildBody()),
       ),
     );
   }
 
   Widget _buildBody() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator(color: Colors.white));
-    if (_errorMessage.isNotEmpty) return Center(child: Text(_errorMessage, style: const TextStyle(color: Colors.white, fontSize: 18)));
+    if (_isLoading)
+      return const Center(
+          child: CircularProgressIndicator(color: Color(0xFF5C1A2E)));
+    if (_errorMessage.isNotEmpty)
+      return Center(
+          child: Text(_errorMessage,
+              style: GoogleFonts.poppins(color: Colors.red, fontSize: 18)));
 
     return TabBarView(
       controller: _tabController,
@@ -310,12 +332,17 @@ class _SupervisorTaskSummaryPageState extends State<SupervisorTaskSummaryPage>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(DateFormat.yMMMMEEEEd().format(_selectedDailyDate), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const Text("Selected Date", style: TextStyle(color: Colors.white70)),
+                  Text(DateFormat.yMMMMEEEEd().format(_selectedDailyDate),
+                      style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF5C1A2E))),
+                  Text("Selected Date",
+                      style: GoogleFonts.poppins(color: Colors.grey.shade600)),
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.calendar_today, color: Colors.white),
+                icon: const Icon(Icons.calendar_today, color: Color(0xFF5C1A2E)),
                 onPressed: () async {
                   final pickedDate = await showDatePicker(context: context, initialDate: _selectedDailyDate, firstDate: DateTime(2022), lastDate: DateTime.now());
                   if (pickedDate != null && pickedDate != _selectedDailyDate) {

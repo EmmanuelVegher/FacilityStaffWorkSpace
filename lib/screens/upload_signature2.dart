@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:service_delivery_workspace/widgets/drawer2.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -30,12 +31,8 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
   // State variable to control the visibility of the progress indicator
   bool _isLoading = false;
 
-  static const Color wineColor = Color(0xFF722F37);
-  static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  static const Color wineColor = Color(0xFF5C1A2E);
+  static const Color goldColor = Color(0xFFD4A03C);
 
   @override
   void initState() {
@@ -113,7 +110,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       print('Signature link updated in Firestore successfully!');
     } catch (e) {
       print('Error updating signature link in Firestore: $e');
-      rethrow; // Rethrow to be caught in the calling function
+      rethrow;
     }
   }
 
@@ -126,7 +123,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       return;
     }
 
-    setState(() => _isLoading = true); // Show progress indicator
+    setState(() => _isLoading = true);
 
     try {
       final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -160,7 +157,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false); // Hide progress indicator
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -174,7 +171,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       return;
     }
 
-    setState(() => _isLoading = true); // Show progress indicator
+    setState(() => _isLoading = true);
 
     try {
       final signatureBytes = await _signatureController.toPngBytes();
@@ -190,6 +187,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
             _currentSignatureBytes = signatureBytes;
           });
           _signatureController.clear();
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close dialog if open
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Drawn signature saved successfully!")),
           );
@@ -208,7 +206,7 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false); // Hide progress indicator
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -222,30 +220,44 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
     }
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Draw Signature"),
-          content: SizedBox(
+          title: Text("Draw Signature", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: wineColor)),
+          content: Container(
             height: 300,
-            width: 300,
-            child: Signature(
-              controller: _signatureController,
-              backgroundColor: Colors.grey[200]!,
+            width: double.maxFinite,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Signature(
+                controller: _signatureController,
+                backgroundColor: Colors.white,
+              ),
             ),
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
+            ),
+            TextButton(
               onPressed: () => _signatureController.clear(),
-              child: const Text("Clear"),
+              child: Text("Clear", style: GoogleFonts.poppins(color: wineColor)),
             ),
             ElevatedButton(
               onPressed: () {
-                // First, pop the dialog
                 Navigator.of(context).pop();
-                // Then, start the saving process which shows the indicator
                 _saveDrawnSignature();
               },
-              child: const Text("Save"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: wineColor,
+                foregroundColor: Colors.white,
+              ),
+              child: Text("Save", style: GoogleFonts.poppins()),
             ),
           ],
         );
@@ -258,104 +270,151 @@ class _UploadSignaturePage2State extends State<UploadSignaturePage2> {
     return Scaffold(
       drawer: drawer2(context),
       appBar: AppBar(
-        title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
+        title: Text('Upload Signature',
+            style: GoogleFonts.poppins(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(gradient: appBarGradient),
-        ),
+        backgroundColor: wineColor,
+        elevation: 0,
       ),
-      body: Stack( // Use a Stack to overlay the progress indicator
-        children: [
-          // Main content
-          _userId == null
-              ? const Center(child: CircularProgressIndicator())
-              : Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    GestureDetector(
-                      onTap: _showSignaturePad,
-                      child: Container(
-                        height: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.5 : 300,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: _signatureLink != null
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(19),
-                          child: Image.network(
-                            _signatureLink!,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return const Center(child: CircularProgressIndicator());
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(child: Icon(Icons.error, color: Colors.red));
-                            },
+      body: SelectionArea(
+        child: Container(
+          color: Colors.grey.shade50,
+          child: Stack(
+            children: [
+              _userId == null
+                  ? const Center(child: CircularProgressIndicator(color: wineColor))
+                  : Center(
+                      child: SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 600),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                GestureDetector(
+                                  onTap: _showSignaturePad,
+                                  child: Container(
+                                    height: 300,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: goldColor.withOpacity(0.5), width: 1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            blurRadius: 15,
+                                            offset: const Offset(0, 5))
+                                      ],
+                                    ),
+                                    child: _signatureLink != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(15),
+                                            child: Image.network(
+                                              _signatureLink!,
+                                              fit: BoxFit.contain,
+                                              loadingBuilder:
+                                                  (context, child, progress) {
+                                                if (progress == null) return child;
+                                                return const Center(
+                                                    child:
+                                                        CircularProgressIndicator(color: wineColor));
+                                              },
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return const Center(
+                                                    child: Icon(Icons.error,
+                                                        color: Colors.red));
+                                              },
+                                            ),
+                                          )
+                                        : Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.draw_rounded,
+                                                size: 64,
+                                                color: wineColor.withOpacity(0.3),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                "Tap to Draw or Upload Signature",
+                                                style: GoogleFonts.poppins(
+                                                    fontSize: 16,
+                                                    color: wineColor.withOpacity(0.7),
+                                                    fontWeight: FontWeight.w500),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _showSignaturePad,
+                                        icon: const Icon(Icons.create),
+                                        label: Text("Draw New",
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: goldColor,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 16),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          elevation: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _pickAndUploadSignature,
+                                        icon: const Icon(Icons.upload_file),
+                                        label: Text("Upload Image",
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: wineColor,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 16),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          elevation: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        )
-                            : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.draw,
-                              size: MediaQuery.of(context).size.width * 0.15,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Tap to Draw or Upload Signature",
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _showSignaturePad,
-                          icon: const Icon(Icons.create),
-                          label: const Text("Draw Signature"),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _pickAndUploadSignature,
-                          icon: const Icon(Icons.upload_file, color: Colors.white),
-                          label: const Text("Upload Signature", style: TextStyle(color: Colors.white)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.5),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
-          // Loading overlay
-          if (_isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

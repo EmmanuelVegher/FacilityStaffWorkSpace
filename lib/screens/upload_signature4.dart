@@ -5,6 +5,7 @@ import 'package:signature/signature.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 
 import '../widgets/drawer4.dart';
 
@@ -31,9 +32,10 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
   // State variable to control the visibility of the progress indicator
   bool _isLoading = false;
 
-  static const Color wineColor = Color(0xFF722F37);
+  // Define Maroon theme colors
+  static const Color maroonPrimary = Color(0xFF5C1A2E); 
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)],
+    colors: [maroonPrimary, Color(0xFF2E0215)], // Consistent Maroon/Gold gradient
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -59,11 +61,11 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       _loadSignatureLink();
     } else {
       print("User not logged in.");
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User not logged in. Please log in to continue.")),
+          SnackBar(content: Text("User not logged in. Please log in to continue.", style: GoogleFonts.poppins())),
         );
-      });
+      }
     }
   }
 
@@ -84,7 +86,7 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       print("Error loading signature link: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error loading signature: $e")),
+          SnackBar(content: Text("Error loading signature: $e", style: GoogleFonts.poppins())),
         );
       }
     }
@@ -114,7 +116,7 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       print('Signature link updated in Firestore successfully!');
     } catch (e) {
       print('Error updating signature link in Firestore: $e');
-      rethrow; // Rethrow to be caught in the calling function
+      rethrow; 
     }
   }
 
@@ -122,12 +124,12 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
   Future<void> _pickAndUploadSignature() async {
     if (_userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User ID not available. Please try again.")),
+        SnackBar(content: Text("User ID not available. Please try again.", style: GoogleFonts.poppins())),
       );
       return;
     }
 
-    setState(() => _isLoading = true); // Show progress indicator
+    setState(() => _isLoading = true); 
 
     try {
       final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -144,11 +146,11 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
             _currentSignatureBytes = imageBytes;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Signature uploaded and saved successfully!")),
+            SnackBar(content: Text("Signature uploaded and saved successfully!", style: GoogleFonts.poppins())),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to upload signature.")),
+            SnackBar(content: Text("Failed to upload signature.", style: GoogleFonts.poppins())),
           );
         }
       }
@@ -156,12 +158,12 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       print("Error picking and uploading signature: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("An error occurred during upload.")),
+          SnackBar(content: Text("An error occurred during upload.", style: GoogleFonts.poppins())),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false); // Hide progress indicator
+        setState(() => _isLoading = false); 
       }
     }
   }
@@ -170,12 +172,12 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
   Future<void> _saveDrawnSignature() async {
     if (_signatureController.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please draw your signature first.")),
+        SnackBar(content: Text("Please draw your signature first.", style: GoogleFonts.poppins())),
       );
       return;
     }
 
-    setState(() => _isLoading = true); // Show progress indicator
+    setState(() => _isLoading = true); 
 
     try {
       final signatureBytes = await _signatureController.toPngBytes();
@@ -192,11 +194,11 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
           });
           _signatureController.clear();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Drawn signature saved successfully!")),
+            SnackBar(content: Text("Drawn signature saved successfully!", style: GoogleFonts.poppins())),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to save drawn signature.")),
+            SnackBar(content: Text("Failed to save drawn signature.", style: GoogleFonts.poppins())),
           );
         }
       }
@@ -204,12 +206,12 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       print("Error saving drawn signature: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("An error occurred while saving.")),
+          SnackBar(content: Text("An error occurred while saving.", style: GoogleFonts.poppins())),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false); // Hide progress indicator
+        setState(() => _isLoading = false); 
       }
     }
   }
@@ -217,7 +219,7 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
   void _showSignaturePad() {
     if (_userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User ID not available. Please try again.")),
+        SnackBar(content: Text("User ID not available. Please try again.", style: GoogleFonts.poppins())),
       );
       return;
     }
@@ -225,28 +227,37 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Draw Signature"),
-          content: SizedBox(
+          title: Text("Draw Signature", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: maroonPrimary)),
+          content: Container(
             height: 300,
             width: 300,
-            child: Signature(
-              controller: _signatureController,
-              backgroundColor: Colors.grey[200]!,
+            decoration: BoxDecoration(
+              border: Border.all(color: maroonPrimary.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Signature(
+                controller: _signatureController,
+                backgroundColor: Colors.grey[100]!,
+              ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => _signatureController.clear(),
-              child: const Text("Clear"),
+              child: Text("Clear", style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: () {
-                // First, pop the dialog
                 Navigator.of(context).pop();
-                // Then, start the saving process which shows the indicator
                 _saveDrawnSignature();
               },
-              child: const Text("Save"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: maroonPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text("Save Signature", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -259,104 +270,140 @@ class _UploadSignaturePage4State extends State<UploadSignaturePage4> {
     return Scaffold(
       drawer: drawer4(context),
       appBar: AppBar(
-        title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
+        title: Text('Upload Signature', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
         ),
       ),
-      body: Stack( // Use a Stack to overlay the progress indicator
-        children: [
-          // Main content
-          _userId == null
-              ? const Center(child: CircularProgressIndicator())
-              : Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    GestureDetector(
-                      onTap: _showSignaturePad,
-                      child: Container(
-                        height: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.5 : 300,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: _signatureLink != null
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(19),
-                          child: Image.network(
-                            _signatureLink!,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return const Center(child: CircularProgressIndicator());
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(child: Icon(Icons.error, color: Colors.red));
-                            },
+      body: SelectionArea( // Wrapped in SelectionArea for copyable text
+        child: Stack( 
+          children: [
+            // Main content
+            _userId == null
+                ? const Center(child: CircularProgressIndicator(color: maroonPrimary))
+                : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        "My Core Signature",
+                        style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: maroonPrimary),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "This signature will be used for your timesheets and official documents.",
+                        style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      GestureDetector(
+                        onTap: _showSignaturePad,
+                        child: Container(
+                          height: MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.6 : 300,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: maroonPrimary.withOpacity(0.2), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
-                        )
-                            : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.draw,
-                              size: MediaQuery.of(context).size.width * 0.15,
-                              color: Colors.grey.shade600,
+                          child: _signatureLink != null
+                              ? ClipRRect(
+                            borderRadius: BorderRadius.circular(19),
+                            child: Image.network(
+                              _signatureLink!,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator(color: maroonPrimary));
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(child: Icon(Icons.error_outline, color: Colors.red, size: 40));
+                              },
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Tap to Draw or Upload Signature",
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                          )
+                              : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.draw_outlined,
+                                size: 60,
+                                color: maroonPrimary.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "Tap to Draw or Upload Signature",
+                                style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _showSignaturePad,
-                          icon: const Icon(Icons.create),
-                          label: const Text("Draw Signature"),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _pickAndUploadSignature,
-                          icon: const Icon(Icons.upload_file, color: Colors.white),
-                          label: const Text("Upload Signature", style: TextStyle(color: Colors.white)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown,
-                            foregroundColor: Colors.white,
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _showSignaturePad,
+                              icon: const Icon(Icons.edit_outlined),
+                              label: Text("Draw", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFC09E5F), // Gold-ish color
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 3,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _pickAndUploadSignature,
+                              icon: const Icon(Icons.upload_file_outlined),
+                              label: Text("Upload", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: maroonPrimary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          // Loading overlay
-          if (_isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            // Loading overlay
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.4),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

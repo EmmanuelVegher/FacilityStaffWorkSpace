@@ -1,13 +1,17 @@
 // profile_page.dart
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/staff_model.dart';
 import '../widgets/drawer3.dart';
+import '../widgets/drawer2.dart';
 import '../widgets/editable_gender.dart';
 import '../widgets/editable_maritalstatus.dart';
 import '../widgets/header_widget.dart';
@@ -293,445 +297,538 @@ class _ProfilePage2State extends State<ProfilePage2> {
     return LayoutBuilder(
       builder: (context, constraints) {
         bool isDesktop = constraints.maxWidth > 900;
-        bool isTablet = constraints.maxWidth > 600 && constraints.maxWidth <= 900;
+        bool isTablet =
+            constraints.maxWidth > 600 && constraints.maxWidth <= 900;
         double fontSizeName = isDesktop ? 28 : isTablet ? 24 : 22;
         double fontSizeDesignation = isDesktop ? 20 : isTablet ? 18 : 16;
         double fontSizeSectionTitle = isDesktop ? 18 : isTablet ? 17 : 16;
         double fontSizeDetailTitle = isDesktop ? 16 : isTablet ? 15 : 14;
         double fontSizeDetailSubtitle = isDesktop ? 16 : isTablet ? 15 : 14;
-        double cardPadding = isDesktop ? 20 : 15;
-        double cardMarginVertical = isDesktop ? 15 : 10;
-        double cardMarginHorizontal = isDesktop ? 20 : 10;
-        double profileImageSize = isDesktop ? 150 : isTablet ? 130 : 120;
-        double syncButtonWidth = isDesktop ? 0.4 : 0.6;
-        double syncButtonHeight = isDesktop ? 0.05 : 0.06;
-        double sectionTitlePaddingBottom = isDesktop ? 10 : 8;
+        double cardPadding = isDesktop ? 24 : 16;
+        double cardMarginVertical = isDesktop ? 16 : 12;
+        double cardMarginHorizontal = isDesktop ? 32 : 12;
+        double profileImageSize = isDesktop ? 180 : isTablet ? 150 : 130;
+        double syncButtonWidth = isDesktop ? 0.35 : 0.7;
+        double syncButtonHeight = isDesktop ? 0.055 : 0.065;
+        double sectionTitlePaddingBottom = isDesktop ? 12 : 8;
 
         return Scaffold(
-          drawer: drawer3(context,),
+          drawer: drawer2(context),
           appBar: AppBar(
-            title: const Text('Profile page', style: TextStyle(color: Colors.white)),
-            iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
+            title: Text('Profile',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: Container(
-              decoration: const BoxDecoration(gradient: appBarGradient),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
             actions: [
-
               Container(
                 margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
                 child: Image.asset("assets/image/ccfn_logo.png"),
               )
             ],
           ),
-          body: firebaseAuthId == null || _staffData == null
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-            child: Stack(
-              // ... (rest of the Stack and Container widgets are the same as before)
-              children: [
-                const SizedBox(
-                  height: 100,
-                  child: HeaderWidget(100, false, Icons.house_rounded),
-                ),
-                Container(
-                  alignment: Alignment.center,
-                  margin: EdgeInsets.fromLTRB(cardMarginHorizontal, 10, cardMarginHorizontal, 10),
-                  padding: const EdgeInsets.fromLTRB(7, 0, 7, 0),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          _pickProfileImage().then((_) {
-                            pickUpLoadProfilePic();
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(
-                            top: 20,
-                            bottom: 24,
-                          ),
-                          height: profileImageSize,
-                          width: profileImageSize,
+          body: SelectionArea(
+            child: firebaseAuthId == null || _staffData == null
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF5C1A2E)))
+                : SingleChildScrollView(
+                    child: Stack(
+                      children: [
+                        const SizedBox(
+                          height: 120,
+                          child: HeaderWidget(120, false, Icons.house_rounded),
+                        ),
+                        Container(
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.grey.shade300,
-                          ),
-                          child: _profileImageUrl != null
-                              ? ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              _profileImageUrl!,
-                              width: profileImageSize,
-                              height: profileImageSize,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: profileImageSize * 0.6, color: Colors.grey.shade600),
-                              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Center(
-                                  child: CircularProgressIndicator(
-                                    value: loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                        : null,
-                                  ),
-                                );
-                              },
-                            ),
-                          )
-                              : Icon(
-                            Icons.person,
-                            size: profileImageSize * 0.6,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '${_staffData?.firstName?.toString().toUpperCase()} ${_staffData?.lastName?.toString().toUpperCase()}',
-                        style: TextStyle(
-                          fontSize: fontSizeName,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        _staffData?.designation?.toString().toUpperCase() ?? '',
-                        style: TextStyle(
-                          fontSize: fontSizeDesignation,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: EdgeInsets.all(cardPadding),
-                        child: Column(
-                          children: <Widget>[
-                            Container(
-                              padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom),
-                              alignment: Alignment.topLeft,
-                              child: Text(
-                                "${_staffData?.role}'s Information",
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: fontSizeSectionTitle,
-                                ),
-                                textAlign: TextAlign.left,
-                              ),
-                            ),
-                            SizedBox(
-                              width: double.infinity,
-                              child: Card(
-                                elevation: 3,
-                                margin: EdgeInsets.symmetric(vertical: cardMarginVertical),
+                          margin: EdgeInsets.fromLTRB(cardMarginHorizontal, 10,
+                              cardMarginHorizontal, 10),
+                          padding: const EdgeInsets.fromLTRB(7, 0, 7, 0),
+                          child: Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  _pickProfileImage().then((_) {
+                                    pickUpLoadProfilePic();
+                                  });
+                                },
                                 child: Container(
-                                  alignment: Alignment.topLeft,
-                                  padding: EdgeInsets.all(cardPadding),
-                                  child: Column(
-                                    children: <Widget>[
-                                      EditableGenderTile(
-                                        icon: Icons.person,
-                                        title: "Sex",
-                                        initialValue: _staffData?.gender ?? '',
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('gender', newValue);
-                                          setState(() {
-                                            newGender = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchGender: () => _fetchGenderFromFirestore(),
-                                      ),
-                                      EditableMaritalStatusTile(
-                                        icon: Icons.person,
-                                        title: "Marital Status",
-                                        initialValue: _staffData?.maritalStatus ?? '',
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('maritalStatus', newValue);
-                                          setState(() {
-                                            newMaritalStatus = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
-                                      ),
-
-                                      ListTile(
-                                        leading: const Icon(Icons.category),
-                                        title: Text("Staff Category", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.staffCategory ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.place),
-                                        title: Text("State", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.state.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.my_location),
-                                        title: Text(_staffData?.staffCategory == "Facility Staff"
-                                            ? "Facility Name"
-                                            : _staffData?.staffCategory == "State Office Staff"
-                                            ? "Office Name"
-                                            : "Office Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.location.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text('Email', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.emailAddress ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      _buildEditableListTile1(
-                                        icon: Icons.phone,
-                                        title: 'Phone',
-                                        controller: _phoneController,
-                                        initialValue: _staffData?.mobile,
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) async {
-                                          _updateFirestoreField('mobile', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.local_fire_department_sharp),
-                                        title: Text('Department', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.department ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Designation", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.designation.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.work),
-                                        title: Text('Project', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.project ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Supervisor's Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisor.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Supervisor's Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-
-                                      // System Information Section
-                                      Container(
-                                        padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
-                                        alignment: Alignment.topLeft,
-                                        child: Text(
-                                          "System Information",
-                                          style: TextStyle(
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: fontSizeSectionTitle,
-                                          ),
-                                          textAlign: TextAlign.left,
-                                        ),
-                                      ),
-
-                                      // Staff ID
-                                      ListTile(
-                                        leading: const Icon(Icons.perm_identity),
-                                        title: Text("Staff ID", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.id?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Sync Status
-                                      ListTile(
-                                        leading: const Icon(Icons.sync),
-                                        title: Text("Sync Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.isSynced == true ? 'Synced' : 'Not Synced', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Created By
-                                      ListTile(
-                                        leading: const Icon(Icons.person_add),
-                                        title: Text("Created By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Created By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Created By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Last Updated By
-                                      ListTile(
-                                        leading: const Icon(Icons.update),
-                                        title: Text("Last Updated By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Last Updated By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Last Updated By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      // Padding(
-                                      //   padding: const EdgeInsets.symmetric(vertical: 10.0),
-                                      //   child: Row(
-                                      //       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                      //       children: [
-                                      //         Row(children: [
-                                      //           const Icon(Icons.draw),
-                                      //           Text("Is Signature saved?", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                      //           Text(_signatureLink != null ? "Yes" : "No", style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      //         ]),
-                                      //         Row(children: [
-                                      //           ElevatedButton(
-                                      //             onPressed: () {
-                                      //               showModalBottomSheet(
-                                      //                 context: context,
-                                      //                 builder: (context) => Container(
-                                      //                   height: MediaQuery.of(context).size.width *
-                                      //                       (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.60),
-                                      //                   padding: const EdgeInsets.all(16),
-                                      //                   child: Column(children: [
-                                      //                     SizedBox(
-                                      //                       height: MediaQuery.of(context).size.width *
-                                      //                           (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.50),
-                                      //                       child: GestureDetector(
-                                      //                         onTap: () {
-                                      //                           _pickSignatureImage();
-                                      //                         },
-                                      //                         child: Container(
-                                      //                           margin: const EdgeInsets.only(
-                                      //                             top: 20,
-                                      //                             bottom: 24,
-                                      //                           ),
-                                      //                           height: MediaQuery.of(context).size.width *
-                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                      //                           width: MediaQuery.of(context).size.width *
-                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                      //                           alignment: Alignment.center,
-                                      //                           decoration: BoxDecoration(
-                                      //                             borderRadius: BorderRadius.circular(20),
-                                      //                           ),
-                                      //                           child: _signatureImage != null
-                                      //                               ? ClipRRect(
-                                      //                               borderRadius: BorderRadius.circular(20),
-                                      //                               child: Image.file(
-                                      //                                 _signatureImage!,
-                                      //                                 width: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                      //                                 height: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                      //                                 fit: BoxFit.cover,
-                                      //                               )
-                                      //                           )
-                                      //                               : Column(
-                                      //                             mainAxisAlignment: MainAxisAlignment.center,
-                                      //                             children: [
-                                      //                               Icon(
-                                      //                                 Icons.upload_file,
-                                      //                                 size: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.075 : 0.05),
-                                      //                                 color: Colors.grey.shade600,
-                                      //                               ),
-                                      //                               const SizedBox(height: 8),
-                                      //                               const Text(
-                                      //                                 "Click to Upload Signature Image Here",
-                                      //                                 style: TextStyle(
-                                      //                                   fontSize: 14,
-                                      //                                   color: Colors.grey,
-                                      //                                   fontWeight: FontWeight.bold,
-                                      //                                 ),
-                                      //                                 textAlign: TextAlign.center,
-                                      //                               ),
-                                      //                             ],
-                                      //                           ),
-                                      //                         ),
-                                      //                       ),
-                                      //                     ),
-                                      //                     ElevatedButton(
-                                      //                         onPressed: () {
-                                      //                           _uploadSignatureAndSync().then((_){
-                                      //                             Navigator.pop(context);
-                                      //                           });
-                                      //
-                                      //                         },
-                                      //                         child: const Text("Save Signature")),
-                                      //                   ]),
-                                      //                 ),
-                                      //               );
-                                      //             },
-                                      //             child: _signatureLink == null ? const Text("Add") : const Text("Update"),
-                                      //           ),
-                                      //         ]),
-                                      //       ]),
-                                      // ),
+                                  margin: const EdgeInsets.only(
+                                      top: 20, bottom: 24),
+                                  height: profileImageSize,
+                                  width: profileImageSize,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.grey.shade300,
+                                    border: Border.all(
+                                        color: const Color(0xFFD4A03C),
+                                        width: 2),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                          color: Colors.black12,
+                                          blurRadius: 10,
+                                          offset: Offset(0, 5))
                                     ],
                                   ),
+                                  child: _profileImageUrl != null
+                                      ? ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(18),
+                                          child: Image.network(
+                                            _profileImageUrl!,
+                                            width: profileImageSize,
+                                            height: profileImageSize,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error,
+                                                    stackTrace) =>
+                                                Icon(Icons.person,
+                                                    size: profileImageSize * 0.6,
+                                                    color:
+                                                        Colors.grey.shade600),
+                                            loadingBuilder:
+                                                (BuildContext context,
+                                                    Widget child,
+                                                    ImageChunkEvent?
+                                                        loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress
+                                                              .expectedTotalBytes !=
+                                                          null
+                                                      ? loadingProgress
+                                                              .cumulativeBytesLoaded /
+                                                          loadingProgress
+                                                              .expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : Icon(Icons.person,
+                                          size: profileImageSize * 0.6,
+                                          color: Colors.grey.shade600),
                                 ),
                               ),
-                            )
-                          ],
-                        ),
-                      ),
-                      !isSynced
-                          ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20.0),
-                          child: GestureDetector(
-                            onTap: () async {
-                              await syncCompleteData();
-                              setState(() {
-                                isSynced = newSynced;
-                              });
-                            },
-                            child: Container(
-                              width: MediaQuery.of(context).size.width * syncButtonWidth,
-                              height: MediaQuery.of(context).size.height * syncButtonHeight,
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.red,
-                                    Colors.black,
+                              const SizedBox(height: 20),
+                              Text(
+                                '${_staffData?.firstName?.toString().toUpperCase()} ${_staffData?.lastName?.toString().toUpperCase()}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: fontSizeName,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF5C1A2E),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _staffData?.designation
+                                        ?.toString()
+                                        .toUpperCase() ??
+                                    '',
+                                style: GoogleFonts.poppins(
+                                  fontSize: fontSizeDesignation,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFD4A03C),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: EdgeInsets.all(cardPadding),
+                                child: Column(
+                                  children: <Widget>[
+                                    Container(
+                                      padding: EdgeInsets.only(
+                                          left: 8.0,
+                                          bottom: sectionTitlePaddingBottom),
+                                      alignment: Alignment.topLeft,
+                                      child: Text(
+                                        "${_staffData?.role}'s Information",
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFF5C1A2E),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: fontSizeSectionTitle,
+                                        ),
+                                        textAlign: TextAlign.left,
+                                      ),
+                                    ),
+                                    Card(
+                                      elevation: 4,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16)),
+                                      margin: EdgeInsets.symmetric(
+                                          vertical: cardMarginVertical),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Column(
+                                          children: <Widget>[
+                                            EditableGenderTile(
+                                              icon: Icons.person_outline,
+                                              title: "Sex",
+                                              initialValue:
+                                                  _staffData?.gender ?? '',
+                                              onSave: (newValue) {
+                                                _updateFirestoreField(
+                                                    'gender', newValue);
+                                                setState(() {
+                                                  newGender = newValue;
+                                                  isSynced = false;
+                                                });
+                                              },
+                                              fetchGender: () =>
+                                                  _fetchGenderFromFirestore(),
+                                            ),
+                                            EditableMaritalStatusTile(
+                                              icon: Icons.favorite_outline,
+                                              title: "Marital Status",
+                                              initialValue:
+                                                  _staffData?.maritalStatus ??
+                                                      '',
+                                              onSave: (newValue) {
+                                                _updateFirestoreField(
+                                                    'maritalStatus', newValue);
+                                                setState(() {
+                                                  newMaritalStatus = newValue;
+                                                  isSynced = false;
+                                                });
+                                              },
+                                              fetchMaritalStatus: () =>
+                                                  _fetchMaritalStatusFromFirestore(),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.category_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("Staff Category",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.staffCategory ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.map_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("State",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.state.toString() ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.business_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text(
+                                                  _staffData?.staffCategory ==
+                                                          "Facility Staff"
+                                                      ? "Facility Name"
+                                                      : "Office Name",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.location
+                                                          .toString() ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.email_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text('Email',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.emailAddress ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            _buildEditableTile(
+                                              icon: Icons.phone_outlined,
+                                              title: 'Phone',
+                                              controller: _phoneController,
+                                              initialValue: _staffData?.mobile,
+                                              onSave: (newValue) async {
+                                                _updateFirestoreField(
+                                                    'mobile', newValue);
+                                                setState(() {
+                                                  isSynced = false;
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Container(
+                                      padding: EdgeInsets.only(
+                                          left: 8.0,
+                                          bottom: sectionTitlePaddingBottom),
+                                      alignment: Alignment.topLeft,
+                                      child: Text(
+                                        "Professional Details",
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFF5C1A2E),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: fontSizeSectionTitle,
+                                        ),
+                                        textAlign: TextAlign.left,
+                                      ),
+                                    ),
+                                    Card(
+                                      elevation: 4,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16)),
+                                      margin: EdgeInsets.symmetric(
+                                          vertical: cardMarginVertical),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Column(
+                                          children: [
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.apartment_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text('Department',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.department ?? '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.assignment_ind_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("Designation",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.designation
+                                                          .toString() ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.work_outline,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text('Project',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.project ?? '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.supervisor_account_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("Supervisor",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.supervisor
+                                                          .toString() ??
+                                                      '',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Container(
+                                      padding: EdgeInsets.only(
+                                          left: 8.0,
+                                          bottom: sectionTitlePaddingBottom),
+                                      alignment: Alignment.topLeft,
+                                      child: Text(
+                                        "System Information",
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFF5C1A2E),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: fontSizeSectionTitle,
+                                        ),
+                                        textAlign: TextAlign.left,
+                                      ),
+                                    ),
+                                    Card(
+                                      elevation: 4,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16)),
+                                      margin: EdgeInsets.symmetric(
+                                          vertical: cardMarginVertical),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Column(
+                                          children: [
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.fingerprint_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("Staff ID",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.id?.toString() ??
+                                                      'Not Available',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle)),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(
+                                                  Icons.sync_outlined,
+                                                  color: Color(0xFF5C1A2E)),
+                                              title: Text("Sync Status",
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailTitle,
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                              subtitle: Text(
+                                                  _staffData?.isSynced == true
+                                                      ? 'Synced'
+                                                      : 'Not Synced',
+                                                  style: GoogleFonts.poppins(
+                                                      fontSize:
+                                                          fontSizeDetailSubtitle,
+                                                      color: _staffData?.isSynced ==
+                                                              true
+                                                          ? Colors.green
+                                                          : Colors.orange)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 32),
+                                    if (!isSynced)
+                                      GestureDetector(
+                                        onTap: () async {
+                                          await syncCompleteData();
+                                          setState(() {
+                                            isSynced = newSynced;
+                                          });
+                                        },
+                                        child: Container(
+                                          width: constraints.maxWidth *
+                                              syncButtonWidth,
+                                          height: constraints.maxHeight *
+                                              syncButtonHeight,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF5C1A2E),
+                                                Color(0xFF2E0215)
+                                              ],
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(15),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                  color: Colors.black26,
+                                                  blurRadius: 8,
+                                                  offset: Offset(0, 4))
+                                            ],
+                                          ),
+                                          child: Center(
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  "Sync Updated Bio Data",
+                                                  style: GoogleFonts.poppins(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize:
+                                                          fontSizeDetailTitle),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Icon(
+                                                  Icons.arrow_upward_rounded,
+                                                  size: fontSizeDetailTitle + 4,
+                                                  color: Colors.white,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(height: 40),
                                   ],
                                 ),
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(15),
-                                ),
                               ),
-                              child: Center(
-                                child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        "Sync Updated Bio Data",
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: fontSizeDetailTitle),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Icon(
-                                        Icons.arrow_upward,
-                                        size: fontSizeDetailTitle + 4,
-                                        color: Colors.white,
-                                      ),
-                                    ]),
-                              ),
-                            ),
-                          ))
-                          : const SizedBox.shrink(),
-                    ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
           ),
         );
       },
@@ -739,12 +836,7 @@ class _ProfilePage2State extends State<ProfilePage2> {
   }
 
   Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
@@ -1044,23 +1136,25 @@ class _ProfilePage2State extends State<ProfilePage2> {
   }
 
 
-  Widget _buildEditableListTile1({
+  Widget _buildEditableTile({
     required IconData icon,
     required String title,
     String? initialValue,
     TextEditingController? controller,
     required Function(String) onSave,
-    double? fontSizeTitle,
-    double? fontSizeSubtitle,
   }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title, style: const TextStyle(fontSize: 16)),
+      leading: Icon(icon, color: const Color(0xFF5C1A2E)),
+      title: Text(title,
+          style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF5C1A2E))),
       subtitle: initialValue != null
-          ? Text(initialValue, style: const TextStyle(fontSize: 14))
+          ? Text(initialValue, style: GoogleFonts.poppins(fontSize: 14))
           : null,
       trailing: IconButton(
-        icon: const Icon(Icons.edit),
+        icon: const Icon(Icons.edit, color: Color(0xFFD4A03C)),
         onPressed: () {
           _showEditDialog1(
             context: context,
@@ -1083,16 +1177,26 @@ class _ProfilePage2State extends State<ProfilePage2> {
       context: context,
       builder: (context) {
         String? newValue = initialValue;
+        TextEditingController dialogController =
+            TextEditingController(text: initialValue);
 
         return AlertDialog(
-          title: Text('Edit $title'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Edit $title',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold, color: const Color(0xFF5C1A2E))),
           content: TextField(
             onChanged: (value) {
               newValue = value;
             },
-            controller: TextEditingController(text: initialValue),
+            controller: dialogController,
+            style: GoogleFonts.poppins(),
             decoration: InputDecoration(
               hintText: 'Enter new $title',
+              hintStyle: GoogleFonts.poppins(),
+              focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFD4A03C))),
             ),
           ),
           actions: [
@@ -1100,14 +1204,22 @@ class _ProfilePage2State extends State<ProfilePage2> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Cancel'),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.grey)),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
                 onSave(newValue ?? "");
                 Navigator.of(context).pop();
               },
-              child: const Text('Save'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5C1A2E),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text('Save',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );

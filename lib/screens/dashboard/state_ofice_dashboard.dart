@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -270,13 +271,14 @@ class DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       drawer: drawer2(context),
       appBar: AppBar(
-        title: Text('$_currentUserState Monitoring Dashboard', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('$_currentUserState Monitoring Dashboard', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFF5C1A2E), // Corporate Maroon
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -293,7 +295,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 builder: (context, snapshot) {
                   return Text(
                     snapshot.data ?? '',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   );
                 },
               ),
@@ -306,24 +308,26 @@ class DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 10),
         ],
       ),
-      body: Column(
-        children: [
-          _buildTopFilterBar(),
-          Expanded(
-            child: StreamBuilder<DashboardData>(
-              stream: _dashboardStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError) {
-                  debugPrint("Dashboard Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
-                  return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("An error occurred: ${snapshot.error}", style: const TextStyle(color: Colors.red))));
-                }
-                if (!snapshot.hasData || snapshot.data!.staffList.isEmpty) return const Center(child: Text("No 'Facility Staff' found for your state."));
-                return _buildDashboardContent(snapshot.data!);
-              },
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildTopFilterBar(),
+            Expanded(
+              child: StreamBuilder<DashboardData>(
+                stream: _dashboardStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (snapshot.hasError) {
+                    debugPrint("Dashboard Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
+                    return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("An error occurred: ${snapshot.error}", style: GoogleFonts.poppins(color: Colors.red))));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.staffList.isEmpty) return Center(child: Text("No 'Facility Staff' found for your state.", style: GoogleFonts.poppins()));
+                  return _buildDashboardContent(snapshot.data!);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -332,10 +336,10 @@ class DashboardScreenState extends State<DashboardScreen> {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: SegmentedButton<AttendanceFilter>(
-        segments: const [
-          ButtonSegment(value: AttendanceFilter.all, label: Text('All'), icon: Icon(Icons.people)),
-          ButtonSegment(value: AttendanceFilter.onTime, label: Text('On Time'), icon: Icon(Icons.timer_outlined)),
-          ButtonSegment(value: AttendanceFilter.late, label: Text('Late'), icon: Icon(Icons.history_toggle_off)),
+        segments: [
+          ButtonSegment(value: AttendanceFilter.all, label: Text('All', style: GoogleFonts.poppins()), icon: const Icon(Icons.people)),
+          ButtonSegment(value: AttendanceFilter.onTime, label: Text('On Time', style: GoogleFonts.poppins()), icon: const Icon(Icons.timer_outlined)),
+          ButtonSegment(value: AttendanceFilter.late, label: Text('Late', style: GoogleFonts.poppins()), icon: const Icon(Icons.history_toggle_off)),
         ],
         selected: {_filterController.value},
         onSelectionChanged: (newSelection) => _filterController.add(newSelection.first),
@@ -392,7 +396,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18), overflow: TextOverflow.ellipsis)),
+                  Flexible(child: Text(title, style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)), overflow: TextOverflow.ellipsis)),
                   if (trailing != null) trailing,
                 ],
               ),
@@ -492,11 +496,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text('Gender Breakdown', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
+        Text('Gender Breakdown', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
         const SizedBox(height: 12),
-        Text('Male: $malePresent / ${data.staffList.where((s) => s.gender == 'Male').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text('Male: $malePresent / ${data.staffList.where((s) => s.gender == 'Male').length} Present', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text('Female: $femalePresent / ${data.staffList.where((s) => s.gender == 'Female').length} Present', style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text('Female: $femalePresent / ${data.staffList.where((s) => s.gender == 'Female').length} Present', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
       ],
     );
 
@@ -524,8 +528,8 @@ class DashboardScreenState extends State<DashboardScreen> {
           widget: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text("${presentIds.length}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              Text("Clocked In /\n${data.staffList.length} Staff", textAlign: TextAlign.center),
+              Text("${presentIds.length}", style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
+              Text("Clocked In /\n${data.staffList.length} Staff", textAlign: TextAlign.center, style: GoogleFonts.poppins()),
             ],
           ),
         ),
@@ -539,7 +543,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           child: TextButton.icon(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AttendanceAnalysisPage())),
             icon: const Icon(Icons.analytics_outlined, size: 16),
-            label: const Text("View Full Analysis"),
+            label: Text("View Full Analysis", style: GoogleFonts.poppins()),
           ),
         ),
         Expanded(
@@ -570,9 +574,9 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildPunctualityChampion(StaffInfo? champion, AttendanceRecord? record) {
     if (champion == null || record == null) {
-      return const Column(
+      return Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [ Icon(Icons.shield_moon_outlined, size: 80, color: Colors.grey), SizedBox(height: 8), Text("Punctuality Champion", style: TextStyle(fontWeight: FontWeight.bold)), Text("No punctual staff today", style: TextStyle(color: Colors.grey))]);
+          children: [ const Icon(Icons.shield_moon_outlined, size: 80, color: Colors.grey), const SizedBox(height: 8), Text("Punctuality Champion", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), Text("No punctual staff today", style: GoogleFonts.poppins(color: Colors.grey))]);
     }
     final championImage = champion.imageUrl;
     return Column(
@@ -585,10 +589,10 @@ class DashboardScreenState extends State<DashboardScreen> {
               : Icon(champion.gender == 'Male' ? Icons.person : Icons.person_2, size: 50, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 8),
-        const Text("Punctuality Champion", style: TextStyle(fontWeight: FontWeight.bold)),
-        Text(champion.name, textAlign: TextAlign.center),
-        Text(champion.location, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        Text(record.clockInTime, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+        Text("Punctuality Champion", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        Text(champion.name, textAlign: TextAlign.center, style: GoogleFonts.poppins()),
+        Text(champion.location, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+        Text(record.clockInTime, style: GoogleFonts.poppins(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
       ],
     );
   }
@@ -596,23 +600,23 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildYetToClockInCard(DashboardData data) {
     final yetToClockInList = data.yetToClockIn;
     if (yetToClockInList.isEmpty) {
-      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle, color: Colors.green, size: 40), SizedBox(height: 8), Text("All staff have clocked in!", textAlign: TextAlign.center)]));
+      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check_circle, color: Colors.green, size: 40), const SizedBox(height: 8), Text("All staff have clocked in!", textAlign: TextAlign.center, style: GoogleFonts.poppins())]));
     }
     return ListView.builder(
       itemCount: yetToClockInList.length,
       itemBuilder: (context, index) {
         final staff = yetToClockInList[index];
-        return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: Colors.red.shade100, child: Text(staff.name.isNotEmpty ? staff.name[0] : '?', style: TextStyle(color: Colors.red.shade800))), title: Text(staff.name, style: const TextStyle(fontSize: 14)), subtitle: Text(staff.location, style: const TextStyle(fontSize: 12)));
+        return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: Colors.red.shade100, child: Text(staff.name.isNotEmpty ? staff.name[0] : '?', style: GoogleFonts.poppins(color: Colors.red.shade800))), title: Text(staff.name, style: GoogleFonts.poppins(fontSize: 14)), subtitle: Text(staff.location, style: GoogleFonts.poppins(fontSize: 12)));
       },
     );
   }
 
   Widget _buildFacilityClockInCard(DashboardData data) {
-    return data.attendanceRecords.isEmpty ? const Center(child: Text("No clock-in records found.")) : ListView.builder(
+    return data.attendanceRecords.isEmpty ? Center(child: Text("No clock-in records found.", style: GoogleFonts.poppins())) : ListView.builder(
       itemCount: data.attendanceRecords.length,
       itemBuilder: (context, index) {
         final record = data.attendanceRecords[index];
-        return ListTile(dense: true, contentPadding: EdgeInsets.zero, title: Text(record.staffName, style: const TextStyle(fontWeight: FontWeight.w500)), subtitle: Text('${record.staffLocation}\n${DateFormat('dd-MMM-yyyy').format(record.timestamp)}'), isThreeLine: true, trailing: Text(record.clockInTime, style: TextStyle(fontWeight: FontWeight.bold, color: record.isLate ? Colors.red : Colors.green)));
+        return ListTile(dense: true, contentPadding: EdgeInsets.zero, title: Text(record.staffName, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)), subtitle: Text('${record.staffLocation}\n${DateFormat('dd-MMM-yyyy').format(record.timestamp)}', style: GoogleFonts.poppins()), isThreeLine: true, trailing: Text(record.clockInTime, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: record.isLate ? Colors.red : Colors.green)));
       },
     );
   }
@@ -620,14 +624,14 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTimesheetStatusCard() {
     return Column(
       children: [
-        Text(DateFormat('MMMM yyyy').format(DateTime(_selectedTimesheetYear, _selectedTimesheetMonth)), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+        Text(DateFormat('MMMM yyyy').format(DateTime(_selectedTimesheetYear, _selectedTimesheetMonth)), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
         Expanded(
           child: StreamBuilder<TimesheetMetrics>(
             stream: _timesheetStreamController.stream,
             builder: (context, snapshot) {
               if (_isTimesheetLoading) return const Center(child: CircularProgressIndicator());
-              if (snapshot.hasError) { debugPrint("Timesheet Stream Error: ${snapshot.error}\n${snapshot.stackTrace}"); return const Center(child: Text("Error", style: TextStyle(color: Colors.red))); }
-              if (!snapshot.hasData || snapshot.data == null || snapshot.data!.totalExpected == 0) return const Center(child: Text("No Data", style: TextStyle(color: Colors.grey)));
+              if (snapshot.hasError) { debugPrint("Timesheet Stream Error: ${snapshot.error}\n${snapshot.stackTrace}"); return Center(child: Text("Error", style: GoogleFonts.poppins(color: Colors.red))); }
+              if (!snapshot.hasData || snapshot.data == null || snapshot.data!.totalExpected == 0) return Center(child: Text("No Data", style: GoogleFonts.poppins(color: Colors.grey)));
               final metrics = snapshot.data!;
               final pendingSubmission = metrics.totalExpected - metrics.totalSubmitted;
               final completionPercentage = metrics.totalExpected > 0 ? (metrics.fullyApproved / metrics.totalExpected) * 100 : 0.0;
@@ -641,10 +645,10 @@ class DashboardScreenState extends State<DashboardScreen> {
                     _buildStatusRow('Pending Submission', '$pendingSubmission Staff', Colors.orange),
                     _buildStatusRow('Pending Approval', '${metrics.pendingApproval} Timesheets', Colors.red),
                     const Spacer(),
-                    Text('Overall Approval: ${completionPercentage.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Overall Approval: ${completionPercentage.toStringAsFixed(1)}%', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(value: completionPercentage / 100, minHeight: 10, borderRadius: BorderRadius.circular(5), backgroundColor: Colors.grey.shade300, valueColor: const AlwaysStoppedAnimation<Color>(Colors.green)),
-                    Align(alignment: Alignment.bottomRight, child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TimesheetReviewPage())), child: const Text('View Details'))),
+                    Align(alignment: Alignment.bottomRight, child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TimesheetReviewPage())), child: Text('View Details', style: GoogleFonts.poppins()))),
                   ],
                 ),
               );
@@ -660,7 +664,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [ Row(children: [Icon(Icons.circle, color: color, size: 10), const SizedBox(width: 8), Text(title)]), Text(count, style: const TextStyle(fontWeight: FontWeight.bold)) ],
+        children: [ Row(children: [Icon(Icons.circle, color: color, size: 10), const SizedBox(width: 8), Text(title, style: GoogleFonts.poppins())]), Text(count, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)) ],
       ),
     );
   }
@@ -691,7 +695,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             gauges.RangePointer(value: percentage, width: 0.2, sizeUnit: gauges.GaugeSizeUnit.factor, cornerStyle: gauges.CornerStyle.bothCurve, color: Colors.teal),
             gauges.MarkerPointer(value: percentage, markerHeight: 10, markerWidth: 10, markerType: gauges.MarkerType.circle, color: Colors.white)
           ],
-          annotations: <gauges.GaugeAnnotation>[gauges.GaugeAnnotation(widget: Text('${percentage.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)), angle: 90, positionFactor: 0.1)],
+          annotations: <gauges.GaugeAnnotation>[gauges.GaugeAnnotation(widget: Text('${percentage.toStringAsFixed(1)}%', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)), angle: 90, positionFactor: 0.1)],
         )
       ],
     );
@@ -700,22 +704,22 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildLeaveRequestCard(DashboardData data) {
     final pendingLeaves = data.pendingLeaves;
     if (pendingLeaves.isEmpty) {
-      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, color: Colors.green, size: 40), SizedBox(height: 8), Text("No pending leave requests.", textAlign: TextAlign.center)]));
+      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check_circle_outline, color: Colors.green, size: 40), const SizedBox(height: 8), Text("No pending leave requests.", textAlign: TextAlign.center, style: GoogleFonts.poppins())]));
     }
     return Column(
       children: [
-        Text("${pendingLeaves.length} Pending Request(s)", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+        Text("${pendingLeaves.length} Pending Request(s)", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
         const Divider(),
         Expanded(
           child: ListView.builder(
             itemCount: pendingLeaves.length,
             itemBuilder: (context, index) {
               final leave = pendingLeaves[index];
-              return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.person_outline)), title: Text(leave.staffName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)), subtitle: Text('${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})', style: const TextStyle(fontSize: 12)));
+              return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.person_outline)), title: Text(leave.staffName, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)), subtitle: Text('${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})', style: GoogleFonts.poppins(fontSize: 12)));
             },
           ),
         ),
-        Align(alignment: Alignment.bottomRight, child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StateLeaveRequestManagementPage())), child: const Text('View Details'))),
+        Align(alignment: Alignment.bottomRight, child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StateLeaveRequestManagementPage())), child: Text('View Details', style: GoogleFonts.poppins()))),
       ],
     );
   }
@@ -729,17 +733,17 @@ class LiveFeedFullScreenPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Full Clock-In Feed')),
-      body: records.isEmpty ? const Center(child: Text("No clock-in records to display.")) : ListView.builder(
+      appBar: AppBar(title: Text('Full Clock-In Feed', style: GoogleFonts.poppins())),
+      body: records.isEmpty ? Center(child: Text("No clock-in records to display.", style: GoogleFonts.poppins())) : ListView.builder(
         padding: const EdgeInsets.all(8.0), itemCount: records.length,
         itemBuilder: (context, index) {
           final record = records[index];
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4.0),
             child: ListTile(
-              title: Text(record.staffName, style: const TextStyle(fontWeight: FontWeight.w500)),
-              subtitle: Text('${record.staffLocation} - ${DateFormat('dd-MMM-yyyy').format(record.timestamp)}'),
-              trailing: Text(record.clockInTime, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: record.isLate ? Colors.red.shade700 : Colors.green.shade700)),
+              title: Text(record.staffName, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+              subtitle: Text('${record.staffLocation} - ${DateFormat('dd-MMM-yyyy').format(record.timestamp)}', style: GoogleFonts.poppins()),
+              trailing: Text(record.clockInTime, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: record.isLate ? Colors.red.shade700 : Colors.green.shade700)),
             ),
           );
         },

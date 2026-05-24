@@ -1,6 +1,8 @@
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -335,8 +337,19 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
     if (_isLoadingState) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Staff Status (State)', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF722F37),
+          title: Text('Staff Status (State)',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF5C1A2E),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         drawer: drawer2(context),
@@ -346,8 +359,19 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
     if (_stateError != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Staff Status (State)', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF722F37),
+          title: Text('Staff Status (State)',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF5C1A2E),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         drawer: drawer2(context),
@@ -365,8 +389,19 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Staff Status ($_userState)', style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text('Staff Status ($_userState)',
+            style: GoogleFonts.poppins(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
@@ -385,31 +420,34 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
           isScrollable: true,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
+          indicatorColor: const Color(0xFFD4A03C),
           tabs: [
-            Tab(text: 'Active ($_activeCount)'),
-            Tab(text: 'Inactive ($_inactiveCount)'),
-            Tab(text: 'Resigned ($_resignedCount)'),
-            Tab(text: 'Terminated ($_terminatedCount)'),
+            Tab(child: Text('Active ($_activeCount)', style: GoogleFonts.poppins())),
+            Tab(child: Text('Inactive ($_inactiveCount)', style: GoogleFonts.poppins())),
+            Tab(child: Text('Resigned ($_resignedCount)', style: GoogleFonts.poppins())),
+            Tab(child: Text('Terminated ($_terminatedCount)', style: GoogleFonts.poppins())),
           ],
         ),
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildCountsRow(context),
-          const SizedBox(height: 8),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildStatusList('Active'),
-                _buildStatusList('Inactive'),
-                _buildStatusList('Resigned'),
-                _buildStatusList('Terminated'),
-              ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildCountsRow(context),
+            const SizedBox(height: 8),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildStatusList('Active'),
+                  _buildStatusList('Inactive'),
+                  _buildStatusList('Resigned'),
+                  _buildStatusList('Terminated'),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

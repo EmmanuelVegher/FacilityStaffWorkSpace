@@ -21,6 +21,7 @@ import 'package:video_player/video_player.dart';
 import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Storage
 //import 'package:firebase_ml_vision/firebase_ml_vision.dart'; // Import Firebase ML Vision
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/button.dart';
 import '../../widgets/drawer.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1413,13 +1414,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
             children:[
               Text(
                 "Task Summary for ${DateFormat('MMMM yyyy').format(_selectedReportingDate)}",
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               ElevatedButton(
                 onPressed: () { // Disable button when saving
                   _performDataValidation(); // Call the data validation function
                 },
-                child: const Text('Task Validation'),
+                child: Text('Task Validation', style: GoogleFonts.poppins()),
               ),
 
 
@@ -2469,12 +2470,12 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                     Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        Text(report.reportType!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}"),
+                        Text(report.reportType!, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text("Date: ${DateFormat('yyyy-MM-dd').format(report.date!)}", style: GoogleFonts.poppins()),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text("Entered by: $username", style: const TextStyle(fontWeight: FontWeight.bold)), // Display username in card
+                    Text("Entered by: $username", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), // Display username in card
                     const SizedBox(height: 16),
                     Column(
                       children: _buildIndicatorRowsForUser(report, username), // Extract indicator row building
@@ -2486,13 +2487,13 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
                         ElevatedButton(
                           onPressed: () => _approveReportForUser(report, username), // Approve for specific user
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                          child: const Text("Approve All", style: TextStyle(color: Colors.white)),
+                          child: Text("Approve All", style: GoogleFonts.poppins(color: Colors.white)),
                         ),
                         const SizedBox(width: 10),
                         ElevatedButton(
                           onPressed: () => _returnReportForUser(report, username), // Return for specific user
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          child: const Text("Return All", style: TextStyle(color: Colors.white)),
+                          child: Text("Return All", style: GoogleFonts.poppins(color: Colors.white)),
                         ),
                       ],
                     ),
@@ -3475,12 +3476,7 @@ class _DailyActivityMonitoringPageState extends State<DailyActivityMonitoringPag
 
 
   Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot =
@@ -5296,12 +5292,12 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
           children: [
             Text(
               task.taskTitle ?? "No Title",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8.0),
             Text(
               task.taskDescription ?? "No Description",
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
             ),
             const SizedBox(height: 10),
             if (task.attachments != null && task.attachments!.isNotEmpty)
@@ -5311,7 +5307,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
                   "Analysis: ${task.appAnalysis!}",
-                  style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontStyle: FontStyle.italic),
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.blueGrey, fontStyle: FontStyle.italic),
                 ),
               ),
             const SizedBox(height: 16.0),
@@ -5324,11 +5320,11 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text("Supervisor's Approval Status: ",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                       Text("Supervisor's Approval Status: ",
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                       Text(
                         task.taskStatus ?? "Pending",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(width: 4.0),
                       _getTaskStatusIcon(task.taskStatus ?? "Pending"),
@@ -5346,7 +5342,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     _editTaskOnMainPage(task);
                   },
                   icon: const Icon(Icons.edit, size: 18),
-                  label: const Text("Edit", style: TextStyle(fontSize: 14)),
+                  label: Text("Edit", style: GoogleFonts.poppins(fontSize: 14)),
                 ),
                 const SizedBox(width: 8.0),
                 TextButton.icon(
@@ -5354,8 +5350,8 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
                     _deleteTask(task);
                   },
                   icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                  label: const Text("Delete",
-                      style: TextStyle(fontSize: 14, color: Colors.red)),
+                  label: Text("Delete",
+                      style: GoogleFonts.poppins(fontSize: 14, color: Colors.red)),
                 ),
               ],
             )
@@ -5790,7 +5786,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       String departmentName, List<Map<String, dynamic>> designationReports) {
     return ExpansionTile(
       title: Text(departmentName,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
       children: designationReports.map((designationReport) {
         String designationName = designationReport['designation'] as String;
         List<String> indicators =
@@ -6677,98 +6673,89 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
       ),
       appBar: _appBar(),
       backgroundColor: Colors.white,
-      body: Stack( // Wrap body in Stack
-        children: [
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : IndexedStack( // Use IndexedStack to manage different tabs
-            index: _selectedIndex,
-            children: [
-              SingleChildScrollView( // Daily Activity Monitoring Tab Content
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+      body: SelectionArea( // Wrapped in SelectionArea
+        child: Stack(
+          children: [
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : IndexedStack(
+              index: _selectedIndex,
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
 
-                    _addDateBar(),
-                    const SizedBox(height: 30),
-                    const Divider(),
-                    const Divider(),
-                    Text(
-                      "Routine Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(),
-                    const Divider(),
-                    const SizedBox(height: 10),
-
-                    const SizedBox(height: 20),
-                    // Dynamically build department expandable widgets (same as before)
-                    ...departmentGroupedReports.entries.map((entry) {
-                      String departmentName = entry.key;
-                      List<Map<String, dynamic>> designationReports = entry.value;
-                      return _buildDepartmentExpandable(departmentName, designationReports);
-                    }),
-
-                    const Divider(),
-                    const Divider(),
-                    Text(
-                      "Other Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(),
-                    const Divider(),
-
-                    const SizedBox(height: 10),
-                    _addTaskBar(),
-                    const SizedBox(height: 10),
-                    if (_tasksForDate.isEmpty)
-                      const Text("No tasks added for this date.",
-                          style: TextStyle(fontWeight: FontWeight.bold))
-                    else
-                      Column(
-                        children:
-                        _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
+                      _addDateBar(),
+                      const SizedBox(height: 30),
+                      const Divider(),
+                      const Divider(),
+                      Text(
+                        "Routine Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
+                        style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
-                    const Divider(),
-                    const Divider(),
-                    const SizedBox(height: 20),
+                      const Divider(),
+                      const Divider(),
+                      const SizedBox(height: 10),
 
-                    const SizedBox(height: 100),
-                  ],
+                      const SizedBox(height: 20),
+                      // Dynamically build department expandable widgets (same as before)
+                      ...departmentGroupedReports.entries.map((entry) {
+                        String departmentName = entry.key;
+                        List<Map<String, dynamic>> designationReports = entry.value;
+                        return _buildDepartmentExpandable(departmentName, designationReports);
+                      }),
+
+                      const Divider(),
+                      const Divider(),
+                      Text(
+                        "Other Tasks For ( ${_selectedReportingDate.toLocal().toString().split(' ')[0]} )",
+                        style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const Divider(),
+                      const Divider(),
+
+                      const SizedBox(height: 10),
+                      _addTaskBar(),
+                      const SizedBox(height: 10),
+                      if (_tasksForDate.isEmpty)
+                        Text("No tasks added for this date.",
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold))
+                      else
+                        Column(
+                          children:
+                          _tasksForDate.map((task) => _buildTaskCard(task)).toList(),
+                        ),
+                      const Divider(),
+                      const Divider(),
+                      const SizedBox(height: 20),
+
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+                _buildReviewListTab(),
+                _buildTaskSummaryTab(),
+              ],
+            ),
+            if (_isValidating)
+              Container(
+                color: Colors.black.withOpacity(0.5),
+                child: const Center(
+                  child: CircularProgressIndicator(),
                 ),
               ),
-              _buildReviewListTab(), // Review List Tab Content
-              _buildTaskSummaryTab(),
-            ],
-          ),
-          if (_isValidating) // Validation progress bar overlay
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: CircularProgressIndicator(),
+            if (_isAnalyzingImage)
+              Container(
+                color: Colors.black.withOpacity(0.5),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
-            ),
-          if (_isAnalyzingImage) // Gemini analysis progress bar overlay
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
-      // floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended( // Show FAB only on Daily Activity Tab
-      //   onPressed: () {
-      //     _showAddTaskBottomSheet(context);
-      //   },
-      //   label: const Text(
-      //     "Click to Add Extra Task",
-      //     style: TextStyle(color: Colors.white, fontSize: 14.0),
-      //   ),
-      //   icon: const Icon(Icons.add, color: Colors.white),
-      //   backgroundColor: Colors.red,
-      // ) : null, // No FAB on Review List Tab
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -6779,7 +6766,7 @@ void _initializeEditableMap(String reportTypeKey, List<String> indicators) {
             icon: Icon(Icons.list_alt),
             label: 'Review List',
           ),
-          BottomNavigationBarItem( // ADDED: Task Summary Tab
+          BottomNavigationBarItem(
             icon: Icon(Icons.summarize),
             label: 'Task Summary',
           ),

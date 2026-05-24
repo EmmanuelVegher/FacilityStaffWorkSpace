@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -896,45 +897,74 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       context: context,
       builder: (ctx) {
         return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
           return AlertDialog(
-            title: Text(title),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             content: SizedBox(
               width: 350,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: allOptions.length,
-                itemBuilder: (context, index) {
-                  final option = allOptions[index];
-                  final isAllOption = option == allKeyword;
-
-                  return CheckboxListTile(
-                    title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                    value: tempSelected.contains(option),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
                     onChanged: (bool? value) {
                       setStateDialog(() {
                         if (value == true) {
-                          if (isAllOption) {
-                            tempSelected.clear();
-                            tempSelected.add(allKeyword);
-                          } else {
-                            tempSelected.remove(allKeyword);
-                            tempSelected.add(option);
-                          }
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
                         } else {
-                          tempSelected.remove(option);
-                          if (tempSelected.isEmpty) {
-                            tempSelected.add(allKeyword);
-                          }
+                          tempSelected.clear();
                         }
                       });
                     },
-                  );
-                },
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
                   onPressed: () {
                     onConfirm(tempSelected);
                     Navigator.pop(context);
@@ -1509,10 +1539,19 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
       appBar: AppBar(
         title: Text(
           appBarTitle,
-          style: const TextStyle(color: Colors.white),
+          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: const Color(0xFF722F37),
+        backgroundColor: const Color(0xFF5C1A2E),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
@@ -1551,12 +1590,17 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
         ],
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          if (_isFilterLoading) const Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator()),
-          Expanded(child: bodyContent),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            if (_isFilterLoading)
+              const Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator()),
+            Expanded(child: bodyContent),
+          ],
+        ),
       ),
     );
   }
@@ -1572,7 +1616,9 @@ class _ReportsPageWeb2State extends State<ReportsPageWeb2> {
           padding: const EdgeInsets.all(12.0),
           child: Column(
             children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text(title,
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600, fontSize: 16)),
               const SizedBox(height: 10),
               SizedBox(height: 250, child: chartWithBoundary),
             ],

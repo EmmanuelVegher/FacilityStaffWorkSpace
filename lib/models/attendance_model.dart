@@ -49,6 +49,13 @@ class AttendanceModel {
   String? deductionStatus;
   String? evidenceImageUrl;
   Recommendation? recommendation;
+  // <<<--- VERIFICATION FIELDS START ---<<<
+  String? verificationMethod;
+  int? verificationCount;
+  bool? verificationRequired;
+  List<String>? verifiedByUserIds;
+  List<String>? verifiedByUserNames;
+  // <<<--- VERIFICATION FIELDS END ---<<<
   // <<<--- NEW FIELDS END ---<<<
 
   // <<<--- MODIFIED: Constructor updated with new fields ---<<<
@@ -76,6 +83,12 @@ class AttendanceModel {
     this.deductionStatus,
     this.evidenceImageUrl,
     this.recommendation,
+    // Verification fields
+    this.verificationMethod,
+    this.verificationCount,
+    this.verificationRequired,
+    this.verifiedByUserIds,
+    this.verifiedByUserNames,
   });
 
   // <<<--- MODIFIED: This is now the definitive factory for all data sources (local JSON, Firestore) ---<<<
@@ -118,6 +131,14 @@ class AttendanceModel {
       deductionStatus: json['deductionStatus'] as String?,
       evidenceImageUrl: json['evidenceImageUrl'] as String?,
       recommendation: rec,
+      // Verification fields
+      verificationMethod: json['verificationMethod'] as String?,
+      verificationCount: (json['verificationCount'] as num?)?.toInt(),
+      verificationRequired: json['verificationRequired'] as bool?,
+      verifiedByUserIds:
+          (json['verifiedByUserIds'] as List<dynamic>?)?.cast<String>(),
+      verifiedByUserNames:
+          (json['verifiedByUserNames'] as List<dynamic>?)?.cast<String>(),
     );
   }
 
@@ -148,6 +169,12 @@ class AttendanceModel {
       'evidenceImageUrl': evidenceImageUrl,
       // Use the toJson method from the embedded class
       'recommendation': recommendation?.toJson(),
+      // Verification fields
+      'verificationMethod': verificationMethod,
+      'verificationCount': verificationCount,
+      'verificationRequired': verificationRequired,
+      'verifiedByUserIds': verifiedByUserIds,
+      'verifiedByUserNames': verifiedByUserNames,
     };
   }
 }

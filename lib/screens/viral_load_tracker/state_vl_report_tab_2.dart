@@ -14,6 +14,9 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../widgets/global_multi_select_dropdown.dart';
 import '../../widgets/drawer2.dart';
 
 // --- DATA MODELS ---
@@ -131,8 +134,8 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
 
   // Filter State
   String? _currentUserState;
-  final List<String> _availableFacilities = ['All Facilities'];
-  List<String> _selectedFacilities = ['All Facilities'];
+  final List<String> _availableFacilities = [];
+  List<String> _selectedFacilities = [];
   List<String> _availableQuarters = [];
   String? _selectedQuarter;
 
@@ -291,7 +294,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
         .where('callDateTime', isGreaterThanOrEqualTo: startDate)
         .where('callDateTime',
             isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
-    if (!_selectedFacilities.contains('All Facilities')) {
+    if (_selectedFacilities.isNotEmpty) {
       query = query.where('trackerFacility', whereIn: _selectedFacilities);
     }
     final querySnapshot =
@@ -304,10 +307,7 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
   }
 
   Future<void> _fetchSummaries() async {
-    final List<String> facilitiesToQuery =
-        _selectedFacilities.contains('All Facilities')
-            ? _availableFacilities.where((f) => f != 'All Facilities').toList()
-            : _selectedFacilities;
+    final List<String> facilitiesToQuery = _selectedFacilities.contains("All Facilities") ? _availableFacilities.where((f) => f != "All Facilities").toList() : _selectedFacilities;
     if (facilitiesToQuery.isEmpty) {
       if (mounted) setState(() => _summaries = []);
       return;
@@ -546,18 +546,29 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appBarTitle,
-            style: const TextStyle(color: Colors.white),
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
             overflow: TextOverflow.ellipsis),
-        backgroundColor: const Color(0xFF722F37),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(child: bodyContent),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(child: bodyContent),
+          ],
+        ),
       ),
     );
   }
@@ -606,11 +617,6 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     if (_isFilterLoading || _currentUserState == null) {
       return const SizedBox.shrink();
     }
-    String facilityButtonText = _selectedFacilities.contains('All Facilities')
-        ? 'All Facilities'
-        : _selectedFacilities.length == 1
-            ? _selectedFacilities.first
-            : '${_selectedFacilities.length} Facilities';
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -622,30 +628,29 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
           runSpacing: 12.0,
           alignment: WrapAlignment.start,
           children: [
-            _buildFilterChip(
-                "Facility", facilityButtonText, Icons.business_center, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Facilities',
-                allOptions: _availableFacilities,
-                selectedOptions: _selectedFacilities,
-                allKeyword: 'All Facilities',
-                onConfirm: (results) =>
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) =>
                     setState(() => _selectedFacilities = results),
-              );
-            }, disabled: _isFacilitiesLoading),
+              ),
+            ),
             SizedBox(
               width: 200,
               child: DropdownButtonFormField<String>(
                 initialValue: _selectedQuarter,
-                hint: const Text('Select Quarter'),
+                hint: Text('Select Quarter', style: GoogleFonts.poppins()),
                 decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Quarter',
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
                 items: _availableQuarters
-                    .map((q) => DropdownMenuItem(value: q, child: Text(q)))
+                    .map((q) => DropdownMenuItem(value: q, child: Text(q, style: GoogleFonts.poppins())))
                     .toList(),
                 onChanged: (value) => setState(() => _selectedQuarter = value),
               ),
@@ -655,16 +660,18 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
               icon: const Icon(Icons.date_range_outlined),
               label: Text((startDate != null && endDate != null)
                   ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}'
-                  : 'Select Dates'),
+                  : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
               style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
@@ -701,12 +708,12 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
           ],
           if (_masterLogList.isNotEmpty) ...[
             Text('Call Log Analysis',
-                style: Theme.of(context).textTheme.headlineSmall),
+                style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
             const SizedBox(height: 16),
             _buildCallLogChartSection(),
             const SizedBox(height: 30),
             Text('Detailed Call Logs',
-                style: Theme.of(context).textTheme.headlineSmall),
+                style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
             const SizedBox(height: 10),
             _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
           ]
@@ -1166,61 +1173,88 @@ class _StateVlTrackingPageWebState extends State<StateVlTrackingPageWeb> {
     required Function(List<String>) onConfirm,
   }) async {
     final tempSelected = List<String>.from(selectedOptions);
+
     await showDialog(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(builder: (bldContext, setStateDialog) {
-            return AlertDialog(
-                title: Text(title),
-                content: SizedBox(
-                    width: 350,
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (bldContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
+          return AlertDialog(
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 350,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        if (value == true) {
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
+                        } else {
+                          tempSelected.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const Divider(),
+                  Expanded(
                     child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: allOptions.length,
-                        itemBuilder: (context, index) {
-                          final option = allOptions[index];
-                          final isAllOption = option == allKeyword;
-                          return CheckboxListTile(
-                            title: Text(option,
-                                style: TextStyle(
-                                    fontWeight: isAllOption
-                                        ? FontWeight.bold
-                                        : FontWeight.normal)),
-                            value: tempSelected.contains(option),
-                            onChanged: (bool? value) {
-                              setStateDialog(() {
-                                if (value == true) {
-                                  if (isAllOption) {
-                                    tempSelected
-                                      ..clear()
-                                      ..add(allKeyword);
-                                  } else {
-                                    tempSelected.remove(allKeyword);
-                                    tempSelected.add(option);
-                                  }
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
                                 } else {
-                                  tempSelected.remove(option);
-                                  if (tempSelected.isEmpty &&
-                                      allOptions.contains(allKeyword)) {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
                                     tempSelected.add(allKeyword);
                                   }
                                 }
-                              });
-                            },
-                          );
-                        })),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancel')),
-                  ElevatedButton(
-                      onPressed: () {
-                        onConfirm(tempSelected);
-                        Navigator.pop(dialogContext);
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
                       },
-                      child: const Text('Apply'))
-                ]);
-          });
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
+                  onPressed: () {
+                    onConfirm(tempSelected);
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Apply')),
+            ],
+          );
         });
+      },
+    );
   }
 }

@@ -5,6 +5,7 @@ import 'package:signature/signature.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/drawer.dart';
 
@@ -31,9 +32,10 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
   // State variable to control the visibility of the progress indicator
   bool _isLoading = false;
 
-  static const Color wineColor = Color(0xFF722F37);
+  static const Color wineColor = Color(0xFF5C1A2E);
+  static const Color goldColor = Color(0xFFD4A03C);
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)],
+    colors: [wineColor, Color(0xFF8B2635)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -225,7 +227,7 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Draw Signature"),
+          title: Text("Draw Signature", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           content: SizedBox(
             height: 300,
             width: 300,
@@ -237,7 +239,7 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
           actions: [
             TextButton(
               onPressed: () => _signatureController.clear(),
-              child: const Text("Clear"),
+              child: Text("Clear", style: GoogleFonts.poppins(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -246,7 +248,11 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
                 // Then, start the saving process which shows the indicator
                 _saveDrawnSignature();
               },
-              child: const Text("Save"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: wineColor,
+                foregroundColor: Colors.white,
+              ),
+              child: Text("Save", style: GoogleFonts.poppins()),
             ),
           ],
         );
@@ -259,7 +265,7 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
     return Scaffold(
       drawer: drawer(context),
       appBar: AppBar(
-        title: const Text('Upload Signature', style: TextStyle(color: Colors.white)),
+        title: Text('Upload Signature', style: GoogleFonts.poppins(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
@@ -311,9 +317,9 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
                               color: Colors.grey.shade600,
                             ),
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               "Tap to Draw or Upload Signature",
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -327,15 +333,15 @@ class _UploadSignaturePageState extends State<UploadSignaturePage> {
                         ElevatedButton.icon(
                           onPressed: _showSignaturePad,
                           icon: const Icon(Icons.create),
-                          label: const Text("Draw Signature"),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                          label: Text("Draw Signature", style: GoogleFonts.poppins()),
+                          style: ElevatedButton.styleFrom(backgroundColor: goldColor, foregroundColor: Colors.white),
                         ),
                         ElevatedButton.icon(
                           onPressed: _pickAndUploadSignature,
                           icon: const Icon(Icons.upload_file, color: Colors.white),
-                          label: const Text("Upload Signature", style: TextStyle(color: Colors.white)),
+                          label: Text("Upload Signature", style: GoogleFonts.poppins(color: Colors.white)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown,
+                            backgroundColor: wineColor,
                             foregroundColor: Colors.white,
                           ),
                         ),

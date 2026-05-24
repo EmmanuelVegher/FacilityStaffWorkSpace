@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 import '../models/staff_model.dart';
 import '../widgets/drawer4.dart';
 import '../widgets/editable_gender.dart';
@@ -59,10 +60,11 @@ class _ProfilePage4State extends State<ProfilePage4> {
   String? selectedSupervisor; // State variable to store the selected supervisor
   String? selectedFacilitySupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
-  // Define wine color and gradients
-  static const Color wineColor = Color(0xFF722F37); // Deep wine color
+  
+  // Define Maroon theme colors
+  static const Color maroonPrimary = Color(0xFF5C1A2E); 
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
+    colors: [maroonPrimary, Color(0xFF2E0215)], // Consistent Maroon/Gold gradient
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -268,26 +270,6 @@ class _ProfilePage4State extends State<ProfilePage4> {
     });
   }
 
-  Future<void> getAttendance() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      // Assuming SuperAdminUserDashBoard can handle navigation appropriately
-      // Navigator.push(
-      //     context,
-      //     MaterialPageRoute(
-      //         builder: (context) => const SuperAdminUserDashBoard()));
-    } else {
-      Fluttertoast.showToast(
-          msg: "User not logged in.",
-          toastLength: Toast.LENGTH_SHORT,
-          backgroundColor: Colors.red,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -310,427 +292,281 @@ class _ProfilePage4State extends State<ProfilePage4> {
         return Scaffold(
           drawer: drawer4(context,),
           appBar: AppBar(
-            title: const Text('Profile page', style: TextStyle(color: Colors.white)),
+            title: Text('Profile Page', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+            centerTitle: true,
             iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
             flexibleSpace: Container(
               decoration: const BoxDecoration(gradient: appBarGradient),
             ),
             actions: [
-
               Container(
                 margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
                 child: Image.asset("assets/image/ccfn_logo.png"),
               )
             ],
           ),
-          body: firebaseAuthId == null || _staffData == null
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-            child: Stack(
-              // ... (rest of the Stack and Container widgets are the same as before)
-              children: [
-                const SizedBox(
-                  height: 100,
-                  child: HeaderWidget(100, false, Icons.house_rounded),
-                ),
-                Container(
-                  alignment: Alignment.center,
-                  margin: EdgeInsets.fromLTRB(cardMarginHorizontal, 10, cardMarginHorizontal, 10),
-                  padding: const EdgeInsets.fromLTRB(7, 0, 7, 0),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          _pickProfileImage().then((_) {
-                            pickUpLoadProfilePic();
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(
-                            top: 20,
-                            bottom: 24,
-                          ),
-                          height: profileImageSize,
-                          width: profileImageSize,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.grey.shade300,
-                          ),
-                          child: _profileImageUrl != null
-                              ? ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              _profileImageUrl!,
-                              width: profileImageSize,
-                              height: profileImageSize,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: profileImageSize * 0.6, color: Colors.grey.shade600),
-                              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Center(
-                                  child: CircularProgressIndicator(
-                                    value: loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                        : null,
-                                  ),
-                                );
-                              },
+          body: SelectionArea( // Wrapped in SelectionArea for copyable text
+            child: firebaseAuthId == null || _staffData == null
+                ? const Center(child: CircularProgressIndicator(color: maroonPrimary))
+                : SingleChildScrollView(
+              child: Stack(
+                children: [
+                  const SizedBox(
+                    height: 100,
+                    child: HeaderWidget(100, false, Icons.house_rounded),
+                  ),
+                  Container(
+                    alignment: Alignment.center,
+                    margin: EdgeInsets.fromLTRB(cardMarginHorizontal, 10, cardMarginHorizontal, 10),
+                    padding: const EdgeInsets.fromLTRB(7, 0, 7, 0),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            _pickProfileImage().then((_) {
+                              pickUpLoadProfilePic();
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(
+                              top: 20,
+                              bottom: 24,
                             ),
-                          )
-                              : Icon(
-                            Icons.person,
-                            size: profileImageSize * 0.6,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '${_staffData?.firstName?.toString().toUpperCase()} ${_staffData?.lastName?.toString().toUpperCase()}',
-                        style: TextStyle(
-                          fontSize: fontSizeName,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        _staffData?.designation?.toString().toUpperCase() ?? '',
-                        style: TextStyle(
-                          fontSize: fontSizeDesignation,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: EdgeInsets.all(cardPadding),
-                        child: Column(
-                          children: <Widget>[
-                            Container(
-                              padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom),
-                              alignment: Alignment.topLeft,
-                              child: Text(
-                                "${_staffData?.role}'s Information",
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: fontSizeSectionTitle,
+                            height: profileImageSize,
+                            width: profileImageSize,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: Colors.grey.shade300,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
                                 ),
-                                textAlign: TextAlign.left,
-                              ),
+                              ],
                             ),
-                            SizedBox(
-                              width: double.infinity,
-                              child: Card(
-                                elevation: 3,
-                                margin: EdgeInsets.symmetric(vertical: cardMarginVertical),
-                                child: Container(
-                                  alignment: Alignment.topLeft,
-                                  padding: EdgeInsets.all(cardPadding),
-                                  child: Column(
-                                    children: <Widget>[
-                                      EditableGenderTile(
-                                        icon: Icons.person,
-                                        title: "Sex",
-                                        initialValue: _staffData?.gender ?? '',
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('gender', newValue);
-                                          setState(() {
-                                            newGender = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchGender: () => _fetchGenderFromFirestore(),
-                                      ),
-                                      EditableMaritalStatusTile(
-                                        icon: Icons.person,
-                                        title: "Marital Status",
-                                        initialValue: _staffData?.maritalStatus ?? '',
-                                        onSave: (newValue) {
-                                          _updateFirestoreField('maritalStatus', newValue);
-                                          setState(() {
-                                            newMaritalStatus = newValue;
-                                            isSynced = false;
-                                          });
-                                        },
-                                        fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
-                                      ),
-
-                                      ListTile(
-                                        leading: const Icon(Icons.category),
-                                        title: Text("Staff Category", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.staffCategory ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.place),
-                                        title: Text("State", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.state.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.my_location),
-                                        title: Text(_staffData?.staffCategory == "Facility Staff"
-                                            ? "Facility Name"
-                                            : _staffData?.staffCategory == "State Office Staff"
-                                            ? "Office Name"
-                                            : "Office Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.location.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text('Email', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.emailAddress ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      _buildEditableListTile1(
-                                        icon: Icons.phone,
-                                        title: 'Phone',
-                                        controller: _phoneController,
-                                        initialValue: _staffData?.mobile,
-                                        fontSizeTitle: fontSizeDetailTitle,
-                                        fontSizeSubtitle: fontSizeDetailSubtitle,
-                                        onSave: (newValue) async {
-                                          _updateFirestoreField('mobile', newValue);
-                                          setState(() {
-                                            isSynced = false;
-                                          });
-                                        },
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.local_fire_department_sharp),
-                                        title: Text('Department', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.department ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Designation", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.designation.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.work),
-                                        title: Text('Project', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.project ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Supervisor's Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisor.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Supervisor's Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-
-                                      // System Information Section
-                                      Container(
-                                        padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
-                                        alignment: Alignment.topLeft,
-                                        child: Text(
-                                          "System Information",
-                                          style: TextStyle(
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: fontSizeSectionTitle,
-                                          ),
-                                          textAlign: TextAlign.left,
-                                        ),
-                                      ),
-
-                                      // Staff ID
-                                      ListTile(
-                                        leading: const Icon(Icons.perm_identity),
-                                        title: Text("Staff ID", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.id?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Sync Status
-                                      ListTile(
-                                        leading: const Icon(Icons.sync),
-                                        title: Text("Sync Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.isSynced == true ? 'Synced' : 'Not Synced', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Created By
-                                      ListTile(
-                                        leading: const Icon(Icons.person_add),
-                                        title: Text("Created By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Created By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Created By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Last Updated By
-                                      ListTile(
-                                        leading: const Icon(Icons.update),
-                                        title: Text("Last Updated By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-
-                                      // Last Updated By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Last Updated By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      // Padding(
-                                      //   padding: const EdgeInsets.symmetric(vertical: 10.0),
-                                      //   child: Row(
-                                      //       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                      //       children: [
-                                      //         Row(children: [
-                                      //           const Icon(Icons.draw),
-                                      //           Text("Is Signature saved?", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                      //           Text(_signatureLink != null ? "Yes" : "No", style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      //         ]),
-                                      //         Row(children: [
-                                      //           ElevatedButton(
-                                      //             onPressed: () {
-                                      //               showModalBottomSheet(
-                                      //                 context: context,
-                                      //                 builder: (context) => Container(
-                                      //                   height: MediaQuery.of(context).size.width *
-                                      //                       (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.60),
-                                      //                   padding: const EdgeInsets.all(16),
-                                      //                   child: Column(children: [
-                                      //                     SizedBox(
-                                      //                       height: MediaQuery.of(context).size.width *
-                                      //                           (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.50),
-                                      //                       child: GestureDetector(
-                                      //                         onTap: () {
-                                      //                           _pickSignatureImage();
-                                      //                         },
-                                      //                         child: Container(
-                                      //                           margin: const EdgeInsets.only(
-                                      //                             top: 20,
-                                      //                             bottom: 24,
-                                      //                           ),
-                                      //                           height: MediaQuery.of(context).size.width *
-                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                      //                           width: MediaQuery.of(context).size.width *
-                                      //                               (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                      //                           alignment: Alignment.center,
-                                      //                           decoration: BoxDecoration(
-                                      //                             borderRadius: BorderRadius.circular(20),
-                                      //                           ),
-                                      //                           child: _signatureImage != null
-                                      //                               ? ClipRRect(
-                                      //                               borderRadius: BorderRadius.circular(20),
-                                      //                               child: Image.file(
-                                      //                                 _signatureImage!,
-                                      //                                 width: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.30),
-                                      //                                 height: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.30 : 0.15),
-                                      //                                 fit: BoxFit.cover,
-                                      //                               )
-                                      //                           )
-                                      //                               : Column(
-                                      //                             mainAxisAlignment: MainAxisAlignment.center,
-                                      //                             children: [
-                                      //                               Icon(
-                                      //                                 Icons.upload_file,
-                                      //                                 size: MediaQuery.of(context).size.width *
-                                      //                                     (MediaQuery.of(context).size.shortestSide < 600 ? 0.075 : 0.05),
-                                      //                                 color: Colors.grey.shade600,
-                                      //                               ),
-                                      //                               const SizedBox(height: 8),
-                                      //                               const Text(
-                                      //                                 "Click to Upload Signature Image Here",
-                                      //                                 style: TextStyle(
-                                      //                                   fontSize: 14,
-                                      //                                   color: Colors.grey,
-                                      //                                   fontWeight: FontWeight.bold,
-                                      //                                 ),
-                                      //                                 textAlign: TextAlign.center,
-                                      //                               ),
-                                      //                             ],
-                                      //                           ),
-                                      //                         ),
-                                      //                       ),
-                                      //                     ),
-                                      //                     ElevatedButton(
-                                      //                         onPressed: () {
-                                      //                           _uploadSignatureAndSync().then((_){
-                                      //                             Navigator.pop(context);
-                                      //                           });
-                                      //
-                                      //                         },
-                                      //                         child: const Text("Save Signature")),
-                                      //                   ]),
-                                      //                 ),
-                                      //               );
-                                      //             },
-                                      //             child: _signatureLink == null ? const Text("Add") : const Text("Update"),
-                                      //           ),
-                                      //         ]),
-                                      //       ]),
-                                      // ),
-                                    ],
-                                  ),
-                                ),
+                            child: _profileImageUrl != null
+                                ? ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.network(
+                                _profileImageUrl!,
+                                width: profileImageSize,
+                                height: profileImageSize,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: profileImageSize * 0.6, color: Colors.grey.shade600),
+                                loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  );
+                                },
                               ),
                             )
-                          ],
+                                : Icon(
+                              Icons.person,
+                              size: profileImageSize * 0.6,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                         ),
-                      ),
-                      !isSynced
-                          ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20.0),
-                          child: GestureDetector(
-                            onTap: () async {
-                              await syncCompleteData();
-                              setState(() {
-                                isSynced = newSynced;
-                              });
-                            },
-                            child: Container(
-                              width: MediaQuery.of(context).size.width * syncButtonWidth,
-                              height: MediaQuery.of(context).size.height * syncButtonHeight,
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.red,
-                                    Colors.black,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(15),
+                        const SizedBox(height: 20),
+                        Text(
+                          '${_staffData?.firstName?.toString().toUpperCase()} ${_staffData?.lastName?.toString().toUpperCase()}',
+                          style: GoogleFonts.poppins(
+                            fontSize: fontSizeName,
+                            fontWeight: FontWeight.bold,
+                            color: maroonPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _staffData?.designation?.toString().toUpperCase() ?? '',
+                          style: GoogleFonts.poppins(
+                            fontSize: fontSizeDesignation,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: cardPadding),
+                          child: Column(
+                            children: <Widget>[
+                              Container(
+                                padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom),
+                                alignment: Alignment.topLeft,
+                                child: Text(
+                                  "${_staffData?.role}'s Information",
+                                  style: GoogleFonts.poppins(
+                                    color: maroonPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: fontSizeSectionTitle,
+                                  ),
+                                  textAlign: TextAlign.left,
                                 ),
                               ),
-                              child: Center(
-                                child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        "Sync Updated Bio Data",
-                                        style: TextStyle(
+                              SizedBox(
+                                width: double.infinity,
+                                child: Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  margin: EdgeInsets.symmetric(vertical: cardMarginVertical),
+                                  child: Container(
+                                    alignment: Alignment.topLeft,
+                                    padding: EdgeInsets.all(cardPadding),
+                                    child: Column(
+                                      children: <Widget>[
+                                        EditableGenderTile(
+                                          icon: Icons.person_outline,
+                                          title: "Sex",
+                                          initialValue: _staffData?.gender ?? '',
+                                          onSave: (newValue) {
+                                            _updateFirestoreField('gender', newValue);
+                                            setState(() {
+                                              newGender = newValue;
+                                              isSynced = false;
+                                            });
+                                          },
+                                          fetchGender: () => _fetchGenderFromFirestore(),
+                                        ),
+                                        EditableMaritalStatusTile(
+                                          icon: Icons.favorite_border,
+                                          title: "Marital Status",
+                                          initialValue: _staffData?.maritalStatus ?? '',
+                                          onSave: (newValue) {
+                                            _updateFirestoreField('maritalStatus', newValue);
+                                            setState(() {
+                                              newMaritalStatus = newValue;
+                                              isSynced = false;
+                                            });
+                                          },
+                                          fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
+                                        ),
+
+                                        _buildDetailTile(Icons.category_outlined, "Staff Category", _staffData?.staffCategory ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.map_outlined, "State", _staffData?.state.toString() ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(
+                                          Icons.location_on_outlined,
+                                          _staffData?.staffCategory == "Facility Staff"
+                                              ? "Facility Name"
+                                              : "Office Name",
+                                          _staffData?.location.toString() ?? '',
+                                          fontSizeDetailTitle,
+                                          fontSizeDetailSubtitle,
+                                        ),
+                                        _buildDetailTile(Icons.email_outlined, 'Email', _staffData?.emailAddress ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        
+                                        _buildEditableListTile1(
+                                          icon: Icons.phone_outlined,
+                                          title: 'Phone',
+                                          controller: _phoneController,
+                                          initialValue: _staffData?.mobile,
+                                          fontSizeTitle: fontSizeDetailTitle,
+                                          fontSizeSubtitle: fontSizeDetailSubtitle,
+                                          onSave: (newValue) async {
+                                            _updateFirestoreField('mobile', newValue);
+                                            setState(() {
+                                              isSynced = false;
+                                            });
+                                          },
+                                        ),
+                                        _buildDetailTile(Icons.business_outlined, 'Department', _staffData?.department ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.assignment_ind_outlined, "Designation", _staffData?.designation.toString() ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.work_outline, 'Project', _staffData?.project ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.supervisor_account_outlined, "Supervisor's Name", _staffData?.supervisor.toString() ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.mark_email_read_outlined, "Supervisor's Email", _staffData?.supervisorEmail.toString() ?? '', fontSizeDetailTitle, fontSizeDetailSubtitle),
+
+                                        // System Information Section
+                                        const Divider(height: 40),
+                                        Container(
+                                          padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom),
+                                          alignment: Alignment.topLeft,
+                                          child: Text(
+                                            "System Information",
+                                            style: GoogleFonts.poppins(
+                                              color: maroonPrimary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: fontSizeSectionTitle,
+                                            ),
+                                            textAlign: TextAlign.left,
+                                          ),
+                                        ),
+
+                                        _buildDetailTile(Icons.badge_outlined, "Staff ID", _staffData?.id?.toString() ?? 'Not Available', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.sync_outlined, "Sync Status", _staffData?.isSynced == true ? 'Synced' : 'Not Synced', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.person_add_outlined, "Created By", _staffData?.createdBy?.toString() ?? 'Not Available', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.alternate_email_outlined, "Created By Email", _staffData?.createdByEmail?.toString() ?? 'Not Available', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.update_outlined, "Last Updated By", _staffData?.lastUpdatedBy?.toString() ?? 'Not Available', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                        _buildDetailTile(Icons.alternate_email_outlined, "Last Updated By Email", _staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', fontSizeDetailTitle, fontSizeDetailSubtitle),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                        if (!isSynced)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 32.0),
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  await syncCompleteData();
+                                  setState(() {
+                                    isSynced = newSynced;
+                                  });
+                                },
+                                child: Container(
+                                  width: MediaQuery.of(context).size.width * syncButtonWidth,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    gradient: appBarGradient,
+                                    borderRadius: BorderRadius.circular(15),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: maroonPrimary.withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "Sync Updated Bio Data",
+                                            style: GoogleFonts.poppins(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: fontSizeDetailTitle),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          const Icon(
+                                            Icons.sync,
+                                            size: 20,
                                             color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: fontSizeDetailTitle),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Icon(
-                                        Icons.arrow_upward,
-                                        size: fontSizeDetailTitle + 4,
-                                        color: Colors.white,
-                                      ),
-                                    ]),
+                                          ),
+                                        ]),
+                                  ),
+                                ),
                               ),
                             ),
-                          ))
-                          : const SizedBox.shrink(),
-                    ],
+                          )
+                        else 
+                          const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -738,13 +574,16 @@ class _ProfilePage4State extends State<ProfilePage4> {
     );
   }
 
-  Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
+  Widget _buildDetailTile(IconData icon, String title, String subtitle, double titleSize, double subtitleSize) {
+    return ListTile(
+      leading: Icon(icon, color: maroonPrimary),
+      title: Text(title, style: GoogleFonts.poppins(fontSize: titleSize, fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: GoogleFonts.poppins(fontSize: subtitleSize, color: Colors.black87)),
+    );
+  }
 
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+  Future<void> _loadBioData() async {
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
@@ -848,12 +687,6 @@ class _ProfilePage4State extends State<ProfilePage4> {
             .set(_staffData!.toFirestore(), SetOptions(merge: true)).then((value) {
           Fluttertoast.showToast(
             msg: "Syncing BioData to Server...",
-            toastLength: Toast.LENGTH_SHORT,
-            backgroundColor: Colors.black54,
-            gravity: ToastGravity.BOTTOM,
-            timeInSecForIosWeb: 1,
-            textColor: Colors.white,
-            fontSize: 16.0,
           );
           setState(() {
             isSynced = true;
@@ -862,23 +695,11 @@ class _ProfilePage4State extends State<ProfilePage4> {
           });
           Fluttertoast.showToast(
             msg: "Syncing Completed...",
-            toastLength: Toast.LENGTH_SHORT,
-            backgroundColor: Colors.black54,
-            gravity: ToastGravity.BOTTOM,
-            timeInSecForIosWeb: 1,
-            textColor: Colors.white,
-            fontSize: 16.0,
           );
         });
       } catch (e) {
         Fluttertoast.showToast(
           msg: "Sync Error: ${e.toString()}",
-          toastLength: Toast.LENGTH_SHORT,
-          backgroundColor: Colors.black54,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          textColor: Colors.white,
-          fontSize: 16.0,
         );
         setState(() {
           isSynced = false;
@@ -902,7 +723,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return locations.map((location) => DropdownMenuItem<String>(
       value: location,
-      child: Text(location),
+      child: Text(location, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -914,7 +735,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return departments.map((department) => DropdownMenuItem<String>(
       value: department,
-      child: Text(department),
+      child: Text(department, style: GoogleFonts.poppins()),
     )).toList();
   }
   Future<List<DropdownMenuItem<String>>> _fetchMaritalStatusFromFirestore() async {
@@ -924,7 +745,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return staffCategories.map((category) => DropdownMenuItem<String>(
       value: category,
-      child: Text(category),
+      child: Text(category, style: GoogleFonts.poppins()),
     )).toList();
   }
   Future<List<DropdownMenuItem<String>>> _fetchGenderFromFirestore() async {
@@ -934,7 +755,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return staffCategories.map((category) => DropdownMenuItem<String>(
       value: category,
-      child: Text(category),
+      child: Text(category, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -945,7 +766,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return staffCategories.map((category) => DropdownMenuItem<String>(
       value: category,
-      child: Text(category),
+      child: Text(category, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -963,7 +784,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return filteredDepartments.map((department) => DropdownMenuItem<String>(
       value: department,
-      child: Text(department),
+      child: Text(department, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -983,7 +804,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return designations.map((designation) => DropdownMenuItem<String>(
       value: designation,
-      child: Text(designation),
+      child: Text(designation, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -1003,7 +824,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return states.map((state) => DropdownMenuItem<String>(
       value: state,
-      child: Text(state),
+      child: Text(state, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -1014,7 +835,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return projects.map((project) => DropdownMenuItem<String>(
       value: project,
-      child: Text(project),
+      child: Text(project, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -1026,7 +847,7 @@ class _ProfilePage4State extends State<ProfilePage4> {
 
     return supervisors.map((supervisor) => DropdownMenuItem<String>(
       value: supervisor,
-      child: Text(supervisor),
+      child: Text(supervisor, style: GoogleFonts.poppins()),
     )).toList();
   }
 
@@ -1054,13 +875,13 @@ class _ProfilePage4State extends State<ProfilePage4> {
     double? fontSizeSubtitle,
   }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title, style: const TextStyle(fontSize: 16)),
+      leading: Icon(icon, color: maroonPrimary),
+      title: Text(title, style: GoogleFonts.poppins(fontSize: fontSizeTitle, fontWeight: FontWeight.bold)),
       subtitle: initialValue != null
-          ? Text(initialValue, style: const TextStyle(fontSize: 14))
+          ? Text(initialValue, style: GoogleFonts.poppins(fontSize: fontSizeSubtitle))
           : null,
       trailing: IconButton(
-        icon: const Icon(Icons.edit),
+        icon: const Icon(Icons.edit_outlined, color: maroonPrimary),
         onPressed: () {
           _showEditDialog1(
             context: context,
@@ -1085,14 +906,16 @@ class _ProfilePage4State extends State<ProfilePage4> {
         String? newValue = initialValue;
 
         return AlertDialog(
-          title: Text('Edit $title'),
+          title: Text('Edit $title', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           content: TextField(
             onChanged: (value) {
               newValue = value;
             },
+            style: GoogleFonts.poppins(),
             controller: TextEditingController(text: initialValue),
             decoration: InputDecoration(
               hintText: 'Enter new $title',
+              hintStyle: GoogleFonts.poppins(),
             ),
           ),
           actions: [
@@ -1100,27 +923,18 @@ class _ProfilePage4State extends State<ProfilePage4> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () {
                 onSave(newValue ?? "");
                 Navigator.of(context).pop();
               },
-              child: const Text('Save'),
+              child: Text('Save', style: GoogleFonts.poppins(color: maroonPrimary, fontWeight: FontWeight.bold)),
             ),
           ],
         );
       },
     );
-  }
-
-
-  Future<List<Uint8List>?> _readImagesFromDatabase() async {
-    return null;
-  }
-
-  Future<List<Uint8List>?> _readSignatureImagesFromDatabase() async {
-    return null;
   }
 }

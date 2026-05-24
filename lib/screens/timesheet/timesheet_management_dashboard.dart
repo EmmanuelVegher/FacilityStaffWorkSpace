@@ -12,9 +12,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:html' as html;
 import 'package:flutter/services.dart' show Uint8List, rootBundle;
-import 'package:csv/csv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:excel/excel.dart';
-
+import 'package:csv/csv.dart';
+import '../../widgets/global_multi_select_dropdown.dart';
 import '../../widgets/drawer2.dart'; // State-level drawer
 import '../admin/payment_schedule_page.dart';
 import 'hq_timesheet_review_page.dart'; // NEW: Import for the payment schedule page
@@ -352,8 +353,8 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
 
       if (mounted) {
         setState(() {
-          _availableFacilities = ['All Facilities', ...facilityNames];
-          _selectedFacilities = ['All Facilities'];
+          _availableFacilities = facilityNames;
+          _selectedFacilities = [];
           _canSeePaymentButton = canSeePayment;
         });
         await _loadTimesheets();
@@ -426,11 +427,14 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
           .where('staffCategory', isEqualTo: 'Facility Staff')
           .where('state', isEqualTo: _userState);
 
-      if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
+      if (facilitiesToQuery.isNotEmpty) {
         staffQuery = staffQuery.where('location', whereIn: facilitiesToQuery);
       }
       final staffSnapshot = await staffQuery.get();
-      _allExpectedStaffMaster = staffSnapshot.docs.map((doc) {
+      _allExpectedStaffMaster = staffSnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['accountStatus'] == 'Active';
+      }).map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'staffId': doc.id,
@@ -447,7 +451,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
 
       Query timesheetQuery = _firestore.collectionGroup('TimeSheets').where('state', isEqualTo: _userState);
 
-      if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
+      if (facilitiesToQuery.isNotEmpty) {
         timesheetQuery = timesheetQuery.where('location', whereIn: facilitiesToQuery);
       }
       final timesheetSnapshot = await timesheetQuery.get();
@@ -585,9 +589,18 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("$_userState Timesheet Dashboard", style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("$_userState Timesheet Dashboard", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           if(_isExporting)
             const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
@@ -599,6 +612,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
                 if(value == 'bulk_pdf') _downloadBulkPdf();
                 if(value == 'summary_csv') _downloadSummaryAsCsv();
                 if(value == 'summary_excel') _downloadSummaryAsExcel();
+                if(value == 'missing_staff_excel') _downloadMissingStaffAsExcel();
               },
               itemBuilder: (context) => [
                 PopupMenuItem(
@@ -617,6 +631,11 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
                     enabled: !_isLoading && _facilitySummary.isNotEmpty,
                     child: const ListTile(leading: Icon(Icons.table_chart), title: Text("Download Summary (Excel)"))
                 ),
+                PopupMenuItem(
+                    value: 'missing_staff_excel',
+                    enabled: !_isLoading && _nonSubmittedStaff.isNotEmpty,
+                    child: const ListTile(leading: Icon(Icons.person_off), title: Text("Download Missing Staff (Excel)"))
+                ),
               ],
             )
         ],
@@ -624,7 +643,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       drawer: drawer2(context),
       body: Column(
         children: [
-          _buildResponsiveFilterBar(),
+        SelectionArea(child: _buildResponsiveFilterBar()),
           // This condition will now work correctly
           // This condition will now work perfectly every time.
           // This is the complete and corrected block
@@ -634,54 +653,56 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
               child: TabBar(
                 controller: _tabController,
                 onTap: _onTabTapped, // Your handler for tab clicks
-                labelColor: Theme.of(context).primaryColor,
+                labelColor: const Color(0xFF5C1A2E),
                 unselectedLabelColor: Colors.grey.shade600,
-                indicatorColor: Theme.of(context).primaryColor,
+                indicatorColor: const Color(0xFFD4A03C),
                 // THIS IS THE REQUIRED 'tabs' PARAMETER THAT WAS MISSING
-                tabs: const [
-                  Tab(text: 'Part 1'),
-                  Tab(text: 'Part 2'),
+                tabs: [
+                  Tab(child: Text('Part 1', style: GoogleFonts.poppins())),
+                  Tab(child: Text('Part 2', style: GoogleFonts.poppins())),
                 ],
               ),
             ),
           if (_errorMessage != null)
             Center(child: Padding(padding: const EdgeInsets.all(8.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center))),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMetricsDashboard(),
-                  const SizedBox(height: 24),
-                  if (_facilitySummary.isNotEmpty)
-                    _buildFacilitySummaryTable(),
-                  const SizedBox(height: 24),
-                  if (_nonSubmittedStaff.isNotEmpty)
-                    _buildNonSubmittedStaffList(),
-                  const SizedBox(height: 24),
-                  if (_allTimesheetsMaster.isNotEmpty)
-                    _buildSubmittedStaffList(),
-                  const SizedBox(height: 24),
-                  if (_displayedItems.isNotEmpty) ...[
-                    Text("Detailed View: $_selectedStatusFilter", style: Theme.of(context).textTheme.titleLarge),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    ..._displayedItems.map((item) {
-                      if (item is TimesheetModel) return _buildTimesheetCard(item);
-                      if (item is Map) return _buildNonSubmittedCard(item as Map<String, dynamic>);
-                      return const SizedBox.shrink();
-                    }),
-                  ] else if (!_isLoading)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Text("No data found for the current filters.", style: TextStyle(color: Colors.grey.shade600)),
+            child: SelectionArea(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildMetricsDashboard(),
+                    const SizedBox(height: 24),
+                    if (_facilitySummary.isNotEmpty)
+                      _buildFacilitySummaryTable(),
+                    const SizedBox(height: 24),
+                    if (_nonSubmittedStaff.isNotEmpty)
+                      _buildNonSubmittedStaffList(),
+                    const SizedBox(height: 24),
+                    if (_allTimesheetsMaster.isNotEmpty)
+                      _buildSubmittedStaffList(),
+                    const SizedBox(height: 24),
+                    if (_displayedItems.isNotEmpty) ...[
+                      Text("Detailed View: $_selectedStatusFilter", style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge)),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      ..._displayedItems.map((item) {
+                        if (item is TimesheetModel) return _buildTimesheetCard(item);
+                        if (item is Map) return _buildNonSubmittedCard(item as Map<String, dynamic>);
+                        return const SizedBox.shrink();
+                      }),
+                    ] else if (!_isLoading)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text("No data found for the current filters.", style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -690,90 +711,10 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
     );
   }
 
-  // MODIFIED: Added Payment Schedule button and responsive layout from HQ version
+  // MODIFIED: Fully responsive filter bar with adaptive layouts
   Widget _buildResponsiveFilterBar() {
     final years = List.generate(5, (index) => DateTime.now().year - index);
     final months = List.generate(12, (index) => index + 1);
-
-    final filterItems = [
-      if (_isFilterLoading)
-        const Center(child: Text("Loading filters..."))
-      else
-        SizedBox(width: 220, child: _buildMultiSelectFacilityDropdown()),
-      SizedBox(
-        width: 150,
-        child: DropdownButtonFormField<int>(
-          initialValue: _selectedMonth,
-          decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
-          items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(0, m)))))
-              .toList(),
-          // THIS IS THE FINAL, CORRECTED LOGIC
-          onChanged: (value) {
-            if (value == null) return;
-
-            // This guarantees the widget tree rebuilds after the state has changed.
-            setState(() {
-              _selectedMonth = value;
-              _updateTabControllerState();
-            });
-          },
-        ),
-      ),
-      SizedBox(
-        width: 120,
-        child: DropdownButtonFormField<int>(
-          initialValue: _selectedYear,
-          decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
-          items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedMonth = value);
-              //_updateTabController(); // MODIFIED: Update tabs when month changes
-            }
-          },
-
-        ),
-      ),
-      SizedBox(
-        width: 250,
-        child: DropdownButtonFormField<String>(
-          initialValue: _selectedStatusFilter,
-          decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-          items: _statusFilters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedStatusFilter = value);
-              _applyFiltersAndCalculateMetrics();
-            }
-          },
-        ),
-      ),
-      SizedBox(width: 220, child: _buildMultiSelectStaffDropdown()),
-    ];
-
-    final applyButton = ElevatedButton.icon(
-      icon: const Icon(Icons.filter_list),
-      label: const Text('Apply Filter'),
-      onPressed: _isLoading || _isFilterLoading ? null : _loadTimesheets,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        minimumSize: const Size(0, 50),
-      ),
-    );
-
-    // NEW: Define the Payment Schedule button
-    final paymentButton = ElevatedButton.icon(
-      icon: const Icon(Icons.payments_outlined),
-      label: const Text('Payment Schedule'),
-      onPressed: _isLoading || _isFilterLoading ? null : _navigateToPaymentSchedule,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        minimumSize: const Size(0, 50),
-      ),
-    );
 
     return Card(
       margin: const EdgeInsets.all(8.0),
@@ -782,48 +723,560 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
         padding: const EdgeInsets.all(12.0),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth < 950) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  GridView.count(
-                    childAspectRatio: 3.0,
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 12,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: filterItems,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
+            // Determine layout based on screen width
+            final bool isVerySmall = constraints.maxWidth < 600;
+            final bool isSmall = constraints.maxWidth < 950;
+            final bool isMedium = constraints.maxWidth < 1200;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Filter items section
+                if (_isFilterLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text("Loading filters..."),
+                    ),
+                  )
+                else if (isVerySmall)
+                  // Very small screens: Stack vertically
+                  Column(
                     children: [
-                      Expanded(child: applyButton),
-                      if (_canSeePaymentButton) const SizedBox(width: 16),
-                      if (_canSeePaymentButton) Expanded(child: paymentButton),
+                      GlobalMultiSelectDropdown<String>(
+                        items: _availableFacilities,
+                        selectedItems: _selectedFacilities,
+                        title: "Select Facilities",
+                        labelBuilder: (val) => val,
+                        onChanged: (results) {
+                          setState(() => _selectedFacilities = results);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _selectedMonth,
+                        decoration: InputDecoration(
+                          labelText: 'Month',
+                          border: const OutlineInputBorder(),
+                          labelStyle: GoogleFonts.poppins(),
+                        ),
+                        items: months
+                            .map((m) => DropdownMenuItem(
+                                  value: m,
+                                  child: Text(
+                                    DateFormat('MMMM').format(DateTime(0, m)),
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedMonth = value;
+                            _updateTabControllerState();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _selectedYear,
+                        decoration: InputDecoration(
+                          labelText: 'Year',
+                          border: const OutlineInputBorder(),
+                          labelStyle: GoogleFonts.poppins(),
+                        ),
+                        items: years
+                            .map((y) => DropdownMenuItem(
+                                  value: y,
+                                  child: Text(y.toString(), style: GoogleFonts.poppins()),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _selectedYear = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedStatusFilter,
+                        decoration: InputDecoration(
+                          labelText: 'Status',
+                          border: const OutlineInputBorder(),
+                          labelStyle: GoogleFonts.poppins(),
+                        ),
+                        items: _statusFilters
+                            .map((s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(s, style: GoogleFonts.poppins()),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _selectedStatusFilter = value);
+                            _applyFiltersAndCalculateMetrics();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      GlobalMultiSelectDropdown<String>(
+                        items: _allTimesheetsMaster.map((ts) => ts.staffName).toSet().toList() +
+                            _nonSubmittedStaff.map((s) => s['staffName'] as String).toSet().toList(),
+                        selectedItems: _selectedStaffIds.map((id) {
+                          final ts = _allTimesheetsMaster.firstWhere(
+                            (element) => element.staffId == id,
+                            orElse: () => TimesheetModel(
+                              staffId: '',
+                              staffName: 'N/A',
+                              staffEmail: '',
+                              designation: '',
+                              department: '',
+                              location: '',
+                              state: '',
+                              caritasSupervisor: '',
+                              caritasSupervisorSignatureStatus: '',
+                              facilitySupervisor: '',
+                              facilitySupervisorSignatureStatus: '',
+                              entries: [],
+                            ),
+                          );
+                          if (ts.staffId != '') return ts.staffName;
+                          final staff = _nonSubmittedStaff.firstWhere(
+                            (element) => element['staffId'] == id,
+                            orElse: () => {},
+                          );
+                          return staff['staffName'] as String? ?? 'N/A';
+                        }).toList(),
+                        title: "Select Staff",
+                        labelBuilder: (val) => val,
+                        onChanged: (results) {
+                          setState(() {
+                            _selectedStaffIds = results.map((name) {
+                              final ts = _allTimesheetsMaster.firstWhere(
+                                (element) => element.staffName == name,
+                                orElse: () => TimesheetModel(
+                                  staffId: '',
+                                  staffName: 'N/A',
+                                  staffEmail: '',
+                                  designation: '',
+                                  department: '',
+                                  location: '',
+                                  state: '',
+                                  caritasSupervisor: '',
+                                  caritasSupervisorSignatureStatus: '',
+                                  facilitySupervisor: '',
+                                  facilitySupervisorSignatureStatus: '',
+                                  entries: [],
+                                ),
+                              );
+                              if (ts.staffId != '') return ts.staffId;
+                              final staff = _nonSubmittedStaff.firstWhere(
+                                (element) => element['staffName'] == name,
+                                orElse: () => {},
+                              );
+                              return staff['staffId'] as String? ?? '';
+                            }).where((id) => id != '').toList();
+                            _applyFiltersAndCalculateMetrics();
+                          });
+                        },
+                      ),
                     ],
-                  ),
-                ],
-              );
-            } else {
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                  child: Wrap(
-                    spacing: 16,
+                  )
+                else if (isSmall)
+                  // Small screens: 2-column grid
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: (constraints.maxWidth - 36) / 2,
+                        child: GlobalMultiSelectDropdown<String>(
+                          items: _availableFacilities,
+                          selectedItems: _selectedFacilities,
+                          title: "Select Facilities",
+                          labelBuilder: (val) => val,
+                          onChanged: (results) {
+                            setState(() => _selectedFacilities = results);
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 36) / 2,
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _selectedMonth,
+                          decoration: InputDecoration(
+                            labelText: 'Month',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: months
+                              .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(
+                                      DateFormat('MMMM').format(DateTime(0, m)),
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedMonth = value;
+                              _updateTabControllerState();
+                            });
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 36) / 2,
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _selectedYear,
+                          decoration: InputDecoration(
+                            labelText: 'Year',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: years
+                              .map((y) => DropdownMenuItem(
+                                    value: y,
+                                    child: Text(y.toString(), style: GoogleFonts.poppins()),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedYear = value);
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 36) / 2,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedStatusFilter,
+                          decoration: InputDecoration(
+                            labelText: 'Status',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: _statusFilters
+                              .map((s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s, style: GoogleFonts.poppins()),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedStatusFilter = value);
+                              _applyFiltersAndCalculateMetrics();
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: constraints.maxWidth - 24,
+                        child: GlobalMultiSelectDropdown<String>(
+                          items: _allTimesheetsMaster.map((ts) => ts.staffName).toSet().toList() +
+                              _nonSubmittedStaff.map((s) => s['staffName'] as String).toSet().toList(),
+                          selectedItems: _selectedStaffIds.map((id) {
+                            final ts = _allTimesheetsMaster.firstWhere(
+                              (element) => element.staffId == id,
+                              orElse: () => TimesheetModel(
+                                staffId: '',
+                                staffName: 'N/A',
+                                staffEmail: '',
+                                designation: '',
+                                department: '',
+                                location: '',
+                                state: '',
+                                caritasSupervisor: '',
+                                caritasSupervisorSignatureStatus: '',
+                                facilitySupervisor: '',
+                                facilitySupervisorSignatureStatus: '',
+                                entries: [],
+                              ),
+                            );
+                            if (ts.staffId != '') return ts.staffName;
+                            final staff = _nonSubmittedStaff.firstWhere(
+                              (element) => element['staffId'] == id,
+                              orElse: () => {},
+                            );
+                            return staff['staffName'] as String? ?? 'N/A';
+                          }).toList(),
+                          title: "Select Staff",
+                          labelBuilder: (val) => val,
+                          onChanged: (results) {
+                            setState(() {
+                              _selectedStaffIds = results.map((name) {
+                                final ts = _allTimesheetsMaster.firstWhere(
+                                  (element) => element.staffName == name,
+                                  orElse: () => TimesheetModel(
+                                    staffId: '',
+                                    staffName: 'N/A',
+                                    staffEmail: '',
+                                    designation: '',
+                                    department: '',
+                                    location: '',
+                                    state: '',
+                                    caritasSupervisor: '',
+                                    caritasSupervisorSignatureStatus: '',
+                                    facilitySupervisor: '',
+                                    facilitySupervisorSignatureStatus: '',
+                                    entries: [],
+                                  ),
+                                );
+                                if (ts.staffId != '') return ts.staffId;
+                                final staff = _nonSubmittedStaff.firstWhere(
+                                  (element) => element['staffName'] == name,
+                                  orElse: () => {},
+                                );
+                                return staff['staffId'] as String? ?? '';
+                              }).where((id) => id != '').toList();
+                              _applyFiltersAndCalculateMetrics();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  // Large screens: Horizontal wrap layout
+                  Wrap(
+                    spacing: 12,
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      ...filterItems,
-                      applyButton,
-                      if (_canSeePaymentButton) const SizedBox(width: 8),
-                      if (_canSeePaymentButton) paymentButton, // Conditionally show
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: isMedium ? 180 : 220,
+                          maxWidth: isMedium ? 220 : 280,
+                        ),
+                        child: GlobalMultiSelectDropdown<String>(
+                          items: _availableFacilities,
+                          selectedItems: _selectedFacilities,
+                          title: "Select Facilities",
+                          labelBuilder: (val) => val,
+                          onChanged: (results) {
+                            setState(() => _selectedFacilities = results);
+                          },
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: isMedium ? 120 : 150,
+                          maxWidth: isMedium ? 150 : 180,
+                        ),
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _selectedMonth,
+                          decoration: InputDecoration(
+                            labelText: 'Month',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: months
+                              .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(
+                                      DateFormat('MMMM').format(DateTime(0, m)),
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedMonth = value;
+                              _updateTabControllerState();
+                            });
+                          },
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: isMedium ? 100 : 120,
+                          maxWidth: isMedium ? 120 : 140,
+                        ),
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _selectedYear,
+                          decoration: InputDecoration(
+                            labelText: 'Year',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: years
+                              .map((y) => DropdownMenuItem(
+                                    value: y,
+                                    child: Text(y.toString(), style: GoogleFonts.poppins()),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedYear = value);
+                            }
+                          },
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: isMedium ? 200 : 250,
+                          maxWidth: isMedium ? 250 : 300,
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedStatusFilter,
+                          decoration: InputDecoration(
+                            labelText: 'Status',
+                            border: const OutlineInputBorder(),
+                            labelStyle: GoogleFonts.poppins(),
+                          ),
+                          items: _statusFilters
+                              .map((s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s, style: GoogleFonts.poppins()),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedStatusFilter = value);
+                              _applyFiltersAndCalculateMetrics();
+                            }
+                          },
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: isMedium ? 180 : 220,
+                          maxWidth: isMedium ? 220 : 280,
+                        ),
+                        child: GlobalMultiSelectDropdown<String>(
+                          items: _allTimesheetsMaster.map((ts) => ts.staffName).toSet().toList() +
+                              _nonSubmittedStaff.map((s) => s['staffName'] as String).toSet().toList(),
+                          selectedItems: _selectedStaffIds.map((id) {
+                            final ts = _allTimesheetsMaster.firstWhere(
+                              (element) => element.staffId == id,
+                              orElse: () => TimesheetModel(
+                                staffId: '',
+                                staffName: 'N/A',
+                                staffEmail: '',
+                                designation: '',
+                                department: '',
+                                location: '',
+                                state: '',
+                                caritasSupervisor: '',
+                                caritasSupervisorSignatureStatus: '',
+                                facilitySupervisor: '',
+                                facilitySupervisorSignatureStatus: '',
+                                entries: [],
+                              ),
+                            );
+                            if (ts.staffId != '') return ts.staffName;
+                            final staff = _nonSubmittedStaff.firstWhere(
+                              (element) => element['staffId'] == id,
+                              orElse: () => {},
+                            );
+                            return staff['staffName'] as String? ?? 'N/A';
+                          }).toList(),
+                          title: "Select Staff",
+                          labelBuilder: (val) => val,
+                          onChanged: (results) {
+                            setState(() {
+                              _selectedStaffIds = results.map((name) {
+                                final ts = _allTimesheetsMaster.firstWhere(
+                                  (element) => element.staffName == name,
+                                  orElse: () => TimesheetModel(
+                                    staffId: '',
+                                    staffName: 'N/A',
+                                    staffEmail: '',
+                                    designation: '',
+                                    department: '',
+                                    location: '',
+                                    state: '',
+                                    caritasSupervisor: '',
+                                    caritasSupervisorSignatureStatus: '',
+                                    facilitySupervisor: '',
+                                    facilitySupervisorSignatureStatus: '',
+                                    entries: [],
+                                  ),
+                                );
+                                if (ts.staffId != '') return ts.staffId;
+                                final staff = _nonSubmittedStaff.firstWhere(
+                                  (element) => element['staffName'] == name,
+                                  orElse: () => {},
+                                );
+                                return staff['staffId'] as String? ?? '';
+                              }).where((id) => id != '').toList();
+                              _applyFiltersAndCalculateMetrics();
+                            });
+                          },
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              );
-            }
+                
+                // Buttons section
+                const SizedBox(height: 16),
+                if (!_isFilterLoading)
+                  if (isVerySmall)
+                    // Very small screens: Stack buttons vertically
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.filter_list),
+                          label: const Text('Apply Filter'),
+                          onPressed: _isLoading || _isFilterLoading ? null : _loadTimesheets,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            minimumSize: const Size(0, 50),
+                          ),
+                        ),
+                        if (_canSeePaymentButton) const SizedBox(height: 12),
+                        if (_canSeePaymentButton)
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.payments_outlined),
+                            label: const Text('Payment Schedule'),
+                            onPressed: _isLoading || _isFilterLoading ? null : _navigateToPaymentSchedule,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              minimumSize: const Size(0, 50),
+                            ),
+                          ),
+                      ],
+                    )
+                  else
+                    // Larger screens: Buttons side by side
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.filter_list),
+                            label: const Text('Apply Filter'),
+                            onPressed: _isLoading || _isFilterLoading ? null : _loadTimesheets,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              minimumSize: const Size(0, 50),
+                            ),
+                          ),
+                        ),
+                        if (_canSeePaymentButton) const SizedBox(width: 16),
+                        if (_canSeePaymentButton)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.payments_outlined),
+                              label: const Text('Payment Schedule'),
+                              onPressed: _isLoading || _isFilterLoading ? null : _navigateToPaymentSchedule,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                minimumSize: const Size(0, 50),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+              ],
+            );
           },
         ),
       ),
@@ -1157,6 +1610,46 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
     }
   }
 
+  Future<void> _downloadMissingStaffAsExcel() async {
+    setState(() => _isExporting = true);
+    try {
+      final excel = Excel.createExcel();
+      
+      final Sheet nonSubmitterSheet = excel['Missing Staff'];
+      if (excel.tables.containsKey('Sheet1')) {
+        excel.delete('Sheet1');
+      }
+      
+      nonSubmitterSheet.appendRow([
+        TextCellValue('Staff Name'),
+        TextCellValue('Facility'),
+        TextCellValue('State'),
+        TextCellValue('Phone Number'),
+        TextCellValue('Email Address'),
+      ]);
+      
+      for (final staff in _nonSubmittedStaff) {
+        nonSubmitterSheet.appendRow([
+          TextCellValue(staff['staffName'] ?? ''),
+          TextCellValue(staff['location'] ?? ''),
+          TextCellValue(staff['state'] ?? ''),
+          TextCellValue(staff['mobile'] ?? ''),
+          TextCellValue(staff['email'] ?? ''),
+        ]);
+      }
+
+      final fileBytes = excel.save();
+      if(fileBytes != null) {
+        _triggerDownload(Uint8List.fromList(fileBytes), 'Missing_Timesheet_Staff_${_selectedMonth}_$_selectedYear.xlsx');
+      }
+    } catch (e, stack) {
+      debugPrint("Error generating Missing Staff Excel: $e\n$stack");
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export missing staff: $e')));
+    } finally {
+      if(mounted) setState(() => _isExporting = false);
+    }
+  }
+
   // --- UI & EXPORT HELPER WIDGETS AND FUNCTIONS ---
   // (These are largely unchanged from the provided code, so they are included for completeness)
 
@@ -1197,14 +1690,14 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(timesheet.staffName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(timesheet.location, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(timesheet.staffName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  Text(timesheet.location, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
             _buildStatusChip(timesheet.facilitySupervisorSignatureStatus, timesheet.caritasSupervisorSignatureStatus),
             const SizedBox(width: 8),
-            Text("${timesheet.totalHours.toStringAsFixed(2)} hrs", style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text("${timesheet.totalHours.toStringAsFixed(2)} hrs", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
             IconButton(
               icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
               tooltip: "Download PDF",
@@ -1223,10 +1716,10 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       color: Colors.red.withOpacity(0.05),
       child: ListTile(
         leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828)),
-        title: Text(staffInfo['staffName'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(staffInfo['location'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
-        trailing: const Chip(
-          label: Text('Not Submitted', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+        title: Text(staffInfo['staffName'] ?? 'N/A', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        subtitle: Text(staffInfo['location'] ?? 'N/A', style: GoogleFonts.poppins(fontSize: 12)),
+        trailing: Chip(
+          label: Text('Not Submitted', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.red,
         ),
       ),
@@ -1469,9 +1962,9 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+                  Text(value, style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
                   const SizedBox(height: 4),
-                  Text(title, style: TextStyle(fontSize: 14, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  Text(title, style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis, maxLines: 1),
                 ],
               ),
             ),
@@ -1491,7 +1984,7 @@ class _TimesheetReviewPageState extends State<TimesheetReviewPage> with SingleTi
       text = 'Awaiting Project Coordinator Signature'; color = Colors.orange;
     }
     return Chip(
-      label: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+      label: Text(text, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
       backgroundColor: color,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

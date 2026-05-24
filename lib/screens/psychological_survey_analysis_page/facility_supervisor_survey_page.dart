@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 
 import '../../widgets/drawer4.dart'; // Assuming a shared drawer widget
 
@@ -79,6 +80,14 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
   // --- Aggregated Data State ---
   SurveyAnalysisData _facilityAnalysisData = SurveyAnalysisData.empty();
   late TooltipBehavior _tooltipBehavior;
+
+  // --- Theme Colors ---
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
+  static const LinearGradient appBarGradient = LinearGradient(
+    colors: [maroonPrimary, Color(0xFF2E0215)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // --- Constants for Questions ---
   static const Q_COLLABORATION = 'Is there good collaboration among your team members?';
@@ -220,12 +229,11 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Facility Survey Analysis', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('Facility Survey Analysis', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF722F37), Color(0xFFB34A5A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          ),
+          decoration: const BoxDecoration(gradient: appBarGradient),
         ),
         actions: [
           _isLoading
@@ -242,19 +250,21 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
         ],
       ),
       drawer: drawer4(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16))))
-                : !_hasLoadedData
-                ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("Click 'Analyze Surveys' to view data.", style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center)))
-                : _buildDashboardContent(),
-          ),
-        ],
+      body: SelectionArea( // Wrapped in SelectionArea for copyable text
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: maroonPrimary))
+                  : _errorMessage != null
+                  ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text(_errorMessage!, style: GoogleFonts.poppins(color: Colors.red, fontSize: 16))))
+                  : !_hasLoadedData
+                  ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("Click 'Analyze Surveys' to view data.", style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey), textAlign: TextAlign.center)))
+                  : _buildDashboardContent(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -263,10 +273,11 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
 
   Widget _buildFilterBar() {
     return Card(
-      margin: const EdgeInsets.all(8.0),
-      elevation: 2,
+      margin: const EdgeInsets.all(12.0),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Wrap(
           spacing: 16,
           runSpacing: 12,
@@ -275,14 +286,28 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
           children: [
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
-              icon: const Icon(Icons.date_range_outlined),
-              label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
+              icon: const Icon(Icons.date_range_outlined, color: maroonPrimary),
+              label: Text(
+                '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}',
+                style: GoogleFonts.poppins(color: maroonPrimary, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: maroonPrimary),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.analytics_outlined),
-              label: const Text('Analyze Surveys'),
+              label: Text('Analyze Surveys', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
               onPressed: _isLoading ? null : _loadSurveyData,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: maroonPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 5,
+              ),
             ),
           ],
         ),
@@ -292,21 +317,35 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
 
   Widget _buildDashboardContent() {
     if (_facilityAnalysisData.totalSurveys == 0) {
-      return const Center(child: Text("No survey data found for your facility in the selected date range."));
+      return Center(child: Text("No survey data found for your facility in the selected date range.", style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey)));
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-              "Analysis for: ${_userLocation ?? 'Your Facility'}",
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
-          ),
-          Text(
-              "Total Surveys Submitted: ${_facilityAnalysisData.totalSurveys}",
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade700)
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      "Analysis for: ${_userLocation ?? 'Your Facility'}",
+                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: maroonPrimary)
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                      "Total Surveys Submitted: ${_facilityAnalysisData.totalSurveys}",
+                      style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500)
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           _buildAnalysisSection(
@@ -316,7 +355,7 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
               _buildYesNoPieChart(Q_SUPPORT, ['Supported', 'Unsupported'], _facilityAnalysisData.questionAggregates),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           _buildAnalysisSection(
             title: "Attitude to Work & Environment",
             children: [
@@ -324,7 +363,7 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
               _buildYesNoPieChart(Q_MATERIALS, ['Equipped', 'Unequipped'], _facilityAnalysisData.questionAggregates),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           _buildAnalysisSection(
             title: "Team Player Recognition",
             children: [
@@ -340,22 +379,28 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.teal)),
-        const Divider(color: Colors.teal, thickness: 1.5),
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Text(title, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: maroonPrimary)),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Divider(color: maroonPrimary, thickness: 2),
+        ),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             // Use a Column for narrow screens, a Wrap for wider screens
-            if (constraints.maxWidth < 600) {
+            if (constraints.maxWidth < 700) {
               return Column(
-                children: children.map((child) => Padding(padding: const EdgeInsets.only(bottom: 16.0), child: child)).toList(),
+                children: children.map((child) => Padding(padding: const EdgeInsets.only(bottom: 24.0), child: child)).toList(),
               );
             } else {
               return Wrap(
-                spacing: 16,
-                runSpacing: 16,
+                spacing: 24,
+                runSpacing: 24,
                 alignment: WrapAlignment.spaceEvenly,
-                children: children,
+                children: children.map((child) => SizedBox(width: (constraints.maxWidth - 64) / 2, child: child)).toList(),
               );
             }
           },
@@ -370,18 +415,18 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
     final noCount = data['No']!;
     final total = yesCount + noCount;
 
-    if (total == 0) return _buildChartCard(title: question, child: const Center(child: Text("No data for this question.")));
+    if (total == 0) return _buildChartCard(title: question, child: Center(child: Text("No data for this question.", style: GoogleFonts.poppins(color: Colors.grey))));
 
     final chartData = [
-      ChartData(labels[0], yesCount, Colors.green.shade400),
-      ChartData(labels[1], noCount, Colors.red.shade400),
+      ChartData(labels[0], yesCount, const Color(0xFF4CAF50)),
+      ChartData(labels[1], noCount, const Color(0xFFE53935)),
     ];
 
     return _buildChartCard(
       title: question,
       child: SfCircularChart(
         tooltipBehavior: _tooltipBehavior,
-        legend: const Legend(isVisible: true, overflowMode: LegendItemOverflowMode.wrap),
+        legend: Legend(isVisible: true, overflowMode: LegendItemOverflowMode.wrap, textStyle: GoogleFonts.poppins()),
         series: <CircularSeries>[
           PieSeries<ChartData, String>(
             dataSource: chartData,
@@ -389,7 +434,7 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
             yValueMapper: (d, _) => d.value,
             pointColorMapper: (d, _) => d.color,
             dataLabelMapper: (d, _) => '${d.value} (${(d.value / total * 100).toStringAsFixed(0)}%)',
-            dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside),
+            dataLabelSettings: DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside, textStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -401,7 +446,7 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
     if (teamPlayerScores.isEmpty) {
       return _buildChartCard(
         title: chartTitle,
-        child: const Center(child: Text("No team player data submitted.")),
+        child: Center(child: Text("No team player data submitted.", style: GoogleFonts.poppins(color: Colors.grey))),
       );
     }
     return _buildChartCard(
@@ -411,10 +456,12 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
           labelRotation: -45,
           labelIntersectAction: AxisLabelIntersectAction.rotate45,
           majorGridLines: const MajorGridLines(width: 0),
+          labelStyle: GoogleFonts.poppins(),
         ),
         primaryYAxis: NumericAxis(
-          title: AxisTitle(text: "Points Score"),
+          title: AxisTitle(text: "Points Score", textStyle: GoogleFonts.poppins()),
           majorGridLines: const MajorGridLines(width: 0.5, dashArray: [5, 5]),
+          labelStyle: GoogleFonts.poppins(),
         ),
         tooltipBehavior: _tooltipBehavior,
         series: <CartesianSeries>[
@@ -423,10 +470,13 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
             xValueMapper: (d, _) => d.name,
             yValueMapper: (d, _) => d.score,
             name: "Score",
-            color: Colors.amber.shade700,
-            borderRadius: const BorderRadius.all(Radius.circular(5)),
-            dataLabelSettings: const DataLabelSettings(
-                isVisible: true, labelAlignment: ChartDataLabelAlignment.top),
+            color: const Color(0xFFFFB300), // Gold/Amber
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            dataLabelSettings: DataLabelSettings(
+                isVisible: true, 
+                labelAlignment: ChartDataLabelAlignment.top,
+                textStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold)
+            ),
           )
         ],
       ),
@@ -434,32 +484,27 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
   }
 
   Widget _buildChartCard({required String title, required Widget child}) {
-    return LayoutBuilder(
-        builder: (context, constraints) {
-          return Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              // Make width responsive
-              width: constraints.maxWidth < 600 ? double.infinity : 500,
-              height: 400,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(child: child),
-                ],
-              ),
+    return Card(
+      elevation: 6,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        height: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          );
-        }
+            const SizedBox(height: 20),
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 
@@ -467,7 +512,7 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Date Range'),
+        title: Text('Select Date Range', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         content: SizedBox(
           width: 350,
           height: 350,
@@ -476,6 +521,10 @@ class _FacilitySupervisorPsychologicalSurveyAnalysisPageState extends State<Faci
             initialSelectedRange: PickerDateRange(_startDate, _endDate),
             maxDate: DateTime.now(),
             showActionButtons: true,
+            headerStyle: DateRangePickerHeaderStyle(textStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            monthCellStyle: DateRangePickerMonthCellStyle(textStyle: GoogleFonts.poppins()),
+            selectionTextStyle: GoogleFonts.poppins(color: Colors.white),
+            rangeTextStyle: GoogleFonts.poppins(),
             onSubmit: (Object? value) {
               if (value is PickerDateRange) {
                 setState(() {

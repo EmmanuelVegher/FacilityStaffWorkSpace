@@ -1,0 +1,21 @@
+Analyzing 2 items...                                            
+
+   info • 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:27:1 • deprecated_member_use
+warning • The name window is shown, but isn't used • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:27:69 • unused_shown_name
+   info • The parameter name 'sum' matches a visible type name • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:166:45 • avoid_types_as_parameter_names
+   info • The parameter name 'sum' matches a visible type name • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:168:41 • avoid_types_as_parameter_names
+   info • Invalid use of a private type in a public API • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:187:3 • library_private_types_in_public_api
+   info • The parameter name 'sum' matches a visible type name • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:551:45 • avoid_types_as_parameter_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:606:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:628:27 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1070:63 • deprecated_member_use
+   info • The parameter name 'sum' matches a visible type name • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1166:76 • avoid_types_as_parameter_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1171:68 • deprecated_member_use
+   info • The parameter name 'sum' matches a visible type name • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1175:89 • avoid_types_as_parameter_names
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1203:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1208:62 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1213:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/attendance_analysis_page/hq_attendance_analysis_page.dart:1218:64 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/hq_dashboard_screen.dart:535:158 • deprecated_member_use
+
+17 issues found. (ran in 4.4s)

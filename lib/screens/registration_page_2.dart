@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
@@ -450,36 +451,31 @@ class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
 
   @override
   Widget build(BuildContext context) {
-    // Your entire build method, including desktop/mobile layouts, can remain the same.
-    // The following is a simplified version for brevity, you should use your existing build method.
-    // I am pasting your full build method here to ensure it's complete.
     return Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
+      body: SelectionArea(
+        child: Container(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Colors.red.shade600,
-                Colors.black87,
-                Colors.white,
-                Colors.yellow.shade600,
-              ],
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final bool isDesktop = constraints.maxWidth > 760;
-                  final double containerWidth = isDesktop ? 800 : constraints.maxWidth;
+                  final double containerWidth =
+                      isDesktop ? 800 : constraints.maxWidth;
 
                   return Card(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    elevation: 8,
+                    elevation: 12,
                     child: Container(
                       width: containerWidth,
                       padding: const EdgeInsets.all(32),
@@ -488,54 +484,92 @@ class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset('assets/image/caritaslogo1.png', height: 80),
+                            Image.asset('assets/image/caritaslogo1.png',
+                                height: 80),
                             const SizedBox(height: 16),
-                            const Text('Create Your Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                            Text('Create Your Account',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF5C1A2E))),
                             const SizedBox(height: 8),
-                            Text('Fill in the details below to get started', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+                            Text('Fill in the details below to get started',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 16, color: Colors.grey.shade600)),
                             const SizedBox(height: 32),
                             GestureDetector(
                               onTap: _pickProfileImage,
-                              child: CircleAvatar(
-                                radius: 60,
-                                backgroundColor: Colors.grey.shade200,
-                                backgroundImage: _profileImageBytes != null ? MemoryImage(_profileImageBytes!) : null,
-                                child: _profileImageBytes == null ? Icon(Icons.camera_alt, size: 40, color: Colors.grey.shade700) : null,
+                              child: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 60,
+                                    backgroundColor: Colors.grey.shade200,
+                                    backgroundImage: _profileImageBytes != null
+                                        ? MemoryImage(_profileImageBytes!)
+                                        : null,
+                                    child: _profileImageBytes == null
+                                        ? Icon(Icons.person,
+                                            size: 60,
+                                            color: Colors.grey.shade400)
+                                        : null,
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFD4A03C),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.camera_alt,
+                                          size: 20, color: Colors.white),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 32),
-
-                            if (isDesktop) _buildDesktopLayout() else _buildMobileLayout(),
-
+                            if (isDesktop)
+                              _buildDesktopLayout()
+                            else
+                              _buildMobileLayout(),
                             const SizedBox(height: 20),
                             Row(
                               children: [
                                 Checkbox(
                                   value: _termsAgreed,
-                                  onChanged: (bool? value) => setState(() => _termsAgreed = value ?? false),
+                                  activeColor: const Color(0xFF5C1A2E),
+                                  onChanged: (bool? value) => setState(
+                                      () => _termsAgreed = value ?? false),
                                 ),
-                                const Expanded(
-                                  child: Text('I agree to the Terms and Conditions'),
+                                Expanded(
+                                  child: Text(
+                                      'I agree to the Terms and Conditions',
+                                      style: GoogleFonts.poppins()),
                                 ),
                               ],
                             ),
-                            // if (_errorMessage.isNotEmpty)
-                            //   Padding(
-                            //     padding: const EdgeInsets.only(top: 16.0),
-                            //     child: Text(_errorMessage, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
-                            //   ),
                             const SizedBox(height: 24),
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _register,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade700,
-                                  padding: const EdgeInsets.symmetric(vertical: 18),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                  backgroundColor: const Color(0xFF5C1A2E),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 18),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
                                 ),
-                                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Register', style: TextStyle(color: Colors.white)),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white)
+                                    : Text('Register',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white)),
                               ),
                             ),
                           ],
@@ -547,7 +581,9 @@ class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
               ),
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 
   Widget _buildDesktopLayout() {
@@ -700,36 +736,71 @@ class _RegistrationPageWeb2State extends State<RegistrationPageWeb2> {
     );
   }
 
-  Widget _buildStyledTextField({required TextEditingController controller, required String label, required IconData icon, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator, bool obscureText = false, Widget? suffixIcon}) {
+  Widget _buildStyledTextField(
+      {required TextEditingController controller,
+      required String label,
+      required IconData icon,
+      TextInputType keyboardType = TextInputType.text,
+      String? Function(String?)? validator,
+      bool obscureText = false,
+      Widget? suffixIcon}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      validator: validator ?? (value) => (value == null || value.isEmpty) ? 'This field is required' : null,
+      validator: validator ??
+          (value) => (value == null || value.isEmpty)
+              ? 'This field is required'
+              : null,
       obscureText: obscureText,
+      style: GoogleFonts.poppins(),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        labelStyle: GoogleFonts.poppins(color: Colors.grey.shade700),
+        prefixIcon: Icon(icon, color: const Color(0xFF5C1A2E)),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
+        fillColor: Colors.grey.shade50,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF5C1A2E), width: 2)),
+        errorStyle: GoogleFonts.poppins(color: Colors.red),
       ),
     );
   }
 
-  Widget _buildStyledDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required void Function(T?)? onChanged, String? hint}) {
+  Widget _buildStyledDropdown<T>(
+      {required String label,
+      required T? value,
+      required List<DropdownMenuItem<T>> items,
+      required void Function(T?)? onChanged,
+      String? hint}) {
     return DropdownButtonFormField<T>(
-      initialValue: value,
+      value: value,
       items: items,
       onChanged: onChanged,
       validator: (val) => val == null ? 'Please select an option' : null,
+      style: GoogleFonts.poppins(color: Colors.black87),
       decoration: InputDecoration(
-        labelText: label, hintText: hint, filled: true, fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2)),
+        labelText: label,
+        labelStyle: GoogleFonts.poppins(color: Colors.grey.shade700),
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(color: Colors.grey.shade500),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF5C1A2E), width: 2)),
+        errorStyle: GoogleFonts.poppins(color: Colors.red),
       ),
       isExpanded: true,
     );

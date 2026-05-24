@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
@@ -1111,7 +1112,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   Future<String?> _getUserState() async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return null;
 
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection("Staff")
@@ -1608,12 +1608,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
   Future<void> _loadBioData() async {
     String? userId =
-        FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+        FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot =
@@ -1923,7 +1918,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       appBar: AppBar(
         title: Text('Leave Request',
             style:
-                TextStyle(color: Colors.white, fontSize: 20 * fontSizeFactor)),
+                GoogleFonts.poppins(color: Colors.white, fontSize: 20 * fontSizeFactor)),
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -1947,9 +1942,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         ],
       ),
       drawer: drawer(context),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0 * paddingFactor),
-        child: Column(
+      body: SelectionArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(16.0 * paddingFactor),
+          child: Column(
           children: [
             SizedBox(
               height: 60 * headerHeightFactor,
@@ -1983,8 +1979,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       children: [
                         Text(
                           "Geo-Coordinates Information:",
-                          style: TextStyle(
-                            fontFamily: "NexaBold",
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
                             fontSize: 18 * fontSizeFactor,
                             color: Colors.blueGrey,
                           ),
@@ -1993,8 +1989,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                         IntrinsicWidth(
                           child: Text(
                             "GPS is: ${isGpsEnabled.value ? 'On' : 'Off'}",
-                            style: TextStyle(
-                              fontFamily: "NexaBold",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                               fontSize: 16 * fontSizeFactor,
                             ),
                           ),
@@ -2003,8 +1999,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                         IntrinsicWidth(
                           child: Text(
                             "Current Latitude: ${lati.value.toStringAsFixed(6)}, Current Longitude: ${longi.value.toStringAsFixed(6)}",
-                            style: TextStyle(
-                              fontFamily: "NexaBold",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                               fontSize: 16 * fontSizeFactor,
                             ),
                           ),
@@ -2013,8 +2009,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                         IntrinsicWidth(
                           child: Text(
                             "Coordinates Accuracy: ${accuracy.value}, Altitude: ${altitude.value} , Speed: ${speed.value}, Speed Accuracy: ${speedAccuracy.value}, Location Data Timestamp: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(time.value.toInt()))} , Is Location Mocked?: ${isMock.value}",
-                            style: TextStyle(
-                              fontFamily: "NexaBold",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                               fontSize: 16 * fontSizeFactor,
                             ),
                           ),
@@ -2023,8 +2019,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                         IntrinsicWidth(
                           child: Obx(() => Text(
                                 "Current State: ${administrativeArea.value}",
-                                style: TextStyle(
-                                  fontFamily: "NexaBold",
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
                                   fontSize: 16 * fontSizeFactor,
                                 ),
                               )),
@@ -2034,8 +2030,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                           child: Obx(
                             () => Text(
                               "Current Location: ${location.value}",
-                              style: TextStyle(
-                                fontFamily: "NexaBold",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
                                 fontSize: 16 * fontSizeFactor,
                               ),
                             ),
@@ -2068,7 +2064,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Leave Summary",
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                                 fontSize: 18 * fontSizeFactor,
                                 fontWeight: FontWeight.bold)),
                         SizedBox(height: 12 * paddingFactor),
@@ -2117,6 +2113,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           ],
         ),
       ),
+    ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           _showApplyLeaveBottomSheet(context, fontSizeFactor, paddingFactor,
@@ -2137,12 +2134,12 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     return Column(
       children: [
         Text("$count",
-            style: TextStyle(
+            style: GoogleFonts.poppins(
                 fontSize: 18 * fontSizeFactor,
                 color: color,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 14 * fontSizeFactor)),
+        Text(label, style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor)),
       ],
     );
   }
@@ -2231,7 +2228,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       ),
                       headerStyle: DateRangePickerHeaderStyle(
                         backgroundColor: Colors.blue,
-                        textStyle: TextStyle(
+                        textStyle: GoogleFonts.poppins(
                             color: Colors.white, fontSize: 16 * fontSizeFactor),
                       ),
                       todayHighlightColor: Colors.red,
@@ -2263,7 +2260,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                                 FittedBox(
                                   fit: BoxFit.scaleDown,
                                   child: Text(markedDateLabel,
-                                      style: TextStyle(
+                                      style: GoogleFonts.poppins(
                                           fontSize: 6 * fontSizeFactor)),
                                 ),
                                 SizedBox(height: 2 * paddingFactor),
@@ -2274,14 +2271,14 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                                 FittedBox(
                                   fit: BoxFit.scaleDown,
                                   child: Text(holidayName,
-                                      style: TextStyle(
+                                      style: GoogleFonts.poppins(
                                           fontSize: 6 * fontSizeFactor)),
                                 ),
                                 SizedBox(height: 2 * paddingFactor),
                               ],
                               Text(cellDetails.date.day.toString(),
                                   style:
-                                      TextStyle(fontSize: 14 * fontSizeFactor)),
+                                      GoogleFonts.poppins(fontSize: 14 * fontSizeFactor)),
                             ],
                           ),
                         );
@@ -2292,8 +2289,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       controller: _reasonController,
                       decoration: InputDecoration(
                           labelText: "Reason(s) For been Out-Of-Office",
-                          labelStyle: TextStyle(fontSize: 14 * fontSizeFactor)),
-                      style: TextStyle(fontSize: 14 * fontSizeFactor),
+                          labelStyle: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor)),
+                      style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor),
                     ),
                     SizedBox(height: 16.0 * paddingFactor),
                     Row(
@@ -2308,7 +2305,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                             padding: EdgeInsets.symmetric(
                                 horizontal: 20 * buttonPaddingFactor,
                                 vertical: 12 * buttonPaddingFactor),
-                            textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
+                            textStyle: GoogleFonts.poppins(fontSize: 16 * fontSizeFactor),
                           ),
                           child: const Text("Submit Request"),
                         ),
@@ -2351,7 +2348,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         padding: EdgeInsets.symmetric(
             horizontal: 20 * buttonPaddingFactor,
             vertical: 12 * buttonPaddingFactor),
-        textStyle: TextStyle(fontSize: 16 * fontSizeFactor),
+        textStyle: GoogleFonts.poppins(fontSize: 16 * fontSizeFactor),
       ),
       child: Text(label),
     );
@@ -2451,7 +2448,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                       : 0.0,
                   center: Text(
                     "Total for FY$fiscalYearShort: ${totalLeaves.value}",
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                         fontSize: 18 * fontSizeFactor,
                         fontWeight: FontWeight.w600),
                   ),
@@ -2502,7 +2499,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               padding: EdgeInsets.only(left: 16.0 * paddingFactor),
               child: Text(
                 "Leave Requests",
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                     fontSize: 18 * fontSizeFactor, fontWeight: FontWeight.bold),
               ),
             ),
@@ -2510,7 +2507,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             if (_leaveRequests.isEmpty)
               Center(
                   child: Text("No leave requests found.",
-                      style: TextStyle(fontSize: 14 * fontSizeFactor)))
+                      style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor)))
             else
               ExpansionPanelList(
                 expansionCallback: (int index, bool isExpanded) {
@@ -2533,7 +2530,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                     headerBuilder: (BuildContext context, bool isExpanded) {
                       return ListTile(
                           title: Text("FY $fiscalYear Leave Section",
-                              style: TextStyle(fontSize: 16 * fontSizeFactor)),
+                              style: GoogleFonts.poppins(fontSize: 16 * fontSizeFactor)),
                           leading: isExpanded
                               ? Icon(Icons.remove,
                                   color: Colors.red, size: 24 * iconSizeFactor)
@@ -2569,10 +2566,10 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       double fontSizeFactor, double paddingFactor, double iconSizeFactor) {
     return ListTile(
       title: Text(leaveRequest.type!,
-          style: TextStyle(fontSize: 16 * fontSizeFactor)),
+          style: GoogleFonts.poppins(fontSize: 16 * fontSizeFactor)),
       subtitle: Text(
         'From ${DateFormat('dd MMMM, yyyy').format(leaveRequest.startDate!)} to ${DateFormat('dd MMMM, yyyy').format(leaveRequest.endDate!)}',
-        style: TextStyle(fontSize: 12 * fontSizeFactor),
+        style: GoogleFonts.poppins(fontSize: 12 * fontSizeFactor),
       ),
       trailing: SizedBox(
         width: 200 * paddingFactor,
@@ -2589,7 +2586,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
               child: Text(
                 leaveRequest.status!,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14 * fontSizeFactor),
+                style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor),
               ),
             ),
             leaveRequest.status == "Approved"
@@ -2960,10 +2957,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       double fontSizeFactor,
       double paddingFactor) async {
     String? staffId = FirebaseAuth.instance.currentUser?.uid;
-    if (staffId == null) {
-      dev.log("Error: No logged-in user found");
-      return;
-    }
 
     try {
       leaveRequest.type = _selectedLeaveType;
@@ -3105,10 +3098,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   Future<void> _handleSaveAndSubmit(BuildContext context, StateSetter setState,
       double fontSizeFactor, double paddingFactor) async {
     String? staffId = FirebaseAuth.instance.currentUser?.uid;
-    if (staffId == null) {
-      dev.log("Error: No logged-in user found");
-      return;
-    }
 
     if (_selectedDateRange == null ||
         _reasonController.text.isEmpty ||

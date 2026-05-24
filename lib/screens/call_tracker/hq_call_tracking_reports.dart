@@ -16,6 +16,8 @@ import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../widgets/global_multi_select_dropdown.dart';
 
 import '../../models/contact_tracked.dart';
 import '../../widgets/drawer3.dart';
@@ -121,8 +123,8 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
 
       // Set the default state filter.
       setState(() {
-        _availableStates = ['All States', ...states..sort()];
-        _selectedStates = ['All States'];
+        _availableStates = states..sort();
+        _selectedStates = [];
       });
 
       // After setting the default filters, immediately load the corresponding reports.
@@ -147,17 +149,15 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
     setState(() {
       _selectedStates = selected;
       isLoading = true;
-      _selectedFacilities = ['All Facilities'];
-      _availableFacilities = ['All Facilities'];
-      _selectedTrackers = ['All Trackers'];
-      _availableTrackers = ['All Trackers'];
+      _selectedFacilities = [];
+      _availableFacilities = [];
+      _selectedTrackers = [];
+      _availableTrackers = [];
       _masterContactList.clear();
       _applyAllFiltersAndRecalculate();
     });
 
-    List<String> statesToQuery = _selectedStates.contains('All States')
-        ? _availableStates.where((s) => s != 'All States').toList()
-        : _selectedStates;
+    List<String> statesToQuery = _selectedStates;
 
     if (statesToQuery.isNotEmpty) {
       try {
@@ -192,7 +192,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   }
 
   Future<void> _loadReports() async {
-    if (_selectedStates.isEmpty || (_selectedStates.contains('All States') && _availableStates.length <= 1)) {
+    if (_selectedStates.isEmpty) {
       _showSnackBar("Please select at least one state to generate a report.");
       return;
     }
@@ -210,9 +210,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
     });
 
     try {
-      List<String> statesToQuery = _selectedStates.contains('All States')
-          ? _availableStates.where((s) => s != 'All States').toList()
-          : _selectedStates;
+      List<String> statesToQuery = _selectedStates;
 
       Query<Map<String, dynamic>> query = _firestore.collection('CallLogs')
           .where('dateTracked', isGreaterThanOrEqualTo: startDate)
@@ -244,25 +242,25 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
     final trackers = _masterContactList.map((c) => c.trackedBy).whereType<String>().where((t) => t.isNotEmpty).toSet();
     final statuses = _masterContactList.map((c) => c.callStatus).whereType<String>().where((s) => s.isNotEmpty).toSet();
 
-    _availableTrackers = ['All Trackers', ...trackers.toList()..sort()];
-    _availableCallStatuses = ['All Statuses', ...statuses.toList()..sort()];
+    _availableTrackers = trackers.toList()..sort();
+    _availableCallStatuses = statuses.toList()..sort();
 
     // Reset sub-filters to 'All'
-    _selectedFacilities = ['All Facilities'];
-    _selectedTrackers = ['All Trackers'];
-    _selectedCallStatuses = ['All Statuses'];
+    _selectedFacilities = [];
+    _selectedTrackers = [];
+    _selectedCallStatuses = [];
   }
 
   void _applyAllFiltersAndRecalculate() {
     List<ContactTracked> currentlyFiltered = List.from(_masterContactList);
 
-    if (!_selectedFacilities.contains('All Facilities')) {
+    if (_selectedFacilities.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedFacilities.contains(c.trackerFacilityLocation)).toList();
     }
-    if (!_selectedTrackers.contains('All Trackers')) {
+    if (_selectedTrackers.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedTrackers.contains(c.trackedBy)).toList();
     }
-    if (!_selectedCallStatuses.contains('All Statuses')) {
+    if (_selectedCallStatuses.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedCallStatuses.contains(c.callStatus)).toList();
     }
 
@@ -312,17 +310,28 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HQ Call Tracking Reports', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text('HQ Call Tracking Reports', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer3(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(child: bodyContent),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(child: bodyContent),
+          ],
+        ),
       ),
     );
   }
@@ -358,13 +367,6 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   }
 
   Widget _buildFilterBar() {
-    String getButtonText(String singular, List<String> selected, String allKeyword) {
-      if (selected.contains(allKeyword)) return "All ${singular}s";
-      if (selected.length == 1) return selected.first;
-      if (selected.isNotEmpty) return "${selected.length} ${singular}s";
-      return "Select $singular";
-    }
-
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -378,66 +380,73 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
           runSpacing: 12.0,
           alignment: WrapAlignment.start,
           children: [
-            _buildFilterChip("State", getButtonText("State", _selectedStates, 'All States'), Icons.map, () async {
-              await _showMultiSelectDialog(
-                context: context,
-                title: 'Select States',
-                allOptions: _availableStates,
-                selectedOptions: _selectedStates,
-                allKeyword: 'All States',
-                onConfirm: (results) => _onStateSelectionChange(results),
-              );
-            }),
-            _buildFilterChip("Facility", getButtonText("Facility", _selectedFacilities, 'All Facilities'), Icons.business, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Facilities',
-                allOptions: _availableFacilities,
-                selectedOptions: _selectedFacilities,
-                allKeyword: 'All Facilities',
-                onConfirm: (results) {
+            Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableStates,
+                selectedItems: _selectedStates,
+                title: "Select States",
+                labelBuilder: (val) => val,
+                onChanged: (results) => _onStateSelectionChange(results),
+              ),
+            ),
+            
+            Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedFacilities = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableFacilities.length <= 1),
-            _buildFilterChip("Tracked By", getButtonText("Tracker", _selectedTrackers, 'All Trackers'), Icons.person_search, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Trackers',
-                allOptions: _availableTrackers,
-                selectedOptions: _selectedTrackers,
-                allKeyword: 'All Trackers',
-                onConfirm: (results) {
+              ),
+            ),
+            
+            Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableTrackers,
+                selectedItems: _selectedTrackers,
+                title: "Select Trackers",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedTrackers = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableTrackers.length <= 1),
-            _buildFilterChip("Call Status", getButtonText("Status", _selectedCallStatuses, 'All Statuses'), Icons.phone_callback, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Call Statuses',
-                allOptions: _availableCallStatuses,
-                selectedOptions: _selectedCallStatuses,
-                allKeyword: 'All Statuses',
-                onConfirm: (results) {
+              ),
+            ),
+            
+            Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableCallStatuses,
+                selectedItems: _selectedCallStatuses,
+                title: "Select Statuses",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedCallStatuses = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableCallStatuses.length <= 1),
+              ),
+            ),
+
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -476,7 +485,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
         children: [
           _buildSummaryInfoCard(),
           const SizedBox(height: 24),
-          Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Summary Charts', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 16),
           _buildChartSection(),
           const SizedBox(height: 30),
@@ -484,7 +493,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
             _buildClientSummarySection(clientSummaryMap),
             const SizedBox(height: 30),
           ],
-          Text('Detailed Logs', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Detailed Logs', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 10),
           _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
         ],
@@ -497,7 +506,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message, style: GoogleFonts.poppins()), behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20)));
   }
 
   String _maskClientName(String? name) {
@@ -993,45 +1002,74 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
       context: context,
       builder: (ctx) {
         return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
           return AlertDialog(
-            title: Text(title),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             content: SizedBox(
               width: 350,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: allOptions.length,
-                itemBuilder: (context, index) {
-                  final option = allOptions[index];
-                  final isAllOption = option == allKeyword;
-
-                  return CheckboxListTile(
-                    title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                    value: tempSelected.contains(option),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
                     onChanged: (bool? value) {
                       setStateDialog(() {
                         if (value == true) {
-                          if (isAllOption) {
-                            tempSelected.clear();
-                            tempSelected.add(allKeyword);
-                          } else {
-                            tempSelected.remove(allKeyword);
-                            tempSelected.add(option);
-                          }
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
                         } else {
-                          tempSelected.remove(option);
-                          if (tempSelected.isEmpty && allOptions.contains(allKeyword)) {
-                            tempSelected.add(allKeyword);
-                          }
+                          tempSelected.clear();
                         }
                       });
                     },
-                  );
-                },
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
                   onPressed: () {
                     onConfirm(tempSelected);
                     Navigator.pop(context);

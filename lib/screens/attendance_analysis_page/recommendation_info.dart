@@ -27,7 +27,7 @@ class RecommendationInfo {
       recommenderName: map['recommenderName'] ?? '',
       recommenderDesignation: map['recommenderDesignation'] ?? '',
       recommenderCategory: map['recommenderCategory'] ?? '',
-      timestamp: (map['timestamp'] as Timestamp? ?? Timestamp.now()).toDate(),
+      timestamp: map['timestamp'] is Timestamp ? (map['timestamp'] as Timestamp).toDate() : (map['timestamp'] is String ? DateTime.tryParse(map['timestamp'] as String) ?? DateTime.now() : DateTime.now()),
       // Provide a default value for older records that won't have this field
       deductedHours: map['deductedHours'] as int? ?? 0, // <-- ADD THIS LINE
     );

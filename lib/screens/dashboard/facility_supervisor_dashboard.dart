@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -15,8 +16,8 @@ import '../../models/facility_staff_model.dart';
 // Assuming drawer2 is for State/Supervisor level
 import '../../widgets/drawer4.dart';
 import '../attendance_analysis_page/facility_supervisor_analysis_page.dart';
-import '../leave_request/state_leave_request_page.dart';
-import '../timesheet/timesheet_management_dashboard.dart';
+import 'package:service_delivery_workspace/screens/leave_request/state_leave_request_page.dart';
+import 'package:service_delivery_workspace/screens/timesheet/timesheet_management_dashboard.dart';
 
 
 // --- ENUMS & MODELS (These are reusable across dashboards) ---
@@ -117,6 +118,10 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
   final StreamController<TimesheetMetrics> _timesheetStreamController = StreamController.broadcast();
   bool _isTimesheetLoading = false;
   late Timer _timer;
+
+  // New Constants for Styling
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
+  static const Color wineColor = Color(0xFF722F37);
 
   @override
   void initState() {
@@ -397,13 +402,13 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
     return Scaffold(
       drawer: drawer4(context),
       appBar: AppBar(
-        title: Text('${_currentUserFacility ?? "Facility"} Dashboard', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('${_currentUserFacility ?? "Facility"} Dashboard', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+              colors: [maroonPrimary, Color(0xFF2E0215)], // Maroon gradient
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -417,7 +422,7 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
                 stream: _timeStreamController.stream,
                 initialData: DateFormat('hh:mm:ss a').format(DateTime.now()),
                 builder: (context, snapshot) {
-                  return Text( snapshot.data ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),);
+                  return Text( snapshot.data ?? '', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),);
                 },
               ),
             ),
@@ -429,24 +434,26 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
           const SizedBox(width: 10),
         ],
       ),
-      body: Column(
-        children: [
-          _buildTopFilterBar(),
-          Expanded(
-            child: StreamBuilder<DashboardData>(
-              stream: _dashboardStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError) {
-                  debugPrint("Dashboard Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
-                  return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("An error occurred: ${snapshot.error}", style: const TextStyle(color: Colors.red))));
-                }
-                if (!snapshot.hasData || snapshot.data!.staffList.isEmpty) return Center(child: Text("No 'Facility Staff' found for $_currentUserFacility."));
-                return _buildDashboardContent(snapshot.data!);
-              },
+      body: SelectionArea( // Wrapped in SelectionArea for copyable text
+        child: Column(
+          children: [
+            _buildTopFilterBar(),
+            Expanded(
+              child: StreamBuilder<DashboardData>(
+                stream: _dashboardStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (snapshot.hasError) {
+                    debugPrint("Dashboard Stream Error: ${snapshot.error}\n${snapshot.stackTrace}");
+                    return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text("An error occurred: ${snapshot.error}", style: const TextStyle(color: Colors.red))));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.staffList.isEmpty) return Center(child: Text("No 'Facility Staff' found for $_currentUserFacility."));
+                  return _buildDashboardContent(snapshot.data!);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -799,53 +806,73 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
               )
             ],
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPerformanceGauge(DashboardData data) {
-    final totalStaff = data.staffList.length;
-    final presentToday = data.attendanceRecords.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(DateTime.now())).map((r) => r.staffId).toSet().length;
-    final percentage = totalStaff > 0 ? (presentToday / totalStaff) * 100 : 0.0;
-    return gauges.SfRadialGauge(
-      axes: [
-        gauges.RadialAxis(
-          minimum: 0, maximum: 100, showLabels: false, showTicks: false,
-          axisLineStyle: const gauges.AxisLineStyle(thickness: 0.2, thicknessUnit: gauges.GaugeSizeUnit.factor, cornerStyle: gauges.CornerStyle.bothCurve),
-          pointers: [
-            gauges.RangePointer(value: percentage, width: 0.2, sizeUnit: gauges.GaugeSizeUnit.factor, cornerStyle: gauges.CornerStyle.bothCurve, color: Colors.teal),
-            gauges.MarkerPointer(value: percentage, markerHeight: 10, markerWidth: 10, markerType: gauges.MarkerType.circle, color: Colors.white)
-          ],
-          annotations: <gauges.GaugeAnnotation>[gauges.GaugeAnnotation(widget: Text('${percentage.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)), angle: 90, positionFactor: 0.1)],
         )
       ],
     );
   }
 
-  Widget _buildLeaveRequestCard(DashboardData data) {
-    final pendingLeaves = data.pendingLeaves;
-    if (pendingLeaves.isEmpty) {
-      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, color: Colors.green, size: 40), SizedBox(height: 8), Text("No pending leave requests.", textAlign: TextAlign.center)]));
-    }
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            itemCount: pendingLeaves.length,
-            itemBuilder: (context, index) {
-              final leave = pendingLeaves[index];
-              return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.person_outline)), title: Text(leave.staffName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)), subtitle: Text('${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})', style: const TextStyle(fontSize: 12)));
-            },
+  // --- Gauge Widget ---
+  Widget _buildPerformanceGauge(DashboardData data)   {
+    // A simple attendance gauge comparing 'Present' to 'Total Expected'
+    final totalExpected = data.staffList.length;
+    final today = DateTime.now();
+    final presentCount = data.attendanceRecords.where((r) => DateFormat('yyyy-MM-dd').format(r.timestamp) == DateFormat('yyyy-MM-dd').format(today)).map((e) => e.staffId).toSet().length;
+
+    final double percentage = totalExpected == 0 ? 0 : (presentCount / totalExpected) * 100;
+
+    return SfCircularChart(
+        series: <CircularSeries>[
+          RadialBarSeries<ChartData, String>(
+            dataSource: [ChartData('Present', percentage, Colors.blue)],
+            xValueMapper: (ChartData data, _) => data.category,
+            yValueMapper: (ChartData data, _) => data.value,
+            maximumValue: 100,
+            radius: '80%',
+            cornerStyle: CornerStyle.bothCurve,
+            innerRadius: '60%',
+          )
+        ],
+        annotations: <CircularChartAnnotation>[
+          CircularChartAnnotation(
+            widget: Text(
+              '${percentage.toStringAsFixed(1)}%',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
           ),
-        ),
-        Align(alignment: Alignment.bottomRight, child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StateLeaveRequestManagementPage())), child: const Text('View Details'))),
-      ],
+        ]
+    );
+  }
+
+  // --- Leave Request Widget ---
+  Widget _buildLeaveRequestCard(DashboardData data) {
+    if (data.pendingLeaves.isEmpty) {
+      return const Center(child: Text("No pending leave requests."));
+    }
+    return ListView.builder(
+      itemCount: data.pendingLeaves.length,
+      itemBuilder: (context, index) {
+        final leave = data.pendingLeaves[index];
+        return ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(leave.staffName, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text('${leave.leaveType} (${DateFormat('MM/dd').format(leave.startDate)} - ${DateFormat('MM/dd').format(leave.endDate)})'),
+          trailing: Chip(
+            label: Text(leave.status, style: const TextStyle(fontSize: 10, color: Colors.white)),
+            backgroundColor: Colors.orange,
+            visualDensity: VisualDensity.compact,
+          ),
+          onTap: () {
+            // Navigate to leave approval page if exists
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const StateLeaveRequestManagementPage()));
+          },
+        );
+      },
     );
   }
 }
 
-// A simple full-screen page to show the complete live feed
+// --- NEW FULL-SCREEN PAGE FOR LIVE FEED ---
 class LiveFeedFullScreenPage extends StatelessWidget {
   final List<AttendanceRecord> records;
   const LiveFeedFullScreenPage({super.key, required this.records});
@@ -853,21 +880,43 @@ class LiveFeedFullScreenPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Full Clock-In Feed')),
-      body: records.isEmpty ? const Center(child: Text("No clock-in records to display.")) : ListView.builder(
-        padding: const EdgeInsets.all(8.0), itemCount: records.length,
-        itemBuilder: (context, index) {
-          final record = records[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 4.0),
-            child: ListTile(
-              title: Text(record.staffName, style: const TextStyle(fontWeight: FontWeight.w500)),
-              subtitle: Text(DateFormat('dd-MMM-yyyy').format(record.timestamp)),
-              trailing: Text(record.clockInTime, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: record.isLate ? Colors.red.shade700 : Colors.green.shade700)),
+      appBar: AppBar(
+        title: Text('Full Clock-In Feed', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          );
-        },
+          ),
+        ),
       ),
+      body: records.isEmpty 
+          ? Center(child: Text("No clock-in records to display.", style: GoogleFonts.poppins())) 
+          : ListView.builder(
+              padding: const EdgeInsets.all(16.0), 
+              itemCount: records.length,
+              itemBuilder: (context, index) {
+                final record = records[index];
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    title: Text(record.staffName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    subtitle: Text('${record.staffLocation}\n${DateFormat('dd-MMM-yyyy').format(record.timestamp)}', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+                    trailing: Text(
+                      record.clockInTime, 
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: record.isLate ? Colors.red.shade700 : Colors.green.shade700)
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

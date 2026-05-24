@@ -5,6 +5,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:refreshable_widget/refreshable_widget.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 import '../screens/account_management/my_state_screen.dart';
 import '../screens/admin/pending_schedules_page.dart';
 import '../screens/attendance_analysis_page/attendance_analysis_page.dart';
@@ -73,6 +75,8 @@ Widget drawer2(
   double drawerIconSize = 24;
   double drawerFontSize = 17;
   //final _taskController = Get.put(TaskController());
+  const Color maroonPrimary = Color(0xFF5C1A2E);
+  const Color goldAccent = Color(0xFFD4A03C);
 
   return Drawer(
     child: Container(
@@ -95,64 +99,56 @@ Widget drawer2(
           // Row(children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: Get.isDarkMode ? Colors.white : Colors.white,
+              color: maroonPrimary,
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 stops: [0.0, 1.0],
-                colors: [Colors.red, Colors.black],
+                colors: [maroonPrimary, Color(0xFF2E0215)],
               ),
             ),
             child: Container(
                 alignment: Alignment.bottomLeft,
                 child: Row(
                   children: [
-                    const Text(
-                      "Dashboard",
-                      style: TextStyle(
-                          fontSize: 25,
-                          color: Colors.white,
-                          fontFamily: "NexaBold"),
+                    Expanded(
+                      child: Text(
+                        "Dashboard",
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                            fontSize: 25,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    const SizedBox(
-                      width: 30,
-                    ),
+                    const SizedBox(width: 12),
                     Container(
-                        margin: const EdgeInsets.only(
-                          top: 20,
-                          bottom: 24,
-                        ),
-                        height: 100,
-                        width: 100,
+                        height: 60,
+                        width: 60,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(15),
+                          color: goldAccent,
                         ),
                         child: RefreshableWidget<List<Uint8List>?>(
-                          refreshCall: () async {
-                            return null;
-
-                            // return await _readImagesFromDatabase();
-                          },
+                          refreshCall: () async => null,
                           refreshRate: const Duration(seconds: 1),
                           errorWidget: Icon(
                             Icons.person,
-                            size: 80,
+                            size: 40,
                             color: Colors.grey.shade300,
                           ),
                           loadingWidget: Icon(
                             Icons.person,
-                            size: 80,
+                            size: 40,
                             color: Colors.grey.shade300,
                           ),
-                          builder: ((context, value) {
-                            return ListView.builder(
-                              itemCount: value!.length,
-                              itemBuilder: (context, index) =>
-                                  Image.memory(value.first),
-                            );
-                          }),
+                          builder: (context, value) {
+                            if (value == null || value.isEmpty) {
+                              return Icon(Icons.person, size: 40, color: Colors.grey.shade300);
+                            }
+                            return Image.memory(value.first, fit: BoxFit.cover);
+                          },
                         )),
                   ],
                 )),
@@ -165,13 +161,13 @@ Widget drawer2(
               leading: Icon(
                 Icons.screen_lock_landscape_rounded,
                 size: drawerIconSize,
-                color: Colors.red,
+                color: maroonPrimary,
               ),
               title: Text(
                 'DashBoard',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                     fontSize: drawerFontSize,
-                    color: Get.isDarkMode ? Colors.white : Colors.brown),
+                    color: Get.isDarkMode ? Colors.white : Colors.black87),
               ),
               onTap: () async {
                 //  onTap();
@@ -192,14 +188,17 @@ Widget drawer2(
           ),
           ListTile(
             leading: Icon(Icons.timer,
-                size: drawerIconSize, color: Colors.orangeAccent),
+                size: drawerIconSize, color: maroonPrimary),
             title: Row(
               children: [
-                Text(
-                  'Attendance Analysis',
-                  style: TextStyle(
-                      fontSize: drawerFontSize,
-                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                Expanded(
+                  child: Text(
+                    'Attendance Analysis',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        fontSize: drawerFontSize,
+                        color: Get.isDarkMode ? Colors.white : Colors.black87),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Chip(
@@ -228,12 +227,15 @@ Widget drawer2(
           ),
           ListTile(
             leading: Icon(Icons.person_off_outlined,
-                size: drawerIconSize, color: Colors.red),
+                size: drawerIconSize, color: maroonPrimary),
             title: Row(
               children: [
-                const Text(
-                  'Low Attendance Staff',
-                  style: TextStyle(fontSize: 17, color: Colors.brown),
+                Expanded(
+                  child: Text(
+                    'Low Attendance Staff',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(fontSize: 17, color: Colors.black87),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Chip(
@@ -261,14 +263,17 @@ Widget drawer2(
           ),
           ListTile(
             leading: Icon(Icons.analytics,
-                size: drawerIconSize, color: Colors.blue),
+                size: drawerIconSize, color: maroonPrimary),
             title: Row(
               children: [
-                Text(
-                  'Performance Impact',
-                  style: TextStyle(
-                      fontSize: drawerFontSize,
-                      color: Get.isDarkMode ? Colors.white : Colors.brown),
+                Expanded(
+                  child: Text(
+                    'Performance Impact',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        fontSize: drawerFontSize,
+                        color: Get.isDarkMode ? Colors.white : Colors.black87),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 // --- NEW: "NEW" FLAG FOR 30 DAYS ---
@@ -302,13 +307,13 @@ Widget drawer2(
             leading: Icon(
               Icons.pending_actions, // Changed Icon
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Pending Leave Requests',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -329,13 +334,13 @@ Widget drawer2(
             leading: Icon(
               Icons.schedule, // Changed Icon
               size: drawerIconSize,
-              color: Colors.red,
+              color: maroonPrimary,
             ),
             title: Text(
               'Pending Timesheets',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -351,12 +356,12 @@ Widget drawer2(
           ),
           ListTile(
             leading: Icon(Icons.task,
-                size: drawerIconSize, color: Colors.orange),
+                size: drawerIconSize, color: maroonPrimary),
             title: Text(
               'Task Management Summary',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -402,13 +407,13 @@ Widget drawer2(
             leading: Icon(
               Icons.phone,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Call Tracking Report',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -432,13 +437,13 @@ Widget drawer2(
             leading: Icon(
               Icons.art_track,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'EAC Tracking Report',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -460,13 +465,13 @@ Widget drawer2(
             leading: Icon(
               Icons.biotech_outlined,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Viral Load Tracking Report',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -488,13 +493,13 @@ Widget drawer2(
             leading: Icon(
               Icons.lock_clock,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'View Submitted Timesheets',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -517,8 +522,8 @@ Widget drawer2(
               final allowed = snapshot.data == true;
               if (!allowed) return const SizedBox.shrink();
               return ListTile(
-                leading: const Icon(Icons.playlist_add_check_circle_outlined),
-                title: const Text('Pending Payment Schedules'),
+                leading: const Icon(Icons.playlist_add_check_circle_outlined, color: maroonPrimary),
+                title: Text('Pending Payment Schedules', style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87)),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -544,13 +549,13 @@ Widget drawer2(
             leading: Icon(
               Icons.psychology,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Survey Analysis',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -568,10 +573,10 @@ Widget drawer2(
 
           // NEW: State-specific reports for drawer2
           ListTile(
-            leading: const Icon(Icons.group, color: Colors.teal),
+            leading: const Icon(Icons.group, color: maroonPrimary),
             title: Text(
               'Staff Status Report',
-              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -582,10 +587,10 @@ Widget drawer2(
           ),
           const Divider(color: Colors.grey, height: 1),
           ListTile(
-            leading: const Icon(Icons.history, color: Colors.brown),
+            leading: const Icon(Icons.history, color: maroonPrimary),
             title: Text(
               'Audit Logs',
-              style: TextStyle(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -596,8 +601,8 @@ Widget drawer2(
           ),
           const Divider(color: Colors.grey, height: 1),
           ListTile(
-            leading: const Icon(Icons.location_city, color: Colors.purple),
-            title: const Text('SRT Management'),
+            leading: const Icon(Icons.location_city, color: maroonPrimary),
+            title: Text('SRT Management', style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87)),
             onTap: () {
               Navigator.push(
                 context,
@@ -617,10 +622,10 @@ Widget drawer2(
               final allowed = snapshot.data == true;
               if (!allowed) return const SizedBox.shrink();
               return ListTile(
-                leading: const Icon(Icons.manage_accounts),
+                leading: const Icon(Icons.manage_accounts, color: maroonPrimary),
                 title: Text(
                   'Account Management',
-                  style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+                  style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
                 ),
                 onTap: () {
                   Navigator.of(context).pop(); // Close the drawer
@@ -643,13 +648,13 @@ Widget drawer2(
             leading: Icon(
               Icons.password_rounded,
               size: drawerIconSize,
-              color: Colors.purple,
+              color: maroonPrimary,
             ),
             title: Text(
               'Forgot Password',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -667,13 +672,13 @@ Widget drawer2(
             leading: Icon(
               Icons.draw,
               size: drawerIconSize,
-              color: Colors.blue,
+              color: maroonPrimary,
             ),
             title: Text(
               'Upload Signature',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: drawerFontSize,
-                  color: Get.isDarkMode ? Colors.white : Colors.brown),
+                  color: Get.isDarkMode ? Colors.white : Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -694,11 +699,11 @@ Widget drawer2(
             leading: Icon(
               Icons.person,
               size: drawerIconSize,
-              color: Colors.red,
+              color: maroonPrimary,
             ),
             title: Text(
               'Profile Page',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
             ),
             onTap: () {
               Navigator.push(
@@ -718,11 +723,11 @@ Widget drawer2(
             leading: Icon(
               Icons.logout_rounded,
               size: drawerIconSize,
-              color: Colors.red,
+              color: maroonPrimary,
             ),
             title: Text(
               'Logout',
-              style: TextStyle(fontSize: drawerFontSize, color: Colors.brown),
+              style: GoogleFonts.poppins(fontSize: drawerFontSize, color: Colors.black87),
             ),
             onTap: () {
               Navigator.pushReplacement(

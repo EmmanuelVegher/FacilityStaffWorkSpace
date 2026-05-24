@@ -16,8 +16,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show Uint8List, rootBundle;
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
-
+import '../../widgets/global_multi_select_dropdown.dart';
 import '../../widgets/drawer3.dart';
 import '../admin/payment_schedule_page.dart';
 
@@ -326,8 +327,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
 
       if (mounted) {
         setState(() {
-          _availableStates = ['All States', ...states..sort()];
-          _selectedStates = ['All States'];
+          _availableStates = states..sort();
+          _selectedStates = [];
         });
 
         await _onStateSelectionChange(_selectedStates);
@@ -384,8 +385,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
     setState(() {
       _selectedStates = selected;
       _isFilterLoading = true;
-      _selectedFacilities = ['All Facilities'];
-      _availableFacilities = ['All Facilities'];
+      _selectedFacilities = [];
+      _availableFacilities = [];
       _allTimesheetsMaster.clear();
       _displayedItems.clear();
     });
@@ -425,7 +426,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
 
 
   Future<void> _loadTimesheets() async {
-    if (_selectedStates.isEmpty || (_selectedStates.contains('All States') && _availableStates.length <= 1)) {
+    if (_selectedStates.isEmpty) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select at least one state.")));
       return;
     }
@@ -445,9 +446,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
           ? _availableStates.where((s) => s != 'All States').toList()
           : _selectedStates;
 
-      List<String> facilitiesToQuery = _selectedFacilities.contains('All Facilities')
-          ? _availableFacilities.where((f) => f != 'All Facilities').toList()
-          : _selectedFacilities;
+      List<String> facilitiesToQuery = _selectedFacilities;
 
       // <<<--- REWRITTEN QUERY LOGIC TO FIX 'whereIn' ERROR ---<<<
 
@@ -455,7 +454,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       Query staffQuery = _firestore.collection('Staff')
           .where('staffCategory', isEqualTo: 'Facility Staff');
 
-      if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
+      if (facilitiesToQuery.isNotEmpty) {
         // If specific facilities are selected, this is the most direct and specific filter.
         // This avoids using a 'whereIn' on the state.
         staffQuery = staffQuery.where('location', whereIn: facilitiesToQuery);
@@ -465,7 +464,10 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       }
 
       final staffSnapshot = await staffQuery.get();
-      _allExpectedStaffMaster = staffSnapshot.docs.map((doc) {
+      _allExpectedStaffMaster = staffSnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['accountStatus'] == 'Active';
+      }).map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'staffId': doc.id,
@@ -482,7 +484,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       // 2. Build the Timesheet Query using the same logic
       Query timesheetQuery = _firestore.collectionGroup('TimeSheets');
       
-      if (facilitiesToQuery.isNotEmpty && !_selectedFacilities.contains('All Facilities')) {
+      if (facilitiesToQuery.isNotEmpty) {
           // If specific facilities are selected, filter by location.
           timesheetQuery = timesheetQuery.where('location', whereIn: facilitiesToQuery);
       } else if (statesToQuery.isNotEmpty) {
@@ -671,9 +673,18 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Timesheet Review Dashboard", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("Timesheet Review Dashboard", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           if(_isExporting)
             const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
@@ -685,6 +696,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
                 if(value == 'bulk_pdf') _downloadBulkPdf();
                 if(value == 'summary_csv') _downloadSummaryAsCsv();
                 if(value == 'summary_excel') _downloadSummaryAsExcel();
+                if(value == 'missing_staff_excel') _downloadMissingStaffAsExcel();
               },
               itemBuilder: (context) => [
                 PopupMenuItem(
@@ -703,6 +715,11 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
                     enabled: !_isLoading && _stateFacilitySummary.isNotEmpty,
                     child: const ListTile(leading: Icon(Icons.table_chart), title: Text("Download Summary (Excel)"))
                 ),
+                PopupMenuItem(
+                    value: 'missing_staff_excel',
+                    enabled: !_isLoading && _nonSubmittedStaff.isNotEmpty,
+                    child: const ListTile(leading: Icon(Icons.person_off), title: Text("Download Missing Staff (Excel)"))
+                ),
               ],
             )
         ],
@@ -710,7 +727,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       drawer: drawer3(context),
       body: Column(
         children: [
-          _buildResponsiveFilterBar(),
+          SelectionArea(child: _buildResponsiveFilterBar()),
           if (_errorMessage != null)
             Center(
                 child: Padding(
@@ -721,53 +738,55 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
           // --- NEW: September Tabs ---
           if (_selectedMonth == 9) _buildSeptemberTabs(),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMetricsDashboard(),
-                  // const SizedBox(height: 24),
-                  // if (_turnaroundTimeSummary.isNotEmpty)
-                  //   _buildTurnaroundTimeCharts(),
-                  const SizedBox(height: 24),
-                  if (_stateFacilitySummary.isNotEmpty)
-                    _buildStateFacilitySummaryTable(),
-                  const SizedBox(height: 24),
-                  if (_nonSubmittedStaff.isNotEmpty)
-                    _buildNonSubmittedStaffList(),
-                  const SizedBox(height: 24),
-                  if (_allTimesheetsMaster.isNotEmpty)
-                    _buildSubmittedStaffList(),
-                  const SizedBox(height: 24),
-                  if (_displayedItems.isNotEmpty) ...[
-                    Text(
-                      "Detailed View: $_selectedStatusFilter",
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    ..._displayedItems.map((item) {
-                      if (item is TimesheetModel) {
-                        return _buildTimesheetCard(item);
-                      } else if (item is Map) {
-                        return _buildNonSubmittedCard(item as Map<String, dynamic>);
-                      }
-                      return const SizedBox.shrink();
-                    }),
-                  ] else if (!_isLoading)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Text(
-                          "No data found for the current filters.",
-                          style: TextStyle(color: Colors.grey.shade600),
+            child: SelectionArea(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildMetricsDashboard(),
+                    // const SizedBox(height: 24),
+                    // if (_turnaroundTimeSummary.isNotEmpty)
+                    //   _buildTurnaroundTimeCharts(),
+                    const SizedBox(height: 24),
+                    if (_stateFacilitySummary.isNotEmpty)
+                      _buildStateFacilitySummaryTable(),
+                    const SizedBox(height: 24),
+                    if (_nonSubmittedStaff.isNotEmpty)
+                      _buildNonSubmittedStaffList(),
+                    const SizedBox(height: 24),
+                    if (_allTimesheetsMaster.isNotEmpty)
+                      _buildSubmittedStaffList(),
+                    const SizedBox(height: 24),
+                    if (_displayedItems.isNotEmpty) ...[
+                      Text(
+                        "Detailed View: $_selectedStatusFilter",
+                        style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge),
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      ..._displayedItems.map((item) {
+                        if (item is TimesheetModel) {
+                          return _buildTimesheetCard(item);
+                        } else if (item is Map) {
+                          return _buildNonSubmittedCard(item as Map<String, dynamic>);
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                    ] else if (!_isLoading)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text(
+                            "No data found for the current filters.",
+                            style: GoogleFonts.poppins(color: Colors.grey.shade600),
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -786,25 +805,47 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       if (_isFilterLoading)
         const Center(child: Text("Loading filters..."))
       else ...[
-        SizedBox(width: 220, child: _buildMultiSelectStateDropdown()),
-        SizedBox(width: 220, child: _buildMultiSelectFacilityDropdown()),
-      ],
-      SizedBox(
-        width: 150,
-        child: DropdownButtonFormField<int>(
-          initialValue: _selectedMonth,
-          decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
-          items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(0, m)))))
-              .toList(),
-          onChanged: (value) => setState(() => _selectedMonth = value!),
+        SizedBox(
+          width: 220,
+          child: GlobalMultiSelectDropdown<String>(
+            items: _availableStates,
+            selectedItems: _selectedStates,
+            title: "Select States",
+            labelBuilder: (val) => val,
+            onChanged: (results) {
+              _onStateSelectionChange(results);
+            },
+          ),
         ),
-      ),
+        SizedBox(
+          width: 220,
+          child: GlobalMultiSelectDropdown<String>(
+            items: _availableFacilities,
+            selectedItems: _selectedFacilities,
+            title: "Select Facilities",
+            labelBuilder: (val) => val,
+            onChanged: (results) {
+              setState(() => _selectedFacilities = results);
+            },
+          ),
+        ),
+      ],
+        SizedBox(
+          width: 150,
+          child: DropdownButtonFormField<int>(
+            initialValue: _selectedMonth,
+            decoration: InputDecoration(labelText: 'Month', border: const OutlineInputBorder(), labelStyle: GoogleFonts.poppins()),
+            items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(0, m)), style: GoogleFonts.poppins())))
+                .toList(),
+            onChanged: (value) => setState(() => _selectedMonth = value!),
+          ),
+        ),
       SizedBox(
         width: 120,
         child: DropdownButtonFormField<int>(
           initialValue: _selectedYear,
-          decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
-          items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
+          decoration: InputDecoration(labelText: 'Year', border: const OutlineInputBorder(), labelStyle: GoogleFonts.poppins()),
+          items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString(), style: GoogleFonts.poppins())))
               .toList(),
           onChanged: (value) => setState(() => _selectedYear = value!),
         ),
@@ -813,8 +854,8 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
         width: 250,
         child: DropdownButtonFormField<String>(
           initialValue: _selectedStatusFilter,
-          decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-          items: _statusFilters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          decoration: InputDecoration(labelText: 'Status', border: const OutlineInputBorder(), labelStyle: GoogleFonts.poppins()),
+          items: _statusFilters.map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.poppins()))).toList(),
           onChanged: (value) {
             if (value != null) {
               setState(() => _selectedStatusFilter = value);
@@ -823,7 +864,31 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
           },
         ),
       ),
-      SizedBox(width: 220, child: _buildMultiSelectStaffDropdown()),
+      SizedBox(
+        width: 220,
+        child: GlobalMultiSelectDropdown<String>(
+          items: _allTimesheetsMaster.map((ts) => ts.staffName).toSet().toList()+_nonSubmittedStaff.map((s) => s['staffName'] as String).toSet().toList(),
+          selectedItems: _selectedStaffIds.map((id) {
+            final ts = _allTimesheetsMaster.firstWhere((element) => element.staffId == id, orElse: () => TimesheetModel(staffId: '', staffName: 'N/A', staffEmail: '', designation: '', department: '', location: '', state: '', caritasSupervisor: '', caritasSupervisorSignatureStatus: '', facilitySupervisor: '', facilitySupervisorSignatureStatus: '', entries: []));
+            if (ts.staffId != '') return ts.staffName;
+            final staff = _nonSubmittedStaff.firstWhere((element) => element['staffId'] == id, orElse: () => {});
+            return staff['staffName'] as String? ?? 'N/A';
+          }).toList(),
+          title: "Select Staff",
+          labelBuilder: (val) => val,
+          onChanged: (results) {
+            setState(() {
+              _selectedStaffIds = results.map((name) {
+                final ts = _allTimesheetsMaster.firstWhere((element) => element.staffName == name, orElse: () => TimesheetModel(staffId: '', staffName: 'N/A', staffEmail: '', designation: '', department: '', location: '', state: '', caritasSupervisor: '', caritasSupervisorSignatureStatus: '', facilitySupervisor: '', facilitySupervisorSignatureStatus: '', entries: []));
+                if (ts.staffId != '') return ts.staffId;
+                final staff = _nonSubmittedStaff.firstWhere((element) => element['staffName'] == name, orElse: () => {});
+                return staff['staffId'] as String? ?? '';
+              }).where((id) => id != '').toList();
+              _applyFiltersAndCalculateMetrics();
+            });
+          },
+        ),
+      ),
     ];
 
     final applyButton = ElevatedButton.icon(
@@ -1511,6 +1576,46 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
     }
   }
 
+  Future<void> _downloadMissingStaffAsExcel() async {
+    setState(() => _isExporting = true);
+    try {
+      final excel = Excel.createExcel();
+      
+      final Sheet nonSubmitterSheet = excel['Missing Staff'];
+      if (excel.tables.containsKey('Sheet1')) {
+        excel.delete('Sheet1');
+      }
+      
+      nonSubmitterSheet.appendRow([
+        TextCellValue('Staff Name'),
+        TextCellValue('Facility'),
+        TextCellValue('State'),
+        TextCellValue('Phone Number'),
+        TextCellValue('Email Address'),
+      ]);
+      
+      for (final staff in _nonSubmittedStaff) {
+        nonSubmitterSheet.appendRow([
+          TextCellValue(staff['staffName'] ?? ''),
+          TextCellValue(staff['location'] ?? ''),
+          TextCellValue(staff['state'] ?? ''),
+          TextCellValue(staff['mobile'] ?? ''),
+          TextCellValue(staff['email'] ?? ''),
+        ]);
+      }
+
+      final fileBytes = excel.save();
+      if(fileBytes != null) {
+        _triggerDownload(Uint8List.fromList(fileBytes), 'Missing_Timesheet_Staff_${_selectedMonth}_$_selectedYear.xlsx');
+      }
+    } catch (e, stack) {
+      debugPrint("Error generating Missing Staff Excel: $e\n$stack");
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export missing staff: $e')));
+    } finally {
+      if(mounted) setState(() => _isExporting = false);
+    }
+  }
+
   Widget _buildTimesheetCard(TimesheetModel timesheet) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -1521,14 +1626,14 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(timesheet.staffName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text('${timesheet.location} - ${timesheet.state}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(timesheet.staffName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  Text('${timesheet.location} - ${timesheet.state}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
             _buildStatusChip(timesheet.facilitySupervisorSignatureStatus, timesheet.caritasSupervisorSignatureStatus),
             const SizedBox(width: 8),
-            Text("${timesheet.totalHours.toStringAsFixed(2)} hrs", style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text("${timesheet.totalHours.toStringAsFixed(2)} hrs", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
             IconButton(
               icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
               tooltip: "Download PDF",
@@ -1547,10 +1652,10 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       color: Colors.red.withOpacity(0.05),
       child: ListTile(
         leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828)),
-        title: Text(staffInfo['staffName'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${staffInfo['location']} - ${staffInfo['state']}', style: const TextStyle(fontSize: 12)),
-        trailing: const Chip(
-          label: Text('Not Submitted', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+        title: Text(staffInfo['staffName'] ?? 'N/A', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        subtitle: Text('${staffInfo['location']} - ${staffInfo['state']}', style: GoogleFonts.poppins(fontSize: 12)),
+        trailing: Chip(
+          label: Text('Not Submitted', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.red,
         ),
       ),
@@ -1889,9 +1994,9 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+                  Text(value, style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
                   const SizedBox(height: 4),
-                  Text(title, style: TextStyle(fontSize: 14, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis, maxLines: 1,),
+                  Text(title, style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis, maxLines: 1,),
                 ],
               ),
             ),
@@ -1911,7 +2016,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       text = 'Awaiting Project Coordinator Signature'; color = Colors.orange;
     }
     return Chip(
-      label: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+      label: Text(text, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
       backgroundColor: color,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1998,8 +2103,6 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
       ),
     );
   }
-
-// In _TimesheetReviewPageHqState class
 
   // <<<--- CORRECTED METHOD ---<<<
   Future<TimesheetModel?> _fetchTimesheetFromFirestore(String staffId, String timesheetDocId) async {
@@ -2229,12 +2332,12 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
         children: [
           TabBar(
             controller: _tabController,
-            tabs: const [
-              Tab(text: 'Part 1'),
-              Tab(text: 'Part 2'),
+            tabs: [
+              Tab(child: Text('Part 1', style: GoogleFonts.poppins())),
+              Tab(child: Text('Part 2', style: GoogleFonts.poppins())),
             ],
-            indicatorColor: const Color(0xFF722F37),
-            labelColor: const Color(0xFF722F37),
+            indicatorColor: const Color(0xFF5C1A2E),
+            labelColor: const Color(0xFF5C1A2E),
             unselectedLabelColor: Colors.grey,
             onTap: (index) {
               setState(() {

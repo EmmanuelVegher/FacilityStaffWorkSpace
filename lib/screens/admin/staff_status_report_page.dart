@@ -17,6 +17,11 @@ class StaffStatusReportPage extends StatefulWidget {
 class _StaffStatusReportPageState extends State<StaffStatusReportPage> with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // User info for state filtering
+  String? _userState;
+  String? _userStaffCategory;
+  bool _isStateOfficeStaff = false;
+
   // Access guard
   Future<bool> _hasProgramManagementAccess() async {
     try {
@@ -27,6 +32,26 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
       return dept == 'program management';
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      
+      final doc = await _firestore.collection('Staff').doc(user.uid).get();
+      final data = doc.data() ?? {};
+      
+      _userState = data['state'] as String?;
+      _userStaffCategory = data['staffCategory'] as String? ?? data['role'] as String?;
+      
+      // Check if user is State Office Staff
+      _isStateOfficeStaff = _userStaffCategory?.toLowerCase().contains('state office') ?? false;
+      
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Error loading user info: $e');
     }
   }
 
@@ -69,6 +94,7 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
     _tabController.addListener(() {
       setState(() {});
     });
+    _loadUserInfo(); // Load user info first
     _loadFilters();
     _loadCounts();
     
@@ -204,9 +230,17 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
       final statesQuery = await _firestore.collection('Staff').where('accountStatus', isEqualTo: 'Active').get();
       final states = statesQuery.docs.map((doc) => (doc.data()['state'] as String? ?? '').trim()).toSet().where((s) => s.isNotEmpty).toList();
       states.sort();
+      
       setState(() {
-        _availableStates = ['All States', ...states];
-        _selectedState = 'All States';
+        if (_isStateOfficeStaff && _userState != null) {
+          // State Office Staff: Only show their state
+          _availableStates = [_userState!];
+          _selectedState = _userState!;
+        } else {
+          // HQ/Program Management: Show all states
+          _availableStates = ['All States', ...states];
+          _selectedState = 'All States';
+        }
       });
     } catch (e) {
       debugPrint('StaffStatusReportPage _loadFilters error: $e');
@@ -447,16 +481,18 @@ class _StaffStatusReportPageState extends State<StaffStatusReportPage> with Sing
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        initialValue: _selectedState,
-                        decoration: const InputDecoration(
+                        value: _selectedState,
+                        decoration: InputDecoration(
                           labelText: 'State',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          helperText: _isStateOfficeStaff ? 'Restricted to your state' : null,
+                          helperStyle: const TextStyle(color: Colors.orange, fontSize: 12),
                         ),
                         items: _availableStates.map((state) => DropdownMenuItem(
                           value: state,
                           child: Text(state),
                         )).toList(),
-                        onChanged: (value) {
+                        onChanged: _isStateOfficeStaff ? null : (value) {
                           setState(() {
                             _selectedState = value ?? 'All States';
                             _loadCounts();

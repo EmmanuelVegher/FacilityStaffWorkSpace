@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/drawer.dart';
 
@@ -382,9 +383,9 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
     } else if (isLoading) {
       bodyContent = const Center(child: CircularProgressIndicator());
     } else if (_errorMessage != null) {
-      bodyContent = Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)));
+      bodyContent = Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('Error: $_errorMessage', style: GoogleFonts.poppins(color: Colors.red), textAlign: TextAlign.center)));
     } else {
-      bodyContent = _buildDashboardContent();
+      bodyContent = SelectionArea(child: _buildDashboardContent());
     }
 
     String appBarTitle = 'My Facility VL Report';
@@ -394,10 +395,19 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text(appBarTitle, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer(context),
       body: Column(
@@ -446,23 +456,26 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
               width: 200,
               child: DropdownButtonFormField<String>(
                 initialValue: _selectedQuarter,
-                hint: const Text('Select Quarter'),
+                hint: Text('Select Quarter', style: GoogleFonts.poppins()),
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Quarter', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
-                items: _availableQuarters.map((q) => DropdownMenuItem(value: q, child: Text(q))).toList(),
+                items: _availableQuarters.map((q) => DropdownMenuItem(value: q, child: Text(q, style: GoogleFonts.poppins()))).toList(),
                 onChanged: (value) => setState(() => _selectedQuarter = value),
               ),
             ),
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -491,11 +504,11 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
             const SizedBox(height: 24),
           ],
           if(_masterLogList.isNotEmpty)...[
-            Text('Call Log Analysis', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Call Log Analysis', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             _buildCallLogChartSection(),
             const SizedBox(height: 30),
-            Text('Detailed Call Logs', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Detailed Call Logs', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
           ]
@@ -515,30 +528,28 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
         final bool isExpanded = _currentlyExpandedDateIndex == index;
         return ExpansionPanel(
           isExpanded: isExpanded, canTapOnHeader: true,
-          headerBuilder: (BuildContext context, bool isExpanded) => ListTile(title: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+          headerBuilder: (BuildContext context, bool isExpanded) => ListTile(title: Text(dateKey, style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
           body: SingleChildScrollView(
             controller: _logTableControllers.length > index ? _logTableControllers[index] : null, scrollDirection: Axis.horizontal,
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTable(
-                columns: const [
-
-                  DataColumn(label: Text('Client Name')),
-                  DataColumn(label: Text('ART ID')),
-                  DataColumn(label: Text('Phone No.')),
-                  DataColumn(label: Text('Call Status')),
-                  DataColumn(label: Text('Time')),
-                  DataColumn(label: Text('Duration')),
-                  DataColumn(label: Text('Tracked By'))],
+                columns: [
+                  DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Phone No.', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Call Status', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Time', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Duration', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Tracked By', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)))],
                 rows: dailyLogList.map((log) => DataRow(cells: [
-
-                  DataCell(Text(_maskClientName(log.clientName))),
-                  DataCell(Text(_maskArtId(log.artId))),
-                  DataCell(Text(_maskPhoneNumber(log.phoneNumberCalled))),
+                  DataCell(Text(_maskClientName(log.clientName), style: GoogleFonts.poppins())),
+                  DataCell(Text(_maskArtId(log.artId), style: GoogleFonts.poppins())),
+                  DataCell(Text(_maskPhoneNumber(log.phoneNumberCalled), style: GoogleFonts.poppins())),
                   DataCell(_buildStatusCell(log.callStatus)),
-                  DataCell(Text(log.callDateTime != null ? DateFormat('HH:mm').format(log.callDateTime!) : 'N/A')),
-                  DataCell(Text(formatDuration(log.callDurationInSeconds ?? 0))),
-                  DataCell(Text(log.trackedBy ?? 'N/A')),
+                  DataCell(Text(log.callDateTime != null ? DateFormat('HH:mm').format(log.callDateTime!) : 'N/A', style: GoogleFonts.poppins())),
+                  DataCell(Text(formatDuration(log.callDurationInSeconds ?? 0), style: GoogleFonts.poppins())),
+                  DataCell(Text(log.trackedBy ?? 'N/A', style: GoogleFonts.poppins())),
                 ])).toList(),
               ),
             ),
@@ -637,11 +648,11 @@ class _UserFacilityVlTrackingPageWebState extends State<UserFacilityVlTrackingPa
 
   Widget _buildStatusCell(String? status) { if (status == null || status.isEmpty) { return const Text('N/A'); } Color color = _getStatusColor(status); return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)),); }
 
-  Widget _buildVlSummarySection() { if (_summaryErrorMessage != null) { return Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(16.0), child: Row(children: [const Icon(Icons.warning_amber_rounded, color: Colors.red), const SizedBox(width: 8), Expanded(child: Text("Summary Error: $_summaryErrorMessage", style: TextStyle(color: Colors.red.shade800)))]))); } if (_summary == null) return const SizedBox.shrink(); final summary = _summary!; final double sampleCollectionRate = summary.totalEligibleClientsInFilter > 0 ? (summary.samplesCollected / summary.totalEligibleClientsInFilter) * 100 : 0.0; final double resultReturnRate = summary.samplesCollected > 0 ? (summary.resultsReturned / summary.samplesCollected) * 100 : 0.0; return Card(clipBehavior: Clip.antiAlias, elevation: 2, child: Padding(padding: const EdgeInsets.all(16.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text('VL Summary for $_selectedQuarter', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800)), const Divider(height: 24), Wrap(spacing: 20.0, runSpacing: 20.0, alignment: WrapAlignment.spaceAround, children: [ _buildInfoTile(iconWidget: Icon(Icons.people_alt_outlined, size: 36, color: Colors.blue.shade700), label: 'Total Eligible Clients', value: summary.totalEligibleClientsInFilter.toString()), _buildInfoTile(iconWidget: Icon(Icons.bloodtype_outlined, size: 36, color: Colors.red.shade700), label: 'Samples Collected', value: summary.samplesCollected.toString(), subtitle: '${sampleCollectionRate.toStringAsFixed(1)}% of eligible'), _buildInfoTile(iconWidget: Icon(Icons.assignment_turned_in_outlined, size: 36, color: Colors.green.shade700), label: 'Results Returned', value: summary.resultsReturned.toString(), subtitle: '${resultReturnRate.toStringAsFixed(1)}% of samples'), _buildInfoTile(iconWidget: Icon(Icons.check_circle_outline, size: 36, color: Colors.green.shade900), label: 'Suppressed', value: summary.suppressed.toString()), _buildInfoTile(iconWidget: Icon(Icons.warning_amber_rounded, size: 36, color: Colors.orange.shade900), label: 'Unsuppressed', value: summary.unsuppressed.toString()), ],) ],),),); }
+  Widget _buildVlSummarySection() { if (_summaryErrorMessage != null) { return Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(16.0), child: Row(children: [const Icon(Icons.warning_amber_rounded, color: Colors.red), const SizedBox(width: 8), Expanded(child: Text("Summary Error: $_summaryErrorMessage", style: GoogleFonts.poppins(color: Colors.red.shade800)))]))); } if (_summary == null) return const SizedBox.shrink(); final summary = _summary!; final double sampleCollectionRate = summary.totalEligibleClientsInFilter > 0 ? (summary.samplesCollected / summary.totalEligibleClientsInFilter) * 100 : 0.0; final double resultReturnRate = summary.samplesCollected > 0 ? (summary.resultsReturned / summary.samplesCollected) * 100 : 0.0; return Card(clipBehavior: Clip.antiAlias, elevation: 2, child: Padding(padding: const EdgeInsets.all(16.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text('VL Summary for $_selectedQuarter', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800)), const Divider(height: 24), Wrap(spacing: 20.0, runSpacing: 20.0, alignment: WrapAlignment.spaceAround, children: [ _buildInfoTile(iconWidget: Icon(Icons.people_alt_outlined, size: 36, color: Colors.blue.shade700), label: 'Total Eligible Clients', value: summary.totalEligibleClientsInFilter.toString()), _buildInfoTile(iconWidget: Icon(Icons.bloodtype_outlined, size: 36, color: Colors.red.shade700), label: 'Samples Collected', value: summary.samplesCollected.toString(), subtitle: '${sampleCollectionRate.toStringAsFixed(1)}% of eligible'), _buildInfoTile(iconWidget: Icon(Icons.assignment_turned_in_outlined, size: 36, color: Colors.green.shade700), label: 'Results Returned', value: summary.resultsReturned.toString(), subtitle: '${resultReturnRate.toStringAsFixed(1)}% of samples'), _buildInfoTile(iconWidget: Icon(Icons.check_circle_outline, size: 36, color: Colors.green.shade900), label: 'Suppressed', value: summary.suppressed.toString()), _buildInfoTile(iconWidget: Icon(Icons.warning_amber_rounded, size: 36, color: Colors.orange.shade900), label: 'Unsuppressed', value: summary.unsuppressed.toString()), ],) ],),),); }
 
   Widget _buildCallLogChartSection() { return Wrap( spacing: 20.0, runSpacing: 20.0, alignment: WrapAlignment.start, children: [ _buildChartCard(title: 'Call Outcome Distribution', chartKey: _callOutcomesChartKey, chart: SfCircularChart(annotations: (callOutcomesChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null, legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap), series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: callOutcomesChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])), ], ); }
 
-  Widget _buildInfoTile({required Widget iconWidget, required String label, required String value, String? subtitle}) { return Row(mainAxisSize: MainAxisSize.min, children: [ iconWidget, const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text(label, style: Theme.of(context).textTheme.bodySmall), Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), if (subtitle != null && subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600))], ],), ],); }
+  Widget _buildInfoTile({required Widget iconWidget, required String label, required String value, String? subtitle}) { return Row(mainAxisSize: MainAxisSize.min, children: [ iconWidget, const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text(label, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)), Text(value, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)), if (subtitle != null && subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade600))], ],), ],); }
 
-  Widget _buildChartCard({required String title, required Widget chart, GlobalKey? chartKey, bool isWide = false}) { return ConstrainedBox(constraints: BoxConstraints(maxWidth: isWide ? 600 : 400, minWidth: 350), child: Card(elevation: 2.0, child: Padding(padding: const EdgeInsets.all(12.0), child: Column(children: [Text(title, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 10), SizedBox(height: 250, child: RepaintBoundary(key: chartKey, child: Container(color: Colors.white, child: chart)))],),),),); }
+  Widget _buildChartCard({required String title, required Widget chart, GlobalKey? chartKey, bool isWide = false}) { return ConstrainedBox(constraints: BoxConstraints(maxWidth: isWide ? 600 : 400, minWidth: 350), child: Card(elevation: 2.0, child: Padding(padding: const EdgeInsets.all(12.0), child: Column(children: [Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), const SizedBox(height: 10), SizedBox(height: 250, child: RepaintBoundary(key: chartKey, child: Container(color: Colors.white, child: chart)))],),),),); }
 }

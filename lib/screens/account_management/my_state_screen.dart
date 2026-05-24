@@ -5,6 +5,7 @@ import 'package:service_delivery_workspace/screens/registration_page.dart';
 import 'package:service_delivery_workspace/screens/supervisor/supervisor_list_screen.dart';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -194,96 +195,99 @@ class _MyStateScreenState extends State<MyStateScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.red.shade600, Colors.black87, Colors.white, Colors.yellow.shade600],
+            colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              title: Text(
-                _isLoading ? 'Loading...' : '${_stateName ?? 'My State'} Dashboard',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              centerTitle: true,
-              pinned: true,
-              iconTheme: const IconThemeData(color: Colors.white),
-            ),
-
-            // Tutorial Banner
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.amber.shade200,
-                    width: 1,
-                  ),
+        child: SelectionArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                title: Text(
+                  _isLoading ? 'Loading...' : '${_stateName ?? 'My State'} Dashboard',
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.amber.shade700,
-                      size: 24,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                centerTitle: true,
+                pinned: true,
+                iconTheme: const IconThemeData(color: Colors.white),
+              ),
+  
+              // Tutorial Banner
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.amber.shade200,
+                      width: 1,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Need help with account management?',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.amber.shade800,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          GestureDetector(
-                            onTap: () async {
-                              const url = 'https://youtu.be/dTBm7-FNI_g';
-                              if (await canLaunch(url)) {
-                                await launch(url);
-                              } else {
-                                Fluttertoast.showToast(
-                                  msg: "Could not open tutorial link",
-                                  toastLength: Toast.LENGTH_SHORT,
-                                  gravity: ToastGravity.BOTTOM,
-                                  backgroundColor: Colors.red,
-                                  textColor: Colors.white,
-                                );
-                              }
-                            },
-                            child: Text(
-                              'View Tutorial',
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.amber.shade700,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Need help with account management?',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.amber.shade600,
-                                decoration: TextDecoration.underline,
+                                color: Colors.amber.shade800,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: () async {
+                                const url = 'https://youtu.be/dTBm7-FNI_g';
+                                if (await canLaunch(url)) {
+                                  await launch(url);
+                                } else {
+                                  Fluttertoast.showToast(
+                                    msg: "Could not open tutorial link",
+                                    toastLength: Toast.LENGTH_SHORT,
+                                    gravity: ToastGravity.BOTTOM,
+                                    backgroundColor: Colors.red,
+                                    textColor: Colors.white,
+                                  );
+                                }
+                              },
+                              child: Text(
+                                'View Tutorial',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.amber.shade600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-
-            _buildBodyContent(),
-          ],
+  
+              _buildBodyContent(),
+            ],
+          ),
         ),
       ),
       // --- REMOVED: No more FloatingActionButton here ---
@@ -312,10 +316,10 @@ class _ActionCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20.0),
       child: Card(
         elevation: 8,
-        color: Colors.white.withOpacity(0.85),
+        color: Colors.white.withOpacity(0.95),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20.0),
-          side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
+          side: const BorderSide(color: Color(0xFFD4A03C), width: 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -328,10 +332,10 @@ class _ActionCard extends StatelessWidget {
               child: Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
+                  color: const Color(0xFF5C1A2E),
                 ),
               ),
             ),
@@ -379,10 +383,10 @@ class _CategoryCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20.0),
       child: Card(
         elevation: 8,
-        color: Colors.white.withOpacity(0.85),
+        color: Colors.white.withOpacity(0.95),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20.0),
-          side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
+          side: const BorderSide(color: Color(0xFFD4A03C), width: 1.5),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -390,10 +394,22 @@ class _CategoryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icons[category] ?? Icons.people_outline, size: 48, color: Colors.red.shade700),
+              Icon(icons[category] ?? Icons.people_outline,
+                  size: 48, color: const Color(0xFF5C1A2E)),
               const Spacer(),
-              Text('${staffList.length}', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.grey.shade800, height: 1)),
-              Text(category, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+              Text('${staffList.length}',
+                  style: GoogleFonts.poppins(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF5C1A2E),
+                      height: 1)),
+              Text(category,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700)),
             ],
           ),
         ),

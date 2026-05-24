@@ -208,3 +208,289 @@ export const resetAnnualLeave = onSchedule({
     throw new Error("Failed to reset annual leave balances.");
   }
 });
+// --- Attendance Optimization Tools ---
+
+/**
+ * Backfills the 'state' field into all attendance records for a specific state.
+ */
+export const backfillStateField = functions.https.onCall({
+  timeoutSeconds: 540, // 9 minutes
+  memory: "512MiB",
+  invoker: "public",
+}, async (request: functions.https.CallableRequest<{ state: string }>) => {
+  // v1.0.1 - Force redeploy for public invoker fix
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Auth required.");
+  }
+
+  const state = request.data.state;
+  if (!state) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing state.");
+  }
+
+  const db = admin.firestore();
+  let totalProcessed = 0;
+  
+  try {
+    // 1. Find all staff in this state
+    const staffSnapshot = await db.collection("Staff")
+      .where("state", "==", state)
+      .get();
+
+    console.log(`Starting backfill for state: ${state}. Found ${staffSnapshot.size} staff.`);
+
+    for (const staffDoc of staffSnapshot.docs) {
+      const recordsSnapshot = await staffDoc.ref.collection("Record").get();
+      
+      let batch = db.batch();
+      let batchCount = 0;
+
+      for (const recordDoc of recordsSnapshot.docs) {
+        if (recordDoc.data().state !== state) {
+          batch.set(recordDoc.ref, { state: state }, { merge: true });
+          batchCount++;
+          totalProcessed++;
+
+          if (batchCount >= 450) {
+            await batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
+      }
+      
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    }
+
+    return { success: true, processed: totalProcessed };
+  } catch (error) {
+    console.error("Error in backfillStateField:", error);
+    throw new functions.https.HttpsError("internal", "Optimization failed.");
+  }
+});
+
+/**
+ * Clean up 'Annual' labels to 'Annual Leave' across the entire system.
+ * Designed to be called iteratively for massive datasets (1M+ records).
+ */
+export const cleanupAttendanceData = functions.https.onCall({
+  timeoutSeconds: 300, // 5 minutes
+  memory: "512MiB",
+  invoker: "public",
+}, async (request: functions.https.CallableRequest<any>) => {
+  // v1.0.1 - Force redeploy for public invoker fix
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Auth required.");
+  }
+
+  const db = admin.firestore();
+  const LIMIT = 5000; // Burst size
+  let processedCount = 0;
+
+  try {
+    // Use a collectionGroup query to find all records where durationWorked is 'Annual'
+    const query = db.collectionGroup("Record")
+      .where("durationWorked", "==", "Annual")
+      .limit(LIMIT);
+
+    const snapshot = await query.get();
+    
+    if (snapshot.empty) {
+      return { done: true, processed: 0 };
+    }
+
+    let batch = db.batch();
+    let batchCount = 0;
+
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, { 
+        durationWorked: "Annual Leave", 
+        processedByCleanup: true 
+      });
+      batchCount++;
+      processedCount++;
+
+      if (batchCount >= 450) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    }
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    return { 
+      done: snapshot.size < LIMIT, 
+      processed: processedCount 
+    };
+  } catch (error) {
+    console.error("Error in cleanupAttendanceData:", error);
+    throw new functions.https.HttpsError("internal", "Cleanup failed.");
+  }
+});
+
+/**
+ * Backfills all required staff denormalized data to existing attendance records.
+ * Can be called iteratively.
+ */
+export const backfillStaffDataToRecords = functions.https.onCall({
+  timeoutSeconds: 540,
+  memory: "1GiB",
+  invoker: "public",
+}, async (request: functions.https.CallableRequest<{ state?: string }>) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Auth required.");
+  }
+
+  const db = admin.firestore();
+  let totalProcessed = 0;
+  
+  try {
+    let staffQuery: admin.firestore.Query = db.collection("Staff");
+    if (request.data.state) {
+      staffQuery = staffQuery.where("state", "==", request.data.state);
+    }
+    
+    const staffSnapshot = await staffQuery.get();
+    console.log(`Found ${staffSnapshot.size} staff to process.`);
+
+    for (const staffDoc of staffSnapshot.docs) {
+      const staffData = staffDoc.data();
+      const state = staffData['state'];
+      const location = staffData['location'];
+      const designation = staffData['designation'];
+      const staffName = `${staffData['firstName'] ?? ''} ${staffData['lastName'] ?? ''}`.trim();
+
+      const recordsSnapshot = await staffDoc.ref.collection("Record").get();
+      
+      let batch = db.batch();
+      let batchCount = 0;
+
+      for (const recordDoc of recordsSnapshot.docs) {
+        const recordData = recordDoc.data();
+        
+        // Only update if missing one of the fields to save writes
+        if (recordData.state !== state || recordData.location !== location || 
+            recordData.designation !== designation || recordData.staffName !== staffName) {
+            
+          batch.set(recordDoc.ref, { 
+            state: state,
+            location: location,
+            designation: designation,
+            staffName: staffName
+          }, { merge: true });
+          
+          batchCount++;
+          totalProcessed++;
+
+          if (batchCount >= 450) {
+            await batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
+      }
+      
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    }
+
+    return { success: true, processed: totalProcessed };
+  } catch (error) {
+    console.error("Error in backfillStaffDataToRecords:", error);
+    throw new functions.https.HttpsError("internal", "Backfill failed.");
+  }
+});
+
+/**
+ * Scheduled function to run daily at 12:00 AM (Lagos time).
+ * Corrects any recent attendance records missing denormalized staff data.
+ */
+export const dailyRecordDataCorrection = onSchedule({
+  schedule: "0 0 * * *",
+  timeZone: "Africa/Lagos",
+  timeoutSeconds: 540,
+  memory: "512MiB"
+}, async (event) => {
+  console.log("Starting daily correction of staff data on records.");
+  const db = admin.firestore();
+  let totalProcessed = 0;
+  
+  try {
+    // Only check records from the last 48 hours to save massive read costs
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+    const recordsSnapshot = await db.collectionGroup("Record")
+      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(twoDaysAgo))
+      .get();
+      
+    console.log(`Found ${recordsSnapshot.size} recent records to verify.`);
+
+    // To prevent fetching the same Staff document repeatedly, cache them
+    const staffCache: { [id: string]: any } = {};
+    
+    let batch = db.batch();
+    let batchCount = 0;
+
+    for (const recordDoc of recordsSnapshot.docs) {
+      const recordData = recordDoc.data();
+      const staffRef = recordDoc.ref.parent.parent;
+      if (!staffRef) continue;
+
+      const staffId = staffRef.id;
+
+      // Ensure staff data is in cache
+      if (!staffCache[staffId]) {
+        const staffDoc = await staffRef.get();
+        if (staffDoc.exists) {
+          staffCache[staffId] = staffDoc.data();
+        } else {
+          staffCache[staffId] = null; // Mark as not found
+        }
+      }
+
+      const staffData = staffCache[staffId];
+      if (!staffData) continue;
+
+      const state = staffData['state'];
+      const location = staffData['location'];
+      const designation = staffData['designation'];
+      const staffName = `${staffData['firstName'] ?? ''} ${staffData['lastName'] ?? ''}`.trim();
+
+      // Only update if missing one of the fields
+      if (recordData.state !== state || recordData.location !== location || 
+          recordData.designation !== designation || recordData.staffName !== staffName) {
+          
+        batch.set(recordDoc.ref, { 
+          state: state,
+          location: location,
+          designation: designation,
+          staffName: staffName
+        }, { merge: true });
+        
+        batchCount++;
+        totalProcessed++;
+
+        if (batchCount >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          batchCount = 0;
+        }
+      }
+    }
+    
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    console.log(`Daily correction completed. Fixed ${totalProcessed} records.`);
+  } catch (error) {
+    console.error("Error in dailyRecordDataCorrection:", error);
+  }
+});

@@ -16,7 +16,9 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
 import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
+import 'package:google_fonts/google_fonts.dart';
 
+import '../../widgets/global_multi_select_dropdown.dart';
 import '../../widgets/drawer.dart'; // Assuming you have a drawer widget
 
 // --- DATA MODEL TO MATCH THE FLATTENED 'EACTrackedLogs' COLLECTION ---
@@ -230,10 +232,11 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   String? userLocation;
 
   // --- Filter State ---
-  List<String> _availableOutcomes = ['All Outcomes'];
-  List<String> _selectedOutcomes = ['All Outcomes'];
-  List<String> _availableSessionTypes = ['All Sessions'];
-  List<String> _selectedSessionTypes = ['All Sessions'];
+  // --- Filter State ---
+  List<String> _availableOutcomes = [];
+  List<String> _selectedOutcomes = [];
+  List<String> _availableSessionTypes = [];
+  List<String> _selectedSessionTypes = [];
 
   // --- Segregated Call Costs ---
   double _totalCallCost = 0.0;
@@ -406,22 +409,22 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
 
   void _updateAvailableFiltersFromData() {
     final outcomes = _masterLogList.map((c) => c.trackingOutcome).whereType<String>().where((s) => s.isNotEmpty).toSet();
-    _availableOutcomes = ['All Outcomes', ...outcomes.toList()..sort()];
-    _selectedOutcomes = ['All Outcomes'];
+    _availableOutcomes = outcomes.toList()..sort();
+    _selectedOutcomes = [];
 
     final sessionTypes = _masterLogList.map((c) => c.eacSessionType).whereType<String>().where((s) => s.isNotEmpty).toSet();
-    _availableSessionTypes = ['All Sessions', ...sessionTypes.toList()..sort()];
-    _selectedSessionTypes = ['All Sessions'];
+    _availableSessionTypes = sessionTypes.toList()..sort();
+    _selectedSessionTypes = [];
   }
 
   void _applyAllFiltersAndRecalculate() {
     List<EacCallLog> currentlyFiltered = List.from(_masterLogList);
 
-    if (!_selectedOutcomes.contains('All Outcomes')) {
+    if (_selectedOutcomes.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedOutcomes.contains(c.trackingOutcome)).toList();
     }
 
-    if (!_selectedSessionTypes.contains('All Sessions')) {
+    if (_selectedSessionTypes.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedSessionTypes.contains(c.eacSessionType)).toList();
     }
 
@@ -464,18 +467,27 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     } else if (_errorMessage != null) {
       bodyContent = Center(child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+        child: Text('Error: $_errorMessage', style: GoogleFonts.poppins(color: Colors.red), textAlign: TextAlign.center,),
       ));
     } else {
-      bodyContent = _buildDashboardContent();
+      bodyContent = SelectionArea(child: _buildDashboardContent());
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('EAC Reports for ${userLocation ?? "Your Facility"}', style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text('EAC Reports for ${userLocation ?? "Your Facility"}', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer(context),
       body: Column(
@@ -518,18 +530,6 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
   }
 
   Widget _buildFilterBar() {
-    String outcomeButtonText = _selectedOutcomes.contains('All Outcomes')
-        ? 'All Outcomes'
-        : _selectedOutcomes.length == 1
-        ? _selectedOutcomes.first
-        : '${_selectedOutcomes.length} Outcomes';
-
-    String sessionButtonText = _selectedSessionTypes.contains('All Sessions')
-        ? 'All Sessions'
-        : _selectedSessionTypes.length == 1
-        ? _selectedSessionTypes.first
-        : '${_selectedSessionTypes.length} Sessions';
-
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -541,46 +541,49 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
           runSpacing: 12.0,
           alignment: WrapAlignment.start,
           children: [
-            _buildFilterChip("EAC Session Type", sessionButtonText, Icons.repeat_one, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select EAC Session Types',
-                allOptions: _availableSessionTypes,
-                selectedOptions: _selectedSessionTypes,
-                allKeyword: 'All Sessions',
-                onConfirm: (results) {
+            Container(
+              constraints: const BoxConstraints(maxWidth: 250),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableSessionTypes,
+                selectedItems: _selectedSessionTypes,
+                title: "Select Session Types",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedSessionTypes = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableSessionTypes.length <= 1 || isLoading),
+              ),
+            ),
 
-            _buildFilterChip("Call Outcome", outcomeButtonText, Icons.phone_callback, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Call Outcomes',
-                allOptions: _availableOutcomes,
-                selectedOptions: _selectedOutcomes,
-                allKeyword: 'All Outcomes',
-                onConfirm: (results) {
+            Container(
+              constraints: const BoxConstraints(maxWidth: 250),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableOutcomes,
+                selectedItems: _selectedOutcomes,
+                title: "Select Call Outcomes",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedOutcomes = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableOutcomes.length <= 1 || isLoading),
+              ),
+            ),
 
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
 
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -616,7 +619,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             const SizedBox(height: 24),
           ],
           // --- END NEW ---
-          Text('Call Log Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Call Log Summary Charts', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 16),
           _buildChartSection(),
           const SizedBox(height: 30),
@@ -624,7 +627,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             _buildClientSummarySection(clientSummaryMap),
             const SizedBox(height: 30),
           ],
-          Text('Detailed EAC Logs', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Detailed EAC Logs', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 10),
           _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
         ],
@@ -660,11 +663,11 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
         collapsedBackgroundColor: Colors.blueGrey.shade50.withOpacity(0.5),
         title: Text(
           'Latest Programmatic EAC Analysis',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800),
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade800),
         ),
         subtitle: Text(
           'Summary from ${DateFormat.yMMMMd().format(latestSummary.reportDate)} by ${latestSummary.trackerName}',
-          style: TextStyle(color: Colors.blueGrey.shade600),
+          style: GoogleFonts.poppins(color: Colors.blueGrey.shade600),
         ),
         children: [
           Padding(
@@ -725,11 +728,10 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, color: iconColor),
               const SizedBox(width: 8),
-              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
             ],
           ),
           const Divider(height: 12),
@@ -738,10 +740,10 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(entry.key, style: Theme.of(context).textTheme.bodyMedium),
+                Text(entry.key, style: GoogleFonts.poppins()),
                 Text(
                   entry.value,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
               ],
             ),
@@ -876,7 +878,7 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             return ListTile(
               title: Row(
                 children: [
-                  Expanded(child: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text(dateKey, style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                   Visibility(
                     visible: isExpanded,
                     maintainSize: true, maintainAnimation: true, maintainState: true,
@@ -905,32 +907,42 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
-                  DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
-                  DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('EAC Session')),
-                  DataColumn(label: Text('Call Outcome')), DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')),
-                  DataColumn(label: Text("Tracker's Designation")), DataColumn(label: Text("Tracker's Facility")),
-                  DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
+                columns: [
+                  DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client PhoneNo', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client ART Status', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Client's Facility", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client State', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('DatimCode', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Time Tracked', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('EAC Session', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Call Outcome', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Duration', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Tracked By', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Designation", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Facility", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Supervisor", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Supervisor Email", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                 ],
                 rows: dailyLogList.map((log) {
                   return DataRow(cells: [
-                    DataCell(Text(_maskClientName(log.clientName))),
-                    DataCell(Text(_maskPhoneNumber(log.phoneNumber))),
-                    DataCell(Text(log.artStatus ?? 'N/A')),
-                    DataCell(Text(log.facilityName ?? 'N/A')),
-                    DataCell(Text(log.state ?? 'N/A')),
-                    DataCell(Text(_maskClientName(log.artId))),
-                    DataCell(Text(log.datimCode ?? 'N/A')),
-                    DataCell(Text(log.dateTracked != null ? DateFormat('HH:mm').format(log.dateTracked!) : 'N/A')),
-                    DataCell(Text(log.eacSessionType ?? 'N/A')),
+                    DataCell(Text(_maskClientName(log.clientName), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskPhoneNumber(log.phoneNumber), style: GoogleFonts.poppins())),
+                    DataCell(Text(log.artStatus ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.facilityName ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.state ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskClientName(log.artId), style: GoogleFonts.poppins())),
+                    DataCell(Text(log.datimCode ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.dateTracked != null ? DateFormat('HH:mm').format(log.dateTracked!) : 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.eacSessionType ?? 'N/A', style: GoogleFonts.poppins())),
                     DataCell(_buildStatusCell(log.trackingOutcome)),
-                    DataCell(Text(formatDuration(log.callDuration ?? 0))),
-                    DataCell(Text(log.trackedBy ?? 'N/A')),
-                    DataCell(Text(log.designation ?? 'N/A')),
-                    DataCell(Text(log.trackerFacilityLocation ?? 'N/A')),
-                    DataCell(Text(log.supervisorName ?? 'N/A')),
-                    DataCell(Text(log.supervisorEmail ?? 'N/A')),
+                    DataCell(Text(formatDuration(log.callDuration ?? 0), style: GoogleFonts.poppins())),
+                    DataCell(Text(log.trackedBy ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.designation ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.trackerFacilityLocation ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.supervisorName ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(log.supervisorEmail ?? 'N/A', style: GoogleFonts.poppins())),
                   ]);
                 }).toList(),
               ),
@@ -1271,9 +1283,9 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
       icon = Icon(Icons.call_received, color: color, size: 16);
     } else if (lowerStatus.contains('failed') || lowerStatus.contains('missed')) icon = Icon(Icons.phone_missed, color: color, size: 16);
     if (icon != null) {
-      return Row(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(width: 6), Flexible(child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)))]);
+      return Row(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(width: 6), Flexible(child: Text(status, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500)))]);
     }
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)));
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)), child: Text(status, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500)));
   }
 
   Map<String, List<EacCallLog>> _groupLogsByDate() {
@@ -1344,61 +1356,91 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     required Function(List<String>) onConfirm,
   }) async {
     final tempSelected = List<String>.from(selectedOptions);
+
     await showDialog(
       context: context,
-      builder: (ctx) { // This is the dialog's outer context
-        return StatefulBuilder(
-          builder: (dialogContext, setStateDialog) { // This is the inner context we'll use
-            return AlertDialog(
-              title: Text(title),
-              content: SizedBox(
-                width: 350,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: allOptions.length,
-                  itemBuilder: (context, index) {
-                    final option = allOptions[index];
-                    final isAllOption = option == allKeyword;
-                    return CheckboxListTile(
-                      title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                      value: tempSelected.contains(option),
-                      onChanged: (bool? value) {
-                        setStateDialog(() {
-                          if (value == true) {
-                            if (isAllOption) {
-                              tempSelected.clear();
-                              tempSelected.add(allKeyword);
-                            } else {
-                              tempSelected.remove(allKeyword);
-                              tempSelected.add(option);
-                            }
-                          } else {
-                            tempSelected.remove(option);
-                            if (tempSelected.isEmpty && allOptions.contains(allKeyword)) {
-                              tempSelected.add(allKeyword);
-                            }
-                          }
-                        });
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (bldContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
+          return AlertDialog(
+            title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 350,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: Text("Select All", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF5C1A2E))),
+                    value: isAllSelected,
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        if (value == true) {
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
+                        } else {
+                          tempSelected.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: GoogleFonts.poppins(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-              actions: [
-                // --- FIX --- Use the dialog's context to pop
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-                // --- FIX --- Use the dialog's context to pop
-                ElevatedButton(
-                  onPressed: () {
-                    onConfirm(tempSelected);
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Apply'),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('Cancel', style: GoogleFonts.poppins())),
+              ElevatedButton(
+                onPressed: () {
+                  onConfirm(tempSelected);
+                  Navigator.pop(dialogContext);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
                 ),
-              ],
-            );
-          },
-        );
+                child: Text('Apply', style: GoogleFonts.poppins()),
+              ),
+            ],
+          );
+        });
       },
     );
   }
@@ -1417,9 +1459,9 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
       iconWidget,
       const SizedBox(width: 12),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        if (subtitle != null && subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600))],
+        Text(label, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+        Text(value, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
+        if (subtitle != null && subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade600))],
       ],),
     ],);
   }
@@ -1428,14 +1470,14 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
     Widget chartWithBoundary = RepaintBoundary(key: chartKey, child: Container(color: Colors.white, child: chart));
     return ConstrainedBox(constraints: BoxConstraints(maxWidth: isWide ? 600 : 400, minWidth: 350),
       child: Card(elevation: 2.0, child: Padding(padding: const EdgeInsets.all(12.0),
-        child: Column(children: [Text(title, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 10), SizedBox(height: 250, child: chartWithBoundary)],),),),);
+        child: Column(children: [Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), const SizedBox(height: 10), SizedBox(height: 250, child: chartWithBoundary)],),),),);
   }
 
   Widget _buildClientSummarySection(Map<String, _ClientCallSummary> clientSummaryMap) {
     return Card(clipBehavior: Clip.antiAlias, elevation: 2, margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ExpansionTile(
         title: Row(children: [
-          Expanded(child: Text('Summary of Calls per Client', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: Text('Summary of Calls per Client', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold))),
           Visibility(visible: _isClientSummaryExpanded, maintainSize: true, maintainAnimation: true, maintainState: true,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Scroll Left', onPressed: () => _clientSummaryScrollController.animateTo(_clientSummaryScrollController.offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)),
@@ -1448,10 +1490,22 @@ class _EacReportsPageWebState extends State<EacReportsPageWeb> {
           SingleChildScrollView(controller: _clientSummaryScrollController, scrollDirection: Axis.horizontal,
             child: Padding(padding: const EdgeInsets.all(8.0),
               child: DataTable(columnSpacing: 15.0, headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
-                columns: const [DataColumn(label: Text('Client ART ID')), DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client Phone')), DataColumn(label: Text('Total Calls')), DataColumn(label: Text('Call Outcome Summary'))],
+                columns: [
+                  DataColumn(label: Text('Client ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client Phone', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Total Calls', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Call Outcome Summary', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                ],
                 rows: clientSummaryMap.values.map((summary) {
                   final statusSummary = summary.statusCounts.entries.map((e) => '${e.key}: ${e.value}').join(', ');
-                  return DataRow(cells: [DataCell(Text(_maskClientName(summary.clientId))), DataCell(Text(_maskClientName(summary.clientName))), DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))), DataCell(Text(summary.totalCalls.toString())), DataCell(Text(statusSummary))]);
+                  return DataRow(cells: [
+                    DataCell(Text(_maskClientName(summary.clientId), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskClientName(summary.clientName), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber), style: GoogleFonts.poppins())),
+                    DataCell(Text(summary.totalCalls.toString(), style: GoogleFonts.poppins())),
+                    DataCell(Text(statusSummary, style: GoogleFonts.poppins())),
+                  ]);
                 }).toList(),
               ),),),],),);
   }

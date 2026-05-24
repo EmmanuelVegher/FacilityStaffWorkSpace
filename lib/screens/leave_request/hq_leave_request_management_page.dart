@@ -513,33 +513,63 @@ class _LeaveRequestManagementPageState extends State<LeaveRequestManagementPage>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
           return AlertDialog(
             title: Text('Select $title'),
             content: SizedBox(
               width: 350,
-              child: ListView(
-                shrinkWrap: true,
-                children: allOptions.map((option) {
-                  return CheckboxListTile(
-                    title: Text(option, style: option == allKeyword ? const TextStyle(fontWeight: FontWeight.bold) : null),
-                    value: tempSelected.contains(option),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
                     onChanged: (bool? value) {
                       setDialogState(() {
                         if (value == true) {
-                          if (option == allKeyword) {
-                            tempSelected.clear();
-                            tempSelected.add(allKeyword);
-                          } else {
-                            tempSelected.remove(allKeyword);
-                            tempSelected.add(option);
-                          }
+                          tempSelected = List.from(allOptions);
                         } else {
-                          tempSelected.remove(option);
+                          tempSelected.clear();
                         }
                       });
                     },
-                  );
-                }).toList(),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: allOptions.map((option) {
+                        bool isSpecialAll = option == allKeyword;
+                        return CheckboxListTile(
+                          title: Text(option, style: isSpecialAll ? const TextStyle(fontWeight: FontWeight.bold) : null),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                if (isSpecialAll) {
+                                  tempSelected = List.from(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isSpecialAll) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [

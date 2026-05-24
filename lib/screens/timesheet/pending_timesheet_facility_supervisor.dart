@@ -20,7 +20,6 @@ import 'package:pdf/widgets.dart' as pw;
 import '../pending_approval_facility_supervisor.dart';
 import '../pending_approvals.dart';
 
-
 // report_model.dart
 class ReportEntry4 {
   String key;
@@ -65,7 +64,8 @@ class ReportEntry4 {
       supervisorEmail: map['supervisorEmail'],
       supervisorApprovalStatus: map['supervisorApprovalStatus'],
       supervisorFeedBackComment: map['supervisorFeedBackComment'],
-      attachments: (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+      attachments:
+          (map['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       appAnalysis: map['appAnalysis'],
       reviewerId: map['reviewerId'],
     );
@@ -117,9 +117,9 @@ class ReportEntry4 {
       supervisorName: supervisorName ?? this.supervisorName,
       supervisorEmail: supervisorEmail ?? this.supervisorEmail,
       supervisorApprovalStatus:
-      supervisorApprovalStatus ?? this.supervisorApprovalStatus,
+          supervisorApprovalStatus ?? this.supervisorApprovalStatus,
       supervisorFeedBackComment:
-      supervisorFeedBackComment ?? this.supervisorFeedBackComment,
+          supervisorFeedBackComment ?? this.supervisorFeedBackComment,
       attachments: attachments ?? this.attachments,
       appAnalysis: appAnalysis ?? this.appAnalysis,
       reviewerId: reviewerId ?? this.reviewerId,
@@ -161,14 +161,14 @@ class Report4 {
     this.reportEntries,
   });
 
-  factory Report4.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> snapshot,
+  factory Report4.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot,
       SnapshotOptions? options) {
     final data = snapshot.data();
     return Report4(
       id: snapshot.id,
       reportType: data?['reportType'],
-      date: data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
+      date:
+          data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
       reportingWeek: data?['reportingWeek'],
       reportingMonth: data?['reportingMonth'],
       reportStatus: data?['reportStatus'],
@@ -178,18 +178,18 @@ class Report4 {
       supervisorApprovalStatus: data?['supervisorApprovalStatus'],
       supervisorFeedBackComment: data?['supervisorFeedBackComment'],
       attachments:
-      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+          (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       isSynced: data?['isSynced'],
       // Deserialize reportEntries correctly
       reportEntries: (data?['reportEntries'] as Map<String, dynamic>?)?.map(
-            (username, indicatorMap) => MapEntry(
+        (username, indicatorMap) => MapEntry(
           username,
           (indicatorMap as Map<String, dynamic>).map(
-                (indicator, entryList) => MapEntry(
+            (indicator, entryList) => MapEntry(
               indicator,
               (entryList as List<dynamic>)
                   .map((entryData) =>
-                  ReportEntry4.fromMap(entryData as Map<String, dynamic>))
+                      ReportEntry4.fromMap(entryData as Map<String, dynamic>))
                   .toList(),
             ),
           ),
@@ -205,7 +205,8 @@ class Report4 {
       if (reportingWeek != null) 'reportingWeek': reportingWeek,
       if (reportingMonth != null) 'reportingMonth': reportingMonth,
       if (reportStatus != null) 'reportStatus': reportStatus,
-      if (reportFeedbackComment != null) 'reportFeedbackComment': reportFeedbackComment,
+      if (reportFeedbackComment != null)
+        'reportFeedbackComment': reportFeedbackComment,
       if (supervisorName != null) 'supervisorName': supervisorName,
       if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
       if (supervisorApprovalStatus != null)
@@ -217,10 +218,10 @@ class Report4 {
       // Serialize reportEntries correctly
       if (reportEntries != null)
         'reportEntries': reportEntries!.map(
-              (username, indicatorMap) => MapEntry(
+          (username, indicatorMap) => MapEntry(
             username,
             indicatorMap.map(
-                  (indicator, entryList) => MapEntry(
+              (indicator, entryList) => MapEntry(
                 indicator,
                 entryList.map((e) => e.toMap()).toList(),
               ),
@@ -263,23 +264,23 @@ class Task4 {
     this.supervisorFeedBackComment,
   });
 
-
-  factory Task4.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> snapshot,
+  factory Task4.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot,
       SnapshotOptions? options) {
     final data = snapshot.data();
     return Task4(
       id: null, // Firestore doesn't use integer IDs, document ID is used instead
-      date: data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
+      date:
+          data?['date'] != null ? (data?['date'] as Timestamp).toDate() : null,
       taskTitle: data?['taskTitle'],
       taskDescription: data?['taskDescription'],
       isSynced: data?['isSynced'],
       firestoreId: snapshot.id,
       taskStatus: data?['taskStatus'],
       attachments:
-      (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
+          (data?['attachments'] as List<dynamic>?)?.cast<String>().toList(),
       reviewedBy: data?['reviewedBy'], // ADDED: Retrieve from Firestore data
-      appAnalysis: data?['appAnalysis'], // ADDED: Retrieve appAnalysis from Firestore
+      appAnalysis:
+          data?['appAnalysis'], // ADDED: Retrieve appAnalysis from Firestore
       supervisorName: data?['supervisorName'],
       supervisorEmail: data?['supervisorEmail'],
       supervisorApprovalStatus: data?['supervisorApprovalStatus'],
@@ -296,8 +297,11 @@ class Task4 {
       if (firestoreId != null) 'firestoreId': firestoreId,
       if (taskStatus != null) 'taskStatus': taskStatus,
       if (attachments != null) 'attachments': attachments,
-      if (reviewedBy != null) 'reviewedBy': reviewedBy, // ADDED: Include in Firestore data
-      if (appAnalysis != null) 'appAnalysis': appAnalysis, // ADDED: Include appAnalysis in Firestore data
+      if (reviewedBy != null)
+        'reviewedBy': reviewedBy, // ADDED: Include in Firestore data
+      if (appAnalysis != null)
+        'appAnalysis':
+            appAnalysis, // ADDED: Include appAnalysis in Firestore data
       if (supervisorName != null) 'supervisorName': supervisorName,
       if (supervisorEmail != null) 'supervisorEmail': supervisorEmail,
       if (supervisorApprovalStatus != null)
@@ -313,19 +317,19 @@ class TimesheetDetailsScreen3 extends StatefulWidget {
   //final String timesheetId; // Removed unused parameter
   final String staffId;
 
-  const TimesheetDetailsScreen3({super.key,
+  const TimesheetDetailsScreen3({
+    super.key,
     required this.timesheetData,
     //required this.timesheetId, // Removed unused parameter
     required this.staffId,
   });
 
-
   @override
-  State<TimesheetDetailsScreen3> createState() => _TimesheetDetailsScreen3State();
+  State<TimesheetDetailsScreen3> createState() =>
+      _TimesheetDetailsScreen3State();
 }
 
 class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
-
   String? selectedProjectName;
   String? selectedBioFirstName;
   String? selectedBioLastName;
@@ -358,9 +362,10 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
   String? _caritasSupervisorSignatureLink;
   String? _selectedSupervisorEmail;
   final GlobalKey _globalKey = GlobalKey(); // Define the GlobalKey
-  final ScrollController _scrollController = ScrollController(); // Add a scroll controller
+  final ScrollController _scrollController =
+      ScrollController(); // Add a scroll controller
   final ScrollController _horizontalScrollController =
-  ScrollController(); // Controller for horizontal scrolling
+      ScrollController(); // Controller for horizontal scrolling
   Uint8List? staffSignature1; // Store staff signature as Uint8List
   String formattedDate = DateFormat('MMMM dd, yyyy').format(DateTime.now());
   var facilitySupervisorSignature;
@@ -397,16 +402,16 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
   String displayMonthYear = "Loading...";
   String? filteredMonthYear;
 
-
   @override
   void initState() {
     super.initState();
     // Call the new method to set the correct date range from widget data
     _initializeDateRangeFromData();
-    _loadBioData().then((_){
+    _loadBioData().then((_) {
       _loadBioData2();
       _fetchPendingApprovals();
-      _taskSummaryFuture = _prepareTaskSummaryContent1(); // Fetch data once in initState
+      _taskSummaryFuture =
+          _prepareTaskSummaryContent1(); // Fetch data once in initState
     });
   }
 
@@ -426,22 +431,27 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     DateTime startDate;
     DateTime endDate;
-    String monthName = DateFormat('MMMM').format(DateTime(year, monthIndex + 1));
+    String monthName =
+        DateFormat('MMMM').format(DateTime(year, monthIndex + 1));
 
-    if (monthIndex == 8 && part.isNotEmpty) { // Special case for September (month index 8)
+    if (monthIndex == 8 && part.isNotEmpty) {
+      // Special case for September (month index 8)
       displayMonthYear = "$monthName, $year (${part.replaceFirst('p', 'P')})";
       if (part == 'part1') {
         startDate = DateTime(year, 8, 20); // Aug 20
-        endDate = DateTime(year, 9, 19);   // Sep 19
-      } else { // part2
+        endDate = DateTime(year, 9, 19); // Sep 19
+      } else {
+        // part2
         startDate = DateTime(year, 9, 20); // Sep 20
-        endDate = DateTime(year, 9, 30);   // Sep 30
+        endDate = DateTime(year, 9, 30); // Sep 30
       }
-    } else if (monthIndex == 9) { // Special case for October
+    } else if (monthIndex == 9) {
+      // Special case for October
       displayMonthYear = "$monthName, $year";
       startDate = DateTime(year, 10, 1);
       endDate = DateTime(year, 10, 19);
-    } else { // Standard months
+    } else {
+      // Standard months
       displayMonthYear = "$monthName, $year";
       endDate = DateTime(year, monthIndex + 1, 19);
       startDate = DateTime(endDate.year, endDate.month - 1, 20);
@@ -449,7 +459,9 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     // Populate the list of days for the determined range
     final tempDays = <DateTime>[];
-    for (var d = startDate; d.isBefore(endDate.add(const Duration(days: 1))); d = d.add(const Duration(days: 1))) {
+    for (var d = startDate;
+        d.isBefore(endDate.add(const Duration(days: 1)));
+        d = d.add(const Duration(days: 1))) {
       tempDays.add(d);
     }
 
@@ -459,7 +471,6 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       filteredMonthYear = _getTimesheetDocId(widget.timesheetData);
     });
   }
-
 
   Future<void> _fetchPendingApprovals() async {
     setState(() {
@@ -476,23 +487,30 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
         return;
       }
 
-      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+      final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore
+          .instance
           .collectionGroup('TimeSheets')
           .where('caritasSupervisorEmail', isEqualTo: bioData['emailAddress'])
           .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
           .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
           .get();
 
-      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
+      final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore
+          .instance
           .collectionGroup('TimeSheets')
           .where('facilitySupervisorEmail', isEqualTo: bioData['emailAddress'])
           .where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending')
           .get();
 
-
       setState(() {
-        pendingTimesheetsFacilitySupervisor = facilitySupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-        pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
+        pendingTimesheetsFacilitySupervisor =
+            facilitySupervisorTimesheetsSnapshot.docs
+                .map((doc) => doc.data())
+                .toList();
+        pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot
+            .docs
+            .map((doc) => doc.data())
+            .toList();
         isLoading = false;
       });
     } catch (e) {
@@ -518,7 +536,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     final monthField = timesheetData['month'] as String?;
     if (monthField == null || monthField.isEmpty) {
       // Fallback to the old method if 'month' field is missing.
-      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final dateString =
+          timesheetData['staffSignatureDate'] ?? timesheetData['date'];
       final date = DateFormat('MMMM dd, yyyy').parse(dateString);
       return DateFormat('MMMM_yyyy').format(date);
     }
@@ -526,7 +545,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     final parts = monthField.split('_');
     if (parts.length < 2) {
       // Handle unexpected format
-      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final dateString =
+          timesheetData['staffSignatureDate'] ?? timesheetData['date'];
       final date = DateFormat('MMMM dd, yyyy').parse(dateString);
       return DateFormat('MMMM_yyyy').format(date);
     }
@@ -534,38 +554,42 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     try {
       // parts[0] is month number (e.g., '8' for September)
       // parts[1] is the year
-      final monthNum = int.parse(parts[0]) + 1; // DateTime constructor is 1-based (1=Jan)
+      final monthNum =
+          int.parse(parts[0]) + 1; // DateTime constructor is 1-based (1=Jan)
       final yearNum = int.parse(parts[1]);
       final monthName = DateFormat('MMMM').format(DateTime(yearNum, monthNum));
 
       // Reconstruct the ID, including the optional "_partX"
       String docId = '${monthName}_$yearNum';
       if (parts.length > 2) {
-        docId += '_${parts.sublist(2).join('_')}'; // Handles "part1", "part2", etc.
+        docId +=
+            '_${parts.sublist(2).join('_')}'; // Handles "part1", "part2", etc.
       }
       return docId;
     } catch (e) {
       // Fallback on parsing error
       print("Error parsing month field for doc ID: $e");
-      final dateString = timesheetData['staffSignatureDate'] ?? timesheetData['date'];
+      final dateString =
+          timesheetData['staffSignatureDate'] ?? timesheetData['date'];
       final date = DateFormat('MMMM dd, yyyy').parse(dateString);
       return DateFormat('MMMM_yyyy').format(date);
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchBioDataFromFirestore(String staffId) async {
+  Future<Map<String, dynamic>?> _fetchBioDataFromFirestore(
+      String staffId) async {
     try {
-      DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
-          .collection('Staff')
-          .doc(staffId)
-          .get();
+      DocumentSnapshot<Map<String, dynamic>> docSnapshot =
+          await FirebaseFirestore.instance
+              .collection('Staff')
+              .doc(staffId)
+              .get();
       return docSnapshot.data();
     } catch (e) {
       print("Error fetching bio data: $e");
       return null;
     }
   }
-
 
   // NEW HELPER: Finds the specific timesheet entry for a given date.
   Map<String, dynamic>? _getEntryForDate(DateTime date) {
@@ -587,7 +611,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
   // NEW WIDGET METHOD: Builds a single, styled cell for the timesheet table.
   // This includes coloring, icons, and a tooltip for deduction details.
-  Widget _buildTimesheetCell(DateTime date, String category, String projectName) {
+  Widget _buildTimesheetCell(
+      DateTime date, String category, String projectName) {
     bool weekend = isWeekend(date);
     if (weekend) {
       return Container(
@@ -606,7 +631,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       return Container(
           width: 50,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+          decoration: BoxDecoration(
+              color: Colors.white, border: Border.all(color: Colors.black12)),
           child: const Text("0.00"));
     }
 
@@ -614,13 +640,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     final isProjectRow = category == projectName;
     final isOffDay = recordForDay['offDay'] as bool? ?? false;
     final offDayCategory = recordForDay['durationWorked'] as String?;
-    bool isMatch = (isProjectRow && !isOffDay) || (!isProjectRow && isOffDay && offDayCategory?.toLowerCase() == category.toLowerCase());
+    bool isMatch = (isProjectRow && !isOffDay) ||
+        (!isProjectRow &&
+            isOffDay &&
+            offDayCategory?.toLowerCase() == category.toLowerCase());
 
     if (!isMatch) {
       return Container(
           width: 50,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+          decoration: BoxDecoration(
+              color: Colors.white, border: Border.all(color: Colors.black12)),
           child: const Text("0.00"));
     }
 
@@ -631,10 +661,12 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     Color? iconColor;
     String tooltipMessage = "Hours: $hours";
 
-    final deductionStatus = recordForDay['deductionStatus'] as String? ?? 'None';
-    final recommendation = recordForDay['recommendation'] as Map<String, dynamic>?;
-    final deductedHours = (recommendation?['deductedHours'] as num?); // Get deducted hours
-
+    final deductionStatus =
+        recordForDay['deductionStatus'] as String? ?? 'None';
+    final recommendation =
+        recordForDay['recommendation'] as Map<String, dynamic>?;
+    final deductedHours =
+        (recommendation?['deductedHours'] as num?); // Get deducted hours
 
     switch (deductionStatus) {
       case 'Partial':
@@ -662,7 +694,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     if (recommendation != null) {
       tooltipMessage += "\nStatus: $deductionStatus";
       final notes = recommendation['notes'] as String?;
-      tooltipMessage += "\nReason: ${notes != null && notes.isNotEmpty ? notes : 'N/A'}";
+      tooltipMessage +=
+          "\nReason: ${notes != null && notes.isNotEmpty ? notes : 'N/A'}";
       tooltipMessage += "\nBy: ${recommendation['recommenderName']}";
     }
 
@@ -675,20 +708,24 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           color: backgroundColor,
           border: Border.all(color: Colors.black12),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 4.0), // Added vertical padding
-        child: Column( // Changed from Row to Column
+        padding: const EdgeInsets.symmetric(
+            horizontal: 2.0, vertical: 4.0), // Added vertical padding
+        child: Column(
+          // Changed from Row to Column
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Row for the hours and status icon
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (statusIcon != null) Icon(statusIcon, size: 12, color: iconColor),
+                if (statusIcon != null)
+                  Icon(statusIcon, size: 12, color: iconColor),
                 if (statusIcon != null) const SizedBox(width: 2),
                 Flexible(
                   child: Text(
                     hours,
-                    style: const TextStyle(color: Colors.blueAccent, fontSize: 13),
+                    style:
+                        const TextStyle(color: Colors.blueAccent, fontSize: 13),
                     overflow: TextOverflow.clip,
                   ),
                 ),
@@ -713,14 +750,14 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     );
   }
 
-
-
 // =======================================================================
 // === FINAL, STABLE DEDUCTION SUMMARY SECTION (REPLACES THE OLD METHOD) ===
 // =======================================================================
 
   Widget _buildDeductionSummarySection() {
-    final timesheetEntries = (widget.timesheetData['timesheetEntries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final timesheetEntries = (widget.timesheetData['timesheetEntries'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
     final recordsWithDeductions = timesheetEntries.where((entry) {
       final status = entry['deductionStatus'] as String?;
       return status != null && status != 'None';
@@ -732,7 +769,9 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     recordsWithDeductions.sort((a, b) {
       try {
-        return DateFormat('yyyy-MM-dd').parse(a['date']).compareTo(DateFormat('yyyy-MM-dd').parse(b['date']));
+        return DateFormat('yyyy-MM-dd')
+            .parse(a['date'])
+            .compareTo(DateFormat('yyyy-MM-dd').parse(b['date']));
       } catch (e) {
         return 0;
       }
@@ -745,31 +784,47 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         initiallyExpanded: true,
-        leading: const Icon(Icons.playlist_add_check_circle_rounded, color: Colors.deepOrange),
-        title: Text("Deduction & Approval Log", style: TextStyle(fontSize: 18 * titleFontSizeFactor, fontWeight: FontWeight.bold)),
-        subtitle: Text("${recordsWithDeductions.length} day(s) with an action taken"),
+        leading: const Icon(Icons.playlist_add_check_circle_rounded,
+            color: Colors.deepOrange),
+        title: Text("Deduction & Approval Log",
+            style: TextStyle(
+                fontSize: 18 * titleFontSizeFactor,
+                fontWeight: FontWeight.bold)),
+        subtitle:
+            Text("${recordsWithDeductions.length} day(s) with an action taken"),
         children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: 16.0, left: 16.0, right: 16.0),
+            padding:
+                const EdgeInsets.only(bottom: 16.0, left: 16.0, right: 16.0),
             child: DataTable(
               columnSpacing: 20.0,
               columns: const [
-                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Recommendation', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Recommended By', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Reason / Notes', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text('Date',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text('Recommendation',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text('Recommended By',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text('Reason / Notes',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
               ],
               rows: recordsWithDeductions.map((record) {
-                final recommendation = record['recommendation'] as Map<String, dynamic>? ?? {};
+                final recommendation =
+                    record['recommendation'] as Map<String, dynamic>? ?? {};
                 String statusText = record['deductionStatus'] ?? 'N/A';
                 Color statusColor = Colors.black;
 
                 // Formatting logic for status text and color
                 switch (record['deductionStatus']) {
-                // ... (your existing switch case logic remains unchanged) ...
+                  // ... (your existing switch case logic remains unchanged) ...
                   case 'Partial':
-                    statusText = 'Partial Deduction (${recommendation['deductedHours'] ?? 0} hrs)';
+                    statusText =
+                        'Partial Deduction (${recommendation['deductedHours'] ?? 0} hrs)';
                     statusColor = Colors.orange.shade800;
                     break;
                   case 'Full':
@@ -777,8 +832,10 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                     statusColor = Colors.red.shade800;
                     break;
                   case 'ApprovedPartial':
-                    final hours = (record['noOfHours'] as num?)?.toDouble() ?? 0.0;
-                    statusText = 'Partial Approval (${hours.toInt()} hr${hours == 1 ? '' : 's'})';
+                    final hours =
+                        (record['noOfHours'] as num?)?.toDouble() ?? 0.0;
+                    statusText =
+                        'Partial Approval (${hours.toInt()} hr${hours == 1 ? '' : 's'})';
                     statusColor = Colors.blue.shade800;
                     break;
                   case 'ApprovedFull':
@@ -787,12 +844,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                     break;
                 }
 
-                final recommenderText = '${recommendation['recommenderName'] ?? 'N/A'}\n(${recommendation['recommenderDesignation'] ?? 'N/A'})';
-                final notesText = recommendation['notes'] as String? ?? 'No notes provided.';
+                final recommenderText =
+                    '${recommendation['recommenderName'] ?? 'N/A'}\n(${recommendation['recommenderDesignation'] ?? 'N/A'})';
+                final notesText =
+                    recommendation['notes'] as String? ?? 'No notes provided.';
 
                 return DataRow(cells: [
-                  DataCell(Text(DateFormat.yMd().format(DateFormat('yyyy-MM-dd').parse(record['date'])))),
-                  DataCell(Text(statusText, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor))),
+                  DataCell(Text(DateFormat.yMd()
+                      .format(DateFormat('yyyy-MM-dd').parse(record['date'])))),
+                  DataCell(Text(statusText,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: statusColor))),
                   DataCell(Text(recommenderText)),
 
                   // --- THIS IS THE UPDATED, STABLE SOLUTION ---
@@ -800,9 +862,11 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                   // The Text widget inside is constrained to 2 lines to keep the table clean.
                   DataCell(
                     Tooltip(
-                      message: notesText, // The tooltip shows the full, uncut text
+                      message:
+                          notesText, // The tooltip shows the full, uncut text
                       padding: const EdgeInsets.all(12),
-                      textStyle: const TextStyle(fontSize: 14, color: Colors.white),
+                      textStyle:
+                          const TextStyle(fontSize: 14, color: Colors.white),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
@@ -812,7 +876,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                         child: Text(
                           notesText,
                           maxLines: 2, // Show a maximum of 2 lines in the cell
-                          overflow: TextOverflow.ellipsis, // Add "..." if text is longer
+                          overflow: TextOverflow
+                              .ellipsis, // Add "..." if text is longer
                         ),
                       ),
                     ),
@@ -849,7 +914,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     // 2. Validate that the staff has already signed the timesheet before the supervisor can approve it.
     // This uses the actual data from the timesheet document, which is more reliable.
-    if (widget.timesheetData['staffSignature'] == null || (widget.timesheetData['staffSignature'] as String).isEmpty) {
+    if (widget.timesheetData['staffSignature'] == null ||
+        (widget.timesheetData['staffSignature'] as String).isEmpty) {
       Fluttertoast.showToast(
         msg: "Cannot Sign timesheet without Staff Signature.",
         toastLength: Toast.LENGTH_LONG,
@@ -873,21 +939,25 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           .get();
 
       Map<String, dynamic> timesheetDataUpdate = {};
-      if (selectedBioStaffCategory2 == "Facility Supervisor"){
+      if (selectedBioStaffCategory2 == "Facility Supervisor") {
         timesheetDataUpdate = {
           'facilitySupervisorSignature': selectedSignatureLink2,
-          'facilitySupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-          'facilitySupervisorSignatureStatus':"Approved",
-          'facilitySupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
+          'facilitySupervisorSignatureDate':
+              DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+          'facilitySupervisorSignatureStatus': "Approved",
+          'facilitySupervisorTimesheetSubmissionTimestamp':
+              DateTime.now().toIso8601String(),
         };
       }
 
-      if (selectedBioStaffCategory2 == "State Office Staff"){
+      if (selectedBioStaffCategory2 == "State Office Staff") {
         timesheetDataUpdate = {
           'caritasSupervisorSignature': selectedSignatureLink2,
-          'caritasSupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-          'caritasSupervisorSignatureStatus':"Approved",
-          'caritasSupervisorTimesheetSubmissionTimestamp':DateTime.now().toIso8601String(),
+          'caritasSupervisorSignatureDate':
+              DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+          'caritasSupervisorSignatureStatus': "Approved",
+          'caritasSupervisorTimesheetSubmissionTimestamp':
+              DateTime.now().toIso8601String(),
         };
       }
 
@@ -909,22 +979,19 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
         fontSize: 16.0,
       );
 
-
-
-      if (selectedBioStaffCategory2 == "Facility Supervisor"){
+      if (selectedBioStaffCategory2 == "Facility Supervisor") {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const PendingFacilitySupervisorApprovalsPage(),
+            builder: (context) =>
+                const PendingFacilitySupervisorApprovalsPage(),
           ),
         ).then((_) => _fetchPendingApprovals());
       }
-
     } catch (e) {
       print('Error saving timesheet: $e');
     }
   }
-
 
   Future<void> _showLogo() async {
     try {
@@ -951,25 +1018,24 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     }
   }
 
-
-
   Future<void> _createAndExportPDF1() async {
     print("widget.timesheetData==${widget.timesheetData}");
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
-
 
     final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
@@ -994,14 +1060,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     _buildStaffInfo(context),
-                    pw.Column(
-                        children: [
-                          pw.Text("CARITAS NIGERIA", style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold, fontSize: 20),),
-                          pw.SizedBox(height: 10,),
-                          pw.Text("Monthly Time Report ($monthYear1)")
-                        ]
-                    ),
+                    pw.Column(children: [
+                      pw.Text(
+                        "CARITAS NIGERIA",
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 20),
+                      ),
+                      pw.SizedBox(
+                        height: 10,
+                      ),
+                      pw.Text("Monthly Time Report ($monthYear1)")
+                    ]),
                     pw.Container(
                       child: pw.Image(
                         logoImage,
@@ -1042,8 +1111,6 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       // Clean up: remove the anchor and revoke the ObjectURL
       html.document.body!.children.remove(anchor);
       html.Url.revokeObjectUrl(url);
-
-
     } catch (e) {
       print("Error generating PDF: $e");
       Fluttertoast.showToast(
@@ -1058,27 +1125,26 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     }
   }
 
-
   Future<void> _createAndExportPDF() async {
-
     setState(() {
       _isPDFLoading = true;
     });
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
-
 
     final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
@@ -1088,7 +1154,7 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     try {
       final ByteData logoBytes =
-      await rootBundle.load('assets/image/ccfn_logo.png');
+          await rootBundle.load('assets/image/ccfn_logo.png');
       final Uint8List logoImageData = logoBytes.buffer.asUint8List();
       final pw.MemoryImage logoImage = pw.MemoryImage(logoImageData);
       final pageFormat = PdfPageFormat.a4.landscape;
@@ -1097,7 +1163,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       final signatureColumns = await _buildSignatureColumns(supervisorNames);
 
       // **Fetch Task Summary Data BEFORE building PDF**
-      final taskSummaryContent = await _prepareTaskSummaryContent(); // New method to prepare task summary content
+      final taskSummaryContent =
+          await _prepareTaskSummaryContent(); // New method to prepare task summary content
 
       pdf.addPage(
         pw.Page(
@@ -1110,14 +1177,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     _buildStaffInfo(context),
-                    pw.Column(
-                        children: [
-                          pw.Text("CARITAS NIGERIA", style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold, fontSize: 20),),
-                          pw.SizedBox(height: 10,),
-                          pw.Text("Monthly Time Report ($monthYear1)")
-                        ]
-                    ),
+                    pw.Column(children: [
+                      pw.Text(
+                        "CARITAS NIGERIA",
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 20),
+                      ),
+                      pw.SizedBox(
+                        height: 10,
+                      ),
+                      pw.Text("Monthly Time Report ($monthYear1)")
+                    ]),
                     pw.Container(
                       child: pw.Image(
                         logoImage,
@@ -1158,8 +1228,7 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                       'Page ${context.pageNumber} of ${context.pagesCount}',
                       style: pw.Theme.of(context)
                           .defaultTextStyle
-                          .copyWith(color: PdfColors.grey)
-                  ));
+                          .copyWith(color: PdfColors.grey)));
             },
             build: (pw.Context context) {
               return [
@@ -1167,16 +1236,18 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                 pw.Center(
                   child: pw.Text(
                     "Task Summary for $monthYear1",
-                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                    style: pw.TextStyle(
+                        fontSize: 16, fontWeight: pw.FontWeight.bold),
                   ),
                 ),
                 pw.SizedBox(height: 20),
-                _buildTaskSummaryPage(logoImage, taskSummaryContent), // Pass pre-fetched content here
+                _buildTaskSummaryPage(logoImage,
+                    taskSummaryContent), // Pass pre-fetched content here
               ];
             },
           ),
-        );}
-
+        );
+      }
 
       final Uint8List pdfBytes = await pdf.save();
 
@@ -1184,7 +1255,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
         final blob = html.Blob([pdfBytes], 'application/pdf');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.AnchorElement(href: url)
-          ..setAttribute("download", "Timesheet_${monthYear1}_${selectedBioFirstName}_$selectedBioLastName.pdf")
+          ..setAttribute("download",
+              "Timesheet_${monthYear1}_${selectedBioFirstName}_$selectedBioLastName.pdf")
           ..click();
 
         html.Url.revokeObjectUrl(url);
@@ -1200,7 +1272,7 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
       }
     } catch (e) {
       print("Error generating PDF: $e");
-    }finally {
+    } finally {
       setState(() {
         _isPDFLoading = false;
       });
@@ -1213,7 +1285,9 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     final parts = dateString.split('_');
 
     if (parts.length != 2) {
-      return [pw.Center(child: pw.Text("Invalid date format in timesheet data."))];
+      return [
+        pw.Center(child: pw.Text("Invalid date format in timesheet data."))
+      ];
     }
 
     final int month = int.tryParse(parts[0]) ?? 1;
@@ -1221,7 +1295,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
 
-    final DateTime now = DateTime(year, month + 1); // for proper 20th to 19th range
+    final DateTime now =
+        DateTime(year, month + 1); // for proper 20th to 19th range
     final DateTime startDateOfMonth = DateTime(now.year, now.month - 1, 20);
     final DateTime endDateOfMonth = DateTime(now.year, now.month, 19);
 
@@ -1232,9 +1307,10 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     Map<DateTime, List<Report4>> reportsByDate = {};
 
     for (DateTime date = startDateOfMonth;
-    date.isBefore(endDateOfMonth.add(const Duration(days: 1)));
-    date = date.add(const Duration(days: 1))) {
-      if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+        date.isBefore(endDateOfMonth.add(const Duration(days: 1)));
+        date = date.add(const Duration(days: 1))) {
+      if (date.weekday == DateTime.saturday ||
+          date.weekday == DateTime.sunday) {
         continue; // skip weekends
       }
 
@@ -1252,8 +1328,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
 
       final dailyReports = reportSnapshot.docs
           .map((doc) => Report4.fromFirestore(doc, null))
-          .where((r) =>
-      r.reportEntries?.keys.contains(_currentUsername) ?? false)
+          .where(
+              (r) => r.reportEntries?.keys.contains(_currentUsername) ?? false)
           .toList();
 
       reportsByDate[date] = dailyReports;
@@ -1269,14 +1345,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           .collection(selectedFirebaseId!)
           .get();
 
-      final dailyTasks =
-      taskSnapshot.docs.map((doc) => Task4.fromFirestore(doc, null)).toList();
+      final dailyTasks = taskSnapshot.docs
+          .map((doc) => Task4.fromFirestore(doc, null))
+          .toList();
 
       otherTasksByDate[date] = dailyTasks;
     }
 
     if (reportsByDate.isEmpty && otherTasksByDate.isEmpty) {
-      return [pw.Center(child: pw.Text("No reports or tasks found for this period."))];
+      return [
+        pw.Center(child: pw.Text("No reports or tasks found for this period."))
+      ];
     }
 
     // Process report summaries
@@ -1289,10 +1368,12 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
               final indicatorName = indicator.key;
               final value = int.tryParse(indicator.value.first.value) ?? 0;
 
-              summaryDataByDate[date]!.putIfAbsent(indicatorName, () => {'Total': 0});
+              summaryDataByDate[date]!
+                  .putIfAbsent(indicatorName, () => {'Total': 0});
               summaryDataByDate[date]![indicatorName]![userEntry.key] = value;
               summaryDataByDate[date]![indicatorName]!['Total'] =
-                  (summaryDataByDate[date]![indicatorName]!['Total'] as int) + value;
+                  (summaryDataByDate[date]![indicatorName]!['Total'] as int) +
+                      value;
             }
           }
         }
@@ -1351,7 +1432,8 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           content.add(pw.Padding(
             padding: const pw.EdgeInsets.only(top: 10, bottom: 5),
             child: pw.Text(DateFormat('EEEE, dd MMMM yyyy').format(date),
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                style:
+                    pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
           ));
 
           for (var task in tasks) {
@@ -1380,7 +1462,9 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     final parts = dateString.split('_');
 
     if (parts.length != 2) {
-      return [const Center(child: Text("Invalid date format in timesheet data."))];
+      return [
+        const Center(child: Text("Invalid date format in timesheet data."))
+      ];
     }
 
     final int month = int.tryParse(parts[0]) ?? 1;
@@ -1398,9 +1482,10 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     Map<DateTime, List<Report4>> reportsByDate = {};
 
     for (DateTime date = startDate;
-    date.isBefore(endDate.add(const Duration(days: 1)));
-    date = date.add(const Duration(days: 1))) {
-      if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) continue;
+        date.isBefore(endDate.add(const Duration(days: 1)));
+        date = date.add(const Duration(days: 1))) {
+      if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday)
+        continue;
 
       final formattedDate = DateFormat('dd-MMM-yyyy').format(date);
       final formattedTaskDate = DateFormat('yyyy-MM-dd').format(date);
@@ -1429,12 +1514,16 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           .collection(selectedFirebaseId!)
           .get();
 
-      final tasks = taskSnapshot.docs.map((doc) => Task4.fromFirestore(doc, null)).toList();
+      final tasks = taskSnapshot.docs
+          .map((doc) => Task4.fromFirestore(doc, null))
+          .toList();
       otherTasksByDate[date] = tasks;
     }
 
     if (reportsByDate.isEmpty && otherTasksByDate.isEmpty) {
-      return [const Center(child: Text("No reports or tasks found for this period."))];
+      return [
+        const Center(child: Text("No reports or tasks found for this period."))
+      ];
     }
 
     for (var date in reportsByDate.keys) {
@@ -1525,31 +1614,34 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                 DataCell(
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 200),
-                    child: Text(indicatorName, style: const TextStyle(fontSize: 10), softWrap: true),
+                    child: Text(indicatorName,
+                        style: const TextStyle(fontSize: 10), softWrap: true),
                   ),
                 ),
                 DataCell(
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 100),
-                    child: Text(enteredStr, style: const TextStyle(fontSize: 10), softWrap: true),
+                    child: Text(enteredStr,
+                        style: const TextStyle(fontSize: 10), softWrap: true),
                   ),
                 ),
                 DataCell(
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 100),
-                    child: Text(totalStr, style: const TextStyle(fontSize: 10), softWrap: true),
+                    child: Text(totalStr,
+                        style: const TextStyle(fontSize: 10), softWrap: true),
                   ),
                 ),
                 DataCell(
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 100),
-                    child: Text(formattedPercentage, style: const TextStyle(fontSize: 10), softWrap: true),
+                    child: Text(formattedPercentage,
+                        style: const TextStyle(fontSize: 10), softWrap: true),
                   ),
                 ),
               ],
             );
           }).toList(),
-
         ),
       ));
     });
@@ -1597,27 +1689,26 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     return content;
   }
 
-
   //Modified _buildPdfTaskSummaryPage to be synchronous and accept pre-fetched content
-  pw.Widget _buildTaskSummaryPage(pw.MemoryImage logoImage, List<pw.Widget> taskSummaryContent) {
+  pw.Widget _buildTaskSummaryPage(
+      pw.MemoryImage logoImage, List<pw.Widget> taskSummaryContent) {
     return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: taskSummaryContent // Use the pre-built content directly
-    );
+        );
   }
 
-
   Future<void> sendEmailToProjectManagementTeam() async {
-
-
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -1625,14 +1716,12 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate);
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
 
     final monthYear = DateFormat('MMMM, yyyy').format(timesheetDate1);
     final monthYear1 = DateFormat('MMMM_yyyy').format(timesheetDate1);
-
 
     final pdf = pw.Document(pageMode: PdfPageMode.outlines);
 
@@ -1661,14 +1750,17 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     _buildStaffInfo(context),
-                    pw.Column(
-                        children: [
-                          pw.Text("CARITAS NIGERIA", style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold, fontSize: 20),),
-                          pw.SizedBox(height: 10,),
-                          pw.Text("Monthly Time Report ($monthYear)")
-                        ]
-                    ),
+                    pw.Column(children: [
+                      pw.Text(
+                        "CARITAS NIGERIA",
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 20),
+                      ),
+                      pw.SizedBox(
+                        height: 10,
+                      ),
+                      pw.Text("Monthly Time Report ($monthYear)")
+                    ]),
                     pw.Container(
                       child: pw.Image(
                         logoImage,
@@ -1691,9 +1783,6 @@ class _TimesheetDetailsScreen3State extends State<TimesheetDetailsScreen3> {
           },
         ),
       );
-
-
-
     } catch (e) {
       print("Error generating PDF: $e");
       // Handle the error, e.g., show a dialog to the user
@@ -1727,12 +1816,13 @@ $selectedBioFirstName $selectedBioLastName
     // **Send email data and base64Pdf to your server endpoint (using http package)**
     // Example using http package (you'll need to add http: ^latest to pubspec.yaml)
 
-
     try {
       final response = await http.post(
-        Uri.parse('YOUR_SERVER_EMAIL_ENDPOINT_URL'), // Replace with your server's URL
+        Uri.parse(
+            'YOUR_SERVER_EMAIL_ENDPOINT_URL'), // Replace with your server's URL
         headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8', // Or appropriate content type
+          'Content-Type':
+              'application/json; charset=UTF-8', // Or appropriate content type
         },
         body: jsonEncode(<String, dynamic>{
           'toEmail': selectedBioEmail,
@@ -1747,10 +1837,10 @@ $selectedBioFirstName $selectedBioLastName
         print('Email sending request sent to server successfully!');
         // ... handle success (e.g., show toast)
       } else {
-        print('Failed to send email request to server. Status code: ${response.statusCode}');
+        print(
+            'Failed to send email request to server. Status code: ${response.statusCode}');
         // ... handle error (e.g., show error toast)
       }
-
     } catch (error) {
       print('Error sending email request to server: $error');
       // ... handle error
@@ -1778,17 +1868,18 @@ $selectedBioFirstName $selectedBioLastName
     );
   }
 
-
   Future<Map<String, String>> _getSupervisorNames() async {
     // ... (Supervisor names fetching logic - same as before, but ensure it uses widget.timesheetData) ...
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -1811,20 +1902,20 @@ $selectedBioFirstName $selectedBioLastName
         final data = timesheetDoc.data() as Map<String, dynamic>;
         return {
           'staffName': data['staffName'] as String? ?? 'Not Assigned',
-          'projectCoordinatorName': data['facilitySupervisor'] as String? ??
-              'Not Assigned',
-          'caritasSupervisorName': data['caritasSupervisor'] as String? ??
-              'Not Assigned',
-          'projectCoordinatorSignature': data['facilitySupervisorSignature'] as String? ??
-              '',
-          'caritasSupervisorSignature': data['caritasSupervisorSignature'] as String? ??
-              '',
+          'projectCoordinatorName':
+              data['facilitySupervisor'] as String? ?? 'Not Assigned',
+          'caritasSupervisorName':
+              data['caritasSupervisor'] as String? ?? 'Not Assigned',
+          'projectCoordinatorSignature':
+              data['facilitySupervisorSignature'] as String? ?? '',
+          'caritasSupervisorSignature':
+              data['caritasSupervisorSignature'] as String? ?? '',
           'staffSignature': data['staffSignature'] as String? ?? '',
           'staffSignatureDate': data['staffSignatureDate'] as String? ?? '',
-          'facilitySupervisorSignatureDate': data['facilitySupervisorSignatureDate'] as String? ??
-              '',
-          'caritasSupervisorSignatureDate': data['caritasSupervisorSignatureDate'] as String? ??
-              '',
+          'facilitySupervisorSignatureDate':
+              data['facilitySupervisorSignatureDate'] as String? ?? '',
+          'caritasSupervisorSignatureDate':
+              data['caritasSupervisorSignatureDate'] as String? ?? '',
         };
       } else {
         return {
@@ -1855,24 +1946,24 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-
   pw.Widget _buildStaffInfo(pw.Context context) {
     // ... (Staff info building logic - same as before, but ensure it uses widget.timesheetData) ...
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
-
 
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
     final department = widget.timesheetData['department'] ?? 'N/A';
@@ -1889,13 +1980,12 @@ $selectedBioFirstName $selectedBioLastName
         pw.Text('Location: $location'),
         pw.Text('State: $state'),
         pw.SizedBox(height: 20),
-
       ],
     );
   }
 
-
-  double _getCappedHoursForDate(DateTime date, String? projectName, String category) {
+  double _getCappedHoursForDate(
+      DateTime date, String? projectName, String category) {
     double totalHoursForDate = 0;
 
     final attendanceData = widget.timesheetData['timesheetEntries'] as List?;
@@ -1903,7 +1993,8 @@ $selectedBioFirstName $selectedBioLastName
     if (attendanceData != null) {
       for (var attendance in attendanceData.cast<Map<String, dynamic>>()) {
         try {
-          DateTime attendanceDate = DateFormat('yyyy-MM-dd').parse(attendance['date']);
+          DateTime attendanceDate =
+              DateFormat('yyyy-MM-dd').parse(attendance['date']);
 
           if (attendanceDate.year == date.year &&
               attendanceDate.month == date.month &&
@@ -1911,8 +2002,9 @@ $selectedBioFirstName $selectedBioLastName
             if (category == projectName && !attendance['offDay']) {
               double hours = attendance['noOfHours'];
               totalHoursForDate += hours > 8 ? 8 : hours;
-
-            } else if (attendance['offDay'] && attendance['durationWorked']?.toLowerCase() == category.toLowerCase()) {
+            } else if (attendance['offDay'] &&
+                attendance['durationWorked']?.toLowerCase() ==
+                    category.toLowerCase()) {
               double hours = attendance['noOfHours'];
               totalHoursForDate += hours > 8 ? 8 : hours;
             }
@@ -1926,18 +2018,19 @@ $selectedBioFirstName $selectedBioLastName
     return totalHoursForDate;
   }
 
-
 // Updated function to calculate total hours for a project (with capping)
   double calculateTotalHours1() {
     double totalHours = 0;
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -1945,12 +2038,11 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate1);
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month),int.parse(year));
+    final daysInRange = initializeDateRange(int.parse(month), int.parse(year));
     for (var date in daysInRange) {
       if (!isWeekend(date)) {
         totalHours += _getCappedHoursForDate(
@@ -1964,11 +2056,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -1976,12 +2070,11 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate1);
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month),int.parse(year));
+    final daysInRange = initializeDateRange(int.parse(month), int.parse(year));
     double projectTotal = calculateTotalHours1();
 
     double categoriesTotal = [
@@ -2001,11 +2094,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -2013,12 +2108,11 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate1);
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month),int.parse(year));
+    final daysInRange = initializeDateRange(int.parse(month), int.parse(year));
     double totalHours = 0;
     for (var date in daysInRange) {
       if (!isWeekend(date)) {
@@ -2034,11 +2128,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -2046,37 +2142,36 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate1);
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month),int.parse(year));
-    int workingDays = daysInRange
-        .where((date) => !isWeekend(date))
-        .length;
+    final daysInRange = initializeDateRange(int.parse(month), int.parse(year));
+    int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
     double cappedGrandTotalHours = calculateGrandTotalHours1();
-    return (workingDays * 8) > 0 ? (cappedGrandTotalHours / (workingDays * 8)) *
-        100 : 0; // Correct denominator
-
+    return (workingDays * 8) > 0
+        ? (cappedGrandTotalHours / (workingDays * 8)) * 100
+        : 0; // Correct denominator
   }
 
   double calculateCategoryPercentage(String category) {
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing timesheet date: $e");
-      timesheetDate1 = DateTime.now(); // Fallback to current date if parsing fails
+      timesheetDate1 =
+          DateTime.now(); // Fallback to current date if parsing fails
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
-
 
     final month = timesheetDate1.month;
     final year = timesheetDate1.year;
@@ -2088,30 +2183,34 @@ $selectedBioFirstName $selectedBioLastName
     double cappedCategoryHours = calculateCategoryHours1(category);
 
     // Check for division by zero
-    return (workingDays * 8) > 0 ? (cappedCategoryHours / (workingDays * 8)) * 100 : 0;
+    return (workingDays * 8) > 0
+        ? (cappedCategoryHours / (workingDays * 8)) * 100
+        : 0;
   }
-
 
   double calculateCategoryHours(String category) {
     // Parse the timesheet date
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing timesheet date: $e");
-      timesheetDate1 = DateTime.now(); // Fallback to current date if parsing fails
+      timesheetDate1 =
+          DateTime.now(); // Fallback to current date if parsing fails
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     // Extract timesheet entries
-    final attendanceData = widget.timesheetData['timesheetEntries'] as List<dynamic>?;
+    final attendanceData =
+        widget.timesheetData['timesheetEntries'] as List<dynamic>?;
 
     // Determine the month and year
     final month = timesheetDate1.month;
@@ -2127,12 +2226,14 @@ $selectedBioFirstName $selectedBioLastName
         for (var entry in attendanceData ?? []) {
           if (entry is Map<String, dynamic>) {
             try {
-              DateTime attendanceDate = DateFormat('dd-MMMM-yyyy').parse(entry['date']);
+              DateTime attendanceDate =
+                  DateFormat('dd-MMMM-yyyy').parse(entry['date']);
               if (attendanceDate.year == date.year &&
                   attendanceDate.month == date.month &&
                   attendanceDate.day == date.day &&
                   entry['offDay'] == true &&
-                  (entry['durationWorked'] as String?)?.toLowerCase() == category.toLowerCase()) {
+                  (entry['durationWorked'] as String?)?.toLowerCase() ==
+                      category.toLowerCase()) {
                 double? hours = entry['noOfHours'] as double?;
                 if (hours != null) {
                   totalHours += hours;
@@ -2153,11 +2254,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -2165,16 +2268,16 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month), int.parse(year)).cast<DateTime>();
-    final data = widget.timesheetData['timesheetEntries'].cast<Map<String, dynamic>>();
-
+    final daysInRange =
+        initializeDateRange(int.parse(month), int.parse(year)).cast<DateTime>();
+    final data =
+        widget.timesheetData['timesheetEntries'].cast<Map<String, dynamic>>();
 
     // Store row data and totals
-    final rowData = <String, List<double>>{};  // Simplified data structure
+    final rowData = <String, List<double>>{}; // Simplified data structure
     final categories = ['Annual leave', 'Holiday', 'Maternity'];
 
     // Helper function to build table cells with weekend styling
@@ -2188,38 +2291,56 @@ $selectedBioFirstName $selectedBioLastName
       );
     }
 
-
     // Build Table Rows (including data and totals calculation)
     List<pw.TableRow> tableRows = [];
     for (final category in [projectName, ...categories]) {
       List<pw.Widget> rowChildren = [];
       List<double> rowDataList = []; // Accumulate data for each category
 
-      rowChildren.add(pw.Container(width: 250, alignment: pw.Alignment.centerLeft, padding: const pw.EdgeInsets.all(1.0), child: pw.Text(category)));
-
+      rowChildren.add(pw.Container(
+          width: 250,
+          alignment: pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.all(1.0),
+          child: pw.Text(category)));
 
       double rowTotal = 0;
 
       for (var date in daysInRange) {
-        double duration = _getDurationForDate3(date, projectName, category, data);
+        double duration =
+            _getDurationForDate3(date, projectName, category, data);
         rowTotal += duration;
         rowDataList.add(duration);
-        rowChildren.add(buildTableCell(duration.round().toString(), isWeekend(date)));
+        rowChildren
+            .add(buildTableCell(duration.round().toString(), isWeekend(date)));
       }
 
-      rowData[category] = rowDataList;  // Store data row for totals calculation
-      rowChildren.add(pw.Container(width: 200, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text(rowTotal.round().toString())));
-
+      rowData[category] = rowDataList; // Store data row for totals calculation
+      rowChildren.add(pw.Container(
+          width: 200,
+          alignment: pw.Alignment.center,
+          padding: const pw.EdgeInsets.all(1.0),
+          child: pw.Text(rowTotal.round().toString())));
 
       int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
-      double percentage = (workingDays * 8) > 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
-      rowChildren.add(pw.Container(width: 200, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('${percentage.round()}%')));
+      double percentage =
+          (workingDays * 8) > 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
+      rowChildren.add(pw.Container(
+          width: 200,
+          alignment: pw.Alignment.center,
+          padding: const pw.EdgeInsets.all(1.0),
+          child: pw.Text('${percentage.round()}%')));
       tableRows.add(pw.TableRow(children: rowChildren));
     }
 
-
     // Total Row
-    List<pw.Widget> totalRowChildren = [pw.Container(width: 250, alignment: pw.Alignment.centerLeft, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))];
+    List<pw.Widget> totalRowChildren = [
+      pw.Container(
+          width: 250,
+          alignment: pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.all(1.0),
+          child: pw.Text('Total',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))
+    ];
     double grandTotalHours = 0;
     for (int i = 0; i < daysInRange.length; i++) {
       double dayTotal = 0;
@@ -2227,27 +2348,48 @@ $selectedBioFirstName $selectedBioLastName
         dayTotal += durations[i]; // Accessing by index is safe now
       });
 
-      totalRowChildren.add(pw.Container(width:80, color: isWeekend(daysInRange[i]) ? PdfColors.grey900 : PdfColors.grey300, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text(dayTotal.round().toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))); // Added bold style and background color
+      totalRowChildren.add(pw.Container(
+          width: 80,
+          color:
+              isWeekend(daysInRange[i]) ? PdfColors.grey900 : PdfColors.grey300,
+          alignment: pw.Alignment.center,
+          padding: const pw.EdgeInsets.all(1.0),
+          child: pw.Text(dayTotal.round().toString(),
+              style: pw.TextStyle(
+                  fontWeight: pw.FontWeight
+                      .bold)))); // Added bold style and background color
       grandTotalHours += dayTotal;
     }
 
-
     int workingDaysTotal = daysInRange.where((date) => !isWeekend(date)).length;
-    double grandPercentage = (workingDaysTotal * 8) > 0 ? (grandTotalHours / (workingDaysTotal * 8)) * 100 : 0;
+    double grandPercentage = (workingDaysTotal * 8) > 0
+        ? (grandTotalHours / (workingDaysTotal * 8)) * 100
+        : 0;
 
-
-    totalRowChildren.add(pw.Container(width: 200, color: PdfColors.grey300, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text(grandTotalHours.round().toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold))));
-    totalRowChildren.add(pw.Container(width: 200, color: PdfColors.grey300, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('${grandPercentage.round()}%', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))));
-    tableRows.add(pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: totalRowChildren));
-
-
-
+    totalRowChildren.add(pw.Container(
+        width: 200,
+        color: PdfColors.grey300,
+        alignment: pw.Alignment.center,
+        padding: const pw.EdgeInsets.all(1.0),
+        child: pw.Text(grandTotalHours.round().toString(),
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold))));
+    totalRowChildren.add(pw.Container(
+        width: 200,
+        color: PdfColors.grey300,
+        alignment: pw.Alignment.center,
+        padding: const pw.EdgeInsets.all(1.0),
+        child: pw.Text('${grandPercentage.round()}%',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold))));
+    tableRows.add(pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: totalRowChildren));
 
     return pw.Table(
       border: pw.TableBorder.all(),
       columnWidths: {
         0: const pw.FixedColumnWidth(250),
-        for (int i = 1; i <= daysInRange.length; i++) i: const pw.FixedColumnWidth(80),
+        for (int i = 1; i <= daysInRange.length; i++)
+          i: const pw.FixedColumnWidth(80),
         daysInRange.length + 1: const pw.FixedColumnWidth(200),
         daysInRange.length + 2: const pw.FixedColumnWidth(200),
       },
@@ -2255,46 +2397,68 @@ $selectedBioFirstName $selectedBioLastName
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: [
-            pw.Container(width: 250, alignment: pw.Alignment.centerLeft, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('Project Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-            ...daysInRange.map((date) => pw.Container(width: 80, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), color: isWeekend(date) ? PdfColors.grey900 : PdfColors.grey300,child: pw.Text(DateFormat('dd').format(date), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)))), // Added bold style and background color
-            pw.Container(width: 200, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('Total Hours', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-            pw.Container(width: 200, alignment: pw.Alignment.center, padding: const pw.EdgeInsets.all(1.0), child: pw.Text('%', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-
-
+            pw.Container(
+                width: 250,
+                alignment: pw.Alignment.centerLeft,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text('Project Name',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            ...daysInRange.map((date) => pw.Container(
+                width: 80,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                color: isWeekend(date) ? PdfColors.grey900 : PdfColors.grey300,
+                child: pw.Text(DateFormat('dd').format(date),
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight
+                            .bold)))), // Added bold style and background color
+            pw.Container(
+                width: 200,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text('Total Hours',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+            pw.Container(
+                width: 200,
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.all(1.0),
+                child: pw.Text('%',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
           ],
         ),
-
-
         ...tableRows,
       ],
     );
   }
 
-
-
-
-  List<pw.Widget> _buildRowChildrenWithWeekendColor1(pw.Context context, List<String> rowData,List<DateTime> daysInRange) {
-
+  List<pw.Widget> _buildRowChildrenWithWeekendColor1(
+      pw.Context context, List<String> rowData, List<DateTime> daysInRange) {
     return rowData.asMap().entries.map((entry) {
       final i = entry.key;
       final data = entry.value;
-      final isWeekendColumn = i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]); // Check for weekend columns
+      final isWeekendColumn = i > 0 &&
+          i <= daysInRange.length &&
+          isWeekend(daysInRange[i - 1]); // Check for weekend columns
 
       return pw.Container(
-        color: isWeekendColumn ? PdfColors.grey900 : null, // Grey for weekend cells
+        color: isWeekendColumn
+            ? PdfColors.grey900
+            : null, // Grey for weekend cells
         padding: const pw.EdgeInsets.all(1.0),
         alignment: pw.Alignment.center, // Center the text
         child: pw.Text(data),
       );
-
     }).toList();
   }
 
-  List<pw.Widget> _buildRowChildrenWithWeekendColor(pw.Context context, List<String> rowData, List<DateTime> daysInRange) {  // Correct type here
+  List<pw.Widget> _buildRowChildrenWithWeekendColor(
+      pw.Context context, List<String> rowData, List<DateTime> daysInRange) {
+    // Correct type here
     return rowData.asMap().entries.map((entry) {
       final i = entry.key;
       final data = entry.value;
-      final isWeekendColumn = i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]);
+      final isWeekendColumn =
+          i > 0 && i <= daysInRange.length && isWeekend(daysInRange[i - 1]);
 
       return pw.Container(
         color: isWeekendColumn ? PdfColors.grey900 : null,
@@ -2305,17 +2469,17 @@ $selectedBioFirstName $selectedBioLastName
     }).toList();
   }
 
-
   // ... (rest of the code)
 
-
   //timesheet_details.dart
-  double _getDurationForDate3(DateTime date, String? projectName, String category, List<Map<String, dynamic>> attendanceData) {
+  double _getDurationForDate3(DateTime date, String? projectName,
+      String category, List<Map<String, dynamic>> attendanceData) {
     double totalHoursForDate = 0;
 
     for (var attendance in attendanceData) {
       try {
-        DateTime attendanceDate = DateFormat('yyyy-MM-dd').parse(attendance['date']);
+        DateTime attendanceDate =
+            DateFormat('yyyy-MM-dd').parse(attendance['date']);
 
         if (attendanceDate.year == date.year &&
             attendanceDate.month == date.month &&
@@ -2324,14 +2488,13 @@ $selectedBioFirstName $selectedBioLastName
             if (!attendance['offDay']) {
               double hours = attendance['noOfHours'];
               totalHoursForDate += hours > 8 ? 8 : hours; // Cap at 8
-
             }
           } else {
             if (attendance['offDay'] &&
-                attendance['durationWorked']?.toLowerCase() == category.toLowerCase()) {
+                attendance['durationWorked']?.toLowerCase() ==
+                    category.toLowerCase()) {
               double hours = attendance['noOfHours'];
               totalHoursForDate += hours > 8 ? 8 : hours; // Cap at 8
-
             }
           }
         }
@@ -2342,36 +2505,33 @@ $selectedBioFirstName $selectedBioLastName
     return totalHoursForDate;
   }
 
-
-
-  Map<String, double> _calculateRowTotals1(List<String> rowData, List<DateTime> daysInRange) {
-
+  Map<String, double> _calculateRowTotals1(
+      List<String> rowData, List<DateTime> daysInRange) {
     double rowTotal = 0;
     for (int i = 1; i <= daysInRange.length; i++) {
       rowTotal += double.tryParse(rowData[i]) ?? 0;
-
     }
     int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
-    double percentage = (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
-
-
+    double percentage =
+        (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
 
     return {
       'totalHours': rowTotal.roundToDouble(),
       'percentage': percentage.roundToDouble(),
     };
-
   }
 
-  Map<String, double> _calculateRowTotals(List<String> rowData, List<DateTime> daysInRange) { // Correct type here
+  Map<String, double> _calculateRowTotals(
+      List<String> rowData, List<DateTime> daysInRange) {
+    // Correct type here
     double rowTotal = 0;
     for (int i = 1; i <= daysInRange.length; i++) {
       rowTotal += double.tryParse(rowData[i]) ?? 0;
     }
 
     int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
-    double percentage = (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
-
+    double percentage =
+        (workingDays * 8) != 0 ? (rowTotal / (workingDays * 8)) * 100 : 0;
 
     return {
       'totalHours': rowTotal,
@@ -2379,13 +2539,11 @@ $selectedBioFirstName $selectedBioLastName
     };
   }
 
-
-
-
   Future<Uint8List?> networkImageToByte(String imageUrl) async {
     log("networkImageToByte called for URL: $imageUrl");
 
-    if (imageUrl.isEmpty) { // Explicit null/empty check at start
+    if (imageUrl.isEmpty) {
+      // Explicit null/empty check at start
       log("networkImageToByte received NULL or empty URL. Returning null.");
       return null;
     }
@@ -2398,7 +2556,8 @@ $selectedBioFirstName $selectedBioLastName
 
       log("Response status code for URL: $imageUrl is ${response.statusCode}"); // Print status code
 
-      if (response.statusCode == 200) { // Check for 200 OK explicitly
+      if (response.statusCode == 200) {
+        // Check for 200 OK explicitly
         log("Response type for URL: $imageUrl is ${response.data.runtimeType}");
 
         if (response.data is List<int>) {
@@ -2419,30 +2578,49 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-  Future<List<pw.Widget>> _buildSignatureColumns(Map<String, String> supervisorData) async {
-    final staffSig = (supervisorData['staffSignature'] != null && supervisorData['staffSignature']!.isNotEmpty) ? await networkImageToByte(supervisorData['staffSignature']!) : null;
-    final coordSig = (supervisorData['projectCoordinatorSignature'] != null && supervisorData['projectCoordinatorSignature']!.isNotEmpty) ? await networkImageToByte(supervisorData['projectCoordinatorSignature']!) : null;
-    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null && supervisorData['caritasSupervisorSignature']!.isNotEmpty) ? await networkImageToByte(supervisorData['caritasSupervisorSignature']!) : null;
+  Future<List<pw.Widget>> _buildSignatureColumns(
+      Map<String, String> supervisorData) async {
+    final staffSig = (supervisorData['staffSignature'] != null &&
+            supervisorData['staffSignature']!.isNotEmpty)
+        ? await networkImageToByte(supervisorData['staffSignature']!)
+        : null;
+    final coordSig = (supervisorData['projectCoordinatorSignature'] != null &&
+            supervisorData['projectCoordinatorSignature']!.isNotEmpty)
+        ? await networkImageToByte(
+            supervisorData['projectCoordinatorSignature']!)
+        : null;
+    final caritasSig = (supervisorData['caritasSupervisorSignature'] != null &&
+            supervisorData['caritasSupervisorSignature']!.isNotEmpty)
+        ? await networkImageToByte(
+            supervisorData['caritasSupervisorSignature']!)
+        : null;
 
     final staffName = supervisorData['staffName']?.toUpperCase() ?? 'UNKNOWN';
-    final projectCoordinatorName = supervisorData['projectCoordinatorName']?.toUpperCase() ?? 'UNKNOWN';
-    final caritasSupervisorName = supervisorData['caritasSupervisorName']?.toUpperCase() ?? 'UNKNOWN';
+    final projectCoordinatorName =
+        supervisorData['projectCoordinatorName']?.toUpperCase() ?? 'UNKNOWN';
+    final caritasSupervisorName =
+        supervisorData['caritasSupervisorName']?.toUpperCase() ?? 'UNKNOWN';
 
-    final staffSignatureDate = supervisorData['staffSignatureDate'] ?? formattedDate;
-    final facilitySupervisorSignatureDate = supervisorData['facilitySupervisorSignatureDate'] ?? 'UNKNOWN';
-    final caritasSupervisorSignatureDate = supervisorData['caritasSupervisorSignatureDate'] ?? 'UNKNOWN';
-
+    final staffSignatureDate =
+        supervisorData['staffSignatureDate'] ?? formattedDate;
+    final facilitySupervisorSignatureDate =
+        supervisorData['facilitySupervisorSignatureDate'] ?? 'UNKNOWN';
+    final caritasSupervisorSignatureDate =
+        supervisorData['caritasSupervisorSignatureDate'] ?? 'UNKNOWN';
 
     return [
-      _buildSingleSignatureColumn('Name of Staff', staffName, staffSig, staffSignatureDate),
-      _buildSingleSignatureColumn('Name of Project Coordinator', projectCoordinatorName, coordSig,facilitySupervisorSignatureDate ),
-      _buildSingleSignatureColumn('Name of Caritas Supervisor', caritasSupervisorName, caritasSig,caritasSupervisorSignatureDate),
+      _buildSingleSignatureColumn(
+          'Name of Staff', staffName, staffSig, staffSignatureDate),
+      _buildSingleSignatureColumn('Name of Project Coordinator',
+          projectCoordinatorName, coordSig, facilitySupervisorSignatureDate),
+      _buildSingleSignatureColumn('Name of Caritas Supervisor',
+          caritasSupervisorName, caritasSig, caritasSupervisorSignatureDate),
     ];
   }
 
-
-  pw.Widget _buildSingleSignatureColumn(String title, String name, Uint8List? imageBytes, String date) {
-    return  pw.Column(
+  pw.Widget _buildSingleSignatureColumn(
+      String title, String name, Uint8List? imageBytes, String date) {
+    return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -2456,7 +2634,9 @@ $selectedBioFirstName $selectedBioLastName
             border: pw.Border.all(),
           ),
           child: pw.Center(
-            child: imageBytes != null ? pw.Image(pw.MemoryImage(imageBytes)) : pw.Text("Signature"),
+            child: imageBytes != null
+                ? pw.Image(pw.MemoryImage(imageBytes))
+                : pw.Text("Signature"),
           ),
         ),
         pw.SizedBox(height: 10),
@@ -2465,32 +2645,31 @@ $selectedBioFirstName $selectedBioLastName
     );
   }
 
-
-  pw.Widget _buildSignatureSection(pw.Context context, List<pw.Widget> signatureColumns) {
+  pw.Widget _buildSignatureSection(
+      pw.Context context, List<pw.Widget> signatureColumns) {
     return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('Signature & Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Signature & Date',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
           pw.Divider(),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: signatureColumns,
-
           ),
-        ]
-    );
+        ]);
   }
-
-
-
 
   // Helper function to generate the list of days from the 19th of the previous month to the 20th of the current month.
   List<DateTime> getDaysInRange(DateTime timesheetDate) {
-    DateTime startDate = DateTime(timesheetDate.year, timesheetDate.month - 1, 19);
+    DateTime startDate =
+        DateTime(timesheetDate.year, timesheetDate.month - 1, 19);
     DateTime endDate = DateTime(timesheetDate.year, timesheetDate.month, 20);
 
     List<DateTime> days = [];
-    for (DateTime date = startDate; date.isBefore(endDate); date = date.add(const Duration(days: 1))) {
+    for (DateTime date = startDate;
+        date.isBefore(endDate);
+        date = date.add(const Duration(days: 1))) {
       days.add(date);
     }
     return days;
@@ -2519,10 +2698,11 @@ $selectedBioFirstName $selectedBioLastName
     return null;
   }
 
-
-  Future<void> _rejectTimesheet() async { // Removed parameters, as they can be accessed from the widget
+  Future<void> _rejectTimesheet() async {
+    // Removed parameters, as they can be accessed from the widget
     final String staffId = widget.timesheetData['staffId'];
-    final String selectedBioStaffCategory = selectedBioStaffCategory2 ?? ""; // Use the logged-in supervisor's category
+    final String selectedBioStaffCategory = selectedBioStaffCategory2 ??
+        ""; // Use the logged-in supervisor's category
 
     // Use the helper to get the CORRECT document ID
     final String timesheetDocId = _getTimesheetDocId(widget.timesheetData);
@@ -2536,7 +2716,8 @@ $selectedBioFirstName $selectedBioLastName
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Return Timesheet'),
-          content: Form( // Wrap with a Form
+          content: Form(
+            // Wrap with a Form
             key: formKey,
             child: TextFormField(
               onChanged: (value) {
@@ -2568,9 +2749,16 @@ $selectedBioFirstName $selectedBioLastName
                   try {
                     Map<String, dynamic> updateData = {};
                     if (selectedBioStaffCategory == "Facility Supervisor") {
-                      updateData = {'facilitySupervisorSignatureStatus': 'Rejected', 'facilitySupervisorRejectionReason': rejectionReason};
-                    } else { // Assumes CARITAS or other state staff
-                      updateData = {'caritasSupervisorSignatureStatus': 'Rejected', 'caritasSupervisorRejectionReason': rejectionReason};
+                      updateData = {
+                        'facilitySupervisorSignatureStatus': 'Rejected',
+                        'facilitySupervisorRejectionReason': rejectionReason
+                      };
+                    } else {
+                      // Assumes CARITAS or other state staff
+                      updateData = {
+                        'caritasSupervisorSignatureStatus': 'Rejected',
+                        'caritasSupervisorRejectionReason': rejectionReason
+                      };
                     }
 
                     await FirebaseFirestore.instance
@@ -2588,10 +2776,10 @@ $selectedBioFirstName $selectedBioLastName
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const PendingFacilitySupervisorApprovalsPage(),
+                        builder: (context) =>
+                            const PendingFacilitySupervisorApprovalsPage(),
                       ),
                     ).then((_) => _fetchPendingApprovals());
-
                   } catch (e) {
                     print('Error rejecting timesheet: $e');
                     Fluttertoast.showToast(msg: 'Error rejecting timesheet');
@@ -2609,8 +2797,13 @@ $selectedBioFirstName $selectedBioLastName
 // New method to display task summary with loading indicator in an expandable widget
   Widget _buildTaskSummaryDisplay() {
     return ExpansionTile(
-      title: Text('Task Summary - Click To Show Task Summary', style: TextStyle(
-        fontWeight: FontWeight.bold, fontSize: 22 * fontSizeFactor,),),
+      title: Text(
+        'Task Summary - Click To Show Task Summary',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 22 * fontSizeFactor,
+        ),
+      ),
       children: <Widget>[
         FutureBuilder<List<Widget>>(
           future: _taskSummaryFuture, // Use the stored Future here
@@ -2618,7 +2811,8 @@ $selectedBioFirstName $selectedBioLastName
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              return Center(child: Text("Error loading task summary: ${snapshot.error}"));
+              return Center(
+                  child: Text("Error loading task summary: ${snapshot.error}"));
             } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
               return Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -2626,7 +2820,8 @@ $selectedBioFirstName $selectedBioLastName
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Divider(),
-                    ...snapshot.data!, // Display the fetched task summary content
+                    ...snapshot
+                        .data!, // Display the fetched task summary content
                   ],
                 ),
               );
@@ -2663,10 +2858,12 @@ $selectedBioFirstName $selectedBioLastName
     } else {
       print("No bio data found!");
     }
-    try{
-      facilitySupervisorSignature = widget.timesheetData['facilitySupervisorSignature'];
-      caritasSupervisorSignature = widget.timesheetData['caritasSupervisorSignature'];
-    }catch(e){
+    try {
+      facilitySupervisorSignature =
+          widget.timesheetData['facilitySupervisorSignature'];
+      caritasSupervisorSignature =
+          widget.timesheetData['caritasSupervisorSignature'];
+    } catch (e) {
       print("This is where the error is");
       log("This is where the error is");
     }
@@ -2674,38 +2871,43 @@ $selectedBioFirstName $selectedBioLastName
 
   Future<void> _loadBioData2() async {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-    final bioData = await _fetchBioDataFromFirestore(userId);
-    if (bioData != null) {
-      setState(() {
-        selectedBioFirstName2 = bioData['firstName'];
-        selectedBioLastName2 = bioData['lastName'];
-        selectedBioDepartment2 = bioData['department'];
-        selectedBioState2 = bioData['state'];
-        selectedBioDesignation2 = bioData['designation'];
-        selectedBioLocation2 = bioData['location'];
-        selectedBioStaffCategory2 = bioData['staffCategory'];
-        selectedSignatureLink2 = bioData['signatureLink'];
-        selectedBioEmail2 = bioData['emailAddress'];
-        selectedBioPhone2 = bioData['mobile'];
-        selectedFirebaseId2 = userId;
-      });
+    if (userId != null) {
+      final bioData = await _fetchBioDataFromFirestore(userId);
+      if (bioData != null) {
+        setState(() {
+          selectedBioFirstName2 = bioData['firstName'];
+          selectedBioLastName2 = bioData['lastName'];
+          selectedBioDepartment2 = bioData['department'];
+          selectedBioState2 = bioData['state'];
+          selectedBioDesignation2 = bioData['designation'];
+          selectedBioLocation2 = bioData['location'];
+          selectedBioStaffCategory2 = bioData['staffCategory'];
+          selectedSignatureLink2 = bioData['signatureLink'];
+          selectedBioEmail2 = bioData['emailAddress'];
+          selectedBioPhone2 = bioData['mobile'];
+          selectedFirebaseId2 = userId;
+        });
+      } else {
+        print("No bio data found!");
+      }
     } else {
-      print("No bio data found!");
+      print("User not logged in!");
     }
-    try{
-      facilitySupervisorSignature = widget.timesheetData['facilitySupervisorSignature'];
-      caritasSupervisorSignature = widget.timesheetData['caritasSupervisorSignature'];
-    }catch(e){
+    try {
+      facilitySupervisorSignature =
+          widget.timesheetData['facilitySupervisorSignature'];
+      caritasSupervisorSignature =
+          widget.timesheetData['caritasSupervisorSignature'];
+    } catch (e) {
       print("This is where the error is");
       log("This is where the error is");
     }
   }
 
-
   Future<void> _facilitySupervisorSignatureToFirestore() async {
     // ... (Facility Supervisor Signature to Firestore logic - update to Firestore directly) ...
-    final String monthYear = _getTimesheetDocId(widget.timesheetData); // CORRECT
+    final String monthYear =
+        _getTimesheetDocId(widget.timesheetData); // CORRECT
     if (selectedSignatureLink == null) {
       Fluttertoast.showToast(
         msg: "Cannot send timesheet without Project Coordinator Signature.",
@@ -2723,11 +2925,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -2736,7 +2940,7 @@ $selectedBioFirstName $selectedBioLastName
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
-  //  String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
+    //  String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
 
     try {
       QuerySnapshot snap = await FirebaseFirestore.instance
@@ -2746,10 +2950,10 @@ $selectedBioFirstName $selectedBioLastName
 
       Map<String, dynamic> timesheetData = {
         'facilitySupervisorSignature': selectedSignatureLink,
-        'facilitySupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-        'facilitySupervisorSignatureStatus':"Approved",
+        'facilitySupervisorSignatureDate':
+            DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+        'facilitySupervisorSignatureStatus': "Approved",
       };
-
 
       await FirebaseFirestore.instance
           .collection("Staff")
@@ -2789,22 +2993,22 @@ $selectedBioFirstName $selectedBioLastName
       return;
     }
 
-
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
       timesheetDate1 = DateTime.now(); // Fallback to current date on error
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
-
 
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
     String monthYear = DateFormat('MMMM_yyyy').format(timesheetDate1);
@@ -2817,8 +3021,9 @@ $selectedBioFirstName $selectedBioLastName
 
       Map<String, dynamic> timesheetData = {
         'caritasSupervisorSignature': selectedSignatureLink,
-        'caritasSupervisorSignatureDate':DateFormat('MMMM dd, yyyy').format(DateTime.now()),
-        'caritasSupervisorSignatureStatus':"Approved",
+        'caritasSupervisorSignatureDate':
+            DateFormat('MMMM dd, yyyy').format(DateTime.now()),
+        'caritasSupervisorSignatureStatus': "Approved",
       };
 
       await FirebaseFirestore.instance
@@ -2827,7 +3032,6 @@ $selectedBioFirstName $selectedBioLastName
           .collection("TimeSheets")
           .doc(monthYear)
           .set(timesheetData, SetOptions(merge: true));
-
 
       print('Timesheet signed by Caritas Supervisor and updated in Firestore');
       Fluttertoast.showToast(
@@ -2844,15 +3048,15 @@ $selectedBioFirstName $selectedBioLastName
     }
   }
 
-
   // Checks if a date falls on a weekend.
-  bool isWeekend(DateTime date) => date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+  bool isWeekend(DateTime date) =>
+      date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
 
   // Computes total hours worked for a specific category.
   double getCategoryHours(String category) {
     return (widget.timesheetData['timesheetEntries'] as List?)
-        ?.where((entry) => entry['status'] == category)
-        .fold(0.0, (sum, entry) => sum! + entry['noOfHours']) ??
+            ?.where((entry) => entry['status'] == category)
+            .fold(0.0, (sum, entry) => sum! + entry['noOfHours']) ??
         0.0;
   }
 
@@ -2866,15 +3070,15 @@ $selectedBioFirstName $selectedBioLastName
   // Computes the total hours across all categories.
   double calculateGrandTotalHours() {
     return (widget.timesheetData['timesheetEntries'] as List?)
-        ?.fold<double>(0.0, (sum, entry) => sum + entry['noOfHours']) ??
+            ?.fold<double>(0.0, (sum, entry) => sum + entry['noOfHours']) ??
         0.0;
   }
 
   // Calculates hours for a specific project.
   double calculateTotalHours(String projectName) {
     return (widget.timesheetData['timesheetEntries'] as List?)
-        ?.where((entry) => entry['status'] == projectName)
-        .fold<double>(0, (sum, entry) => sum + entry['noOfHours']) ??
+            ?.where((entry) => entry['status'] == projectName)
+            .fold<double>(0, (sum, entry) => sum + entry['noOfHours']) ??
         0.0;
   }
 
@@ -2889,11 +3093,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = DateFormat('MMMM dd, yyyy').parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -2901,17 +3107,14 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     //final daysInRange = getDaysInRange(timesheetDate1);
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange = initializeDateRange(int.parse(month), int.parse(year)).cast<DateTime>();
+    final daysInRange =
+        initializeDateRange(int.parse(month), int.parse(year)).cast<DateTime>();
 
-
-    int workingDays = daysInRange
-        .where((date) => !isWeekend(date))
-        .length;
+    int workingDays = daysInRange.where((date) => !isWeekend(date)).length;
     double cappedTotalHours = calculateTotalHours1(); // Use capped total hours
     return (workingDays * 8) > 0
         ? (cappedTotalHours / (workingDays * 8)) * 100
@@ -2922,12 +3125,16 @@ $selectedBioFirstName $selectedBioLastName
   Widget buildTableHeader(List<DateTime> daysInRange) {
     return Row(
       children: [
-        _buildTableCell('Project Name', Colors.blue.shade100, fontWeight: FontWeight.bold),
-        ...daysInRange.map((date) => _buildTableCell(DateFormat('dd MMM').format(date),
+        _buildTableCell('Project Name', Colors.blue.shade100,
+            fontWeight: FontWeight.bold),
+        ...daysInRange.map((date) => _buildTableCell(
+            DateFormat('dd MMM').format(date),
             isWeekend(date) ? Colors.grey.shade300 : Colors.blue.shade100,
             fontWeight: FontWeight.bold)),
-        _buildTableCell('Total Hours', Colors.blue.shade100, fontWeight: FontWeight.bold),
-        _buildTableCell('Percentage', Colors.blue.shade100, fontWeight: FontWeight.bold),
+        _buildTableCell('Total Hours', Colors.blue.shade100,
+            fontWeight: FontWeight.bold),
+        _buildTableCell('Percentage', Colors.blue.shade100,
+            fontWeight: FontWeight.bold),
       ],
     );
   }
@@ -2939,17 +3146,20 @@ $selectedBioFirstName $selectedBioLastName
     return Row(
       children: [
         _buildTableCell(projectName, Colors.white),
-        ...daysInRange.map((date) => _buildTableCell(getHoursForDate(date, projectName, projectName),
+        ...daysInRange.map((date) => _buildTableCell(
+            getHoursForDate(date, projectName, projectName),
             isWeekend(date) ? Colors.grey.shade300 : Colors.white)),
-        _buildTableCell('$totalHours hrs', Colors.white, color: Colors.green, fontWeight: FontWeight.bold),
-        _buildTableCell('${percentageWorked.toStringAsFixed(2)}%', Colors.white, color: Colors.green, fontWeight: FontWeight.bold),
+        _buildTableCell('$totalHours hrs', Colors.white,
+            color: Colors.green, fontWeight: FontWeight.bold),
+        _buildTableCell('${percentageWorked.toStringAsFixed(2)}%', Colors.white,
+            color: Colors.green, fontWeight: FontWeight.bold),
       ],
     );
   }
 
-
   // Helper function to build a table cell.
-  Widget _buildTableCell(String text, Color? backgroundColor, {Color? color, FontWeight? fontWeight}) {
+  Widget _buildTableCell(String text, Color? backgroundColor,
+      {Color? color, FontWeight? fontWeight}) {
     return Container(
       width: 100,
       alignment: Alignment.center,
@@ -2962,8 +3172,16 @@ $selectedBioFirstName $selectedBioLastName
   // Builds rows for each category with their hours and percentage.
   Widget buildCategoryRows(String projectName, List<DateTime> daysInRange) {
     final categories = [
-      'Absent', 'Annual leave', 'Holiday', 'Other Leaves', 'Security Crisis',
-      'Sick leave', 'Remote working', 'Sit at home', 'Trainings', 'Travel'
+      'Absent',
+      'Annual leave',
+      'Holiday',
+      'Other Leaves',
+      'Security Crisis',
+      'Sick leave',
+      'Remote working',
+      'Sit at home',
+      'Trainings',
+      'Travel'
     ];
     return Column(
       children: categories.map((category) {
@@ -2972,25 +3190,32 @@ $selectedBioFirstName $selectedBioLastName
 
         return Row(
           children: [
-            _buildTableCell(category, Colors.white, fontWeight: FontWeight.bold),
-            ...daysInRange.map((date) => _buildTableCell(getHoursForDate(date, projectName, category),
+            _buildTableCell(category, Colors.white,
+                fontWeight: FontWeight.bold),
+            ...daysInRange.map((date) => _buildTableCell(
+                getHoursForDate(date, projectName, category),
                 isWeekend(date) ? Colors.grey.shade300 : Colors.white)),
-            _buildTableCell('${categoryHours.toStringAsFixed(2)} hrs', Colors.white, color: Colors.green, fontWeight: FontWeight.bold),
-            _buildTableCell('${categoryPercentage.toStringAsFixed(2)}%', Colors.white, color: Colors.green, fontWeight: FontWeight.bold),
+            _buildTableCell(
+                '${categoryHours.toStringAsFixed(2)} hrs', Colors.white,
+                color: Colors.green, fontWeight: FontWeight.bold),
+            _buildTableCell(
+                '${categoryPercentage.toStringAsFixed(2)}%', Colors.white,
+                color: Colors.green, fontWeight: FontWeight.bold),
           ],
         );
       }).toList(),
     );
   }
 
-  String _getDurationForDate(DateTime date, String? projectName, String category, List<Map<String, dynamic>> attendanceData) {
+  String _getDurationForDate(DateTime date, String? projectName,
+      String category, List<Map<String, dynamic>> attendanceData) {
     double totalHoursForDate = 0;
     print("attendanceData === $attendanceData");
 
     for (var attendance in attendanceData) {
       try {
         // Access the 'date' key from the map.
-        String dateString = attendance['date'] as String;  // Type cast to String
+        String dateString = attendance['date'] as String; // Type cast to String
         print("dateString === $dateString");
 
         DateTime attendanceDate = DateFormat('yyyy-MM-dd').parse(dateString);
@@ -2999,8 +3224,11 @@ $selectedBioFirstName $selectedBioLastName
             attendanceDate.month == date.month &&
             attendanceDate.day == date.day) {
           if (category == projectName) {
-            if (!attendance['offDay']) {  // Access 'offDay' from the map
-              totalHoursForDate += attendance['noOfHours'] > 8.0 ? 8.0:attendance['noOfHours']  as double; // Access 'noOfHours'
+            if (!attendance['offDay']) {
+              // Access 'offDay' from the map
+              totalHoursForDate += attendance['noOfHours'] > 8.0
+                  ? 8.0
+                  : attendance['noOfHours'] as double; // Access 'noOfHours'
             }
 
             // if (attendance['offDay'] == null ) {  // Access 'offDay' from the map
@@ -3008,13 +3236,17 @@ $selectedBioFirstName $selectedBioLastName
             // }
           } else {
             if (attendance['offDay'] as bool &&
-                (attendance['durationWorked'] as String?)?.toLowerCase() == category.toLowerCase()) {
-              totalHoursForDate += attendance['noOfHours'] > 8.0 ? 8.0:attendance['noOfHours']  as double;
+                (attendance['durationWorked'] as String?)?.toLowerCase() ==
+                    category.toLowerCase()) {
+              totalHoursForDate += attendance['noOfHours'] > 8.0
+                  ? 8.0
+                  : attendance['noOfHours'] as double;
             }
           }
         }
       } catch (e) {
-        print("Error processing attendance data: $e"); // More general error message
+        print(
+            "Error processing attendance data: $e"); // More general error message
       }
     }
     return totalHoursForDate.toStringAsFixed(2);
@@ -3022,13 +3254,17 @@ $selectedBioFirstName $selectedBioLastName
 
   List initializeDateRange(int month, int year) {
     DateTime selectedMonthDate = DateTime(year, month, 1);
-    var startDate = DateTime(selectedMonthDate.year, selectedMonthDate.month - 1, 20); //Start from the 19th of previous month
-    var endDate = DateTime(selectedMonthDate.year, selectedMonthDate.month, 19);    //End on the 20th of current month
-
+    var startDate = DateTime(
+        selectedMonthDate.year,
+        selectedMonthDate.month - 1,
+        20); //Start from the 19th of previous month
+    var endDate = DateTime(selectedMonthDate.year, selectedMonthDate.month,
+        19); //End on the 20th of current month
 
     var daysInRange1 = [];
     DateTime currentDate = startDate;
-    while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
+    while (currentDate.isBefore(endDate) ||
+        currentDate.isAtSameMomentAs(endDate)) {
       daysInRange1.add(currentDate);
       currentDate = currentDate.add(const Duration(days: 1));
     }
@@ -3049,12 +3285,13 @@ $selectedBioFirstName $selectedBioLastName
       Uint8List imageBytes = await image.readAsBytes();
 
       setState(() {
-        selectedSignatureLink = null; // Clear the old link, force reload from memory
+        selectedSignatureLink =
+            null; // Clear the old link, force reload from memory
         staffSignature1 = imageBytes;
-        checkSignatureImage = [imageBytes]; // Directly update checkSignatureImage
+        checkSignatureImage = [
+          imageBytes
+        ]; // Directly update checkSignatureImage
       });
-
-
     } catch (e) {
       Fluttertoast.showToast(
           msg: "Error:${e.toString()}",
@@ -3066,8 +3303,6 @@ $selectedBioFirstName $selectedBioLastName
           fontSize: 16.0);
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -3105,7 +3340,8 @@ $selectedBioFirstName $selectedBioLastName
       iconSizeFactor = 1.2;
       tableFontSizeFactor = 1.1;
       dropdownFontSizeFactor = 1.1;
-    } else { // isLargeDesktop
+    } else {
+      // isLargeDesktop
       appBarHeightFactor = 1.4;
       titleFontSizeFactor = 2.0;
       fontSizeFactor = 1.2;
@@ -3120,11 +3356,13 @@ $selectedBioFirstName $selectedBioLastName
     DateTime? timesheetDate; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate = dateFormat.parse(dateString);
       } else {
         timesheetDate = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -3132,15 +3370,16 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate ??= DateTime.now(); // Ensure not null after try-catch
 
-
     DateTime? timesheetDate1; // Make it nullable
     try {
       final dateString = widget.timesheetData['date'];
-      if (dateString != null && dateString is String) { // Null and type check
+      if (dateString != null && dateString is String) {
+        // Null and type check
         timesheetDate1 = dateFormat.parse(dateString);
       } else {
         timesheetDate1 = DateTime.now(); // Default if null or not string
-        print("Warning: Timesheet date is null or not a string, using current date as default.");
+        print(
+            "Warning: Timesheet date is null or not a string, using current date as default.");
       }
     } catch (e) {
       print("Error parsing date: $e, using current date as default.");
@@ -3148,13 +3387,14 @@ $selectedBioFirstName $selectedBioLastName
     }
     timesheetDate1 ??= DateTime.now(); // Ensure not null after try-catch
 
-
     final daysInRange = getDaysInRange(timesheetDate);
     final staffName = widget.timesheetData['staffName'] ?? 'N/A';
     final staffId = widget.timesheetData['staffId'] ?? 'N/A';
     final projectName = widget.timesheetData['projectName'] ?? 'N/A';
-    final facilitySupervisorName = widget.timesheetData['facilitySupervisor'] ?? 'N/A';
-    final caritasSupervisorName = widget.timesheetData['caritasSupervisor'] ?? 'N/A';
+    final facilitySupervisorName =
+        widget.timesheetData['facilitySupervisor'] ?? 'N/A';
+    final caritasSupervisorName =
+        widget.timesheetData['caritasSupervisor'] ?? 'N/A';
     final timeSheetDate = widget.timesheetData['staffSignatureDate'] ?? 'N/A';
     final department = widget.timesheetData['department'] ?? 'N/A';
     final designation = widget.timesheetData['designation'] ?? 'N/A';
@@ -3169,33 +3409,23 @@ $selectedBioFirstName $selectedBioLastName
 
     final month = DateFormat('MM').format(timesheetDate1);
     final year = DateFormat('yyyy').format(timesheetDate1);
-    final daysInRange2 = initializeDateRange(int.parse(month),int.parse(year));
-
-
-
+    final daysInRange2 = initializeDateRange(int.parse(month), int.parse(year));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Timesheet Details'),
         actions: [
-
           _isPDFLoading
               ? const CircularProgressIndicator()
-              : Row(
-              children:[
-
-                IconButton(
-                  icon: const Icon(Icons.save_alt),
-                  tooltip: 'Download PDF',
-                  onPressed: _createAndExportPDF,
-                ),
-                const Icon(Icons.picture_as_pdf),
-
-              ]
-          ),
-
+              : Row(children: [
+                  IconButton(
+                    icon: const Icon(Icons.save_alt),
+                    tooltip: 'Download PDF',
+                    onPressed: _createAndExportPDF,
+                  ),
+                  const Icon(Icons.picture_as_pdf),
+                ]),
           const SizedBox(width: 15),
-
           Container(
             margin: const EdgeInsets.only(top: 15, right: 15, bottom: 15),
             child: Image.asset("assets/image/ccfn_logo.png"),
@@ -3203,1276 +3433,1769 @@ $selectedBioFirstName $selectedBioLastName
         ],
       ),
       body: SingleChildScrollView(
-
-        child: Column(
-            children:[
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  //mainAxisAlignment:MainAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            checkColor: Colors.black,
-                            // hoverColor: Colors.white,
-                            // activeColor: Colors.white,
-                            // focusColor: Colors.white,
-                            //overlayColor:  Colors.white,
-                            value: _includeTaskSummary,
-                            onChanged: (bool? newValue) {
-                              setState(() {
-                                _includeTaskSummary = newValue ?? false;
-                              });
-                            },
-                          ),
-                          const Text('Include Task Summary in Timesheet PDF', style: TextStyle(color: Colors.black, fontSize: 12)),
-                        ],
-                      ),
-                      Image(
-                        image: const AssetImage("./assets/image/ccfn_logo.png"),
-                        width: MediaQuery
-                            .of(context)
-                            .size
-                            .width * (MediaQuery
-                            .of(context)
-                            .size
-                            .shortestSide < 600 ? 0.15 : 0.10),
-                        //height: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.050 : 0.30),
-                      ),
-                      Text('Name: $staffName',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
-                      SizedBox(height: 5 * marginFactor),
-                      Text('Department: $department',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
-                      SizedBox(height: 5 * marginFactor),
-                      Text('Designation: $designation',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
-                      SizedBox(height: 5 * marginFactor),
-                      Text('Location: $location', style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
-                      SizedBox(height: 5 * marginFactor),
-                      Text('State: $state', style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16 * fontSizeFactor,),),
-                      SizedBox(height: 10 * marginFactor),
-                      // Add some spacing
-                    ]
-                ),),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Month of Timesheet:',
-                      style: TextStyle(fontWeight: FontWeight.bold,fontSize:12),
-                    ),
-                    const SizedBox(width: 10),
-
-                    Text(
-                      displayMonthYear, // Use the new state variable
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-
-                  ],
-                ),
-              ),
-              const Divider(),
-              // ==========================================================
-              // === PASTE THE NEW SCROLL CONTROLS WIDGET HERE          ===
-              // ==========================================================
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+                //mainAxisAlignment:MainAxisAlignment.start,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios),
-                    tooltip: 'Scroll Left',
-                    onPressed: () {
-                      _horizontalScrollController.animateTo(
-                        _horizontalScrollController.offset - 200,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
+                  Row(
+                    children: [
+                      Checkbox(
+                        checkColor: Colors.black,
+                        // hoverColor: Colors.white,
+                        // activeColor: Colors.white,
+                        // focusColor: Colors.white,
+                        //overlayColor:  Colors.white,
+                        value: _includeTaskSummary,
+                        onChanged: (bool? newValue) {
+                          setState(() {
+                            _includeTaskSummary = newValue ?? false;
+                          });
+                        },
+                      ),
+                      const Text('Include Task Summary in Timesheet PDF',
+                          style: TextStyle(color: Colors.black, fontSize: 12)),
+                    ],
                   ),
-                  const SizedBox(width: 20),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward_ios),
-                    tooltip: 'Scroll Right',
-                    onPressed: () {
-                      _horizontalScrollController.animateTo(
-                        _horizontalScrollController.offset + 200,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
+                  Image(
+                    image: const AssetImage("./assets/image/ccfn_logo.png"),
+                    width: MediaQuery.of(context).size.width *
+                        (MediaQuery.of(context).size.shortestSide < 600
+                            ? 0.15
+                            : 0.10),
+                    //height: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.050 : 0.30),
                   ),
-                ],
+                  Text(
+                    'Name: $staffName',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16 * fontSizeFactor,
+                    ),
+                  ),
+                  SizedBox(height: 5 * marginFactor),
+                  Text(
+                    'Department: $department',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16 * fontSizeFactor,
+                    ),
+                  ),
+                  SizedBox(height: 5 * marginFactor),
+                  Text(
+                    'Designation: $designation',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16 * fontSizeFactor,
+                    ),
+                  ),
+                  SizedBox(height: 5 * marginFactor),
+                  Text(
+                    'Location: $location',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16 * fontSizeFactor,
+                    ),
+                  ),
+                  SizedBox(height: 5 * marginFactor),
+                  Text(
+                    'State: $state',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16 * fontSizeFactor,
+                    ),
+                  ),
+                  SizedBox(height: 10 * marginFactor),
+                  // Add some spacing
+                ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                const Text(
+                  'Month of Timesheet:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  displayMonthYear, // Use the new state variable
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          // ==========================================================
+          // === PASTE THE NEW SCROLL CONTROLS WIDGET HERE          ===
+          // ==========================================================
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                tooltip: 'Scroll Left',
+                onPressed: () {
+                  _horizontalScrollController.animateTo(
+                    _horizontalScrollController.offset - 200,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
               ),
-              // ==========================================================
-              // === END OF NEW WIDGET                                  ===
-              // ==========================================================
-              // Attendance Sheet in a Container with 50% screen height
-              Container(
-
-                  child: Row(
-                      mainAxisSize: MainAxisSize.min, // Or MainAxisSize.max depending on layout needs
-                      children:[
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios),
-                          onPressed: () {
-                            _horizontalScrollController.animateTo(
-                              _horizontalScrollController.offset - 200, // Adjust scroll amount
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          },
-                        ),
-
-                        Expanded(
-                            child:RepaintBoundary(
-                                key: _globalKey,
-                                child: Column(
-                                    children: [
-                                      SingleChildScrollView(
-                                        controller: _horizontalScrollController,
-                                        scrollDirection: Axis.horizontal,
-                                        physics: const BouncingScrollPhysics(), // Smooth scrolling effect
-                                        padding: EdgeInsets.symmetric(horizontal: 10 * paddingFactor),
-                                        dragStartBehavior: DragStartBehavior.start,
-                                        clipBehavior: Clip.hardEdge,
-                                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 20),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward_ios),
+                tooltip: 'Scroll Right',
+                onPressed: () {
+                  _horizontalScrollController.animateTo(
+                    _horizontalScrollController.offset + 200,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              ),
+            ],
+          ),
+          // ==========================================================
+          // === END OF NEW WIDGET                                  ===
+          // ==========================================================
+          // Attendance Sheet in a Container with 50% screen height
+          Container(
+              child: Row(
+                  mainAxisSize: MainAxisSize
+                      .min, // Or MainAxisSize.max depending on layout needs
+                  children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () {
+                    _horizontalScrollController.animateTo(
+                      _horizontalScrollController.offset -
+                          200, // Adjust scroll amount
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                ),
+                Expanded(
+                    child: RepaintBoundary(
+                        key: _globalKey,
+                        child: Column(children: [
+                          SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            physics:
+                                const BouncingScrollPhysics(), // Smooth scrolling effect
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 10 * paddingFactor),
+                            dragStartBehavior: DragStartBehavior.start,
+                            clipBehavior: Clip.hardEdge,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Column(
+                                  children: [
+                                    Column(
+                                      children: [
+                                        // Header Row (This part remains the same)
+                                        Row(
                                           children: [
-                                            Column(
-                                              children: [
+                                            Container(
+                                              width: 150,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.blue.shade100,
+                                              child: const Text('Project Name',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                            ),
+                                            ...daysInRange2.map((date) {
+                                              return Container(
+                                                width: 50,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: isWeekend(date)
+                                                    ? Colors.grey.shade300
+                                                    : Colors.blue.shade100,
+                                                child: Text(
+                                                    DateFormat('dd MMM')
+                                                        .format(date),
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                              );
+                                            }),
+                                            Container(
+                                              width: 100,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.blue.shade100,
+                                              child: const Text('Total Hours',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                            ),
+                                            Container(
+                                              width: 100,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.blue.shade100,
+                                              child: const Text('Percentage',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
 
+                                        // UPDATED Project Row - uses the new cell builder
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 150,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.white,
+                                              child: Text(projectName),
+                                            ),
+                                            ...daysInRange2.map((date) =>
+                                                _buildTimesheetCell(date,
+                                                    projectName, projectName)),
+                                            Container(
+                                              width: 100,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.white,
+                                              child: Text(
+                                                "${calculateTotalHours1().round()} hrs",
+                                                style: const TextStyle(
+                                                    color: Colors.green,
+                                                    fontWeight:
+                                                        FontWeight.bold),
+                                              ),
+                                            ),
+                                            Container(
+                                              width: 100,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.white,
+                                              child: Text(
+                                                '${calculatePercentageWorked1().round()}%',
+                                                style: const TextStyle(
+                                                    color: Colors.green,
+                                                    fontWeight:
+                                                        FontWeight.bold),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(),
 
-                                                Column(
-                                                  children: [
-                                                    // Header Row (This part remains the same)
-                                                    Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 150,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text('Project Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                        ),
-                                                        ...daysInRange2.map((date) {
-                                                          return Container(
-                                                            width: 50,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: isWeekend(date) ? Colors.grey.shade300 : Colors.blue.shade100,
-                                                            child: Text(DateFormat('dd MMM').format(date), style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                          );
-                                                        }),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text('Total Hours', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                        ),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.blue.shade100,
-                                                          child: const Text('Percentage', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const Divider(),
+                                        // "Out-of-office" Header Row (This part remains the same)
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 150,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.all(8.0),
+                                              color: Colors.white,
+                                              child: const Text('Out-of-office',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 18)),
+                                            ),
+                                            ...List.generate(
+                                                daysInRange2.length + 2,
+                                                (index) => Container(
+                                                    width: index <
+                                                            daysInRange2.length
+                                                        ? 50
+                                                        : 100,
+                                                    color: Colors.white)),
+                                          ],
+                                        ),
 
-                                                    // UPDATED Project Row - uses the new cell builder
-                                                    Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 150,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.white,
-                                                          child: Text(projectName),
-                                                        ),
-                                                        ...daysInRange2.map((date) => _buildTimesheetCell(date, projectName, projectName)),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.white,
-                                                          child: Text(
-                                                            "${calculateTotalHours1().round()} hrs",
-                                                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width: 100,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.white,
-                                                          child: Text(
-                                                            '${calculatePercentageWorked1().round()}%',
-                                                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const Divider(),
-
-                                                    // "Out-of-office" Header Row (This part remains the same)
-                                                    Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 150,
-                                                          alignment: Alignment.center,
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          color: Colors.white,
-                                                          child: const Text('Out-of-office', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                                                        ),
-                                                        ...List.generate(daysInRange2.length + 2, (index) => Container(width: index < daysInRange2.length ? 50 : 100, color: Colors.white)),
-                                                      ],
-                                                    ),
-
-                                                    // UPDATED Rows for out-of-office categories - also use the new cell builder
-                                                    ...['Annual leave', 'Holiday', 'Maternity'].map((category) {
-                                                      return Row(
-                                                        children: [
-                                                          Container(
-                                                            width: 150,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text(category, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                          ),
-                                                          ...daysInRange2.map((date) => _buildTimesheetCell(date, category, projectName)),
-                                                          Container(
-                                                            width: 100,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text(
-                                                              "${calculateCategoryHours1(category).round()} hrs",
-                                                              style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ),
-                                                          Container(
-                                                            width: 100,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text(
-                                                              '${calculateCategoryPercentage(category).round()}%',
-                                                              style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      );
-                                                    }),
-
-                                                    // Total Row (This part remains the same)
-                                                    Row(
-                                                      children: [
-                                                        Container(
-                                                            width: 150,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20))),
-                                                        ...List.generate(daysInRange2.length, (_) => Container(width: 50, color: Colors.white)),
-                                                        Container(
-                                                            width: 100,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text("${calculateGrandTotalHours1().toStringAsFixed(0)} hrs", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
-                                                        Container(
-                                                            width: 100,
-                                                            alignment: Alignment.center,
-                                                            padding: const EdgeInsets.all(8.0),
-                                                            color: Colors.white,
-                                                            child: Text('${calculateGrandPercentageWorked().round()}%', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
-                                                      ],
-                                                    ),
-                                                  ],
+                                        // UPDATED Rows for out-of-office categories - also use the new cell builder
+                                        ...[
+                                          'Annual leave',
+                                          'Holiday',
+                                          'Maternity'
+                                        ].map((category) {
+                                          return Row(
+                                            children: [
+                                              Container(
+                                                width: 150,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: Text(category,
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                              ),
+                                              ...daysInRange2.map((date) =>
+                                                  _buildTimesheetCell(date,
+                                                      category, projectName)),
+                                              Container(
+                                                width: 100,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: Text(
+                                                  "${calculateCategoryHours1(category).round()} hrs",
+                                                  style: const TextStyle(
+                                                      color: Colors.green,
+                                                      fontWeight:
+                                                          FontWeight.bold),
                                                 ),
-                                                const Divider(),
-                                                // buildCategoryRows(projectName, daysInRange),
-                                                // Row(
-                                                //   children: [
-                                                //     _buildTableCell('Grand Total', Colors.grey, fontWeight: FontWeight.bold),
-                                                //     ...List.generate(daysInRange.length, (_) => SizedBox(width: 100)),
-                                                //     _buildTableCell('$grandTotalHours hrs', Colors.grey, fontWeight: FontWeight.bold),
-                                                //     _buildTableCell('100%', Colors.grey, fontWeight: FontWeight.bold),
-                                                //   ],
-                                                // ),
+                                              ),
+                                              Container(
+                                                width: 100,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: Text(
+                                                  '${calculateCategoryPercentage(category).round()}%',
+                                                  style: const TextStyle(
+                                                      color: Colors.green,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }),
 
-                                              ],
+                                        // Total Row (This part remains the same)
+                                        Row(
+                                          children: [
+                                            Container(
+                                                width: 150,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: const Text('Total',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 20))),
+                                            ...List.generate(
+                                                daysInRange2.length,
+                                                (_) => Container(
+                                                    width: 50,
+                                                    color: Colors.white)),
+                                            Container(
+                                                width: 100,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: Text(
+                                                    "${calculateGrandTotalHours1().toStringAsFixed(0)} hrs",
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight:
+                                                            FontWeight.bold))),
+                                            Container(
+                                                width: 100,
+                                                alignment: Alignment.center,
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                color: Colors.white,
+                                                child: Text(
+                                                    '${calculateGrandPercentageWorked().round()}%',
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight:
+                                                            FontWeight.bold))),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const Divider(),
+                                    // buildCategoryRows(projectName, daysInRange),
+                                    // Row(
+                                    //   children: [
+                                    //     _buildTableCell('Grand Total', Colors.grey, fontWeight: FontWeight.bold),
+                                    //     ...List.generate(daysInRange.length, (_) => SizedBox(width: 100)),
+                                    //     _buildTableCell('$grandTotalHours hrs', Colors.grey, fontWeight: FontWeight.bold),
+                                    //     _buildTableCell('100%', Colors.grey, fontWeight: FontWeight.bold),
+                                    //   ],
+                                    // ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const Divider(),
+                          _buildDeductionSummarySection(), // <-- ADD THIS LINE
+                          //Signature and Details
+
+                          // =========================
+                          // ===SECOND Widget
+                          Text(
+                            'Signature & Date',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 25 * fontSizeFactor,
+                            ),
+                          ),
+                          const Divider(),
+                          Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                //First -  Name Of STAFF
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    //Name of STAFF
+                                    Expanded(
+                                      // Wrap Container with Expanded
+                                      child: Container(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.40
+                                                    : 0.25),
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.all(8.0),
+                                        //color: Colors.white,
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment
+                                              .center, // Vertically center the content
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              'Name of Staff',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18 * fontSizeFactor,
+                                              ),
+                                            ),
+                                            SizedBox(height: 3 * marginFactor),
+                                            Text(
+                                              '${staffName.toUpperCase()}',
+                                              style: TextStyle(
+                                                fontSize: 14 * fontSizeFactor,
+                                                // fontWeight: FontWeight.bold,
+                                                fontFamily: "NexaLight",
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
-
-                                      const Divider(),
-                                      _buildDeductionSummarySection(), // <-- ADD THIS LINE
-                                      //Signature and Details
-
-                                      // =========================
-                                      // ===SECOND Widget
-                                      Text('Signature & Date', style: TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 25 * fontSizeFactor,),),
-                                      const Divider(),
-                                      Column(
-                                          mainAxisAlignment: MainAxisAlignment.start,
-                                          children: [
-                                            //First -  Name Of STAFF
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                //Name of STAFF
-                                                Expanded( // Wrap Container with Expanded
-                                                  child:Container(
-                                                    width: MediaQuery
-                                                        .of(context)
-                                                        .size
-                                                        .width * (MediaQuery
-                                                        .of(context)
-                                                        .size
-                                                        .shortestSide < 600 ? 0.40 : 0.25),
-                                                    alignment: Alignment.center,
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    //color: Colors.white,
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center, // Vertically center the content
-                                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                                      children: [
-                                                        Text('Name of Staff',
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),),
-                                                        SizedBox(height: 3 * marginFactor),
-
-                                                        Text(
-                                                          '${staffName.toUpperCase()}',
-                                                          style: TextStyle(
-                                                            fontSize: 14 * fontSizeFactor,
-                                                            // fontWeight: FontWeight.bold,
-                                                            fontFamily: "NexaLight",
-                                                          ),
-                                                        ),
-
-                                                      ],
-                                                    ),
-
-
-                                                  ),),
-                                                SizedBox(width: MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600 ? 0.001 : 0.009)),
-                                                // Signature of Staff
-                                                Container(
-                                                  width: MediaQuery
-                                                      .of(context)
+                                    ),
+                                    SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.001
+                                                    : 0.009)),
+                                    // Signature of Staff
+                                    Container(
+                                      width: MediaQuery.of(context).size.width *
+                                          (MediaQuery.of(context)
                                                       .size
-                                                      .width * (MediaQuery
-                                                      .of(context)
-                                                      .size
-                                                      .shortestSide < 600 ? 0.30 : 0.35),
-                                                  alignment: Alignment.center,
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  //  color: Colors.grey.shade200,
-                                                  child:
-                                                  Column(
-                                                    children: [
-                                                      Text('Signature', style: TextStyle(
-                                                        fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),),
-
-                                                      Container(
-                                                          margin: const EdgeInsets
-                                                              .only(
-                                                            top: 20,
-                                                            bottom: 24,
-                                                          ),
-                                                          height: MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .width *
-                                                              (MediaQuery
-                                                                  .of(context)
-                                                                  .size
-                                                                  .shortestSide <
-                                                                  600
-                                                                  ? 0.30
-                                                                  : 0.15),
-                                                          width: MediaQuery
-                                                              .of(context)
-                                                              .size
-                                                              .width *
-                                                              (MediaQuery
-                                                                  .of(context)
-                                                                  .size
-                                                                  .shortestSide <
-                                                                  600
-                                                                  ? 0.30
-                                                                  : 0.30),
-                                                          alignment: Alignment
-                                                              .center,
-                                                          decoration: BoxDecoration(
-                                                            borderRadius: BorderRadius
-                                                                .circular(20),
-                                                            //color: Colors.grey.shade300,
-                                                          ),
-                                                          child:  ClipRRect(
-                                                            borderRadius: BorderRadius.circular(12),
-                                                            child: Image.network( // Use Image.network to display from Firebase Storage
-                                                              staffSignature.toString(),
-                                                              fit: BoxFit.contain,
-                                                              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                                                                if (loadingProgress == null) return child;
-                                                                return Center(
-                                                                  child: CircularProgressIndicator(
-                                                                    value: loadingProgress.expectedTotalBytes != null
-                                                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                                        : null,
-                                                                  ),
-                                                                );
-                                                              },
-                                                            ),
-                                                          )
-                                                      ),
-
-
-                                                    ],
-                                                  ),
-
-                                                ),
-                                                SizedBox(width: MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600 ? 0.001 : 0.009)),
-                                                // Date of Signature of Staff
-
-                                                Container(
-                                                  width: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.20 : 0.30),
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('Date', style: TextStyle(
-                                                          fontWeight: FontWeight.bold, fontSize: 18 ),),
-                                                      SizedBox(height: 5 * marginFactor),
-                                                      Text("$timeSheetDate", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                                    ],
-                                                  ),
-                                                ),
-
-                                              ],
+                                                      .shortestSide <
+                                                  600
+                                              ? 0.30
+                                              : 0.35),
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.all(8.0),
+                                      //  color: Colors.grey.shade200,
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            'Signature',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18 * fontSizeFactor,
                                             ),
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.005 : 0.005)),
-                                            const Divider(),
-                                            //Second - Project Coordinator Section
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
+                                          ),
+                                          Container(
+                                              margin: const EdgeInsets.only(
+                                                top: 20,
+                                                bottom: 24,
+                                              ),
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  (MediaQuery.of(context)
+                                                              .size
+                                                              .shortestSide <
+                                                          600
+                                                      ? 0.30
+                                                      : 0.15),
+                                              width: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  (MediaQuery.of(context)
+                                                              .size
+                                                              .shortestSide <
+                                                          600
+                                                      ? 0.30
+                                                      : 0.30),
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                //color: Colors.grey.shade300,
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  // Use Image.network to display from Firebase Storage
+                                                  staffSignature.toString(),
+                                                  fit: BoxFit.contain,
+                                                  loadingBuilder:
+                                                      (BuildContext context,
+                                                          Widget child,
+                                                          ImageChunkEvent?
+                                                              loadingProgress) {
+                                                    if (loadingProgress == null)
+                                                      return child;
+                                                    return Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        value: loadingProgress
+                                                                    .expectedTotalBytes !=
+                                                                null
+                                                            ? loadingProgress
+                                                                    .cumulativeBytesLoaded /
+                                                                loadingProgress
+                                                                    .expectedTotalBytes!
+                                                            : null,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              )),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.001
+                                                    : 0.009)),
+                                    // Date of Signature of Staff
 
-                                                //Name of Project Cordinator
-                                                Expanded( // Wrap Container with Expanded
-                                                  child:
-                                                  Container(
-                                                    width: MediaQuery.of(context).size.width *
-                                                        (MediaQuery.of(context).size.shortestSide < 600 ? 0.40 : 0.25),
-                                                    alignment: Alignment.center,
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    //  color: Colors.grey.shade200,
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        // Email of Project Cordinator
-                                                        Text(
-                                                          'Name of Project Cordinator',
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
-                                                        ),
-                                                        SizedBox(height: 3 * marginFactor),
-                                                        Text(
-                                                          '${facilitySupervisorName.toUpperCase()}',
-                                                          style: TextStyle(
-                                                            fontSize: 14 * fontSizeFactor,
-                                                            // fontWeight: FontWeight.bold,
-                                                            fontFamily: "NexaLight",
-                                                          ),
-                                                        ),
-
-                                                      ],
-                                                    ),
-                                                  ),),
-
-
-                                                SizedBox(width: MediaQuery
-                                                    .of(context)
+                                    Container(
+                                      width: MediaQuery.of(context).size.width *
+                                          (MediaQuery.of(context)
+                                                      .size
+                                                      .shortestSide <
+                                                  600
+                                              ? 0.20
+                                              : 0.30),
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            'Date',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+                                          Text("$timeSheetDate",
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(
+                                    width: MediaQuery.of(context).size.width *
+                                        (MediaQuery.of(context)
                                                     .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600 ? 0.001 : 0.009)),
-                                                //Signature of Project Cordinator
-                                                // =======================================================================
+                                                    .shortestSide <
+                                                600
+                                            ? 0.005
+                                            : 0.005)),
+                                const Divider(),
+                                //Second - Project Coordinator Section
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    //Name of Project Cordinator
+                                    Expanded(
+                                      // Wrap Container with Expanded
+                                      child: Container(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.40
+                                                    : 0.25),
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.all(8.0),
+                                        //  color: Colors.grey.shade200,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // Email of Project Cordinator
+                                            Text(
+                                              'Name of Project Cordinator',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18 * fontSizeFactor,
+                                              ),
+                                            ),
+                                            SizedBox(height: 3 * marginFactor),
+                                            Text(
+                                              '${facilitySupervisorName.toUpperCase()}',
+                                              style: TextStyle(
+                                                fontSize: 14 * fontSizeFactor,
+                                                // fontWeight: FontWeight.bold,
+                                                fontFamily: "NexaLight",
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.001
+                                                    : 0.009)),
+                                    //Signature of Project Cordinator
+                                    // =======================================================================
 // === FULL STREAMBUILDER FOR FACILITY SUPERVISOR SIGNATURE            ===
 // =======================================================================
 // This code goes inside the 'children' list of the second main Row in your signature section.
 
-                                                Container(
-                                                  width: screenWidth * 0.3, // Responsive width
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    children: [
-                                                      Text(
-                                                        'Signature',
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 18 * fontSizeFactor,
-                                                        ),
-                                                      ),
-                                                      SizedBox(height: 5 * marginFactor),
-                                                      StreamBuilder<DocumentSnapshot>(
-                                                        // The stream points to the specific timesheet document
-                                                        stream: FirebaseFirestore.instance
-                                                            .collection("Staff")
-                                                            .doc(staffId)
-                                                            .collection("TimeSheets")
-                                                            .doc(filteredMonthYear) // This must be the correct ID (e.g., September_2025_part1)
-                                                            .snapshots(),
-                                                        builder: (context, snapshot) {
-                                                          // --- 1. Handle Loading and Error States ---
-                                                          if (snapshot.connectionState == ConnectionState.waiting) {
-                                                            return const SizedBox(
-                                                              height: 80,
-                                                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                                            );
-                                                          }
-                                                          if (snapshot.hasError) {
-                                                            return const Text("Error loading status", style: TextStyle(color: Colors.red));
-                                                          }
-                                                          if (!snapshot.hasData || !snapshot.data!.exists) {
-                                                            return const Text("Awaiting submission...", style: TextStyle(fontStyle: FontStyle.italic));
-                                                          }
-
-                                                          // --- 2. Process Data if it Exists ---
-                                                          final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                          final signatureUrl = data['facilitySupervisorSignature'];
-                                                          final status = data['facilitySupervisorSignatureStatus'];
-                                                          final rejectionReason = data['facilitySupervisorRejectionReason'];
-
-                                                          // --- 3. Display UI Based on the Timesheet Status ---
-
-                                                          // CASE A: The timesheet has been APPROVED
-                                                          if (status == "Approved" && signatureUrl != null) {
-                                                            return Column(
-                                                              children: [
-                                                                SizedBox(
-                                                                  height: 80,
-                                                                  child: Image.network(
-                                                                    signatureUrl,
-                                                                    fit: BoxFit.contain,
-                                                                    loadingBuilder: (context, child, progress) =>
-                                                                    progress == null ? child : const Center(child: CircularProgressIndicator()),
-                                                                    errorBuilder: (context, error, stack) =>
-                                                                    const Icon(Icons.error, color: Colors.red),
-                                                                  ),
-                                                                ),
-                                                                SizedBox(height: 8 * marginFactor),
-                                                                const Row(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                                                    SizedBox(width: 4),
-                                                                    Text("Approved", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                                                                  ],
-                                                                ),
-                                                              ],
-                                                            );
-                                                          }
-
-                                                          // CASE B: The timesheet has been REJECTED
-                                                          else if (status == "Rejected") {
-                                                            return Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                                              children: [
-                                                                const Row(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.cancel, color: Colors.red, size: 16),
-                                                                    SizedBox(width: 4),
-                                                                    Text("Returned", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                                                                  ],
-                                                                ),
-                                                                if (rejectionReason != null && rejectionReason.isNotEmpty)
-                                                                  Padding(
-                                                                    padding: const EdgeInsets.only(top: 4.0),
-                                                                    child: Text(
-                                                                      'Reason: $rejectionReason',
-                                                                      style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-                                                                      textAlign: TextAlign.center,
-                                                                      softWrap: true,
-                                                                    ),
-                                                                  ),
-                                                              ],
-                                                            );
-                                                          }
-
-                                                          // CASE C: The timesheet is PENDING (This is the critical fix)
-                                                          else { // Default to "Pending"
-                                                            // >> CHECK 1: Does the supervisor VIEWING this page have a signature?
-                                                            if (selectedSignatureLink2 != null && selectedSignatureLink2!.isNotEmpty) {
-                                                              // YES -> Show their signature as a preview of what will be applied.
-                                                              return Column(
-                                                                children: [
-                                                                  SizedBox(
-                                                                    height: 80,
-                                                                    child: Image.network(
-                                                                      selectedSignatureLink2!, // Show the logged-in supervisor's signature
-                                                                      fit: BoxFit.contain,
-                                                                      loadingBuilder: (context, child, progress) =>
-                                                                      progress == null ? child : const Center(child: CircularProgressIndicator()),
-                                                                      errorBuilder: (context, error, stack) =>
-                                                                      const Icon(Icons.error, color: Colors.red),
-                                                                    ),
-                                                                  ),
-                                                                  SizedBox(height: 8 * marginFactor),
-                                                                  const Row(
-                                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                                    children: [
-                                                                      Icon(Icons.pending_actions, color: Colors.orange, size: 16),
-                                                                      SizedBox(width: 4),
-                                                                      Text("Pending Approval", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
-                                                                    ],
-                                                                  ),
-                                                                ],
-                                                              );
-                                                            } else {
-                                                              // NO -> The supervisor has no signature. Show a helpful prompt.
-                                                              // This PREVENTS the "infinite loading" bug.
-                                                              return SizedBox(
-                                                                height: 100,
-                                                                child: Column(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey.shade600),
-                                                                    const SizedBox(height: 8),
-                                                                    const Text(
-                                                                      "Please upload your signature in your profile to approve.",
-                                                                      style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                                                                      textAlign: TextAlign.center,
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              );
-                                                            }
-                                                          }
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-
-
-                                                SizedBox(height: 3 * marginFactor),
-                                                //Date of Project Signature Date
-
-                                                Container(
-                                                  width: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.20 : 0.30),
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('Date', style: TextStyle(
-                                                        fontWeight: FontWeight.bold, fontSize: 18 ,),),
-                                                      SizedBox(height: 5 * marginFactor),
-                                                      StreamBuilder<DocumentSnapshot>(
-                                                        // Stream the supervisor signature
-                                                        stream: FirebaseFirestore.instance
-                                                            .collection("Staff")
-                                                            .doc(staffId) // Replace with how you get the staff document ID
-                                                            .collection("TimeSheets")
-                                                            .doc(filteredMonthYear) // Replace monthYear with the timesheet document ID
-                                                            .snapshots(),
-                                                        builder: (context, snapshot) {
-                                                          if (snapshot.hasData && snapshot.data!.exists) {
-                                                            final data = snapshot.data!.data() as Map<String, dynamic>;
-
-                                                            final facilitySupervisorSignatureDate = data['facilitySupervisorSignatureDate']; // Assuming this stores the image URL
-                                                            final facilitySupervisorSignatureStatus = data['facilitySupervisorSignatureStatus']; // Assuming you store the date
-
-                                                            if (facilitySupervisorSignatureDate != null) {
-                                                              // caritasSupervisorSignature is a URL/path to the image
-                                                              return Text("$facilitySupervisorSignatureDate", style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12));
-
-                                                            }
-
-                                                            else {
-                                                              return Text(formattedDate, style: const TextStyle(fontWeight: FontWeight.bold,fontSize:12));
-
-                                                            }
-                                                          } else {
-                                                            return const Text("Timesheet Yet to be submitted for Project Cordinator's Signature", style: TextStyle(fontWeight: FontWeight.bold,fontSize:12));
-                                                          }
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                //SizedBox(width:MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.02 : 0.02),),
-                                              ],
+                                    Container(
+                                      width:
+                                          screenWidth * 0.3, // Responsive width
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            'Signature',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18 * fontSizeFactor,
                                             ),
-                                            SizedBox(width: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.005 : 0.005)),
-                                            const Divider(),
-                                            // Third - CARITAS Supervisor Section
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+                                          StreamBuilder<DocumentSnapshot>(
+                                            // The stream points to the specific timesheet document
+                                            stream: FirebaseFirestore.instance
+                                                .collection("Staff")
+                                                .doc(staffId)
+                                                .collection("TimeSheets")
+                                                .doc(
+                                                    filteredMonthYear) // This must be the correct ID (e.g., September_2025_part1)
+                                                .snapshots(),
+                                            builder: (context, snapshot) {
+                                              // --- 1. Handle Loading and Error States ---
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.waiting) {
+                                                return const SizedBox(
+                                                  height: 80,
+                                                  child: Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                              strokeWidth: 2)),
+                                                );
+                                              }
+                                              if (snapshot.hasError) {
+                                                return const Text(
+                                                    "Error loading status",
+                                                    style: TextStyle(
+                                                        color: Colors.red));
+                                              }
+                                              if (!snapshot.hasData ||
+                                                  !snapshot.data!.exists) {
+                                                return const Text(
+                                                    "Awaiting submission...",
+                                                    style: TextStyle(
+                                                        fontStyle:
+                                                            FontStyle.italic));
+                                              }
 
-                                                // Name of CARITAS Supervisor
-                                                Expanded(
-                                                  child:Container(
-                                                    width: MediaQuery.of(context).size.width *
-                                                        (MediaQuery.of(context).size.shortestSide < 600 ? 0.40 : 0.25),
-                                                    alignment: Alignment.center,
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    //color: Colors.grey.shade200,
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                              // --- 2. Process Data if it Exists ---
+                                              final data = snapshot.data!.data()
+                                                  as Map<String, dynamic>;
+                                              final signatureUrl = data[
+                                                  'facilitySupervisorSignature'];
+                                              final status = data[
+                                                  'facilitySupervisorSignatureStatus'];
+                                              final rejectionReason = data[
+                                                  'facilitySupervisorRejectionReason'];
+
+                                              // --- 3. Display UI Based on the Timesheet Status ---
+
+                                              // CASE A: The timesheet has been APPROVED
+                                              if (status == "Approved" &&
+                                                  signatureUrl != null) {
+                                                return Column(
+                                                  children: [
+                                                    SizedBox(
+                                                      height: 80,
+                                                      child: Image.network(
+                                                        signatureUrl,
+                                                        fit: BoxFit.contain,
+                                                        loadingBuilder: (context,
+                                                                child,
+                                                                progress) =>
+                                                            progress == null
+                                                                ? child
+                                                                : const Center(
+                                                                    child:
+                                                                        CircularProgressIndicator()),
+                                                        errorBuilder: (context,
+                                                                error, stack) =>
+                                                            const Icon(
+                                                                Icons.error,
+                                                                color:
+                                                                    Colors.red),
+                                                      ),
+                                                    ),
+                                                    SizedBox(
+                                                        height:
+                                                            8 * marginFactor),
+                                                    const Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
                                                       children: [
-                                                        Text(
-                                                          'Name of CARITAS Supervisor',
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor,),
-                                                        ),
-                                                        SizedBox(height: 3 * marginFactor),
-                                                        Text(
-                                                          '${caritasSupervisorName.toUpperCase()}',
-                                                          style: TextStyle(
-                                                            fontSize: 14 * fontSizeFactor,
-                                                            // fontWeight: FontWeight.bold,
-                                                            fontFamily: "NexaLight",
-                                                          ),
-                                                        ),
-
+                                                        Icon(Icons.check_circle,
+                                                            color: Colors.green,
+                                                            size: 16),
+                                                        SizedBox(width: 4),
+                                                        Text("Approved",
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .green,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold)),
                                                       ],
                                                     ),
-                                                  ),
-                                                ),
+                                                  ],
+                                                );
+                                              }
 
+                                              // CASE B: The timesheet has been REJECTED
+                                              else if (status == "Rejected") {
+                                                return Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(Icons.cancel,
+                                                            color: Colors.red,
+                                                            size: 16),
+                                                        SizedBox(width: 4),
+                                                        Text("Returned",
+                                                            style: TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Colors
+                                                                    .red)),
+                                                      ],
+                                                    ),
+                                                    if (rejectionReason !=
+                                                            null &&
+                                                        rejectionReason
+                                                            .isNotEmpty)
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(top: 4.0),
+                                                        child: Text(
+                                                          'Reason: $rejectionReason',
+                                                          style: TextStyle(
+                                                              color: Colors
+                                                                  .red.shade700,
+                                                              fontSize: 12),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          softWrap: true,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                );
+                                              }
 
-                                                SizedBox(width: MediaQuery
-                                                    .of(context)
+                                              // CASE C: The timesheet is PENDING (This is the critical fix)
+                                              else {
+                                                // Default to "Pending"
+                                                // >> CHECK 1: Does the supervisor VIEWING this page have a signature?
+                                                if (selectedSignatureLink2 !=
+                                                        null &&
+                                                    selectedSignatureLink2!
+                                                        .isNotEmpty) {
+                                                  // YES -> Show their signature as a preview of what will be applied.
+                                                  return Column(
+                                                    children: [
+                                                      SizedBox(
+                                                        height: 80,
+                                                        child: Image.network(
+                                                          selectedSignatureLink2!, // Show the logged-in supervisor's signature
+                                                          fit: BoxFit.contain,
+                                                          loadingBuilder: (context,
+                                                                  child,
+                                                                  progress) =>
+                                                              progress == null
+                                                                  ? child
+                                                                  : const Center(
+                                                                      child:
+                                                                          CircularProgressIndicator()),
+                                                          errorBuilder: (context,
+                                                                  error,
+                                                                  stack) =>
+                                                              const Icon(
+                                                                  Icons.error,
+                                                                  color: Colors
+                                                                      .red),
+                                                        ),
+                                                      ),
+                                                      SizedBox(
+                                                          height:
+                                                              8 * marginFactor),
+                                                      const Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .pending_actions,
+                                                              color:
+                                                                  Colors.orange,
+                                                              size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                              "Pending Approval",
+                                                              style: TextStyle(
+                                                                  color: Colors
+                                                                      .orange,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold)),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  );
+                                                } else {
+                                                  // NO -> The supervisor has no signature. Show a helpful prompt.
+                                                  // This PREVENTS the "infinite loading" bug.
+                                                  return SizedBox(
+                                                    height: 100,
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                            Icons
+                                                                .cloud_upload_outlined,
+                                                            size: 40,
+                                                            color: Colors
+                                                                .grey.shade600),
+                                                        const SizedBox(
+                                                            height: 8),
+                                                        const Text(
+                                                          "Please upload your signature in your profile to approve.",
+                                                          style: TextStyle(
+                                                              fontSize: 12,
+                                                              color:
+                                                                  Colors.grey,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    SizedBox(height: 3 * marginFactor),
+                                    //Date of Project Signature Date
+
+                                    Container(
+                                      width: MediaQuery.of(context).size.width *
+                                          (MediaQuery.of(context)
+                                                      .size
+                                                      .shortestSide <
+                                                  600
+                                              ? 0.20
+                                              : 0.30),
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            'Date',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+                                          StreamBuilder<DocumentSnapshot>(
+                                            // Stream the supervisor signature
+                                            stream: FirebaseFirestore.instance
+                                                .collection("Staff")
+                                                .doc(
+                                                    staffId) // Replace with how you get the staff document ID
+                                                .collection("TimeSheets")
+                                                .doc(
+                                                    filteredMonthYear) // Replace monthYear with the timesheet document ID
+                                                .snapshots(),
+                                            builder: (context, snapshot) {
+                                              if (snapshot.hasData &&
+                                                  snapshot.data!.exists) {
+                                                final data =
+                                                    snapshot.data!.data()
+                                                        as Map<String, dynamic>;
+
+                                                final facilitySupervisorSignatureDate =
+                                                    data[
+                                                        'facilitySupervisorSignatureDate']; // Assuming this stores the image URL
+                                                final facilitySupervisorSignatureStatus =
+                                                    data[
+                                                        'facilitySupervisorSignatureStatus']; // Assuming you store the date
+
+                                                if (facilitySupervisorSignatureDate !=
+                                                    null) {
+                                                  // caritasSupervisorSignature is a URL/path to the image
+                                                  return Text(
+                                                      "$facilitySupervisorSignatureDate",
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 12));
+                                                } else {
+                                                  return Text(formattedDate,
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 12));
+                                                }
+                                              } else {
+                                                return const Text(
+                                                    "Timesheet Yet to be submitted for Project Cordinator's Signature",
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 12));
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    //SizedBox(width:MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.02 : 0.02),),
+                                  ],
+                                ),
+                                SizedBox(
+                                    width: MediaQuery.of(context).size.width *
+                                        (MediaQuery.of(context)
                                                     .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600 ? 0.001 : 0.009)),
-                                                //Signature of CARITAS Supervisor
+                                                    .shortestSide <
+                                                600
+                                            ? 0.005
+                                            : 0.005)),
+                                const Divider(),
+                                // Third - CARITAS Supervisor Section
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Name of CARITAS Supervisor
+                                    Expanded(
+                                      child: Container(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.40
+                                                    : 0.25),
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.all(8.0),
+                                        //color: Colors.grey.shade200,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Name of CARITAS Supervisor',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18 * fontSizeFactor,
+                                              ),
+                                            ),
+                                            SizedBox(height: 3 * marginFactor),
+                                            Text(
+                                              '${caritasSupervisorName.toUpperCase()}',
+                                              style: TextStyle(
+                                                fontSize: 14 * fontSizeFactor,
+                                                // fontWeight: FontWeight.bold,
+                                                fontFamily: "NexaLight",
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
 
-                                                // =======================================================================
+                                    SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.001
+                                                    : 0.009)),
+                                    //Signature of CARITAS Supervisor
+
+                                    // =======================================================================
 // =======================================================================
 // === FULL STREAMBUILDER FOR CARITAS SUPERVISOR SIGNATURE            ===
 // =======================================================================
 // This code goes inside the 'children' list of the second main Row in your signature section.
 
-                                                Container(
-                                                  width: screenWidth * 0.3, // Responsive width
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    children: [
-                                                      Text(
-                                                        'Signature',
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 18 * fontSizeFactor,
-                                                        ),
-                                                      ),
-                                                      SizedBox(height: 5 * marginFactor),
-                                                      StreamBuilder<DocumentSnapshot>(
-                                                        // The stream points to the specific timesheet document
-                                                        stream: FirebaseFirestore.instance
-                                                            .collection("Staff")
-                                                            .doc(staffId)
-                                                            .collection("TimeSheets")
-                                                            .doc(filteredMonthYear) // This must be the correct ID (e.g., September_2025_part1)
-                                                            .snapshots(),
-                                                        builder: (context, snapshot) {
-                                                          // --- 1. Handle Loading and Error States ---
-                                                          if (snapshot.connectionState == ConnectionState.waiting) {
-                                                            return const SizedBox(
-                                                              height: 80,
-                                                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                                            );
-                                                          }
-                                                          if (snapshot.hasError) {
-                                                            return const Text("Error loading status", style: TextStyle(color: Colors.red));
-                                                          }
-                                                          if (!snapshot.hasData || !snapshot.data!.exists) {
-                                                            return const Text("Awaiting submission...", style: TextStyle(fontStyle: FontStyle.italic));
-                                                          }
-
-                                                          // --- 2. Process Data if it Exists ---
-                                                          final data = snapshot.data!.data() as Map<String, dynamic>;
-                                                          final signatureUrl = data['caritasSupervisorSignature'];
-                                                          final status = data['caritasSupervisorSignatureStatus'];
-                                                          final rejectionReason = data['caritasSupervisorRejectionReason'];
-
-                                                          // --- 3. Display UI Based on the Timesheet Status ---
-
-                                                          // CASE A: The timesheet has been APPROVED
-                                                          if (status == "Approved" && signatureUrl != null) {
-                                                            return Column(
-                                                              children: [
-                                                                SizedBox(
-                                                                  height: 80,
-                                                                  child: Image.network(
-                                                                    signatureUrl,
-                                                                    fit: BoxFit.contain,
-                                                                    loadingBuilder: (context, child, progress) =>
-                                                                    progress == null ? child : const Center(child: CircularProgressIndicator()),
-                                                                    errorBuilder: (context, error, stack) =>
-                                                                    const Icon(Icons.error, color: Colors.red),
-                                                                  ),
-                                                                ),
-                                                                SizedBox(height: 8 * marginFactor),
-                                                                const Row(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                                                    SizedBox(width: 4),
-                                                                    Text("Approved", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                                                                  ],
-                                                                ),
-                                                              ],
-                                                            );
-                                                          }
-
-                                                          // CASE B: The timesheet has been REJECTED
-                                                          else if (status == "Rejected") {
-                                                            return Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                                              children: [
-                                                                const Row(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.cancel, color: Colors.red, size: 16),
-                                                                    SizedBox(width: 4),
-                                                                    Text("Returned", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                                                                  ],
-                                                                ),
-                                                                if (rejectionReason != null && rejectionReason.isNotEmpty)
-                                                                  Padding(
-                                                                    padding: const EdgeInsets.only(top: 4.0),
-                                                                    child: Text(
-                                                                      'Reason: $rejectionReason',
-                                                                      style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-                                                                      textAlign: TextAlign.center,
-                                                                      softWrap: true,
-                                                                    ),
-                                                                  ),
-                                                              ],
-                                                            );
-                                                          }
-
-                                                          // CASE C: The timesheet is PENDING (This is the critical fix)
-                                                          else { // Default to "Pending"
-                                                            // >> CHECK 1: Does the supervisor VIEWING this page have a signature?
-                                                            if (selectedSignatureLink2 != null && selectedSignatureLink2!.isNotEmpty) {
-                                                              // YES -> Show their signature as a preview of what will be applied.
-                                                              return Column(
-                                                                children: [
-                                                                  SizedBox(
-                                                                    height: 80,
-                                                                    child: Image.network(
-                                                                      selectedSignatureLink2!, // Show the logged-in supervisor's signature
-                                                                      fit: BoxFit.contain,
-                                                                      loadingBuilder: (context, child, progress) =>
-                                                                      progress == null ? child : const Center(child: CircularProgressIndicator()),
-                                                                      errorBuilder: (context, error, stack) =>
-                                                                      const Icon(Icons.error, color: Colors.red),
-                                                                    ),
-                                                                  ),
-                                                                  SizedBox(height: 8 * marginFactor),
-                                                                  const Row(
-                                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                                    children: [
-                                                                      Icon(Icons.pending_actions, color: Colors.orange, size: 16),
-                                                                      SizedBox(width: 4),
-                                                                      Text("Pending Approval", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
-                                                                    ],
-                                                                  ),
-                                                                ],
-                                                              );
-                                                            } else {
-                                                              // NO -> The supervisor has no signature. Show a helpful prompt.
-                                                              // This PREVENTS the "infinite loading" bug.
-                                                              return SizedBox(
-                                                                height: 100,
-                                                                child: Column(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey.shade600),
-                                                                    const SizedBox(height: 8),
-                                                                    const Text(
-                                                                      "Please upload your signature in your profile to approve.",
-                                                                      style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                                                                      textAlign: TextAlign.center,
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              );
-                                                            }
-                                                          }
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-
-
-
-                                                SizedBox(width: MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .width * (MediaQuery
-                                                    .of(context)
-                                                    .size
-                                                    .shortestSide < 600 ? 0.001 : 0.009)),
-
-                                                //Date of CARITAS Supervisor
-                                                Container(
-                                                  width: MediaQuery.of(context).size.width * (MediaQuery.of(context).size.shortestSide < 600 ? 0.20 : 0.30),
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    children: [
-                                                      const Text('Date', style: TextStyle(
-                                                          fontWeight: FontWeight.bold, fontSize: 18),),
-                                                      SizedBox(height: 5 * marginFactor),
-                                                      Text(formattedDate, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
+                                    Container(
+                                      width:
+                                          screenWidth * 0.3, // Responsive width
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            'Signature',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18 * fontSizeFactor,
                                             ),
-                                            SizedBox(height: 5 * marginFactor),
-                                            const Divider(),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+                                          StreamBuilder<DocumentSnapshot>(
+                                            // The stream points to the specific timesheet document
+                                            stream: FirebaseFirestore.instance
+                                                .collection("Staff")
+                                                .doc(staffId)
+                                                .collection("TimeSheets")
+                                                .doc(
+                                                    filteredMonthYear) // This must be the correct ID (e.g., September_2025_part1)
+                                                .snapshots(),
+                                            builder: (context, snapshot) {
+                                              // --- 1. Handle Loading and Error States ---
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.waiting) {
+                                                return const SizedBox(
+                                                  height: 80,
+                                                  child: Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                              strokeWidth: 2)),
+                                                );
+                                              }
+                                              if (snapshot.hasError) {
+                                                return const Text(
+                                                    "Error loading status",
+                                                    style: TextStyle(
+                                                        color: Colors.red));
+                                              }
+                                              if (!snapshot.hasData ||
+                                                  !snapshot.data!.exists) {
+                                                return const Text(
+                                                    "Awaiting submission...",
+                                                    style: TextStyle(
+                                                        fontStyle:
+                                                            FontStyle.italic));
+                                              }
 
-                                            StreamBuilder<DocumentSnapshot>(
-                                              // Stream the supervisor signature
-                                              stream: FirebaseFirestore.instance
-                                                  .collection("Staff")
-                                                  .doc(staffId) // Replace with how you get the staff document ID
-                                                  .collection("TimeSheets")
-                                                  .doc(filteredMonthYear) // Replace monthYear with the timesheet document ID
-                                                  .snapshots(),
-                                              builder: (context, snapshot) {
-                                                if (snapshot.hasData &&
-                                                    snapshot.data!.exists) {
-                                                  final data = snapshot.data!.data() as Map<
-                                                      String,
-                                                      dynamic>;
+                                              // --- 2. Process Data if it Exists ---
+                                              final data = snapshot.data!.data()
+                                                  as Map<String, dynamic>;
+                                              final signatureUrl = data[
+                                                  'caritasSupervisorSignature'];
+                                              final status = data[
+                                                  'caritasSupervisorSignatureStatus'];
+                                              final rejectionReason = data[
+                                                  'caritasSupervisorRejectionReason'];
 
-                                                  final caritasSupervisorSignature = data['caritasSupervisorSignature']; // Assuming this stores the image URL
-                                                  final facilitySupervisorSignature = data['facilitySupervisorSignature'];
-                                                  final staffSignature = data['staffSignature']; // Assuming you store the date
+                                              // --- 3. Display UI Based on the Timesheet Status ---
 
-                                                  if (caritasSupervisorSignature != null &&
-                                                      facilitySupervisorSignature != null &&
-                                                      staffSignature != null) {
-                                                    // caritasSupervisorSignature is a URL/path to the image
-                                                    return Row(
-                                                        crossAxisAlignment : CrossAxisAlignment.center,
-                                                        mainAxisAlignment : MainAxisAlignment.center,
-                                                        children:[
-                                                          _isPDFLoading
-                                                              ? const CircularProgressIndicator()
-                                                              :Row(
-                                                            children: [
-                                                              Checkbox(
-                                                                checkColor: Colors.black,
-                                                                value: _includeTaskSummary,
-                                                                onChanged: (bool? newValue) {
-                                                                  setState(() {
-                                                                    _includeTaskSummary = newValue ?? false;
-                                                                  });
-                                                                },
-                                                              ),
-                                                              // const Text('Include Task Summary in Timesheet PDF', style: TextStyle(color: Colors.black, fontSize: 12)),
-                                                              ElevatedButton.icon(
-                                                                onPressed: () {
-                                                                  _createAndExportPDF();
-                                                                },
-                                                                icon: const Icon(
-                                                                  Icons.download, // Add an appropriate icon
-                                                                  color: Colors.white, // Icon color
-                                                                  size: 16, // Reduce the size of the icon
-                                                                ),
-                                                                label: const Flexible(
-                                                                  child: Text(
-                                                                    'Download Signed Timesheet',
-                                                                    style: TextStyle(
-                                                                      color: Colors.white, // Text color
-                                                                      fontSize: 12, // Reduce font size
-                                                                    ),
-                                                                    textAlign: TextAlign.center, // Center-align text
-                                                                    overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                                  ),
-                                                                ),
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor: Colors.green, // Button background color
-                                                                  foregroundColor: Colors.white, // Text and icon color
-                                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                                  minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
+                                              // CASE A: The timesheet has been APPROVED
+                                              if (status == "Approved" &&
+                                                  signatureUrl != null) {
+                                                return Column(
+                                                  children: [
+                                                    SizedBox(
+                                                      height: 80,
+                                                      child: Image.network(
+                                                        signatureUrl,
+                                                        fit: BoxFit.contain,
+                                                        loadingBuilder: (context,
+                                                                child,
+                                                                progress) =>
+                                                            progress == null
+                                                                ? child
+                                                                : const Center(
+                                                                    child:
+                                                                        CircularProgressIndicator()),
+                                                        errorBuilder: (context,
+                                                                error, stack) =>
+                                                            const Icon(
+                                                                Icons.error,
+                                                                color:
+                                                                    Colors.red),
+                                                      ),
+                                                    ),
+                                                    SizedBox(
+                                                        height:
+                                                            8 * marginFactor),
+                                                    const Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(Icons.check_circle,
+                                                            color: Colors.green,
+                                                            size: 16),
+                                                        SizedBox(width: 4),
+                                                        Text("Approved",
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .green,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold)),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                );
+                                              }
 
+                                              // CASE B: The timesheet has been REJECTED
+                                              else if (status == "Rejected") {
+                                                return Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(Icons.cancel,
+                                                            color: Colors.red,
+                                                            size: 16),
+                                                        SizedBox(width: 4),
+                                                        Text("Returned",
+                                                            style: TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Colors
+                                                                    .red)),
+                                                      ],
+                                                    ),
+                                                    if (rejectionReason !=
+                                                            null &&
+                                                        rejectionReason
+                                                            .isNotEmpty)
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(top: 4.0),
+                                                        child: Text(
+                                                          'Reason: $rejectionReason',
+                                                          style: TextStyle(
+                                                              color: Colors
+                                                                  .red.shade700,
+                                                              fontSize: 12),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          softWrap: true,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                );
+                                              }
 
-                                                          const SizedBox(width:8),
-                                                          ElevatedButton.icon(
-                                                            onPressed: () {
-                                                              Navigator.pushReplacement(
-                                                                context,
-                                                                MaterialPageRoute(
-                                                                  builder: (context) => const PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
-                                                                ),
-                                                              ).then((_) => _fetchPendingApprovals());
-                                                            },
-                                                            icon: const Icon(
-                                                              Icons.arrow_back_sharp, // Add an appropriate icon
-                                                              color: Colors.white, // Icon color
-                                                              size: 16, // Reduce the size of the icon
-                                                            ),
-                                                            label: const Flexible(
-                                                              child: Text(
-                                                                'Navigate Back to Timesheet List',
-                                                                style: TextStyle(
-                                                                  color: Colors.white, // Text color
-                                                                  fontSize: 12, // Reduce font size
-                                                                ),
-                                                                textAlign: TextAlign.center, // Center-align text
-                                                                overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                              ),
-                                                            ),
-                                                            style: ElevatedButton.styleFrom(
-                                                              backgroundColor: Colors.blue, // Button background color
-                                                              foregroundColor: Colors.white, // Text and icon color
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                              minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                            ),
-                                                          ),
-                                                        ]
-                                                    )
-                                                    ;
-                                                  } else {
-                                                    return Row(
-                                                        crossAxisAlignment : CrossAxisAlignment.center,
-                                                        mainAxisAlignment : MainAxisAlignment.center,
-                                                        children:[
-                                                          ElevatedButton.icon(
-                                                            onPressed: () {
-                                                              _uploadSignatureAndSync();
-                                                            },
-                                                            icon: const Icon(
-                                                              Icons.credit_score, // Add an appropriate icon
-                                                              color: Colors.white, // Icon color
-                                                              size: 16, // Reduce the size of the icon
-                                                            ),
-                                                            label: const Flexible(
-                                                              child: Text(
-                                                                'Approve Timesheet',
-                                                                style: TextStyle(
-                                                                  color: Colors.white, // Text color
-                                                                  fontSize: 12, // Reduce font size
-                                                                ),
-                                                                textAlign: TextAlign.center, // Center-align text
-                                                                overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                              ),
-                                                            ),
-                                                            style: ElevatedButton.styleFrom(
-                                                              backgroundColor: Colors.green, // Button background color
-                                                              foregroundColor: Colors.white, // Text and icon color
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                              minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                            ),
-                                                          ),
-
-                                                          const SizedBox(width:8),
-                                                          ElevatedButton.icon(
-                                                            onPressed: () {
-                                                              _rejectTimesheet();
-                                                            },
-                                                            icon: const Icon(
-                                                              Icons.cancel, // Add an appropriate icon
-                                                              color: Colors.white, // Icon color
-                                                              size: 16, // Reduce the size of the icon
-                                                            ),
-                                                            label: const Flexible(
-                                                              child: Text(
-                                                                'Return Timesheet',
-                                                                style: TextStyle(
-                                                                  color: Colors.white, // Text color
-                                                                  fontSize: 12, // Reduce font size
-                                                                ),
-                                                                textAlign: TextAlign.center, // Center-align text
-                                                                overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                              ),
-                                                            ),
-                                                            style: ElevatedButton.styleFrom(
-                                                              backgroundColor: Colors.red, // Button background color
-                                                              foregroundColor: Colors.white, // Text and icon color
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                              minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                            ),
-                                                          ),
-
-
-
-                                                        ]
-                                                    );
-                                                  }
+                                              // CASE C: The timesheet is PENDING (This is the critical fix)
+                                              else {
+                                                // Default to "Pending"
+                                                // >> CHECK 1: Does the supervisor VIEWING this page have a signature?
+                                                if (selectedSignatureLink2 !=
+                                                        null &&
+                                                    selectedSignatureLink2!
+                                                        .isNotEmpty) {
+                                                  // YES -> Show their signature as a preview of what will be applied.
+                                                  return Column(
+                                                    children: [
+                                                      SizedBox(
+                                                        height: 80,
+                                                        child: Image.network(
+                                                          selectedSignatureLink2!, // Show the logged-in supervisor's signature
+                                                          fit: BoxFit.contain,
+                                                          loadingBuilder: (context,
+                                                                  child,
+                                                                  progress) =>
+                                                              progress == null
+                                                                  ? child
+                                                                  : const Center(
+                                                                      child:
+                                                                          CircularProgressIndicator()),
+                                                          errorBuilder: (context,
+                                                                  error,
+                                                                  stack) =>
+                                                              const Icon(
+                                                                  Icons.error,
+                                                                  color: Colors
+                                                                      .red),
+                                                        ),
+                                                      ),
+                                                      SizedBox(
+                                                          height:
+                                                              8 * marginFactor),
+                                                      const Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .pending_actions,
+                                                              color:
+                                                                  Colors.orange,
+                                                              size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                              "Pending Approval",
+                                                              style: TextStyle(
+                                                                  color: Colors
+                                                                      .orange,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold)),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  );
                                                 } else {
-                                                  return Row(
-                                                      crossAxisAlignment : CrossAxisAlignment.center,
-                                                      mainAxisAlignment : MainAxisAlignment.center,
-                                                      children:[
-                                                        ElevatedButton.icon(
-                                                          onPressed: () {
-                                                            _uploadSignatureAndSync();
-                                                          },
-                                                          icon: const Icon(
-                                                            Icons.credit_score, // Add an appropriate icon
-                                                            color: Colors.white, // Icon color
-                                                            size: 16, // Reduce the size of the icon
-                                                          ),
-                                                          label: const Flexible(
-                                                            child: Text(
-                                                              'Approve Timesheet',
-                                                              style: TextStyle(
-                                                                color: Colors.white, // Text color
-                                                                fontSize: 12, // Reduce font size
-                                                              ),
-                                                              textAlign: TextAlign.center, // Center-align text
-                                                              overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                            ),
-                                                          ),
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor: Colors.green, // Button background color
-                                                            foregroundColor: Colors.white, // Text and icon color
-                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                            minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                          ),
+                                                  // NO -> The supervisor has no signature. Show a helpful prompt.
+                                                  // This PREVENTS the "infinite loading" bug.
+                                                  return SizedBox(
+                                                    height: 100,
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                            Icons
+                                                                .cloud_upload_outlined,
+                                                            size: 40,
+                                                            color: Colors
+                                                                .grey.shade600),
+                                                        const SizedBox(
+                                                            height: 8),
+                                                        const Text(
+                                                          "Please upload your signature in your profile to approve.",
+                                                          style: TextStyle(
+                                                              fontSize: 12,
+                                                              color:
+                                                                  Colors.grey,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold),
+                                                          textAlign:
+                                                              TextAlign.center,
                                                         ),
-                                                        const SizedBox(width:8),
-                                                        ElevatedButton.icon(
-                                                          onPressed: () {
-                                                            _rejectTimesheet();
-                                                          },
-                                                          icon: const Icon(
-                                                            Icons.cancel, // Add an appropriate icon
-                                                            color: Colors.white, // Icon color
-                                                            size: 16, // Reduce the size of the icon
-                                                          ),
-                                                          label: const Flexible(
-                                                            child: Text(
-                                                              'Return Timesheet',
-                                                              style: TextStyle(
-                                                                color: Colors.white, // Text color
-                                                                fontSize: 12, // Reduce font size
-                                                              ),
-                                                              textAlign: TextAlign.center, // Center-align text
-                                                              overflow: TextOverflow.clip, // Ensure text wraps instead of overflowing
-                                                            ),
-                                                          ),
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor: Colors.red, // Button background color
-                                                            foregroundColor: Colors.white, // Text and icon color
-                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduce button padding
-                                                            minimumSize: const Size(100, 30), // Set minimum size for the button
-                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize touch target size
-                                                          ),
-                                                        ),
-
-
-
-                                                      ]
+                                                      ],
+                                                    ),
                                                   );
                                                 }
-                                              },
-                                            ),
-
-                                            SizedBox(height: MediaQuery
-                                                .of(context)
-                                                .size
-                                                .width * (MediaQuery
-                                                .of(context)
-                                                .size
-                                                .shortestSide < 600 ? 0.020 : 0.020)),
-                                          ]
+                                              }
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                    ]
-                                )
+                                    ),
 
+                                    SizedBox(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                (MediaQuery.of(context)
+                                                            .size
+                                                            .shortestSide <
+                                                        600
+                                                    ? 0.001
+                                                    : 0.009)),
 
-                            )
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_forward_ios),
-                          onPressed: () {
-                            _horizontalScrollController.animateTo(
-                              _horizontalScrollController.offset + 200, // Adjust scroll amount
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          },
-                        ),
+                                    //Date of CARITAS Supervisor
+                                    Container(
+                                      width: MediaQuery.of(context).size.width *
+                                          (MediaQuery.of(context)
+                                                      .size
+                                                      .shortestSide <
+                                                  600
+                                              ? 0.20
+                                              : 0.30),
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            'Date',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18),
+                                          ),
+                                          SizedBox(height: 5 * marginFactor),
+                                          Text(formattedDate,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 5 * marginFactor),
+                                const Divider(),
 
-                      ]
-                  )
+                                StreamBuilder<DocumentSnapshot>(
+                                  // Stream the supervisor signature
+                                  stream: FirebaseFirestore.instance
+                                      .collection("Staff")
+                                      .doc(
+                                          staffId) // Replace with how you get the staff document ID
+                                      .collection("TimeSheets")
+                                      .doc(
+                                          filteredMonthYear) // Replace monthYear with the timesheet document ID
+                                      .snapshots(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData &&
+                                        snapshot.data!.exists) {
+                                      final data = snapshot.data!.data()
+                                          as Map<String, dynamic>;
 
+                                      final caritasSupervisorSignature = data[
+                                          'caritasSupervisorSignature']; // Assuming this stores the image URL
+                                      final facilitySupervisorSignature =
+                                          data['facilitySupervisorSignature'];
+                                      final staffSignature = data[
+                                          'staffSignature']; // Assuming you store the date
 
+                                      if (caritasSupervisorSignature != null &&
+                                          facilitySupervisorSignature != null &&
+                                          staffSignature != null) {
+                                        // caritasSupervisorSignature is a URL/path to the image
+                                        return Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              _isPDFLoading
+                                                  ? const CircularProgressIndicator()
+                                                  : Row(
+                                                      children: [
+                                                        Checkbox(
+                                                          checkColor:
+                                                              Colors.black,
+                                                          value:
+                                                              _includeTaskSummary,
+                                                          onChanged:
+                                                              (bool? newValue) {
+                                                            setState(() {
+                                                              _includeTaskSummary =
+                                                                  newValue ??
+                                                                      false;
+                                                            });
+                                                          },
+                                                        ),
+                                                        // const Text('Include Task Summary in Timesheet PDF', style: TextStyle(color: Colors.black, fontSize: 12)),
+                                                        ElevatedButton.icon(
+                                                          onPressed: () {
+                                                            _createAndExportPDF();
+                                                          },
+                                                          icon: const Icon(
+                                                            Icons
+                                                                .download, // Add an appropriate icon
+                                                            color: Colors
+                                                                .white, // Icon color
+                                                            size:
+                                                                16, // Reduce the size of the icon
+                                                          ),
+                                                          label: const Flexible(
+                                                            child: Text(
+                                                              'Download Signed Timesheet',
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .white, // Text color
+                                                                fontSize:
+                                                                    12, // Reduce font size
+                                                              ),
+                                                              textAlign: TextAlign
+                                                                  .center, // Center-align text
+                                                              overflow: TextOverflow
+                                                                  .clip, // Ensure text wraps instead of overflowing
+                                                            ),
+                                                          ),
+                                                          style: ElevatedButton
+                                                              .styleFrom(
+                                                            backgroundColor: Colors
+                                                                .green, // Button background color
+                                                            foregroundColor: Colors
+                                                                .white, // Text and icon color
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical:
+                                                                        6), // Reduce button padding
+                                                            minimumSize: const Size(
+                                                                100,
+                                                                30), // Set minimum size for the button
+                                                            tapTargetSize:
+                                                                MaterialTapTargetSize
+                                                                    .shrinkWrap, // Minimize touch target size
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              const SizedBox(width: 8),
+                                              ElevatedButton.icon(
+                                                onPressed: () {
+                                                  Navigator.pushReplacement(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          const PendingApprovalsPage(), // Ensure PendingApprovalsPage is updated if needed
+                                                    ),
+                                                  ).then((_) =>
+                                                      _fetchPendingApprovals());
+                                                },
+                                                icon: const Icon(
+                                                  Icons
+                                                      .arrow_back_sharp, // Add an appropriate icon
+                                                  color: Colors
+                                                      .white, // Icon color
+                                                  size:
+                                                      16, // Reduce the size of the icon
+                                                ),
+                                                label: const Flexible(
+                                                  child: Text(
+                                                    'Navigate Back to Timesheet List',
+                                                    style: TextStyle(
+                                                      color: Colors
+                                                          .white, // Text color
+                                                      fontSize:
+                                                          12, // Reduce font size
+                                                    ),
+                                                    textAlign: TextAlign
+                                                        .center, // Center-align text
+                                                    overflow: TextOverflow
+                                                        .clip, // Ensure text wraps instead of overflowing
+                                                  ),
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors
+                                                      .blue, // Button background color
+                                                  foregroundColor: Colors
+                                                      .white, // Text and icon color
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical:
+                                                          6), // Reduce button padding
+                                                  minimumSize: const Size(100,
+                                                      30), // Set minimum size for the button
+                                                  tapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap, // Minimize touch target size
+                                                ),
+                                              ),
+                                            ]);
+                                      } else {
+                                        return Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              ElevatedButton.icon(
+                                                onPressed: () {
+                                                  _uploadSignatureAndSync();
+                                                },
+                                                icon: const Icon(
+                                                  Icons
+                                                      .credit_score, // Add an appropriate icon
+                                                  color: Colors
+                                                      .white, // Icon color
+                                                  size:
+                                                      16, // Reduce the size of the icon
+                                                ),
+                                                label: const Flexible(
+                                                  child: Text(
+                                                    'Approve Timesheet',
+                                                    style: TextStyle(
+                                                      color: Colors
+                                                          .white, // Text color
+                                                      fontSize:
+                                                          12, // Reduce font size
+                                                    ),
+                                                    textAlign: TextAlign
+                                                        .center, // Center-align text
+                                                    overflow: TextOverflow
+                                                        .clip, // Ensure text wraps instead of overflowing
+                                                  ),
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors
+                                                      .green, // Button background color
+                                                  foregroundColor: Colors
+                                                      .white, // Text and icon color
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical:
+                                                          6), // Reduce button padding
+                                                  minimumSize: const Size(100,
+                                                      30), // Set minimum size for the button
+                                                  tapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap, // Minimize touch target size
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ElevatedButton.icon(
+                                                onPressed: () {
+                                                  _rejectTimesheet();
+                                                },
+                                                icon: const Icon(
+                                                  Icons
+                                                      .cancel, // Add an appropriate icon
+                                                  color: Colors
+                                                      .white, // Icon color
+                                                  size:
+                                                      16, // Reduce the size of the icon
+                                                ),
+                                                label: const Flexible(
+                                                  child: Text(
+                                                    'Return Timesheet',
+                                                    style: TextStyle(
+                                                      color: Colors
+                                                          .white, // Text color
+                                                      fontSize:
+                                                          12, // Reduce font size
+                                                    ),
+                                                    textAlign: TextAlign
+                                                        .center, // Center-align text
+                                                    overflow: TextOverflow
+                                                        .clip, // Ensure text wraps instead of overflowing
+                                                  ),
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors
+                                                      .red, // Button background color
+                                                  foregroundColor: Colors
+                                                      .white, // Text and icon color
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical:
+                                                          6), // Reduce button padding
+                                                  minimumSize: const Size(100,
+                                                      30), // Set minimum size for the button
+                                                  tapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap, // Minimize touch target size
+                                                ),
+                                              ),
+                                            ]);
+                                      }
+                                    } else {
+                                      return Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            ElevatedButton.icon(
+                                              onPressed: () {
+                                                _uploadSignatureAndSync();
+                                              },
+                                              icon: const Icon(
+                                                Icons
+                                                    .credit_score, // Add an appropriate icon
+                                                color:
+                                                    Colors.white, // Icon color
+                                                size:
+                                                    16, // Reduce the size of the icon
+                                              ),
+                                              label: const Flexible(
+                                                child: Text(
+                                                  'Approve Timesheet',
+                                                  style: TextStyle(
+                                                    color: Colors
+                                                        .white, // Text color
+                                                    fontSize:
+                                                        12, // Reduce font size
+                                                  ),
+                                                  textAlign: TextAlign
+                                                      .center, // Center-align text
+                                                  overflow: TextOverflow
+                                                      .clip, // Ensure text wraps instead of overflowing
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors
+                                                    .green, // Button background color
+                                                foregroundColor: Colors
+                                                    .white, // Text and icon color
+                                                padding: const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal: 8,
+                                                    vertical:
+                                                        6), // Reduce button padding
+                                                minimumSize: const Size(100,
+                                                    30), // Set minimum size for the button
+                                                tapTargetSize: MaterialTapTargetSize
+                                                    .shrinkWrap, // Minimize touch target size
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            ElevatedButton.icon(
+                                              onPressed: () {
+                                                _rejectTimesheet();
+                                              },
+                                              icon: const Icon(
+                                                Icons
+                                                    .cancel, // Add an appropriate icon
+                                                color:
+                                                    Colors.white, // Icon color
+                                                size:
+                                                    16, // Reduce the size of the icon
+                                              ),
+                                              label: const Flexible(
+                                                child: Text(
+                                                  'Return Timesheet',
+                                                  style: TextStyle(
+                                                    color: Colors
+                                                        .white, // Text color
+                                                    fontSize:
+                                                        12, // Reduce font size
+                                                  ),
+                                                  textAlign: TextAlign
+                                                      .center, // Center-align text
+                                                  overflow: TextOverflow
+                                                      .clip, // Ensure text wraps instead of overflowing
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors
+                                                    .red, // Button background color
+                                                foregroundColor: Colors
+                                                    .white, // Text and icon color
+                                                padding: const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal: 8,
+                                                    vertical:
+                                                        6), // Reduce button padding
+                                                minimumSize: const Size(100,
+                                                    30), // Set minimum size for the button
+                                                tapTargetSize: MaterialTapTargetSize
+                                                    .shrinkWrap, // Minimize touch target size
+                                              ),
+                                            ),
+                                          ]);
+                                    }
+                                  },
+                                ),
 
-              ),
+                                SizedBox(
+                                    height: MediaQuery.of(context).size.width *
+                                        (MediaQuery.of(context)
+                                                    .size
+                                                    .shortestSide <
+                                                600
+                                            ? 0.020
+                                            : 0.020)),
+                              ]),
+                        ]))),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: () {
+                    _horizontalScrollController.animateTo(
+                      _horizontalScrollController.offset +
+                          200, // Adjust scroll amount
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                ),
+              ])),
 
-              const Divider(),
-              _buildTaskSummaryDisplay(), // Display the Flutter UI task summary
-              const Divider(),
-              const Divider(),
-
-            ]
-        ),
+          const Divider(),
+          _buildTaskSummaryDisplay(), // Display the Flutter UI task summary
+          const Divider(),
+          const Divider(),
+        ]),
         //  caritasSupervisorSignature
-
       ),
     );
   }

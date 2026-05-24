@@ -14,6 +14,9 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
 import 'package:pdf/pdf.dart' show PdfColors, PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../widgets/global_multi_select_dropdown.dart';
 
 import '../../models/contact_tracked.dart';
 import '../../widgets/drawer.dart';
@@ -62,8 +65,8 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
   String? userLocation;
 
   // --- Filter State ---
-  List<String> _availableCallStatuses = ['All Statuses'];
-  List<String> _selectedCallStatuses = ['All Statuses'];
+  List<String> _availableCallStatuses = [];
+  List<String> _selectedCallStatuses = [];
 
   // --- REWRITTEN: Segregated Call Costs ---
   double _totalCallCost = 0.0;
@@ -182,14 +185,14 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
 
   void _updateAvailableFiltersFromData() {
     final statuses = _masterContactList.map((c) => c.callStatus).whereType<String>().where((s) => s.isNotEmpty).toSet();
-    _availableCallStatuses = ['All Statuses', ...statuses.toList()..sort()];
-    _selectedCallStatuses = ['All Statuses'];
+    _availableCallStatuses = statuses.toList()..sort();
+    _selectedCallStatuses = [];
   }
 
   void _applyAllFiltersAndRecalculate() {
     List<ContactTracked> currentlyFiltered = List.from(_masterContactList);
 
-    if (!_selectedCallStatuses.contains('All Statuses')) {
+    if (_selectedCallStatuses.isNotEmpty) {
       currentlyFiltered = currentlyFiltered.where((c) => _selectedCallStatuses.contains(c.callStatus)).toList();
     }
 
@@ -232,18 +235,27 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
     } else if (_errorMessage != null) {
       bodyContent = Center(child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+        child: Text('Error: $_errorMessage', style: GoogleFonts.poppins(color: Colors.red), textAlign: TextAlign.center,),
       ));
     } else {
-      bodyContent = _buildDashboardContent();
+      bodyContent = SelectionArea(child: _buildDashboardContent());
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Reports for ${userLocation ?? "Your Facility"}', style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text('Reports for ${userLocation ?? "Your Facility"}', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer(context),
       body: Column(
@@ -286,12 +298,6 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
   }
 
   Widget _buildFilterBar() {
-    String statusButtonText = _selectedCallStatuses.contains('All Statuses')
-        ? 'All Statuses'
-        : _selectedCallStatuses.length == 1
-        ? _selectedCallStatuses.first
-        : '${_selectedCallStatuses.length} Statuses';
-
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -303,32 +309,35 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
           runSpacing: 12.0,
           alignment: WrapAlignment.start,
           children: [
-            _buildFilterChip("Call Status", statusButtonText, Icons.phone_callback, () {
-              _showMultiSelectDialog(
-                context: context,
-                title: 'Select Call Statuses',
-                allOptions: _availableCallStatuses,
-                selectedOptions: _selectedCallStatuses,
-                allKeyword: 'All Statuses',
-                onConfirm: (results) {
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableCallStatuses,
+                selectedItems: _selectedCallStatuses,
+                title: "Select Call Statuses",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() => _selectedCallStatuses = results);
                   _applyAllFiltersAndRecalculate();
                 },
-              );
-            }, disabled: _availableCallStatuses.length <= 1 || isLoading),
+              ),
+            ),
 
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
 
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -358,7 +367,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
         children: [
           _buildSummaryInfoCard(),
           const SizedBox(height: 24),
-          Text('Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Summary Charts', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 16),
           _buildChartSection(),
           const SizedBox(height: 30),
@@ -366,7 +375,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
             _buildClientSummarySection(clientSummaryMap),
             const SizedBox(height: 30),
           ],
-          Text('Detailed Logs', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Detailed Logs', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
           const SizedBox(height: 10),
           _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
         ],
@@ -750,7 +759,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
         children: [
           icon,
           const SizedBox(width: 6),
-          Flexible(child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500))),
+          Flexible(child: Text(status, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500))),
         ],
       );
     }
@@ -758,7 +767,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-      child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      child: Text(status, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500)),
     );
   }
 
@@ -863,55 +872,99 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
     required Function(List<String>) onConfirm,
   }) async {
     final tempSelected = List<String>.from(selectedOptions);
+    final individualOptions = allOptions.where((o) => o != allKeyword).toList();
 
     await showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+          bool isAllSelected = individualOptions.isNotEmpty && 
+              individualOptions.every((opt) => tempSelected.contains(opt));
+
           return AlertDialog(
-            title: Text(title),
+            title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
             content: SizedBox(
               width: 350,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: allOptions.length,
-                itemBuilder: (context, index) {
-                  final option = allOptions[index];
-                  final isAllOption = option == allKeyword;
-
-                  return CheckboxListTile(
-                    title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                    value: tempSelected.contains(option),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   CheckboxListTile(
+                    title: Text('Select All', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    value: isAllSelected,
                     onChanged: (bool? value) {
                       setStateDialog(() {
                         if (value == true) {
-                          if (isAllOption) {
-                            tempSelected.clear();
-                            tempSelected.add(allKeyword);
-                          } else {
-                            tempSelected.remove(allKeyword);
-                            tempSelected.add(option);
-                          }
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
                         } else {
-                          tempSelected.remove(option);
-                          if (tempSelected.isEmpty && allOptions.contains(allKeyword)) {
-                            tempSelected.add(allKeyword);
-                          }
+                          tempSelected.clear();
                         }
                       });
                     },
-                  );
-                },
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const Divider(),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: GoogleFonts.poppins(
+                            fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal,
+                            color: isAllOption ? const Color(0xFF5C1A2E) : Colors.black87,
+                          )),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  // Sync with "All" keyword
+                                  if (individualOptions.every((opt) => tempSelected.contains(opt))) {
+                                    if (!tempSelected.contains(allKeyword)) tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                tempSelected.remove(option);
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(context), 
+                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))
+              ),
               ElevatedButton(
-                  onPressed: () {
-                    onConfirm(tempSelected);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Apply')),
+                onPressed: () {
+                  // Fallback: If nothing is selected, default to All if requested (or leave empty)
+                  // For this app, empty filter usually means nothing is shown, so "All" is a safer default
+                  // but we let the user choose.
+                  onConfirm(tempSelected);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
+                child: Text('Confirm', style: GoogleFonts.poppins()),
+              ),
             ],
           );
         });
@@ -1008,11 +1061,11 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-            Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(label, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+            Text(value, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
             if (subtitle != null && subtitle.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+              Text(subtitle, style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade600)),
             ],
           ],
         ),
@@ -1065,7 +1118,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
           padding: const EdgeInsets.all(12.0),
           child: Column(
             children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               SizedBox(height: 250, child: chartWithBoundary),
             ],
@@ -1086,7 +1139,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
             Expanded(
               child: Text(
                 'Summary of Calls per Client',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             Visibility(
@@ -1123,12 +1176,12 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
               child: DataTable(
                 columnSpacing: 15.0,
                 headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
-                columns: const [
-                  DataColumn(label: Text('Client ART ID')),
-                  DataColumn(label: Text('Client Name')),
-                  DataColumn(label: Text('Client Phone')),
-                  DataColumn(label: Text('Total Calls')),
-                  DataColumn(label: Text('Call Status Summary')),
+                columns: [
+                  DataColumn(label: Text('Client ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client Phone', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Total Calls', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Call Status Summary', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                 ],
                 rows: clientSummaryMap.values.map((summary) {
                   final statusSummary = summary.statusCounts.entries
@@ -1136,11 +1189,11 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
                       .join(', ');
 
                   return DataRow(cells: [
-                    DataCell(Text(_maskClientName(summary.clientId))),
-                    DataCell(Text(_maskClientName(summary.clientName))),
-                    DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))),
-                    DataCell(Text(summary.totalCalls.toString())),
-                    DataCell(Text(statusSummary)),
+                    DataCell(Text(_maskClientName(summary.clientId), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskClientName(summary.clientName), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber), style: GoogleFonts.poppins())),
+                    DataCell(Text(summary.totalCalls.toString(), style: GoogleFonts.poppins())),
+                    DataCell(Text(statusSummary, style: GoogleFonts.poppins())),
                   ]);
                 }).toList(),
               ),
@@ -1174,7 +1227,7 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
             return ListTile(
               title: Row(
                 children: [
-                  Expanded(child: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text(dateKey, style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                   Visibility(
                     visible: isExpanded,
                     maintainSize: true,
@@ -1205,30 +1258,40 @@ class _ReportsPageWebState extends State<ReportsPageWeb> {
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
-                  DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
-                  DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('Call Status')),
-                  DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')), DataColumn(label: Text("Tracker's Designation")),
-                  DataColumn(label: Text("Tracker's Facility")), DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
+                columns: [
+                  DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client PhoneNo', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client ART Status', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Client's Facility", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client State', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Client ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('DatimCode', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Time Tracked', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Call Status', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Duration', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Tracked By', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Designation", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Facility", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Supervisor", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text("Tracker's Supervisor Email", style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                 ],
                 rows: dailyContactList.map((contact) {
                   return DataRow(cells: [
-                    DataCell(Text(_maskClientName(contact.name))),
-                    DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
-                    DataCell(Text(contact.artStatus ?? 'N/A')),
-                    DataCell(Text(contact.facilityName ?? 'N/A')),
-                    DataCell(Text(contact.state ?? 'N/A')),
-                    DataCell(Text(_maskClientName(contact.uniqueID))),
-                    DataCell(Text(contact.datimCode ?? 'N/A')),
-                    DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
+                    DataCell(Text(_maskClientName(contact.name), style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskPhoneNumber(contact.phoneNumber), style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.artStatus ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.facilityName ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.state ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(_maskClientName(contact.uniqueID), style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.datimCode ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A', style: GoogleFonts.poppins())),
                     DataCell(_buildStatusCell(contact.callStatus)),
-                    DataCell(Text(formatDuration(contact.callDuration ?? 0))),
-                    DataCell(Text(contact.trackedBy ?? 'N/A')),
-                    DataCell(Text(contact.designation ?? 'N/A')),
-                    DataCell(Text(contact.trackerFacilityLocation ?? 'N/A')),
-                    DataCell(Text(contact.supervisorName ?? 'N/A')),
-                    DataCell(Text(contact.supervisorEmail ?? 'N/A')),
+                    DataCell(Text(formatDuration(contact.callDuration ?? 0), style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.trackedBy ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.designation ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.trackerFacilityLocation ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.supervisorName ?? 'N/A', style: GoogleFonts.poppins())),
+                    DataCell(Text(contact.supervisorEmail ?? 'N/A', style: GoogleFonts.poppins())),
                   ]);
                 }).toList(),
               ),

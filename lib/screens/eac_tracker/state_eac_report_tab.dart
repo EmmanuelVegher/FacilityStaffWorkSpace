@@ -14,6 +14,9 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:csv/csv.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../widgets/global_multi_select_dropdown.dart';
 import '../../widgets/drawer2.dart';
 
 
@@ -150,8 +153,8 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
 
   // --- Filter State ---
   String? _currentUserState; // Automatically determined state
-  final List<String> _availableFacilities = ['All Facilities'];
-  List<String> _selectedFacilities = ['All Facilities'];
+  List<String> _availableFacilities = [];
+  List<String> _selectedFacilities = [];
 
   // --- Call Costs & Chart Data ---
   double _totalCallCost = 0.0, _costPerSecond = 0.25;
@@ -367,12 +370,16 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
   // --- DATA FETCHING & PROCESSING ---
 
   Future<void> _loadFacilitiesForState(String state) async {
-    setState(() => _isFacilitiesLoading = true);
+    setState(() {
+      _isFacilitiesLoading = true;
+      _availableFacilities = [];
+      _selectedFacilities = [];
+    });
     try {
       final snapshot = await _firestore.collection('Location').doc(state).collection(state).get();
       final facilities = snapshot.docs.map((doc) => doc['LocationName'] as String).where((name) => name.isNotEmpty).toList()..sort();
       if (mounted) {
-        setState(() => _availableFacilities.addAll(facilities));
+        setState(() => _availableFacilities = facilities);
       }
     } catch (e, s) {
       debugPrint("Error fetching facilities for $state: $e\n$s");
@@ -388,7 +395,7 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
         .where('dateTracked', isGreaterThanOrEqualTo: startDate)
         .where('dateTracked', isLessThanOrEqualTo: endDate!.add(const Duration(days: 1)));
 
-    if (!_selectedFacilities.contains('All Facilities')) {
+    if (_selectedFacilities.isNotEmpty) {
       if (_selectedFacilities.length > 30) {
         _showSnackBar("Log query limited to first 30 facilities due to system limits.");
         query = query.where('trackerFacilityLocation', whereIn: _selectedFacilities.take(30).toList());
@@ -404,9 +411,7 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
   }
 
   Future<void> _fetchEacSummaries() async {
-    List<String> facilitiesToQuery = _selectedFacilities.contains('All Facilities')
-        ? _availableFacilities.where((f) => f != 'All Facilities').toList()
-        : List.from(_selectedFacilities);
+    List<String> facilitiesToQuery = List.from(_selectedFacilities);
 
     if (facilitiesToQuery.isEmpty) {
       if(mounted) setState(() => _eacSummaries = []);
@@ -482,17 +487,28 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text(appBarTitle, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: _buildAppBarActions(),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(child: bodyContent),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(child: bodyContent),
+          ],
+        ),
       ),
     );
   }
@@ -522,8 +538,6 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
   Widget _buildFilterBar() {
     if (_isFilterLoading) return const SizedBox.shrink();
 
-    String facilityButtonText = _selectedFacilities.contains('All Facilities') ? 'All Facilities' : _selectedFacilities.length == 1 ? _selectedFacilities.first : '${_selectedFacilities.length} Facilities';
-
     return Card(
       margin: const EdgeInsets.all(8.0), elevation: 2,
       child: Padding(
@@ -532,26 +546,31 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 16.0, runSpacing: 12.0, alignment: WrapAlignment.start,
           children: [
-            _buildFilterChip("Facility", facilityButtonText, Icons.business_center, () {
-              _showMultiSelectDialog(
-                context: context, title: 'Select Facilities', allOptions: _availableFacilities,
-                selectedOptions: _selectedFacilities, allKeyword: 'All Facilities',
-                onConfirm: (results) => setState(() => _selectedFacilities = results),
-              );
-            }, disabled: _isFacilitiesLoading),
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) => setState(() => _selectedFacilities = results),
+              ),
+            ),
 
             OutlinedButton.icon(
               onPressed: isLoading ? null : _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates'),
+              label: Text((startDate != null && endDate != null) ? '${_formatDateWithSuffix(startDate!)} - ${_formatDateWithSuffix(endDate!)}' : 'Select Dates', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
-
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: isLoading ? null : _loadReports,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -583,7 +602,7 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
             const SizedBox(height: 24),
           ],
           if(_filteredLogList.isNotEmpty)...[
-            Text('Call Log Summary Charts', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Call Log Summary Charts', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
             const SizedBox(height: 16),
             _buildChartSection(),
             const SizedBox(height: 30),
@@ -591,7 +610,7 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
               _buildClientSummarySection(clientSummaryMap),
               const SizedBox(height: 30),
             ],
-            Text('Detailed EAC Logs', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Detailed EAC Logs', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
             const SizedBox(height: 10),
             _buildDetailedLogSection(dailyGroupedKeys, dailyGroupedReports),
           ]
@@ -723,7 +742,7 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
 
   // --- HELPER & UTILITY METHODS ---
 
-  void _showSnackBar(String message) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20))); }
+  void _showSnackBar(String message) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message, style: GoogleFonts.poppins()), behavior: SnackBarBehavior.floating, margin: const EdgeInsets.all(20))); }
 
   void _showDateRangePicker() { showDialog(context: context, builder: (context) => AlertDialog(title: const Text('Select Date Range'), content: SizedBox(width: 400, height: 450, child: SfDateRangePicker(selectionMode: DateRangePickerSelectionMode.range, initialSelectedRange: (startDate != null && endDate != null) ? PickerDateRange(startDate!, endDate!) : null, showActionButtons: true, onSubmit: (Object? value) { Navigator.pop(context); if (value is PickerDateRange && value.startDate != null) { setState(() { startDate = value.startDate; endDate = value.endDate ?? value.startDate; }); } }, onCancel: () => Navigator.pop(context))))); }
 
@@ -749,7 +768,99 @@ class _StateEacReportsPageWebState extends State<StateEacReportsPageWeb> {
   Widget _buildClientSummarySection(Map<String, _ClientCallSummary> clientSummaryMap) { return Card(clipBehavior: Clip.antiAlias, elevation: 2, margin: const EdgeInsets.symmetric(vertical: 8.0), child: ExpansionTile(title: Row(children: [Expanded(child: Text('Summary of Calls per Client', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))), Visibility(visible: _isClientSummaryExpanded, maintainSize: true, maintainAnimation: true, maintainState: true, child: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Scroll Left', onPressed: () => _clientSummaryScrollController.animateTo(_clientSummaryScrollController.offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut)), IconButton(icon: const Icon(Icons.arrow_forward), tooltip: 'Scroll Right', onPressed: () => _clientSummaryScrollController.animateTo(_clientSummaryScrollController.offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut))]))]), initiallyExpanded: _isClientSummaryExpanded, onExpansionChanged: (isExpanded) => setState(() => _isClientSummaryExpanded = isExpanded), children: [SingleChildScrollView(controller: _clientSummaryScrollController, scrollDirection: Axis.horizontal, child: Padding(padding: const EdgeInsets.all(8.0), child: DataTable(columnSpacing: 15.0, headingRowColor: WidgetStateProperty.all(Colors.grey.shade200), columns: const [DataColumn(label: Text('Client ART ID')), DataColumn(label: Text('Client Name')), DataColumn(label: Text('Total Calls')), DataColumn(label: Text('Call Outcome Summary'))], rows: clientSummaryMap.values.map((summary) { final statusSummary = summary.statusCounts.entries.map((e) => '${e.key}: ${e.value}').join(', '); return DataRow(cells: [DataCell(Text(_maskArtId(summary.clientId))), DataCell(Text(_maskClientName(summary.clientName))), DataCell(Text(summary.totalCalls.toString())), DataCell(Text(statusSummary))]); }).toList())))])); }
   Widget _buildEacAnalysisSection() { if (_summaryErrorMessage != null) { return Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(16.0), child: Row(children: [const Icon(Icons.warning_amber_rounded, color: Colors.red), const SizedBox(width: 8), Expanded(child: Text("Analysis Error: $_summaryErrorMessage", style: TextStyle(color: Colors.red.shade800)))]))); } if (_eacSummaries.isEmpty) return const SizedBox.shrink(); final EacSessionsSummary totalSessions = _eacSummaries.fold(EacSessionsSummary(withAtLeast3Sessions: 0, without3Sessions: 0), (p, s) => EacSessionsSummary(withAtLeast3Sessions: p.withAtLeast3Sessions + s.eacSessions.withAtLeast3Sessions, without3Sessions: p.without3Sessions + s.eacSessions.without3Sessions)); final int totalClients = _eacSummaries.fold(0, (p, s) => p + s.totalUniqueClients); final TatSummary totalTat = _eacSummaries.fold(TatSummary(lessThan90Days: 0, between90and150Days: 0, moreThan150Days: 0), (p, s) => TatSummary(lessThan90Days: p.lessThan90Days + s.tat.lessThan90Days, between90and150Days: p.between90and150Days + s.tat.between90and150Days, moreThan150Days: p.moreThan150Days + s.tat.moreThan150Days)); final VlSummary totalVl = _eacSummaries.fold(VlSummary(suppressedLessThan50: 0, suppressedLessThan1000: 0, unsuppressed: 0, withRepeatVl: 0, switchReviewCount: 0), (p, s) => VlSummary(suppressedLessThan50: p.suppressedLessThan50 + s.vlSummary.suppressedLessThan50, suppressedLessThan1000: p.suppressedLessThan1000 + s.vlSummary.suppressedLessThan1000, unsuppressed: p.unsuppressed + s.vlSummary.unsuppressed, withRepeatVl: p.withRepeatVl + s.vlSummary.withRepeatVl, switchReviewCount: p.switchReviewCount + s.vlSummary.switchReviewCount)); String subtitle = 'For ${_selectedFacilities.contains("All Facilities") ? "All Facilities" : "${_selectedFacilities.length} Facilitie(s)"} in $_currentUserState'; return Card( clipBehavior: Clip.antiAlias, elevation: 2, child: ExpansionTile( initiallyExpanded: _isAnalysisExpanded, onExpansionChanged: (isExpanded) => setState(() => _isAnalysisExpanded = isExpanded), backgroundColor: Colors.blueGrey.shade50.withOpacity(0.5), title: Text('Aggregated Programmatic EAC Analysis', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.blueGrey.shade800)), subtitle: Text(subtitle, style: TextStyle(color: Colors.blueGrey.shade600)), children: [ Padding( padding: const EdgeInsets.all(16.0), child: Wrap( spacing: 40.0, runSpacing: 24.0, children: [ _buildAnalysisCategory(title: 'EAC Session Adherence', icon: Icons.checklist_rtl_outlined, iconColor: Colors.teal, metrics: {'Total Unique Clients on EAC': totalClients.toString(), 'Completed 3+ Sessions': totalSessions.withAtLeast3Sessions.toString(), 'Incomplete (< 3 Sessions)': totalSessions.without3Sessions.toString()}), _buildAnalysisCategory(title: 'Viral Load (VL) Summary', icon: Icons.science_outlined, iconColor: Colors.deepPurple, metrics: {'Suppressed (< 50 c/ml)': totalVl.suppressedLessThan50.toString(), 'Suppressed (< 1000 c/ml)': totalVl.suppressedLessThan1000.toString(), 'Unsuppressed (≥ 1000 c/ml)': totalVl.unsuppressed.toString(), 'Clients with Repeat VL': totalVl.withRepeatVl.toString(), 'Clients for Switch Review': totalVl.switchReviewCount.toString()}), _buildAnalysisCategory(title: 'Turn-Around Time (TAT) for VL', icon: Icons.hourglass_top_outlined, iconColor: Colors.amber.shade800, metrics: {'Less than 90 Days': totalTat.lessThan90Days.toString(), '90 - 150 Days': totalTat.between90and150Days.toString(), 'More than 150 Days': totalTat.moreThan150Days.toString()}), ], ), ) ], ), ); }
   Widget _buildAnalysisCategory({required String title, required IconData icon, required Color iconColor, required Map<String, String> metrics}) { return ConstrainedBox( constraints: const BoxConstraints(minWidth: 300, maxWidth: 450), child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [ Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: iconColor), const SizedBox(width: 8), Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold))]), const Divider(height: 12), ...metrics.entries.map((entry) => Padding( padding: const EdgeInsets.only(bottom: 6.0), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Text(entry.key, style: Theme.of(context).textTheme.bodyMedium), Text(entry.value, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, color: Colors.black87)), ],), )), ], ), ); }
-  Future<void> _showMultiSelectDialog({ required BuildContext context, required String title, required List<String> allOptions, required List<String> selectedOptions, required String allKeyword, required Function(List<String>) onConfirm, }) async { final tempSelected = List<String>.from(selectedOptions); await showDialog(context: context, builder: (dialogContext) { return StatefulBuilder(builder: (bldContext, setStateDialog) { return AlertDialog(title: Text(title), content: SizedBox(width: 350, child: ListView.builder( shrinkWrap: true, itemCount: allOptions.length, itemBuilder: (context, index) { final option = allOptions[index]; final isAllOption = option == allKeyword; return CheckboxListTile( title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)), value: tempSelected.contains(option), onChanged: (bool? value) { setStateDialog(() { if (value == true) { if (isAllOption) { tempSelected.clear(); tempSelected.add(allKeyword); } else { tempSelected.remove(allKeyword); tempSelected.add(option); } } else { tempSelected.remove(option); if (tempSelected.isEmpty && allOptions.contains(allKeyword)) { tempSelected.add(allKeyword); } } }); }, ); } )), actions: [ TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), ElevatedButton( onPressed: () { onConfirm(tempSelected); Navigator.pop(dialogContext); }, child: const Text('Apply') ) ]); }); }); }
+  Future<void> _showMultiSelectDialog({
+    required BuildContext context,
+    required String title,
+    required List<String> allOptions,
+    required List<String> selectedOptions,
+    required String allKeyword,
+    required Function(List<String>) onConfirm,
+  }) async {
+    final tempSelected = List<String>.from(selectedOptions);
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (bldContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
+          return AlertDialog(
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 350,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        if (value == true) {
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
+                        } else {
+                          tempSelected.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
+                  onPressed: () {
+                    onConfirm(tempSelected);
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Apply')),
+            ],
+          );
+        });
+      },
+    );
+  }
 }
 
 // --- Helper classes ---

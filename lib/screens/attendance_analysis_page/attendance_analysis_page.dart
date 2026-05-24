@@ -17,17 +17,19 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
-import 'package:multi_select_flutter/multi_select_flutter.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html show Blob, Url, document, AnchorElement, window;
 import 'package:excel/excel.dart' as xls;
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../widgets/drawer2.dart';
+import '../../widgets/global_multi_select_dropdown.dart';
 import 'daily_record_management_page.dart'; // Assuming a state-level drawer
 
 // (AnimatedNumberText widget remains the same)
@@ -218,6 +220,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   bool _isExporting = false;
   String? _errorMessage;
   String? _userState;
+  String? _userDepartment;
 
   // --- Filter State ---
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
@@ -235,6 +238,9 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
   List<StaffInfo> _availableStaff = [];
   List<String> _selectedStaffIds = [];
+
+  List<String> _availableStaffCategories = ["All Categories", "Facility Staff", "State Office Staff"];
+  List<String> _selectedStaffCategories = ["All Categories"];
 
   // --- Data & Chart Keys ---
   List<AttendanceRecord> _allRecords = [];
@@ -297,6 +303,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       if (mounted) {
         setState(() {
           _userState = staffDoc.data()?['state'] as String?;
+          _userDepartment = staffDoc.data()?['department'] as String?;
         });
 
         if (_userState != null) {
@@ -441,14 +448,76 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           .showSnackBar(const SnackBar(content: Text("User state not found.")));
       return;
     }
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // --- QUERY MODIFICATION ---
-      // Start with the base query, scoped to the user's state and active staff.
+      // --- QUERY OPTIMIZATION ---
+      // If a specific, manageable list of staff is selected, query their sub-collections directly.
+      // This is MUCH faster than a system-wide collectionGroup scan.
+      if (_selectedStaffIds.isNotEmpty && _selectedStaffIds.length <= 20) {
+        List<AttendanceRecord> directRecords = [];
+        List<Future<void>> futures = [];
+
+        for (String id in _selectedStaffIds) {
+          futures.add(_firestore
+              .collection('Staff')
+              .doc(id)
+              .collection('Record')
+              .where('timestamp', isGreaterThanOrEqualTo: _startDate)
+              .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
+              .get()
+              .then((snap) {
+            final staffInfo = _availableStaff.firstWhere((s) => s.id == id);
+            for (var doc in snap.docs) {
+              final data = doc.data();
+              RecommendationInfo? recommendation;
+              if (data['recommendation'] != null && data['recommendation'] is Map) {
+                recommendation = RecommendationInfo.fromMap(data['recommendation'] as Map<String, dynamic>);
+              }
+
+              final timestampRaw = data['timestamp'];
+              final recordTimestamp = timestampRaw is Timestamp ? timestampRaw.toDate() : (timestampRaw is String ? DateTime.tryParse(timestampRaw) ?? DateTime.now() : DateTime.now());
+              final noOfHoursRaw = data['noOfHours'];
+              double hoursWorked = (noOfHoursRaw is num) ? noOfHoursRaw.toDouble() : (double.tryParse(noOfHoursRaw?.toString() ?? '0') ?? 0.0);
+
+              directRecords.add(AttendanceRecord(
+                recordId: doc.id,
+                staffId: id,
+                staffName: staffInfo.name,
+                assignedFacility: staffInfo.location,
+                date: recordTimestamp,
+                hoursWorked: hoursWorked,
+                clockInLocation: (data['clockInLatitude'] != null) ? GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble()) : null,
+                clockOutLocation: (data['clockOutLatitude'] != null) ? GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble()) : null,
+                deductionStatus: data['deductionStatus'] as String? ?? 'None',
+                recommendation: recommendation,
+                clockInTime: data['clockIn'] as String?,
+                clockOutTime: data['clockOut'] as String?,
+                clockInLocationString: data['clockInLocation'] as String?,
+                clockOutLocationString: data['clockOutLocation'] as String?,
+                durationWorked: data['durationWorked'] as String?,
+              ));
+            }
+          }));
+        }
+
+        await Future.wait(futures);
+        
+        final dateRange = List.generate(
+            _endDate.difference(_startDate).inDays + 1,
+            (i) => _startDate.add(Duration(days: i)));
+
+        _processAndAggregateData(directRecords, _availableStaff, dateRange, _staffInfoByNameMap);
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // Fallback to collectionGroup for 'All Staff' or large selections
+      // This is the part that takes a long time.
       var staffQuery = _firestore
           .collection('Staff')
           .where('state', isEqualTo: _userState)
@@ -530,7 +599,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 data['recommendation'] as Map<String, dynamic>);
           }
 
-          final recordTimestamp = (data['timestamp'] as Timestamp).toDate();
+          final timestampRaw = data['timestamp'];
+          final recordTimestamp = timestampRaw is Timestamp ? timestampRaw.toDate() : (timestampRaw is String ? DateTime.tryParse(timestampRaw) ?? DateTime.now() : DateTime.now());
 
           // Parse hoursWorked safely
           final noOfHoursRaw = data['noOfHours'];
@@ -1191,9 +1261,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance Analysis Dashboard",
-            style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("Attendance Analysis Dashboard",
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (_isExporting)
@@ -1254,43 +1325,86 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   ),
                 ),
               ],
-            )
+            ),
+          if (_userDepartment?.toLowerCase() == 'program management')
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.admin_panel_settings_outlined, color: Colors.amber),
+              tooltip: "Program Management Tools",
+              onSelected: (value) {
+                if (value == 'apply_holiday') _showApplyHolidayDialog();
+                if (value == 'sync_holiday') _showSyncHolidaysDialog();
+                if (value == 'cleanup') _showDataCleanupDialog();
+                if (value == 'backfill_state') _showBackfillStateDialog();
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'apply_holiday',
+                  child: ListTile(
+                    leading: Icon(Icons.holiday_village_outlined, color: Colors.blue),
+                    title: Text("Apply Batch Holiday"),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'sync_holiday',
+                  child: ListTile(
+                    leading: Icon(Icons.sync_problem_outlined, color: Colors.orange),
+                    title: Text("Sync Holidays with Records"),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'cleanup',
+                  child: ListTile(
+                    leading: Icon(Icons.cleaning_services_outlined, color: Colors.teal),
+                    title: Text("Data Cleanup (Annual Leave)"),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'backfill_state',
+                  child: ListTile(
+                    leading: Icon(Icons.speed_outlined, color: Colors.purple),
+                    title: Text("Backfill State (Optimization)"),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildUpdateBanner(),
-          _buildFilterBar(),
-          Expanded(
-            child: Stack(
-              children: [
-                _buildDashboardBody(),
-                if (_isLoading)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white)),
-                  ),
-                if (_errorMessage != null)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: Center(
-                      child: Card(
-                        margin: const EdgeInsets.all(24),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(_errorMessage!,
-                              style: const TextStyle(
-                                  color: Colors.red, fontSize: 16)),
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildUpdateBanner(),
+            _buildFilterBar(),
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildDashboardBody(),
+                  if (_isLoading)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: const Center(
+                          child: CircularProgressIndicator(color: Colors.white)),
+                    ),
+                  if (_errorMessage != null)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: Center(
+                        child: Card(
+                          margin: const EdgeInsets.all(24),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Text(_errorMessage!,
+                                style: const TextStyle(
+                                    color: Colors.red, fontSize: 16)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1320,142 +1434,86 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             ),
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField(
-                items: [
-                  MultiSelectItem<String>(
-                      _allFacilitiesOption, _allFacilitiesOption),
-                  ..._availableFacilities
-                      .map((f) => MultiSelectItem<String>(f, f)),
-                ],
-                initialValue: _selectedFacilities,
-                title: const Text("Select Facilities"),
-                selectedColor: Colors.teal,
-                decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.teal, width: 1),
-                ),
-                buttonIcon: const Icon(Icons.location_city, color: Colors.teal),
-                buttonText: Text(
-                  _selectedFacilities.length == _availableFacilities.length &&
-                          _availableFacilities.isNotEmpty
-                      ? "All Facilities Selected"
-                      : _selectedFacilities.isEmpty
-                          ? "Facility"
-                          : "${_selectedFacilities.length} Facilit${_selectedFacilities.length == 1 ? 'y' : 'ies'} selected",
-                  style: TextStyle(color: Colors.teal[800], fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                // In the MultiSelectDialogField for Facilities:
-                onConfirm: (results) {
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() {
-                    final castedResults = results.cast<String>();
-                    // If "All Facilities" is selected, select everything.
-                    if (castedResults.contains(_allFacilitiesOption)) {
-                      _selectedFacilities =
-                          List<String>.from(_availableFacilities);
-                    } else {
-                      // Otherwise, just take the specific selections.
-                      _selectedFacilities = castedResults;
-                    }
-                    // After updating facilities, the list of available staff might change.
+                    _selectedFacilities = results;
                     _updateStaffFilter();
                   });
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(
-                      _allDesignationsOption, _allDesignationsOption),
-                  ..._availableDesignations
-                      .map((d) => MultiSelectItem<String>(d, d)),
-                ],
-                initialValue: _selectedDesignations,
-                title: const Text("Select Designations"),
-                buttonIcon:
-                    Icon(Icons.work_outline, color: Colors.grey.shade700),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.grey.shade600, width: 1),
-                ),
-                buttonText: Text(
-                    _selectedDesignations.length ==
-                                _availableDesignations.length &&
-                            _availableDesignations.isNotEmpty
-                        ? "All Designations Selected"
-                        : _selectedDesignations.isEmpty
-                            ? "Designation"
-                            : "${_selectedDesignations.length} Selected",
-                    style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-                    overflow: TextOverflow.ellipsis),
-                onConfirm: (values) {
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableStaff.map((s) => s.id).toList(),
+                selectedItems: _selectedStaffIds,
+                title: "Select Staff",
+                labelBuilder: (id) {
+                     final staff = _availableStaff.firstWhere(
+                        (s) => s.id == id,
+                        // Create a dummy staff or return ID if not found. 
+                        // Since firstWhere throws or requires orElse returning a StaffInfo options.
+                        // Assuming StaffInfo has a constructor. 
+                        // Safer to use a lookup or just loop.
+                        // But for brevity in builder:
+                        orElse: () => _availableStaff.isNotEmpty ? _availableStaff.first : throw "Error", 
+                     );
+                     // Actually better to just do:
+                     try {
+                       return _availableStaff.firstWhere((s) => s.id == id).name;
+                     } catch (e) {
+                       return "Unknown Staff ($id)";
+                     }
+                  },
+                onChanged: (results) {
                   setState(() {
-                    final castedValues = values.cast<String>();
-                    // If "All Designations" is selected, select everything.
-                    if (castedValues.contains(_allDesignationsOption)) {
-                      _selectedDesignations =
-                          List<String>.from(_availableDesignations);
-                    } else {
-                      // Otherwise, just take the specific selections.
-                      _selectedDesignations = castedValues;
-                    }
-                    _updateStaffFilter();
+                    _selectedStaffIds = results;
                   });
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
             Container(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(_allStaffOption, "All Staff"),
-                  ..._availableStaff
-                      .map((s) => MultiSelectItem<String>(s.id, s.name)),
-                ],
-                initialValue: _selectedStaffIds,
-                title: const Text("Select Staff"),
-                buttonIcon:
-                    Icon(Icons.person_outline, color: Colors.grey.shade700),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.grey.shade600, width: 1),
-                ),
-                buttonText: Text(
-                  _selectedStaffIds.length == _availableStaff.length &&
-                          _availableStaff.isNotEmpty
-                      ? "All Staff Selected"
-                      : _selectedStaffIds.isEmpty
-                          ? "Staff"
-                          : "${_selectedStaffIds.length} Selected",
-                  style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onConfirm: (values) {
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableDesignations,
+                selectedItems: _selectedDesignations,
+                title: "Select Designations",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() {
-                    final castedValues = values.cast<String>();
-                    // If "All Staff" is selected, select all available staff IDs.
-                    if (castedValues.contains(_allStaffOption)) {
-                      _selectedStaffIds =
-                          _availableStaff.map((s) => s.id).toList();
-                    } else {
-                      // Otherwise, just take the specific selections.
-                      _selectedStaffIds = castedValues;
-                    }
+                    _selectedDesignations = results;
+                    _updateStaffFilter();
                   });
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
+              ),
+            ),
+            Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableStaffCategories,
+                selectedItems: _selectedStaffCategories,
+                title: "Select Staff Categories",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
+                  setState(() {
+                    _selectedStaffCategories = results;
+                    _updateStaffFilter();
+                  });
+                },
               ),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.bar_chart_rounded),
-              label: const Text('Load Dashboard'),
+              label: Text('Load Dashboard', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
               onPressed: _isLoading ? null : _loadDashboardData,
               style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
@@ -1933,7 +1991,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                             }
                             // --- RENDER 'EDIT' BUTTON (with permission check) ---
                             else {
-                              // ... (logic to get hours, backgroundColor, statusIcon remains the same)
                               final hours = recordForDay.hoursWorked;
                               Color backgroundColor = Colors.transparent;
                               IconData? statusIcon;
@@ -1973,6 +2030,47 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
+                                      FutureBuilder<List<String>>(
+                                        future: _getVerifiersForStaffAndDate(
+                                            recordForDay.staffId, date),
+                                        builder: (context, snapshot) {
+                                          final verifiers = snapshot.data ?? [];
+                                          if (verifiers.isNotEmpty) {
+                                            return Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons.verified_user,
+                                                      size: 16,
+                                                      color: Colors.blue),
+                                                  onPressed: () =>
+                                                      _showVerificationDialog(
+                                                          summary.name,
+                                                          recordForDay.staffId,
+                                                          date),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  tooltip:
+                                                      'View verifiers for this day',
+                                                ),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  verifiers.length.toString(),
+                                                  style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.blue,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
+                                              ],
+                                            );
+                                          }
+                                          return const SizedBox(width: 20);
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
                                       if (statusIcon != null)
                                         Icon(statusIcon,
                                             size: 16, color: iconColor),
@@ -2454,6 +2552,606 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       html.Url.revokeObjectUrl(url);
     } else {
       throw UnsupportedError('Download not supported on this platform');
+    }
+  }
+
+  void _showVerificationDialog(
+      String staffName, String staffId, DateTime date) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Verifiers for $staffName'),
+          content: FutureBuilder<List<String>>(
+            future: _getVerifiersForStaffAndDate(staffId, date),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Text('Error loading verifiers: ${snapshot.error}');
+              }
+
+              final verifiers = snapshot.data ?? [];
+
+              if (verifiers.isEmpty) {
+                return const Text('No verifications found for this day.');
+              }
+
+              return SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM dd, yyyy').format(date),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Verified by:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...verifiers.map((verifier) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(verifier),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- PROGRAM MANAGEMENT TOOLS ---
+
+  void _showApplyHolidayDialog() {
+    DateTime? diagStartDate;
+    DateTime? diagEndDate;
+    String holidayName = '';
+    List<String> selectedStaffIdsForHoliday = _availableStaff.map((s) => s.id).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Apply Batch Holiday',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("This will create attendance records for selected staff on the selected dates (excluding weekends)."),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Holiday Name',
+                    hintText: 'e.g. Good Friday',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (val) => holidayName = val,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final PickerDateRange? range = await showDialog<PickerDateRange>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Select Range'),
+                        content: SizedBox(
+                          width: 350,
+                          height: 350,
+                          child: SfDateRangePicker(
+                            selectionMode: DateRangePickerSelectionMode.range,
+                            maxDate: DateTime.now().add(const Duration(days: 365)),
+                            showActionButtons: true,
+                            onSubmit: (val) => Navigator.pop(context, val),
+                            onCancel: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+                    );
+                    if (range != null && range.startDate != null) {
+                      setDialogState(() {
+                        diagStartDate = range.startDate;
+                        diagEndDate = range.endDate ?? range.startDate;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.date_range),
+                  label: Text(diagStartDate == null
+                      ? "Select Date Range"
+                      : "${DateFormat('dd/MM/yy').format(diagStartDate!)} - ${DateFormat('dd/MM/yy').format(diagEndDate!)}"),
+                ),
+                const SizedBox(height: 16),
+                GlobalMultiSelectDropdown<String>(
+                  items: _availableStaff.map((s) => s.id).toList(),
+                  selectedItems: selectedStaffIdsForHoliday,
+                  title: "Select Staff",
+                  labelBuilder: (id) {
+                    final staff = _availableStaff.firstWhere((s) => s.id == id,
+                        orElse: () => StaffInfo(
+                            id: id, name: "Unknown", location: "", designation: "", firstName: "", lastName: "", supervisorEmail: "", state: "", department: "", mobile: "", email: "", staffCategory: ""));
+                    return staff.name;
+                  },
+                  onChanged: (results) {
+                    setDialogState(() {
+                      selectedStaffIdsForHoliday = results;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (holidayName.isEmpty || diagStartDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please provide a name and date range.")),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                _applyBatchHoliday(diagStartDate!, diagEndDate!, holidayName, selectedStaffIdsForHoliday);
+              },
+              child: const Text('APPLY'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSyncHolidaysDialog() {
+    DateTime? diagStartDate;
+    DateTime? diagEndDate;
+    String holidayName = '';
+    List<String> selectedStaffIdsForHoliday = _availableStaff.map((s) => s.id).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Sync Holidays with Records',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.orange)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("This will check existing records and submitted timesheets. It will add missing holidays or overwrite normal clock-ins to 'Holiday' status."),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Holiday Name',
+                    hintText: 'e.g. Good Friday',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (val) => holidayName = val,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final PickerDateRange? range = await showDialog<PickerDateRange>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Select Range'),
+                        content: SizedBox(
+                          width: 350,
+                          height: 350,
+                          child: SfDateRangePicker(
+                            selectionMode: DateRangePickerSelectionMode.range,
+                            maxDate: DateTime.now().add(const Duration(days: 365)),
+                            showActionButtons: true,
+                            onSubmit: (val) => Navigator.pop(context, val),
+                            onCancel: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+                    );
+                    if (range != null && range.startDate != null) {
+                      setDialogState(() {
+                        diagStartDate = range.startDate;
+                        diagEndDate = range.endDate ?? range.startDate;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.date_range),
+                  label: Text(diagStartDate == null
+                      ? "Select Date Range"
+                      : "${DateFormat('dd/MM/yy').format(diagStartDate!)} - ${DateFormat('dd/MM/yy').format(diagEndDate!)}"),
+                ),
+                const SizedBox(height: 16),
+                GlobalMultiSelectDropdown<String>(
+                  items: _availableStaff.map((s) => s.id).toList(),
+                  selectedItems: selectedStaffIdsForHoliday,
+                  title: "Select Staff",
+                  labelBuilder: (id) {
+                    final staff = _availableStaff.firstWhere((s) => s.id == id,
+                        orElse: () => StaffInfo(
+                            id: id, name: "Unknown", location: "", designation: "", firstName: "", lastName: "", supervisorEmail: "", state: "", department: "", mobile: "", email: "", staffCategory: ""));
+                    return staff.name;
+                  },
+                  onChanged: (results) {
+                    setDialogState(() {
+                      selectedStaffIdsForHoliday = results;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              onPressed: () {
+                if (holidayName.isEmpty || diagStartDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please provide a name and date range.")),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                _syncHolidays(diagStartDate!, diagEndDate!, holidayName, selectedStaffIdsForHoliday);
+              },
+              child: const Text('SYNC NOW', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDataCleanupDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Attendance Data Cleanup',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.teal)),
+        content: const Text("This will scan ALL attendance records across the system and change 'Annual' to 'Annual Leave' so they appear correctly in timesheets. This action is irreversible."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            onPressed: () {
+              Navigator.pop(context);
+              _performDataCleanup();
+            },
+            child: const Text('CLEANUP DATA', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _applyBatchHoliday(
+      DateTime start, DateTime end, String holidayName, List<String> staffIds) async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    int recordsCreated = 0;
+    try {
+      final WriteBatch batch = _firestore.batch();
+      final dateRange = List.generate(
+          end.difference(start).inDays + 1, (i) => start.add(Duration(days: i)));
+
+      int batchCount = 0;
+      for (String staffId in staffIds) {
+        final staff = _availableStaff.firstWhere((s) => s.id == staffId);
+        for (DateTime date in dateRange) {
+          // Skip weekends
+          if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+            continue;
+          }
+
+          final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
+          final monthStr = DateFormat('MMMM yyyy').format(date);
+          final docRef = _firestore.collection('Staff').doc(staffId).collection('Record').doc(dateStr);
+
+          // PERFORMANCE FIX: We use set with merge: true to avoid the expensive 'get()' check.
+          // This allows the holiday to be applied whether or not a record exists.
+          // If we want to strictly avoid overwriting clock-ins, we'd need another strategy, 
+          // but for holidays, we typically want them to be the primary record.
+          batch.set(docRef, {
+            "clockIn": "08:00 AM",
+            "clockInLatitude": 0,
+            "clockInLocation": staff.location,
+            "clockInLongitude": 0,
+            "clockOut": "05:00 PM",
+            "clockOutLatitude": 0,
+            "clockOutLocation": staff.location,
+            "clockOutLongitude": 0,
+            "comments": "Holiday: $holidayName",
+            "date": dateStr,
+            "durationWorked": holidayName,
+            "isSynced": true,
+            "isUpdated": true,
+            "month": monthStr,
+            "noOfHours": 8,
+            "offDay": true,
+            "timestamp": DateTime(date.year, date.month, date.day, 1, 0, 0),
+            "voided": false,
+            "state": _userState, // Optimization: add state field for easier collectionGroup filtering later
+          }, SetOptions(merge: true));
+          
+          recordsCreated++;
+          batchCount++;
+          
+          if (batchCount >= 400) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+      }
+
+      if (batchCount > 0) await batch.commit();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Batch Applied Successfully! $recordsCreated records processed.")),
+        );
+        _loadDashboardData();
+      }
+    } catch (e) {
+      debugPrint("Error in _applyBatchHoliday: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error applying batch holiday: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _syncHolidays(
+      DateTime start, DateTime end, String holidayName, List<String> staffIds) async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    int recordsUpdated = 0;
+    try {
+      final dateRange = List.generate(
+          end.difference(start).inDays + 1, (i) => start.add(Duration(days: i)));
+
+      for (String staffId in staffIds) {
+        final staff = _availableStaff.firstWhere((s) => s.id == staffId);
+        final WriteBatch batch = _firestore.batch();
+        int batchCount = 0;
+
+        for (DateTime date in dateRange) {
+          if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+            continue;
+          }
+
+          final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
+          final monthStr = DateFormat('MMMM yyyy').format(date);
+          final docRef = _firestore.collection('Staff').doc(staffId).collection('Record').doc(dateStr);
+
+          batch.set(docRef, {
+            "clockIn": "08:00 AM",
+            "clockInLatitude": 0,
+            "clockInLocation": staff.location,
+            "clockInLongitude": 0,
+            "clockOut": "05:00 PM",
+            "clockOutLatitude": 0,
+            "clockOutLocation": staff.location,
+            "clockOutLongitude": 0,
+            "comments": "Holiday: $holidayName",
+            "date": dateStr,
+            "durationWorked": holidayName,
+            "isSynced": true,
+            "isUpdated": true,
+            "month": monthStr,
+            "noOfHours": 8,
+            "offDay": true,
+            "timestamp": DateTime(date.year, date.month, date.day, 1, 0, 0),
+            "voided": false,
+            "state": _userState,
+          }, SetOptions(merge: true));
+          
+          recordsUpdated++;
+          batchCount++;
+
+          if (batchCount >= 400) { // Safety for batch limit
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+        if (batchCount > 0) await batch.commit();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Sync Completed! $recordsUpdated days set to Holiday status.")),
+        );
+        _loadDashboardData();
+      }
+    } catch (e) {
+      debugPrint("Error in _syncHolidays: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error syncing holidays: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _performDataCleanup() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
+    int totalCleaned = 0;
+    bool isDone = false;
+    
+    try {
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('cleanupAttendanceData');
+
+      while (!isDone) {
+        if (!mounted) break;
+        
+        // Show iterative progress in snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Phase: Cleaning records... ($totalCleaned completed)"),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        final result = await callable.call();
+        final data = result.data as Map<String, dynamic>;
+        
+        totalCleaned += (data['processed'] as int? ?? 0);
+        isDone = data['done'] as bool? ?? true;
+
+        if (isDone) break;
+        
+        // Optional: slight delay to avoid overwhelming the client UI
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Cleanup Successful! Total $totalCleaned records updated.")),
+        );
+        _loadDashboardData();
+      }
+    } catch (e) {
+      debugPrint("Error in Cloud Function _performDataCleanup: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Cleanup failed on server: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+  Future<List<String>> _getVerifiersForStaffAndDate(
+      String staffId, DateTime date) async {
+    try {
+      final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
+
+      final recordDoc = await _firestore
+          .collection('Staff')
+          .doc(staffId)
+          .collection('Record')
+          .doc(dateStr)
+          .get();
+
+      if (recordDoc.exists) {
+        final data = recordDoc.data();
+        final verifiedByUserNames =
+            List<String>.from(data?['verifiedByUserNames'] ?? []);
+        return verifiedByUserNames;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching verifiers: $e");
+      return [];
+    }
+  }
+
+  void _showBackfillStateDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Database Optimization: Backfill State',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.purple)),
+        content: const Text("This tool will scan every attendance record for all staff in your state and add the 'state' field to them. This is a one-time optimization that will make your dashboard load significantly faster. \n\nThis process may take a few minutes depending on the volume of data."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+            onPressed: () {
+              Navigator.pop(context);
+              _performStateBackfill();
+            },
+            child: const Text('START OPTIMIZATION', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performStateBackfill() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Optimization started on server. This may take a minute..."),
+          duration: Duration(seconds: 5),
+        ),
+      );
+
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('backfillStateField');
+      
+      final result = await callable.call({'state': _userState});
+      final data = result.data as Map<String, dynamic>;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  "Optimization Complete! Handled ${data['processed']} records for your state.")),
+        );
+        _loadDashboardData();
+      }
+    } catch (e) {
+      debugPrint("Error in Cloud Function _performStateBackfill: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server-side optimization failed: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

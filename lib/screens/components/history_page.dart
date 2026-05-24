@@ -9,6 +9,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:month_year_picker/month_year_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/drawer.dart';
 import '../login_screen.dart'; // Import your login screen
@@ -45,9 +46,9 @@ class _HistoryPageState extends State<HistoryPage> {
   ];
   final List<String> _years = [];
 
-  static const Color wineColor = Color(0xFF722F37); // Deep wine color
+  static const Color wineColor = Color(0xFF5C1A2E); // Corporate Maroon
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
+    colors: [wineColor, Color(0xFF7D243E)], // Maroon to slightly lighter maroon
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -158,7 +159,20 @@ class _HistoryPageState extends State<HistoryPage> {
         print("Document ID: ${doc.id}, Data: ${doc.data()}");
       }
 
-      return filteredDocs.map((doc) => AttendanceModel.fromFirestore(doc.data(), doc.id)).toList();
+      final attendanceList = filteredDocs.map((doc) => AttendanceModel.fromFirestore(doc.data(), doc.id)).toList();
+      
+      // Sort by date from latest to earliest
+      attendanceList.sort((a, b) {
+        try {
+          final dateA = DateFormat('dd-MMMM-yyyy').parse(a.date ?? '');
+          final dateB = DateFormat('dd-MMMM-yyyy').parse(b.date ?? '');
+          return dateB.compareTo(dateA); // Descending order (latest first)
+        } catch (e) {
+          return 0; // If parsing fails, keep original order
+        }
+      });
+      
+      return attendanceList;
     });
   }
 
@@ -243,7 +257,9 @@ class _HistoryPageState extends State<HistoryPage> {
       onPointerSignal: (_) => _resetInactivityTimer(), // Reset timer on scroll/signal
       child: Scaffold(
         appBar:AppBar(
-          title: const Text('History', style: TextStyle(color: Colors.white)),
+          title: Text('History',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.w600)),
           iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
           flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: appBarGradient),
@@ -253,12 +269,13 @@ class _HistoryPageState extends State<HistoryPage> {
         drawer: drawer(
           context,
         ),
-        body: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: screenWidth * cardMarginFactor, vertical: screenHeight * cardMarginFactor),
-          child: Column(
-            children: [
-              Container(
-                alignment: Alignment.centerLeft,
+        body: SelectionArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: screenWidth * cardMarginFactor, vertical: screenHeight * cardMarginFactor),
+            child: Column(
+              children: [
+                Container(
+                  alignment: Alignment.centerLeft,
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -276,7 +293,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     child: DropdownButtonFormField<String>(
                       decoration: InputDecoration(
                         labelText: 'Month',
-                        labelStyle: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor),
+                        labelStyle: GoogleFonts.poppins(fontSize: screenWidth * dropdownFontSizeFactor),
                         border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
@@ -285,7 +302,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       items: _months.map((month) {
                         return DropdownMenuItem<String>(
                           value: month,
-                          child: Text(month, style: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor)),
+                          child: Text(month, style: GoogleFonts.poppins(fontSize: screenWidth * dropdownFontSizeFactor)),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -300,7 +317,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     child: DropdownButtonFormField<String>(
                       decoration: InputDecoration(
                         labelText: 'Year',
-                        labelStyle: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor),
+                        labelStyle: GoogleFonts.poppins(fontSize: screenWidth * dropdownFontSizeFactor),
                         border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: screenHeight * 0.01),
                       ),
@@ -309,7 +326,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       items: _years.map((year) {
                         return DropdownMenuItem<String>(
                           value: year,
-                          child: Text(year, style: TextStyle(fontSize: screenWidth * dropdownFontSizeFactor)),
+                          child: Text(year, style: GoogleFonts.poppins(fontSize: screenWidth * dropdownFontSizeFactor)),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -335,7 +352,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       if (snapshot.hasData) {
                         final attendance = snapshot.data!;
                         if (attendance.isEmpty) {
-                          return const Center(child: Text('No Attendance found for the selected month and year'));
+                          return Center(child: Text('No Attendance found for the selected month and year', style: GoogleFonts.poppins()));
                         }
                         return ListView.builder(
                           itemCount: attendance.length,
@@ -373,8 +390,8 @@ class _HistoryPageState extends State<HistoryPage> {
                                                 decoration: const BoxDecoration(
                                                   gradient: LinearGradient(
                                                     colors: [
-                                                      Colors.deepOrange,
-                                                      Colors.deepOrange,
+                                                      wineColor,
+                                                      wineColor,
                                                     ],
                                                     begin: Alignment.topCenter,
                                                     end: Alignment.bottomCenter,
@@ -395,8 +412,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                       ),
                                                       Text(
                                                         attendance[index].date.toString(),
-                                                        style: TextStyle(
-                                                            fontFamily: "NexaBold",
+                                                        style: GoogleFonts.poppins(
                                                             fontSize: screenWidth * fontSizeFactor * 1.0,
                                                             color: Colors.white,
                                                             fontWeight:FontWeight.bold
@@ -409,8 +425,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                         attendance[index].offDay == true
                                                             ? "DayOff: ${attendance[index].durationWorked}"
                                                             : "Hour : ${attendance[index].durationWorked}",
-                                                        style: TextStyle(
-                                                            fontFamily: "NexaBold",
+                                                        style: GoogleFonts.poppins(
                                                             fontSize:  screenWidth * fontSizeFactor * 0.9,
                                                             color: Colors.white,
                                                             fontWeight:FontWeight.bold
@@ -426,8 +441,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                             "true"
                                                             ? "Synced"
                                                             : "Not Synced",
-                                                        style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                        style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor * 1.0,
                                                           color: attendance[index]
                                                               .isSynced
@@ -459,8 +473,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                   children: [
                                                     Text(
                                                       "Clock In",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaLight",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor * 1.0,
                                                           color: attendance[index]
                                                               .clockIn
@@ -473,8 +486,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                       attendance[index]
                                                           .clockIn
                                                           .toString(),
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor * 1.0,
                                                           color: attendance[index]
                                                               .clockIn
@@ -488,8 +500,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     ),
                                                     Text(
                                                       "Lat:${attendance[index].clockInLatitude.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor,
                                                           color: attendance[index]
                                                               .clockInLatitude
@@ -500,8 +511,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     ),
                                                     Text(
                                                       "Long:${attendance[index].clockInLongitude.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor,
                                                           color: attendance[index]
                                                               .clockInLongitude
@@ -523,8 +533,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                   children: [
                                                     Text(
                                                       "Clock Out",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaLight",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor * 1.0,
                                                           color: attendance[index]
                                                               .clockOut
@@ -537,8 +546,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                       attendance[index]
                                                           .clockOut
                                                           .toString(),
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor * 1.0,
                                                           color: attendance[index]
                                                               .clockOut
@@ -552,8 +560,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     ),
                                                     Text(
                                                       "Lat:${attendance[index].clockOutLatitude.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor,
                                                           color: attendance[index]
                                                               .clockOutLatitude
@@ -564,8 +571,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     ),
                                                     Text(
                                                       "Long:${attendance[index].clockOutLongitude.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: screenWidth * fontSizeFactor,
                                                           color: attendance[index]
                                                               .clockOutLongitude
@@ -583,10 +589,10 @@ class _HistoryPageState extends State<HistoryPage> {
                                               width: screenWidth * 1,
                                               decoration: const BoxDecoration(
                                                 gradient: LinearGradient(
-                                                  colors: [
-                                                    Colors.deepOrange,
-                                                    Colors.black,
-                                                  ],
+                                                    colors: [
+                                                      Color(0xFFD4A03C), // Corporate Gold
+                                                      Colors.black,
+                                                    ],
 
                                                   begin: Alignment.centerRight,
                                                   end: Alignment.centerLeft,
@@ -602,8 +608,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
                                                     Text(
                                                       "Clock-In Location: ${attendance[index].clockInLocation.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize:  screenWidth * fontSizeFactor,
                                                           color: Colors.white,
                                                           fontWeight:FontWeight.bold
@@ -612,8 +617,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     SizedBox(height:screenHeight * sizedBoxHeightFactor / 2),
                                                     Text(
                                                       "Clock-Out Location: ${attendance[index].clockOutLocation.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize:  screenWidth * fontSizeFactor,
                                                           color: Colors.white,
                                                           fontWeight:FontWeight.bold
@@ -622,13 +626,23 @@ class _HistoryPageState extends State<HistoryPage> {
                                                     SizedBox(height:screenHeight * sizedBoxHeightFactor / 2),
                                                     Text(
                                                       "Comments: ${attendance[index].comments.toString()}",
-                                                      style: TextStyle(
-                                                          fontFamily: "NexaBold",
+                                                      style: GoogleFonts.poppins(
                                                           fontSize:  screenWidth * fontSizeFactor,
                                                           color: Colors.white,
                                                           fontWeight:FontWeight.bold
                                                       ),
                                                     ),
+                                                    if (attendance[index].verifiedByUserNames != null && attendance[index].verifiedByUserNames!.isNotEmpty) ...[
+                                                      SizedBox(height:screenHeight * sizedBoxHeightFactor / 2),
+                                                      Text(
+                                                        "Verified by: ${attendance[index].verifiedByUserNames!.join(', ')}",
+                                                        style: GoogleFonts.poppins(
+                                                            fontSize:  screenWidth * fontSizeFactor,
+                                                            color: Colors.white,
+                                                            fontWeight:FontWeight.bold
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ]
                                               )
 
@@ -654,29 +668,30 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showAttendanceOptionsDialog(BuildContext context, String date) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Delete Attendance"),
-          content: const Text("Do you want to delete this attendance?"),
+          title: Text("Delete Attendance", style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          content: Text("Do you want to delete this attendance?", style: GoogleFonts.poppins()),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _showDeleteConfirmationDialog(context, date);
               },
-              child: const Text("Delete"),
+              child: Text("Delete", style: GoogleFonts.poppins(color: Colors.red)),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text("Cancel"),
+              child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
             ),
           ],
         );
@@ -690,8 +705,8 @@ class _HistoryPageState extends State<HistoryPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Confirm Delete"),
-          content: const Text("Are you sure you want to delete this attendance? This action cannot be undone."),
+          title: Text("Confirm Delete", style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          content: Text("Are you sure you want to delete this attendance? This action cannot be undone.", style: GoogleFonts.poppins()),
           actions: [
             TextButton(
               onPressed: () async {
@@ -726,13 +741,13 @@ class _HistoryPageState extends State<HistoryPage> {
                   );
                 }
               },
-              child: const Text("Yes"),
+              child: Text("Yes", style: GoogleFonts.poppins(color: Colors.red)),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text("No"),
+              child: Text("No", style: GoogleFonts.poppins(color: Colors.grey)),
             ),
           ],
         );
@@ -862,6 +877,8 @@ class AttendanceModel {
   String? durationWorked;
   bool? offDay;
   String? comments;
+  List<String>? verifiedByUserNames;
+  int? verificationCount;
 
 
   AttendanceModel({
@@ -881,7 +898,9 @@ class AttendanceModel {
     this.month,
     this.durationWorked,
     this.offDay,
-    this.comments
+    this.comments,
+    this.verifiedByUserNames,
+    this.verificationCount,
   });
 
   factory AttendanceModel.fromFirestore(Map<String, dynamic> data, String id) {
@@ -903,6 +922,8 @@ class AttendanceModel {
       durationWorked: data['durationWorked'] ?? '0 hours: 0 minutes',
       offDay: data['offDay'] ?? false,
       comments: data['comments'] ?? '',
+      verifiedByUserNames: (data['verifiedByUserNames'] as List<dynamic>?)?.cast<String>(),
+      verificationCount: data['verificationCount'] ?? 0,
     );
   }
 

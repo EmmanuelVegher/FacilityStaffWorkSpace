@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
@@ -261,15 +262,15 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer3(context),
       appBar: AppBar(
-        title: const Text('HQ Monitoring Dashboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('HQ Monitoring Dashboard', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFF5C1A2E),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -286,56 +287,59 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
           const SizedBox(width: 10),
         ],
       ),
+      drawer: drawer3(context),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-        onRefresh: _initializeDashboard,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFilterBar(),
-              const SizedBox(height: 16),
-              _buildNationwideSummaryCards(),
-              const SizedBox(height: 24),
-              _buildAttendanceByStateChart(),
-              const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  int crossAxisCount;
-                  double childAspectRatio;
-                  if (constraints.maxWidth > 1600) {
-                    crossAxisCount = 3;
-                    childAspectRatio = 1.4;
-                  } else if (constraints.maxWidth > 1100) {
-                    crossAxisCount = 2;
-                    childAspectRatio = 1.3;
-                  } else if (constraints.maxWidth > 750) {
-                    crossAxisCount = 2;
-                    childAspectRatio = 1.1;
-                  }
-                  else {
-                    crossAxisCount = 1;
-                    childAspectRatio = 1.2;
-                  }
-                  return GridView.count(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16, mainAxisSpacing: 16,
-                    childAspectRatio: childAspectRatio,
-                    shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+          : SelectionArea(
+              child: RefreshIndicator(
+                onRefresh: _initializeDashboard,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildNationwideAttendanceChart(),
-                      _buildTimesheetStatusCard(),
-                      _buildLeaveRequestsCard(),
+                      _buildFilterBar(),
+                      const SizedBox(height: 16),
+                      _buildNationwideSummaryCards(),
+                      const SizedBox(height: 24),
+                      _buildAttendanceByStateChart(),
+                      const SizedBox(height: 24),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          int crossAxisCount;
+                          double childAspectRatio;
+                          if (constraints.maxWidth > 1600) {
+                            crossAxisCount = 3;
+                            childAspectRatio = 1.4;
+                          } else if (constraints.maxWidth > 1100) {
+                            crossAxisCount = 2;
+                            childAspectRatio = 1.3;
+                          } else if (constraints.maxWidth > 750) {
+                            crossAxisCount = 2;
+                            childAspectRatio = 1.1;
+                          }
+                          else {
+                            crossAxisCount = 1;
+                            childAspectRatio = 1.2;
+                          }
+                          return GridView.count(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 16, mainAxisSpacing: 16,
+                            childAspectRatio: childAspectRatio,
+                            shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+                            children: [
+                              _buildNationwideAttendanceChart(),
+                              _buildTimesheetStatusCard(),
+                              _buildLeaveRequestsCard(),
+                            ],
+                          );
+                        },
+                      )
                     ],
-                  );
-                },
-              )
-            ],
-          ),
-        ),
-      ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
@@ -347,7 +351,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
         child: DropdownButton<String>(
           value: _selectedState, isExpanded: true, icon: const Icon(Icons.public),
           onChanged: _onStateChanged,
-          items: _states.map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(value: value, child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)))).toList(),
+          items: _states.map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(value: value, child: Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)))).toList(),
         ),
       ),
     );
@@ -383,12 +387,12 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(title, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)), Icon(icon, color: color)]),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(title, style: GoogleFonts.poppins(color: Colors.grey.shade600, fontWeight: FontWeight.bold)), Icon(icon, color: color)]),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic,
                 children: [
-                  AnimatedNumberText(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color), fractionDigits: fractionDigits),
-                  if (suffix.isNotEmpty) Text(suffix, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+                  AnimatedNumberText(value, style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: color), fractionDigits: fractionDigits),
+                  if (suffix.isNotEmpty) Text(suffix, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
                 ],
               ),
             ],
@@ -456,7 +460,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
             SizedBox(
               height: 450,
               child: SfCartesianChart(
-                title: ChartTitle(text: 'Attendance by State', textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                title: ChartTitle(text: 'Attendance by State', textStyle: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
                 primaryXAxis: CategoryAxis(majorGridLines: const MajorGridLines(width: 0), axisLine: const AxisLine(width: 0.8, color: Colors.black54)),
                 primaryYAxis: NumericAxis(title: AxisTitle(text: 'Number of Staff'), majorGridLines: const MajorGridLines(width: 0.5), axisLine: const AxisLine(width: 0), majorTickLines: const MajorTickLines(size: 0)),
                 legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
@@ -465,14 +469,14 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                 selectionGesture: ActivationMode.singleTap,
                 onSelectionChanged: (SelectionArgs args) { _showStaffListDialog('Users in ${_attendanceByStateData[args.pointIndex].state}', _staffMap.values.where((s) => s.state == _attendanceByStateData[args.pointIndex].state).toList());  },
                 series: <CartesianSeries<StateAttendanceData, String>>[
-                  ColumnSeries<StateAttendanceData, String>(dataSource: _attendanceByStateData, xValueMapper: (data, _) => data.state, yValueMapper: (data, _) => data.expectedAttendance, name: 'Expected', color: const Color(0xFFE57373), borderRadius: const BorderRadius.all(Radius.circular(8)), selectionBehavior: SelectionBehavior(enable: true), dataLabelSettings: const DataLabelSettings(isVisible: true, textStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12))),
+                  ColumnSeries<StateAttendanceData, String>(dataSource: _attendanceByStateData, xValueMapper: (data, _) => data.state, yValueMapper: (data, _) => data.expectedAttendance, name: 'Expected', color: const Color(0xFFE57373), borderRadius: const BorderRadius.all(Radius.circular(8)), selectionBehavior: SelectionBehavior(enable: true), dataLabelSettings: DataLabelSettings(isVisible: true, textStyle: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12))),
                   ColumnSeries<StateAttendanceData, String>(dataSource: _attendanceByStateData, xValueMapper: (data, _) => data.state, yValueMapper: (data, _) => data.present, name: 'Present', color: const Color(0xFFFFB74D), borderRadius: const BorderRadius.all(Radius.circular(8)), selectionBehavior: SelectionBehavior(enable: true),
                     dataLabelSettings: DataLabelSettings(
                       isVisible: true,
                       builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
                         final stateData = data as StateAttendanceData;
                         if (stateData.present <= 0) return const SizedBox.shrink();
-                        return Text('${stateData.present} (${stateData.attendancePercentage.toStringAsFixed(0)}%)', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12));
+                        return Text('${stateData.present} (${stateData.attendancePercentage.toStringAsFixed(0)}%)', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12));
                       },
                     ),
                   ),
@@ -510,9 +514,9 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(
           children: [
-            Text('Today\'s Attendance Summary', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Today\'s Attendance Summary', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
             const SizedBox(height: 4),
-            Text('Filtered for: $_selectedState', style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
+            Text('Filtered for: $_selectedState', style: GoogleFonts.poppins(color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
             Expanded(
               child: SfCircularChart(
                 legend: const Legend(isVisible: true, overflowMode: LegendItemOverflowMode.wrap, position: LegendPosition.bottom, toggleSeriesVisibility: false),
@@ -529,7 +533,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.15), blurRadius: 3, offset: const Offset(1,1)) ]),
-                          child: Text('${chartData.category}\n${chartData.value} (${percentage.toStringAsFixed(1)}%)', textAlign: TextAlign.center, style: const TextStyle( color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+                          child: Text('${chartData.category}\n${chartData.value} (${percentage.toStringAsFixed(1)}%)', textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
                         );
                       },
                       connectorLineSettings: const ConnectorLineSettings( type: ConnectorType.curve, length: '20%'),
@@ -541,8 +545,8 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                     widget: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("${summary.totalPresent}", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
-                        Text("Clocked In\nof $totalExpected Expected", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
+                        Text("${summary.totalPresent}", style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: const Color(0xFF00695C))),
+                        Text("Clocked In\nof $totalExpected Expected", textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.grey.shade700)),
                       ],
                     ),
                   ),
@@ -563,9 +567,9 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Timesheet Status', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Timesheet Status', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
             const SizedBox(height: 8),
-            Text(DateFormat('MMMM yyyy').format(DateTime(_selectedTimesheetYear, _selectedTimesheetMonth)), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+            Text(DateFormat('MMMM yyyy').format(DateTime(_selectedTimesheetYear, _selectedTimesheetMonth)), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
             Expanded(
               child: StreamBuilder<TimesheetMetrics>(
                 stream: _timesheetStream,
@@ -611,7 +615,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pending Leave Requests', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Pending Leave Requests', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
             const Divider(height: 20),
             Expanded(
               child: StreamBuilder<List<LeaveRequest>>(
@@ -621,7 +625,7 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                   if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red)));
                   final pendingLeaves = snapshot.data ?? [];
                   if (pendingLeaves.isEmpty) {
-                    return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, color: Colors.green, size: 40), SizedBox(height: 8), Text("No pending leave requests.", textAlign: TextAlign.center)]));
+                    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check_circle_outline, color: Colors.green, size: 40), const SizedBox(height: 8), Text("No pending leave requests.", textAlign: TextAlign.center, style: GoogleFonts.poppins())]));
                   }
                   return ListView.builder(
                     itemCount: pendingLeaves.length,
@@ -630,8 +634,8 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                       return ListTile(
                         dense: true, contentPadding: EdgeInsets.zero,
                         leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-                        title: Text(leave.staffName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                        subtitle: Text('${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})', style: const TextStyle(fontSize: 12)),
+                        title: Text(leave.staffName, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+                        subtitle: Text('${leave.leaveType} (${DateFormat('dd MMM').format(leave.startDate)} - ${DateFormat('dd MMM').format(leave.endDate)})', style: GoogleFonts.poppins(fontSize: 12)),
                       );
                     },
                   );
@@ -655,8 +659,8 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(children: [Icon(Icons.circle, color: color, size: 10), const SizedBox(width: 8), Text(title)]),
-          Text(count, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Row(children: [Icon(Icons.circle, color: color, size: 10), const SizedBox(width: 8), Text(title, style: GoogleFonts.poppins())]),
+          Text(count, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         ],
       ),
     );

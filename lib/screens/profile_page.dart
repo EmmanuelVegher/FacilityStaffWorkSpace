@@ -13,6 +13,7 @@ import '../widgets/drawer.dart';
 import '../widgets/header_widget.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 
 class ProfilePage extends StatefulWidget {
@@ -60,9 +61,9 @@ class _ProfilePageState extends State<ProfilePage> {
   String? selectedFacilitySupervisor; // State variable to store the selected supervisor
   String? _selectedSupervisorEmail;
   // Define wine color and gradients
-  static const Color wineColor = Color(0xFF722F37); // Deep wine color
+  static const Color wineColor = Color(0xFF5C1A2E); // Corporate Maroon
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
+    colors: [wineColor, Color(0xFF7D243E)], // Maroon to slightly lighter maroon
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -310,7 +311,9 @@ class _ProfilePageState extends State<ProfilePage> {
         return Scaffold(
           drawer: drawer(context,),
           appBar: AppBar(
-            title: const Text('Profile page', style: TextStyle(color: Colors.white)),
+            title: Text('Profile page',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
             iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
             flexibleSpace: Container(
               decoration: const BoxDecoration(gradient: appBarGradient),
@@ -325,7 +328,8 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           body: firebaseAuthId == null || _staffData == null
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              : SelectionArea(
+            child: SingleChildScrollView(
             child: Stack(
               // ... (rest of the Stack and Container widgets are the same as before)
               children: [
@@ -389,19 +393,17 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 20),
                       Text(
                         '${_staffData?.firstName?.toString().toUpperCase()} ${_staffData?.lastName?.toString().toUpperCase()}',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: fontSizeName,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
                         ),
                       ),
                       const SizedBox(height: 20),
                       Text(
                         _staffData?.designation?.toString().toUpperCase() ?? '',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: fontSizeDesignation,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "NexaLight",
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -412,15 +414,15 @@ class _ProfilePageState extends State<ProfilePage> {
                             Container(
                               padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom),
                               alignment: Alignment.topLeft,
-                              child: Text(
-                                "${_staffData?.role}'s Information",
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: fontSizeSectionTitle,
+                                child: Text(
+                                  "${_staffData?.role}'s Information",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: fontSizeSectionTitle,
+                                  ),
+                                  textAlign: TextAlign.left,
                                 ),
-                                textAlign: TextAlign.left,
-                              ),
                             ),
                             SizedBox(
                               width: double.infinity,
@@ -459,30 +461,30 @@ class _ProfilePageState extends State<ProfilePage> {
                                         fetchMaritalStatus: () => _fetchMaritalStatusFromFirestore(),
                                       ),
 
-                                      ListTile(
-                                        leading: const Icon(Icons.category),
-                                        title: Text("Staff Category", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.staffCategory ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.place),
-                                        title: Text("State", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.state.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.category),
+                                          title: Text("Staff Category", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.staffCategory ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.place),
+                                          title: Text("State", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.state.toString() ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
                                       ListTile(
                                         leading: const Icon(Icons.my_location),
                                         title: Text(_staffData?.staffCategory == "Facility Staff"
-                                            ? "Facility Name"
-                                            : _staffData?.staffCategory == "State Office Staff"
-                                            ? "Office Name"
-                                            : "Office Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.location.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text('Email', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.emailAddress ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                              ? "Facility Name"
+                                              : _staffData?.staffCategory == "State Office Staff"
+                                              ? "Office Name"
+                                              : "Office Name", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.location.toString() ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.email),
+                                          title: Text('Email', style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.emailAddress ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
                                       _buildEditableListTile1(
                                         icon: Icons.phone,
                                         title: 'Phone',
@@ -497,31 +499,31 @@ class _ProfilePageState extends State<ProfilePage> {
                                           });
                                         },
                                       ),
-                                      ListTile(
-                                        leading: const Icon(Icons.local_fire_department_sharp),
-                                        title: Text('Department', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.department ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Designation", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.designation.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.work),
-                                        title: Text('Project', style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.project ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.person),
-                                        title: Text("Supervisor's Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisor.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Supervisor's Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.local_fire_department_sharp),
+                                          title: Text('Department', style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.department ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.person),
+                                          title: Text("Designation", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.designation.toString() ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.work),
+                                          title: Text('Project', style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.project ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.person),
+                                          title: Text("Supervisor's Name", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.supervisor.toString() ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.email),
+                                          title: Text("Supervisor's Email", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.supervisorEmail.toString() ?? '', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // --- NEW FIELDS ADDED ---
 
@@ -529,137 +531,137 @@ class _ProfilePageState extends State<ProfilePage> {
                                       Container(
                                         padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
                                         alignment: Alignment.topLeft,
-                                        child: Text(
-                                          "Account Information",
-                                          style: TextStyle(
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: fontSizeSectionTitle,
+                                          child: Text(
+                                            "Account Information",
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: fontSizeSectionTitle,
+                                            ),
+                                            textAlign: TextAlign.left,
                                           ),
-                                          textAlign: TextAlign.left,
-                                        ),
                                       ),
 
                                       // Account Number
-                                      ListTile(
-                                        leading: const Icon(Icons.account_balance_wallet),
-                                        title: Text("Account Number", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.accountNumber?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.account_balance_wallet),
+                                          title: Text("Account Number", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.accountNumber?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Account Status
-                                      ListTile(
-                                        leading: const Icon(Icons.account_circle),
-                                        title: Text("Account Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.accountStatus?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.account_circle),
+                                          title: Text("Account Status", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.accountStatus?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Bank Name
-                                      ListTile(
-                                        leading: const Icon(Icons.account_balance),
-                                        title: Text("Bank Name", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.bankName?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.account_balance),
+                                          title: Text("Bank Name", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.bankName?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Sort Code
-                                      ListTile(
-                                        leading: const Icon(Icons.sort),
-                                        title: Text("Sort Code", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.sortCode?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.sort),
+                                          title: Text("Sort Code", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.sortCode?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Program Manager Information Section
                                       Container(
                                         padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
                                         alignment: Alignment.topLeft,
-                                        child: Text(
-                                          "Program Management",
-                                          style: TextStyle(
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: fontSizeSectionTitle,
+                                          child: Text(
+                                            "Program Management",
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: fontSizeSectionTitle,
+                                            ),
+                                            textAlign: TextAlign.left,
                                           ),
-                                          textAlign: TextAlign.left,
-                                        ),
                                       ),
 
                                       // Program Manager
-                                      ListTile(
-                                        leading: const Icon(Icons.supervisor_account),
-                                        title: Text("Program Manager", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.programManager?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.supervisor_account),
+                                          title: Text("Program Manager", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.programManager?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Program Manager Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Program Manager Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.programManagerEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.email),
+                                          title: Text("Program Manager Email", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.programManagerEmail?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // User Role
-                                      ListTile(
-                                        leading: const Icon(Icons.person_outline),
-                                        title: Text("Role", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.role?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.person_outline),
+                                          title: Text("Role", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.role?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // System Information Section
                                       Container(
                                         padding: EdgeInsets.only(left: 8.0, bottom: sectionTitlePaddingBottom, top: 20),
                                         alignment: Alignment.topLeft,
-                                        child: Text(
-                                          "System Information",
-                                          style: TextStyle(
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: fontSizeSectionTitle,
+                                          child: Text(
+                                            "System Information",
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: fontSizeSectionTitle,
+                                            ),
+                                            textAlign: TextAlign.left,
                                           ),
-                                          textAlign: TextAlign.left,
-                                        ),
                                       ),
 
                                       // Staff ID
-                                      ListTile(
-                                        leading: const Icon(Icons.perm_identity),
-                                        title: Text("Staff ID", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.id?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.perm_identity),
+                                          title: Text("Staff ID", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.id?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Sync Status
-                                      ListTile(
-                                        leading: const Icon(Icons.sync),
-                                        title: Text("Sync Status", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.isSynced == true ? 'Synced' : 'Not Synced', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.sync),
+                                          title: Text("Sync Status", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.isSynced == true ? 'Synced' : 'Not Synced', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Created By
-                                      ListTile(
-                                        leading: const Icon(Icons.person_add),
-                                        title: Text("Created By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.person_add),
+                                          title: Text("Created By", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.createdBy?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Created By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Created By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.createdByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.email),
+                                          title: Text("Created By Email", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.createdByEmail?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Last Updated By
-                                      ListTile(
-                                        leading: const Icon(Icons.update),
-                                        title: Text("Last Updated By", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedBy?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.update),
+                                          title: Text("Last Updated By", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.lastUpdatedBy?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
 
                                       // Last Updated By Email
-                                      ListTile(
-                                        leading: const Icon(Icons.email),
-                                        title: Text("Last Updated By Email", style: TextStyle(fontSize: fontSizeDetailTitle)),
-                                        subtitle: Text(_staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', style: TextStyle(fontSize: fontSizeDetailSubtitle)),
-                                      ),
+                                        ListTile(
+                                          leading: const Icon(Icons.email),
+                                          title: Text("Last Updated By Email", style: GoogleFonts.poppins(fontSize: fontSizeDetailTitle)),
+                                          subtitle: Text(_staffData?.lastUpdatedByEmail?.toString() ?? 'Not Available', style: GoogleFonts.poppins(fontSize: fontSizeDetailSubtitle)),
+                                        ),
                                       // Padding(
                                       //   padding: const EdgeInsets.symmetric(vertical: 10.0),
                                       //   child: Row(
@@ -775,12 +777,12 @@ class _ProfilePageState extends State<ProfilePage> {
                               width: MediaQuery.of(context).size.width * syncButtonWidth,
                               height: MediaQuery.of(context).size.height * syncButtonHeight,
                               decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.red,
-                                    Colors.black,
-                                  ],
-                                ),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      wineColor,
+                                      Color(0xFFD4A03C), // Corporate Gold
+                                    ],
+                                  ),
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(15),
                                 ),
@@ -789,13 +791,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                 child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        "Sync Updated Bio Data",
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: fontSizeDetailTitle),
-                                      ),
+                                        Text(
+                                          "Sync Updated Bio Data",
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: fontSizeDetailTitle),
+                                        ),
                                       const SizedBox(width: 10),
                                       Icon(
                                         Icons.arrow_upward,
@@ -813,18 +815,14 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
@@ -1135,9 +1133,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return ListTile(
       leading: Icon(icon),
-      title: Text(title, style: const TextStyle(fontSize: 16)),
+      title: Text(title, style: GoogleFonts.poppins(fontSize: 16)),
       subtitle: initialValue != null
-          ? Text(initialValue, style: const TextStyle(fontSize: 14))
+          ? Text(initialValue, style: GoogleFonts.poppins(fontSize: 14))
           : null,
       trailing: IconButton(
         icon: const Icon(Icons.edit),
@@ -1165,14 +1163,16 @@ class _ProfilePageState extends State<ProfilePage> {
         String? newValue = initialValue;
 
         return AlertDialog(
-          title: Text('Edit $title'),
+          title: Text('Edit $title', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           content: TextField(
+            style: GoogleFonts.poppins(),
             onChanged: (value) {
               newValue = value;
             },
             controller: TextEditingController(text: initialValue),
             decoration: InputDecoration(
               hintText: 'Enter new $title',
+              hintStyle: GoogleFonts.poppins(),
             ),
           ),
           actions: [
@@ -1180,14 +1180,14 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () {
                 onSave(newValue ?? "");
                 Navigator.of(context).pop();
               },
-              child: const Text('Save'),
+              child: Text('Save', style: GoogleFonts.poppins(color: wineColor, fontWeight: FontWeight.bold)),
             ),
           ],
         );

@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../widgets/global_multi_select_dropdown.dart';
+import '../../widgets/drawer2.dart';
 
 // Assuming these models are in your project and correctly set up
 import 'vl_eligible_model.dart';
@@ -23,7 +27,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
   List<String> _availableFacilities = [];
   List<String> _availableTrackers = [];
   String? _selectedState;
-  String? _selectedFacility; // Null means "All Facilities"
+  List<String> _selectedFacilities = ['All Facilities'];
   String? _selectedTracker; // Null means "All Trackers"
 
   String? _userState;
@@ -97,7 +101,8 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
       }
 
       _userState = userState;
-      _availableFacilities = await _getFacilitiesForState(userState);
+      final facilities = await _getFacilitiesForState(userState);
+      _availableFacilities = ['All Facilities', ...facilities];
 
       setState(() {
         _isFilterLoading = false;
@@ -221,8 +226,8 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
       _masterVlSummaries = [];
       _masterCallLogs = [];
 
-      final facilityList = _selectedFacility != null
-          ? [_selectedFacility!] // filter mode
+      final facilityList = !_selectedFacilities.contains('All Facilities')
+          ? _selectedFacilities
           : await _getFacilitiesForState(_userState!); // default all
 
       for (final facility in facilityList) {
@@ -294,7 +299,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
 
     setState(() {
       // Now both lists are guaranteed to be of type List<String>
-      _availableFacilities = facilities;
+      _availableFacilities = ['All Facilities', ...facilities];
       _availableTrackers = trackers; // This will no longer cause an error
     });
   }
@@ -304,9 +309,9 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
     List<VlCallLogModel> filteredCallLogs = List.from(_masterCallLogs);
 
     // Apply facility filter
-    if (_selectedFacility != null) {
-      filteredSummaries = filteredSummaries.where((s) => s.id.contains(_selectedFacility!)).toList();
-      filteredCallLogs = filteredCallLogs.where((l) => l.trackerFacility == _selectedFacility).toList();
+    if (!_selectedFacilities.contains('All Facilities')) {
+      filteredSummaries = filteredSummaries.where((s) => _selectedFacilities.any((f) => s.id.contains(f))).toList();
+      filteredCallLogs = filteredCallLogs.where((l) => _selectedFacilities.contains(l.trackerFacility)).toList();
     }
 
     // Apply tracker filter
@@ -372,25 +377,39 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('State Level VL Report'),
+        title: Text('State Level VL Report', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
         automaticallyImplyLeading: false,
-      ),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+        backgroundColor: const Color(0xFF5C1A2E),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _selectedState == null
-                ? const Center(child: Text('Please select a state to view reports.', style: TextStyle(fontSize: 16)))
-                : _buildReportBody(),
           ),
-        ],
+        ),
+      ),
+      drawer: drawer2(context),
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(_errorMessage!, style: GoogleFonts.poppins(color: Colors.red)),
+              ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _selectedState == null
+                  ? Center(child: Text('Please select a state to view reports.', style: GoogleFonts.poppins(fontSize: 16)))
+                  : _buildReportBody(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -404,26 +423,28 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
         child: Wrap(
           spacing: 20,
           runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'Facility',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) => setState(() => _selectedFacilities = results),
               ),
-              initialValue: _selectedFacility,
-              items: [
-                DropdownMenuItem(value: null, child: Text('All Facilities', style: TextStyle(fontStyle: FontStyle.italic))),
-                ..._availableFacilities.map((f) => DropdownMenuItem(value: f, child: Text(f))),
-              ],
-              onChanged: (val) => setState(() => _selectedFacility = val),
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_alt),
-              label: const Text("Apply Filter"),
+              label: Text("Apply Filter", style: GoogleFonts.poppins()),
               onPressed: () async {
                 await _loadReportData(); // reload with selected facility
               },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -473,7 +494,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
         children: [
           // You can re-add your metric cards and charts here, they will use the aggregated state variables.
           // Example:
-          Text('VL Summary ($_currentQuarterDisplay)', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text('VL Summary ($_currentQuarterDisplay)', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8.0, runSpacing: 8.0, alignment: WrapAlignment.start,
@@ -487,7 +508,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
           ),
           const SizedBox(height: 20),
 
-          Text('VL Summary ($_previousQuarterDisplay)', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text('VL Summary ($_previousQuarterDisplay)', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8.0, runSpacing: 8.0, alignment: WrapAlignment.start,
@@ -501,7 +522,7 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
           const SizedBox(height: 20),
 
           // Call Log Table
-          Text('Call Log Details', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text('Call Log Details', style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
           const SizedBox(height: 8),
           _buildCallLogTable(),
         ],
@@ -516,9 +537,9 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
-            Text(title, style: TextStyle(fontSize: 15, color: Colors.grey.shade700)),
+            Text(title, style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade700)),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(value, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -535,12 +556,12 @@ class _StateLevelReportTabState extends State<StateLevelReportTab> {
     return PaginatedDataTable(
       header: const Text('Call Logs'),
       columns: [
-        DataColumn(label: const Text('Date'), onSort: _onSort),
-        DataColumn(label: const Text('Client Name'), onSort: _onSort),
-        DataColumn(label: const Text('ART ID'), onSort: _onSort),
-        DataColumn(label: const Text('Facility'), onSort: _onSort),
-        DataColumn(label: const Text('Tracker'), onSort: _onSort),
-        DataColumn(label: const Text('Status'), onSort: _onSort),
+        DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
+        DataColumn(label: Text('Client Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
+        DataColumn(label: Text('ART ID', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
+        DataColumn(label: Text('Facility', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
+        DataColumn(label: Text('Tracker', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
+        DataColumn(label: Text('Status', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), onSort: _onSort),
       ],
       source: _callLogDataSource!,
       sortColumnIndex: _sortColumnIndex,
@@ -582,14 +603,14 @@ class _CallLogDataSource extends DataTableSource {
     if (index >= _data.length) return null;
     final log = _data[index];
     return DataRow(cells: [
-      DataCell(Text(log.callDateTime != null ? _dateFormat.format(log.callDateTime!) : 'N/A')),
-      DataCell(Text(log.clientName ?? 'N/A')),
-      DataCell(Text(log.artId ?? 'N/A')),
-      DataCell(Text(log.trackerFacility ?? 'N/A')),
-      DataCell(Text(log.trackedBy ?? 'N/A')),
+      DataCell(Text(log.callDateTime != null ? _dateFormat.format(log.callDateTime!) : 'N/A', style: GoogleFonts.poppins())),
+      DataCell(Text(log.clientName ?? 'N/A', style: GoogleFonts.poppins())),
+      DataCell(Text(log.artId ?? 'N/A', style: GoogleFonts.poppins())),
+      DataCell(Text(log.trackerFacility ?? 'N/A', style: GoogleFonts.poppins())),
+      DataCell(Text(log.trackedBy ?? 'N/A', style: GoogleFonts.poppins())),
       DataCell(
           Text(log.callStatus ?? 'N/A',
-            style: TextStyle(color: log.callStatus?.toLowerCase() == 'answered' ? Colors.green : Colors.red),
+            style: GoogleFonts.poppins(color: log.callStatus?.toLowerCase() == 'answered' ? Colors.green : Colors.red),
           )
       ),
     ]);

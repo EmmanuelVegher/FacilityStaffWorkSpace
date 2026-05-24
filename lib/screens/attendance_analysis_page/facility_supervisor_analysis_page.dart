@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 // import 'package:google_maps_flutter/google_maps_flutter.dart'; // COMMENTED OUT - Using OpenStreetMap instead
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:intl/intl.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
@@ -193,6 +194,9 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
   // );
   latlng.LatLng _initialMapCenter = const latlng.LatLng(9.0820, 8.6753); // Default center
 
+  // New Constants for Styling
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
+
   @override
   void initState() {
     super.initState();
@@ -370,7 +374,7 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
                   staffId: staffId,
                   staffName: staffInfo.name,
                   assignedFacility: staffInfo.location,
-                  date: (data['timestamp'] as Timestamp).toDate(),
+                  date: data['timestamp'] is Timestamp ? (data['timestamp'] as Timestamp).toDate() : (data['timestamp'] is String ? DateTime.tryParse(data['timestamp'] as String) ?? DateTime.now() : DateTime.now()),
                   hoursWorked: (data['noOfHours']as num? ?? 0.0).toDouble(),
                   clockInLocation: (data['clockInLatitude'] != null) ? GeoPoint(data['clockInLatitude'], data['clockInLongitude']) : null,
                   clockOutLocation: (data['clockOutLatitude'] != null) ? GeoPoint(data['clockOutLatitude'], data['clockOutLongitude']) : null,
@@ -442,8 +446,16 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Facility Analysis: ${_userFacility ?? 'Loading...'}", style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("Facility Analysis: ${_userFacility ?? 'Loading...'}", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)), // Poppins Font
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [maroonPrimary, Color(0xFF2E0215)], // Maroon gradient
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if(_isExporting)
@@ -457,24 +469,26 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
         ],
       ),
       drawer: drawer4(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: Stack(
-              children: [
-                _buildDashboardBody(),
-                if (_isLoading)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  ),
-                if (_errorMessage != null)
-                  _buildErrorOverlay(),
-              ],
+      body: SelectionArea( // Wrapped in SelectionArea for copyable text
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildDashboardBody(),
+                  if (_isLoading)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    ),
+                  if (_errorMessage != null)
+                    _buildErrorOverlay(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -583,7 +597,7 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
               label: const Text('Load Dashboard'),
               onPressed: _isLoading ? null : _loadDashboardData,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF722F37),
+                  backgroundColor: maroonPrimary, // Use Maroon
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)
               ),
@@ -797,7 +811,6 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
     );
   }
 
-
   Widget _buildKpiSection(){
     final activeStaffCount = _allRecords.map((r) => r.staffId).toSet().length;
     final averageHours = activeStaffCount > 0 ? _totalHoursAll / activeStaffCount : 0.0;
@@ -993,7 +1006,44 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
+                            FutureBuilder<List<String>>(
+                              future: _getVerifiersForStaffAndDate(
+                                  recordForDay.staffId, date),
+                              builder: (context, snapshot) {
+                                final verifiers = snapshot.data ?? [];
+                                if (verifiers.isNotEmpty) {
+                                  return Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.verified_user,
+                                            size: 16, color: Colors.blue),
+                                        onPressed: () =>
+                                            _showVerificationDialog(
+                                                summary.name,
+                                                recordForDay.staffId,
+                                                date),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        tooltip: 'View verifiers for this day',
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        verifiers.length.toString(),
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  );
+                                }
+                                return const SizedBox(width: 20);
+                              },
+                            ),
+                            const SizedBox(width: 4),
+                            if (statusIcon != null)
+                              Icon(statusIcon, size: 16, color: iconColor),
                             if (statusIcon != null) const SizedBox(width: 4),
                             Text(hours.toStringAsFixed(1)),
                           ],
@@ -1223,5 +1273,106 @@ class _FacilitySupervisorAttendanceAnalysisPageState extends State<FacilitySuper
     anchor.click();
     html.document.body!.children.remove(anchor);
     html.Url.revokeObjectUrl(url);
+  }
+
+  void _showVerificationDialog(
+      String staffName, String staffId, DateTime date) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Verifiers for $staffName'),
+          content: FutureBuilder<List<String>>(
+            future: _getVerifiersForStaffAndDate(staffId, date),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Text('Error loading verifiers: ${snapshot.error}');
+              }
+
+              final verifiers = snapshot.data ?? [];
+
+              if (verifiers.isEmpty) {
+                return const Text('No verifications found for this day.');
+              }
+
+              return SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM dd, yyyy').format(date),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Verified by:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...verifiers.map((verifier) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(verifier),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<List<String>> _getVerifiersForStaffAndDate(
+      String staffId, DateTime date) async {
+    try {
+      final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
+
+      final recordDoc = await _firestore
+          .collection('Staff')
+          .doc(staffId)
+          .collection('Record')
+          .doc(dateStr)
+          .get();
+
+      if (recordDoc.exists) {
+        final data = recordDoc.data();
+        final verifiedByUserNames =
+            List<String>.from(data?['verifiedByUserNames'] ?? []);
+        return verifiedByUserNames;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching verifiers: $e");
+      return [];
+    }
   }
 }

@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart';
@@ -2265,12 +2266,7 @@ $selectedBioFirstName $selectedBioLastName
 
 
   Future<void> _loadAttendanceData1() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the logged-in user ID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
@@ -2300,11 +2296,6 @@ $selectedBioFirstName $selectedBioLastName
 
   Future<void> _loadAttendanceData() async {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
 
     try {
       QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
@@ -2425,12 +2416,7 @@ $selectedBioFirstName $selectedBioLastName
   }
 
   Future<void> _loadBioData() async {
-    String? userId = FirebaseAuth.instance.currentUser?.uid; // Get the user UUID
-
-    if (userId == null) {
-      print("User is not authenticated.");
-      return;
-    }
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       DocumentSnapshot<Map<String, dynamic>> docSnapshot = await FirebaseFirestore.instance
@@ -3245,8 +3231,9 @@ $selectedBioFirstName $selectedBioLastName
     return Scaffold(
       appBar: AppBar(
         title: Text('Timesheet',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
                 color: Colors.white,
+                fontWeight: FontWeight.w600,
                 fontSize: 20 *
                     dev.max(0.8,
                         dev.min(1.2, MediaQuery.of(context).size.shortestSide / 600)))),
@@ -3254,7 +3241,7 @@ $selectedBioFirstName $selectedBioLastName
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+              colors: [Color(0xFF5C1A2E), Color(0xFF7D243E)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -3294,10 +3281,11 @@ $selectedBioFirstName $selectedBioLastName
       drawer: drawer(this.context),
       body: _pageLoading // Conditional rendering based on loading state
           ? const Center(child: CircularProgressIndicator()) // Show loading indicator
-          : SingleChildScrollView(
-        // Wrap the entire body in SingleChildScrollView
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          : SelectionArea(
+        child: SingleChildScrollView(
+          // Wrap the entire body in SingleChildScrollView
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Padding(
               padding: EdgeInsets.all(8.0 * paddingFactor),
@@ -3329,7 +3317,7 @@ $selectedBioFirstName $selectedBioLastName
                     ),
                     Text(
                       'Name: $selectedBioFirstName $selectedBioLastName',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16 * fontSizeFactor,
                       ),
@@ -3337,7 +3325,7 @@ $selectedBioFirstName $selectedBioLastName
                     SizedBox(height: 5 * marginFactor),
                     Text(
                       'Department: $selectedBioDepartment',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16 * fontSizeFactor,
                       ),
@@ -3345,7 +3333,7 @@ $selectedBioFirstName $selectedBioLastName
                     SizedBox(height: 5 * marginFactor),
                     Text(
                       'Designation: $selectedBioDesignation',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16 * fontSizeFactor,
                       ),
@@ -3353,7 +3341,7 @@ $selectedBioFirstName $selectedBioLastName
                     SizedBox(height: 5 * marginFactor),
                     Text(
                       'Location: $selectedBioLocation',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16 * fontSizeFactor,
                       ),
@@ -3361,7 +3349,7 @@ $selectedBioFirstName $selectedBioLastName
                     SizedBox(height: 5 * marginFactor),
                     Text(
                       'State: $selectedBioState',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
                         fontSize: 16 * fontSizeFactor,
                       ),
@@ -3376,10 +3364,10 @@ $selectedBioFirstName $selectedBioLastName
                   Row(
                     children: [
                       SizedBox(width: 10 * marginFactor),
-                      const Text(
+                      Text(
                         'Select Month:',
                         style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       SizedBox(width: 10 * marginFactor),
                       DropdownButton<int>(
@@ -3389,7 +3377,7 @@ $selectedBioFirstName $selectedBioLastName
                           return DropdownMenuItem<int>(
                             value: index,
                             child: Text(DateFormat.MMMM().format(monthDate),
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                     fontSize: 14 * dropdownFontSizeFactor)),
                           );
                         }),
@@ -3403,10 +3391,10 @@ $selectedBioFirstName $selectedBioLastName
                         },
                       ),
                       SizedBox(width: 10 * marginFactor),
-                      const Text(
+                      Text(
                         'Select Year:',
                         style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       SizedBox(width: 10 * marginFactor),
                       DropdownButton<int>(
@@ -3416,7 +3404,7 @@ $selectedBioFirstName $selectedBioLastName
                           return DropdownMenuItem<int>(
                             value: year,
                             child: Text(year.toString(),
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                     fontSize: 14 * dropdownFontSizeFactor)),
                           );
                         }),
@@ -3437,9 +3425,9 @@ $selectedBioFirstName $selectedBioLastName
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Select Timesheet Period for September:',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
                           ToggleButtons(
@@ -3465,16 +3453,16 @@ $selectedBioFirstName $selectedBioLastName
                             color: Colors.red[400],
                             constraints:
                             const BoxConstraints(minHeight: 40.0),
-                            children: const <Widget>[
+                            children: <Widget>[
                               Padding(
                                 padding: EdgeInsets.symmetric(
                                     horizontal: 16.0),
-                                child: Text('Part 1 (Aug 20 - Sep 19)'),
+                                child: Text('Part 1 (Aug 20 - Sep 19)', style: GoogleFonts.poppins()),
                               ),
                               Padding(
                                 padding: EdgeInsets.symmetric(
                                     horizontal: 16.0),
-                                child: Text('Part 2 (Sep 20 - Sep 30)'),
+                                child: Text('Part 2 (Sep 20 - Sep 30)', style: GoogleFonts.poppins()),
                               ),
                             ],
                           ),
@@ -3554,9 +3542,9 @@ $selectedBioFirstName $selectedBioLastName
                                                 padding:
                                                 const EdgeInsets.all(8.0),
                                                 color: Colors.blue.shade100,
-                                                child: const Text(
+                                                child: Text(
                                                   'Project Name',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold),
                                                 ),
@@ -3573,7 +3561,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   child: Text(
                                                     DateFormat('dd MMM')
                                                         .format(date),
-                                                    style: const TextStyle(
+                                                    style: GoogleFonts.poppins(
                                                         fontWeight:
                                                         FontWeight.bold),
                                                   ),
@@ -3585,9 +3573,9 @@ $selectedBioFirstName $selectedBioLastName
                                                 padding:
                                                 const EdgeInsets.all(8.0),
                                                 color: Colors.blue.shade100,
-                                                child: const Text(
+                                                child: Text(
                                                   'Total Hours',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold),
                                                 ),
@@ -3598,9 +3586,9 @@ $selectedBioFirstName $selectedBioLastName
                                                 padding:
                                                 const EdgeInsets.all(8.0),
                                                 color: Colors.blue.shade100,
-                                                child: const Text(
+                                                child: Text(
                                                   'Percentage',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold),
                                                 ),
@@ -3636,7 +3624,7 @@ $selectedBioFirstName $selectedBioLastName
                                                                   .centerLeft,
                                                               child: Text(
                                                                   projectName ??
-                                                                      'No Project Name')),
+                                                                      'No Project Name', style: GoogleFonts.poppins())),
                                                         );
                                                       }).toList(),
                                                   onChanged: (String?
@@ -3716,7 +3704,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     children: [
                                                       if (!weekend)
                                                         Text(hours,
-                                                            style: const TextStyle(
+                                                            style: GoogleFonts.poppins(
                                                                 color: Colors
                                                                     .blueAccent)),
                                                       if (recommendationText
@@ -3751,7 +3739,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 color: Colors.white,
                                                 child: Text(
                                                   "${calculateTotalHours1(selectedProjectName).round()} hrs",
-                                                  style: const TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       color: Colors.green,
                                                       fontWeight:
                                                       FontWeight.bold),
@@ -3765,7 +3753,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 color: Colors.white,
                                                 child: Text(
                                                   '${calculatePercentageWorked1(selectedProjectName).round()}%',
-                                                  style: const TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       color: Colors.green,
                                                       fontWeight:
                                                       FontWeight.bold),
@@ -3782,9 +3770,9 @@ $selectedBioFirstName $selectedBioLastName
                                                 padding:
                                                 const EdgeInsets.all(8.0),
                                                 color: Colors.white,
-                                                child: const Text(
+                                                child: Text(
                                                   'Out-of-office',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18),
@@ -3834,7 +3822,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   color: Colors.white,
                                                   child: Text(
                                                     category,
-                                                    style: const TextStyle(
+                                                    style: GoogleFonts.poppins(
                                                         fontWeight:
                                                         FontWeight.bold),
                                                   ),
@@ -3868,7 +3856,7 @@ $selectedBioFirstName $selectedBioLastName
                                                             : Text(
                                                           offDayHours,
                                                           style:
-                                                          const TextStyle(
+                                                          GoogleFonts.poppins(
                                                               color: Colors
                                                                   .blueAccent),
                                                         ),
@@ -3884,7 +3872,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   color: Colors.white,
                                                   child: Text(
                                                     "${calculateCategoryHours1(category).round()} hrs",
-                                                    style: const TextStyle(
+                                                    style: GoogleFonts.poppins(
                                                         color: Colors.green,
                                                         fontWeight:
                                                         FontWeight.bold),
@@ -3898,7 +3886,7 @@ $selectedBioFirstName $selectedBioLastName
                                                   color: Colors.white,
                                                   child: Text(
                                                     '${calculateCategoryPercentage(category).round()}%',
-                                                    style: const TextStyle(
+                                                    style: GoogleFonts.poppins(
                                                         color: Colors.green,
                                                         fontWeight:
                                                         FontWeight.bold),
@@ -3915,9 +3903,9 @@ $selectedBioFirstName $selectedBioLastName
                                                 padding:
                                                 const EdgeInsets.all(8.0),
                                                 color: Colors.white,
-                                                child: const Text(
+                                                child: Text(
                                                   'Total',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 20),
@@ -3942,7 +3930,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 color: Colors.white,
                                                 child: Text(
                                                   "${calculateGrandTotalHours1().toStringAsFixed(0)} hrs",
-                                                  style: const TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       color: Colors.green,
                                                       fontWeight:
                                                       FontWeight.bold),
@@ -3956,7 +3944,7 @@ $selectedBioFirstName $selectedBioLastName
                                                 color: Colors.white,
                                                 child: Text(
                                                   '${calculateGrandPercentageWorked().round()}%',
-                                                  style: const TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       color: Colors.green,
                                                       fontWeight:
                                                       FontWeight.bold),
@@ -3973,7 +3961,7 @@ $selectedBioFirstName $selectedBioLastName
                                 _buildDeductionsSummary(),
                                 const Divider(),
                                 Text('Signature & Date',
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 25 * fontSizeFactor,
                                     )),
@@ -3993,7 +3981,7 @@ $selectedBioFirstName $selectedBioLastName
                                             children: [
                                               Text(
                                                 'Name of Staff',
-                                                style: TextStyle(
+                                                style: GoogleFonts.poppins(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize:
                                                     18 * fontSizeFactor),
@@ -4003,10 +3991,9 @@ $selectedBioFirstName $selectedBioLastName
                                               Text(
                                                 '${selectedBioFirstName?.toUpperCase()} ${selectedBioLastName?.toUpperCase()}',
                                                 textAlign: TextAlign.center,
-                                                style: TextStyle(
+                                                style: GoogleFonts.poppins(
                                                     fontSize:
-                                                    14 * fontSizeFactor,
-                                                    fontFamily: "NexaLight"),
+                                                    14 * fontSizeFactor),
                                               ),
                                             ],
                                           ),
@@ -4016,7 +4003,7 @@ $selectedBioFirstName $selectedBioLastName
                                           child: Column(
                                             children: [
                                               Text('Signature',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18 *
@@ -4091,7 +4078,7 @@ $selectedBioFirstName $selectedBioLastName
                                           child: Column(
                                             children: [
                                               Text('Date',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18 *
@@ -4114,7 +4101,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     if (signatureDate !=
                                                         null) {
                                                       return Text(signatureDate,
-                                                          style: TextStyle(
+                                                          style: GoogleFonts.poppins(
                                                               fontWeight:
                                                               FontWeight
                                                                   .bold,
@@ -4123,7 +4110,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     }
                                                   }
                                                   return Text(formattedDate,
-                                                      style: TextStyle(
+                                                      style: GoogleFonts.poppins(
                                                           fontWeight:
                                                           FontWeight.bold,
                                                           fontSize: 14 *
@@ -4149,7 +4136,7 @@ $selectedBioFirstName $selectedBioLastName
                                               Text(
                                                   'Name of Project Cordinator',
                                                   textAlign: TextAlign.center,
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18 *
@@ -4328,7 +4315,7 @@ $selectedBioFirstName $selectedBioLastName
                                               Text(
                                                   'Name of CARITAS Supervisor',
                                                   textAlign: TextAlign.center,
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18 *
@@ -4351,7 +4338,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     if (supervisorName !=
                                                         null) {
                                                       return Text(supervisorName,
-                                                          style: TextStyle(
+                                                          style: GoogleFonts.poppins(
                                                               fontWeight:
                                                               FontWeight
                                                                   .bold,
@@ -4370,13 +4357,13 @@ $selectedBioFirstName $selectedBioLastName
                                           width: screenWidth * 0.3,
                                           child: Column(
                                             children: [
-                                              Text('Signature', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
+                                              Text('Signature', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18 * fontSizeFactor)),
                                               SizedBox(height: 5 * marginFactor),
                                               StreamBuilder<DocumentSnapshot>(
                                                 stream: getSupervisorStream(selectedFirebaseId!, selectedYear, selectedMonth),
                                                 builder: (context, snapshot) {
                                                   if (snapshot.connectionState == ConnectionState.waiting) {
-                                                    return const Text("Loading status...");
+                                                    return Text("Loading status...", style: GoogleFonts.poppins());
                                                   }
                                                   if (snapshot.hasData && snapshot.data!.exists) {
                                                     final data = snapshot.data!.data() as Map<String, dynamic>;
@@ -4389,12 +4376,12 @@ $selectedBioFirstName $selectedBioLastName
                                                       return Column(
                                                         children: [
                                                           Image.network(signatureUrl, height: 80, fit: BoxFit.contain),
-                                                          const Row(
+                                                          Row(
                                                             mainAxisAlignment: MainAxisAlignment.center,
                                                             children: [
-                                                              Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                                              SizedBox(width: 4),
-                                                              Text("Approved", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                                              const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                                              const SizedBox(width: 4),
+                                                              Text("Approved", style: GoogleFonts.poppins(color: Colors.green, fontWeight: FontWeight.bold)),
                                                             ],
                                                           ),
                                                         ],
@@ -4403,12 +4390,12 @@ $selectedBioFirstName $selectedBioLastName
                                                       return Column(
                                                         crossAxisAlignment: CrossAxisAlignment.center,
                                                         children: [
-                                                          const Row(
+                                                          Row(
                                                             mainAxisAlignment: MainAxisAlignment.center,
                                                             children: [
-                                                              Icon(Icons.cancel, color: Colors.red, size: 16),
-                                                              SizedBox(width: 4),
-                                                              Text("Rejected", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                                                              const Icon(Icons.cancel, color: Colors.red, size: 16),
+                                                              const SizedBox(width: 4),
+                                                              Text("Rejected", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red)),
                                                             ],
                                                           ),
                                                           if (rejectionReason != null && rejectionReason.isNotEmpty)
@@ -4416,7 +4403,7 @@ $selectedBioFirstName $selectedBioLastName
                                                               padding: const EdgeInsets.only(top: 4.0),
                                                               child: Text(
                                                                 'Reason: $rejectionReason',
-                                                                style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                                                                style: GoogleFonts.poppins(color: Colors.red.shade700, fontSize: 12),
                                                                 textAlign: TextAlign.center,
                                                                 softWrap: true,
                                                               ),
@@ -4425,22 +4412,22 @@ $selectedBioFirstName $selectedBioLastName
                                                       );
                                                     } else {
                                                       if (facilityStatus != "Approved") {
-                                                        return const Text(
+                                                        return Text(
                                                           "Awaiting approval from Project Coordinator first.",
-                                                          style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                                                          style: GoogleFonts.poppins(fontStyle: FontStyle.italic, fontSize: 12),
                                                           textAlign: TextAlign.center,
                                                           softWrap: true,
                                                         );
                                                       } else {
                                                         return Column(
                                                           children: [
-                                                            const Text("Awaiting Signature", style: TextStyle(fontSize: 12)),
+                                                            Text("Awaiting Signature", style: GoogleFonts.poppins(fontSize: 12)),
                                                             Row(
                                                               mainAxisAlignment: MainAxisAlignment.center,
                                                               children: [
                                                                 const Icon(Icons.access_time, color: Colors.orange, size: 16),
                                                                 const SizedBox(width: 4),
-                                                                Text(status ?? "Pending", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                                Text(status ?? "Pending", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                                                               ],
                                                             ),
                                                           ],
@@ -4448,7 +4435,7 @@ $selectedBioFirstName $selectedBioLastName
                                                       }
                                                     }
                                                   } else {
-                                                    return const Text("Timesheet not submitted", style: TextStyle(fontSize: 12));
+                                                    return Text("Timesheet not submitted", style: GoogleFonts.poppins(fontSize: 12));
                                                   }
                                                 },
                                               ),
@@ -4461,7 +4448,7 @@ $selectedBioFirstName $selectedBioLastName
                                           child: Column(
                                             children: [
                                               Text('Date',
-                                                  style: TextStyle(
+                                                  style: GoogleFonts.poppins(
                                                       fontWeight:
                                                       FontWeight.bold,
                                                       fontSize: 18 *
@@ -4484,7 +4471,7 @@ $selectedBioFirstName $selectedBioLastName
                                                     if (signatureDate !=
                                                         null) {
                                                       return Text(signatureDate,
-                                                          style: TextStyle(
+                                                          style: GoogleFonts.poppins(
                                                               fontWeight:
                                                               FontWeight
                                                                   .bold,
@@ -4492,9 +4479,9 @@ $selectedBioFirstName $selectedBioLastName
                                                                   fontSizeFactor));
                                                     }
                                                   }
-                                                  return const Text(
+                                                  return Text(
                                                       "Awaiting Date",
-                                                      style: TextStyle(
+                                                      style: GoogleFonts.poppins(
                                                           fontSize: 12));
                                                 },
                                               ),
@@ -4529,7 +4516,7 @@ $selectedBioFirstName $selectedBioLastName
                                               : _saveTimesheetToFirestore,
                                           child: Text(isFullySigned
                                               ? 'Email Signed Timesheet to Self'
-                                              : 'Submit Timesheet'),
+                                              : 'Submit Timesheet', style: GoogleFonts.poppins()),
                                         );
                                       },
                                     ),
@@ -4551,8 +4538,9 @@ $selectedBioFirstName $selectedBioLastName
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _fetchFacilitySupervisor() async {
     print("_fetchPendingApprovals");
@@ -4919,10 +4907,10 @@ $selectedBioFirstName $selectedBioLastName
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(child: Text('${att.date}: (${att.recommendation?.notes ?? "No reason"})')),
+                Flexible(child: Text('${att.date}: (${att.recommendation?.notes ?? "No reason"})', style: GoogleFonts.poppins())),
                 Text(
                   '-${deducted.toStringAsFixed(1)} hrs',
-                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -4947,18 +4935,17 @@ $selectedBioFirstName $selectedBioLastName
     return Column(
       children: [
         const Divider(),
-        const Padding(
-          padding: EdgeInsets.all(8.0),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
           child: Text(
             'Deductions & Adjustments Summary',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
           ),
         ),
         ListTile(
-          title: const Text('Total Hours Recommended for Deduction:', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Text('Total Hours Recommended for Deduction:', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           trailing: Text(
             '${totalDeductedHours.toStringAsFixed(1)} hrs',
-            style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
         const Text('Breakdown:', style: TextStyle(fontStyle: FontStyle.italic)),

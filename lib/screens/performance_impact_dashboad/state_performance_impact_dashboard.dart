@@ -8,9 +8,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import '../../widgets/global_multi_select_dropdown.dart';
 
 import '../../widgets/drawer2.dart'; // State-level drawer
 
@@ -144,8 +146,8 @@ class _StatePerformanceImpactDashboardPageState
   DateTime _startDate = DateTime(
       DateTime.now().year - 1, DateTime.now().month, DateTime.now().day);
   DateTime _endDate = DateTime.now();
-  final List<String> _availableFacilities = ['All Facilities'];
-  List<String> _selectedFacilities = ['All Facilities'];
+  final List<String> _availableFacilities = [];
+  List<String> _selectedFacilities = [];
 
   // --- Current State (determined from user context) ---
   String _currentState = '';
@@ -449,7 +451,8 @@ class _StatePerformanceImpactDashboardPageState
       if (staffDetails != null) {
         final data = doc.data();
         if (data['timestamp'] is Timestamp) {
-          final timestamp = (data['timestamp'] as Timestamp).toDate();
+          final timestampRaw = data['timestamp'];
+          final timestamp = timestampRaw is Timestamp ? timestampRaw.toDate() : (timestampRaw is String ? DateTime.tryParse(timestampRaw) ?? DateTime.now() : DateTime.now());
           if (timestamp.isAfter(
                   _startDate.subtract(const Duration(microseconds: 1))) &&
               timestamp.isBefore(_endDate.add(const Duration(days: 1)))) {
@@ -477,7 +480,8 @@ class _StatePerformanceImpactDashboardPageState
       if (filteredStaffMap.containsKey(staffId)) {
         final data = doc.data();
         if (data['timestamp'] is Timestamp) {
-          final attendanceDate = (data['timestamp'] as Timestamp).toDate();
+          final timestampRaw = data['timestamp'];
+          final attendanceDate = timestampRaw is Timestamp ? timestampRaw.toDate() : (timestampRaw is String ? DateTime.tryParse(timestampRaw) ?? DateTime.now() : DateTime.now());
           if (!lastAttendanceMap.containsKey(staffId) ||
               attendanceDate.isAfter(lastAttendanceMap[staffId]!)) {
             lastAttendanceMap[staffId] = attendanceDate;
@@ -783,10 +787,7 @@ class _StatePerformanceImpactDashboardPageState
   }
 
   Future<Map<String, StaffDetails>> _getFilteredStaffDetails() async {
-    List<String> facilitiesToQuery =
-        _selectedFacilities.contains('All Facilities')
-            ? []
-            : _selectedFacilities;
+    List<String> facilitiesToQuery = _selectedFacilities;
 
     Query<Map<String, dynamic>> staffQuery =
         _firestore.collection('Staff').where('state', isEqualTo: _currentState);
@@ -828,64 +829,69 @@ class _StatePerformanceImpactDashboardPageState
     return Scaffold(
       appBar: AppBar(
         title: Text("Performance Impact - $_currentState",
-            style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: Stack(
-              children: [
-                if (_errorMessage != null)
-                  _buildMessageDisplay(Icons.error_outline, Colors.red,
-                      "An Error Occurred", _errorMessage!)
-                else if (_isInitialState)
-                  _buildMessageDisplay(
-                      Icons.filter_list,
-                      Colors.grey,
-                      "Awaiting Analysis",
-                      "Please select filters and click 'Load Report' to begin.")
-                else if (!_isLoading && !hasData)
-                  _buildMessageDisplay(
-                      Icons.search_off,
-                      Colors.orange,
-                      "No Data Found",
-                      "No data was found for the selected criteria.")
-                else
-                  _buildDashboardBody(),
-                if (_isLoading)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: const Center(
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                      CircularProgressIndicator(color: Colors.white),
-                      SizedBox(height: 16),
-                      Text("Analyzing Data...",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              decoration: TextDecoration.none))
-                    ])),
-                  ),
-              ],
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-        ],
+        ),
+      ),
+      drawer: drawer2(context),
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: Stack(
+                children: [
+                  if (_errorMessage != null)
+                    _buildMessageDisplay(Icons.error_outline, Colors.red,
+                        "An Error Occurred", _errorMessage!)
+                  else if (_isInitialState)
+                    _buildMessageDisplay(
+                        Icons.filter_list,
+                        Colors.grey,
+                        "Awaiting Analysis",
+                        "Please select filters and click 'Load Report' to begin.")
+                  else if (!_isLoading && !hasData)
+                    _buildMessageDisplay(
+                        Icons.search_off,
+                        Colors.orange,
+                        "No Data Found",
+                        "No data was found for the selected criteria.")
+                  else
+                    _buildDashboardBody(),
+                  if (_isLoading)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: Center(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                        const CircularProgressIndicator(color: Colors.white),
+                        const SizedBox(height: 16),
+                        Text("Analyzing Data...",
+                            style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                                decoration: TextDecoration.none))
+                      ])),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildFilterBar() {
-    String facilityButtonText = _selectedFacilities.contains('All Facilities')
-        ? 'All Facilities'
-        : _selectedFacilities.length == 1
-            ? _selectedFacilities.first
-            : '${_selectedFacilities.length} Facilities';
-
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -901,25 +907,26 @@ class _StatePerformanceImpactDashboardPageState
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
               label: Text(
-                  '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
+                  '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}', style: GoogleFonts.poppins()),
             ),
-            _buildFilterChip(
-                "Facility", facilityButtonText, Icons.business_center, () {
-              _showMultiSelectDialog(
-                title: 'Select Facilities',
-                allOptions: _availableFacilities,
-                selectedOptions: _selectedFacilities,
-                allKeyword: 'All Facilities',
-                onConfirm: (results) =>
-                    setState(() => _selectedFacilities = results),
-              );
-            }, disabled: _isFacilitiesLoading),
+            
+            Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) => setState(() => _selectedFacilities = results),
+              ),
+            ),
+
             ElevatedButton.icon(
               icon: const Icon(Icons.analytics_outlined),
-              label: const Text('Load Report'),
+              label: Text('Load Report', style: GoogleFonts.poppins()),
               onPressed: _isLoading ? null : _loadDashboardData,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF722F37),
+                  backgroundColor: const Color(0xFF5C1A2E),
                   foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
@@ -1403,14 +1410,15 @@ class _StatePerformanceImpactDashboardPageState
           padding: const EdgeInsets.all(24.0),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            Text(title, style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.headlineSmall)),
             if (subtitle != null) ...[
               const SizedBox(height: 4),
               Text(subtitle,
-                  style: Theme.of(context)
+                  style: GoogleFonts.poppins(
+                      textStyle: Theme.of(context)
                       .textTheme
                       .bodyMedium
-                      ?.copyWith(color: Colors.grey.shade600))
+                      ?.copyWith(color: Colors.grey.shade600)))
             ],
             const SizedBox(height: 20),
             SizedBox(height: 400, child: chart),
@@ -1420,28 +1428,6 @@ class _StatePerformanceImpactDashboardPageState
     );
   }
 
-  Widget _buildFilterChip(
-      String label, String value, IconData icon, VoidCallback onPressed,
-      {bool disabled = false}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 4),
-      InputChip(
-          avatar: _isFacilitiesLoading && label == "Facility"
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(icon, size: 18),
-          label: Text(value, overflow: TextOverflow.ellipsis),
-          onPressed: disabled ? null : onPressed,
-          showCheckmark: false,
-          side: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.7)),
-          backgroundColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12))
-    ]);
-  }
 
   Widget _buildMessageDisplay(
       IconData icon, Color color, String title, String message) {
@@ -1454,17 +1440,19 @@ class _StatePerformanceImpactDashboardPageState
             Icon(icon, size: 60, color: color.withOpacity(0.7)),
             const SizedBox(height: 16),
             Text(title,
-                style: Theme.of(context)
+                style: GoogleFonts.poppins(
+                    textStyle: Theme.of(context)
                     .textTheme
                     .headlineMedium
-                    ?.copyWith(color: color)),
+                    ?.copyWith(color: color))),
             const SizedBox(height: 8),
             Text(message,
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
+                style: GoogleFonts.poppins(
+                    textStyle: Theme.of(context)
                     .textTheme
                     .bodyLarge
-                    ?.copyWith(color: Colors.grey.shade700)),
+                    ?.copyWith(color: Colors.grey.shade700))),
           ],
         ),
       ),
@@ -1474,7 +1462,7 @@ class _StatePerformanceImpactDashboardPageState
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(message),
+        content: Text(message, style: GoogleFonts.poppins()),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20)));
   }
@@ -1498,7 +1486,7 @@ class _StatePerformanceImpactDashboardPageState
     showDialog(
         context: context,
         builder: (context) => AlertDialog(
-              title: const Text('Select Date Range'),
+              title: Text('Select Date Range', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
               content: SizedBox(
                 width: 350,
                 height: 350,
@@ -1521,82 +1509,15 @@ class _StatePerformanceImpactDashboardPageState
               ),
             ));
   }
-
-  Future<void> _showMultiSelectDialog(
-      {required String title,
-      required List<String> allOptions,
-      required List<String> selectedOptions,
-      required String allKeyword,
-      required Function(List<String>) onConfirm}) async {
-    final tempSelected = List<String>.from(selectedOptions);
-    await showDialog(
-        context: context,
-        builder: (ctx) {
-          return StatefulBuilder(builder: (dialogContext, setStateDialog) {
-            return AlertDialog(
-              title: Text(title),
-              content: SizedBox(
-                width: 350,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: allOptions.length,
-                  itemBuilder: (context, index) {
-                    final option = allOptions[index];
-                    final isAllOption = option == allKeyword;
-                    return CheckboxListTile(
-                      title: Text(option,
-                          style: TextStyle(
-                              fontWeight: isAllOption
-                                  ? FontWeight.bold
-                                  : FontWeight.normal)),
-                      value: tempSelected.contains(option),
-                      onChanged: (bool? value) {
-                        setStateDialog(() {
-                          if (value == true) {
-                            if (isAllOption) {
-                              tempSelected
-                                ..clear()
-                                ..add(allKeyword);
-                            } else {
-                              tempSelected.remove(allKeyword);
-                              tempSelected.add(option);
-                            }
-                          } else {
-                            tempSelected.remove(option);
-                            if (tempSelected.isEmpty &&
-                                allOptions.contains(allKeyword)) {
-                              tempSelected.add(allKeyword);
-                            }
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel')),
-                ElevatedButton(
-                    onPressed: () {
-                      onConfirm(tempSelected);
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Apply')),
-              ],
-            );
-          });
-        });
-  }
 }
+
 
 class _ScrollablePaginatedTable extends StatefulWidget {
   final Widget header;
   final List<DataColumn> columns;
   final DataTableSource source;
   const _ScrollablePaginatedTable(
-      {required this.header, required this.columns, required this.source});
+      {super.key, required this.header, required this.columns, required this.source});
 
   @override
   __ScrollablePaginatedTableState createState() =>

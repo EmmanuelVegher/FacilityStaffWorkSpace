@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
 import '../../widgets/drawer2.dart'; // Assuming a state-level drawer (drawer2)
@@ -332,23 +333,49 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Leave Request", style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("Leave Request",
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          if (_errorMessage != null) Center(child: Padding(padding: const EdgeInsets.all(8.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,))),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredLeaveList.isEmpty
-                ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Text("No leave requests match the selected criteria.", style: TextStyle(color: Colors.grey.shade600))))
-                : _buildLeaveRequestList(),
-          ),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            if (_errorMessage != null)
+              Center(
+                  child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ))),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredLeaveList.isEmpty
+                      ? Center(
+                          child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Text(
+                                  "No leave requests match the selected criteria.",
+                                  style: TextStyle(
+                                      color: Colors.grey.shade600))))
+                      : _buildLeaveRequestList(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -370,9 +397,13 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
             ],
             ElevatedButton.icon(
               icon: const Icon(Icons.filter_list),
-              label: const Text('Apply Filter'),
+              label: Text('Apply Filter', style: GoogleFonts.poppins()),
               onPressed: _isLoading || _isFilterLoading ? null : _loadLeaveRequests,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5C1A2E),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -537,43 +568,75 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
           return AlertDialog(
             title: Text('Select $title'),
             content: SizedBox(
               width: 350,
-              child: ListView(
-                shrinkWrap: true,
-                children: allOptions.map((option) {
-                  return CheckboxListTile(
-                    title: Text(option, style: option.startsWith("All") ? const TextStyle(fontWeight: FontWeight.bold) : null),
-                    value: tempSelected.contains(option),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
                     onChanged: (bool? value) {
                       setDialogState(() {
                         if (value == true) {
-                          if (option.startsWith("All")) {
-                            tempSelected.clear();
-                            tempSelected.add(option);
-                          } else {
-                            tempSelected.removeWhere((item) => item.startsWith("All"));
-                            tempSelected.add(option);
-                          }
+                          tempSelected = List.from(allOptions);
                         } else {
-                          tempSelected.remove(option);
+                          tempSelected.clear();
                         }
                       });
                     },
-                  );
-                }).toList(),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: allOptions.map((option) {
+                        bool isSpecialAll = option.startsWith("All");
+                        return CheckboxListTile(
+                          title: Text(option, style: isSpecialAll ? const TextStyle(fontWeight: FontWeight.bold) : null),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                if (isSpecialAll) {
+                                  tempSelected = List.from(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  // If all individual items are selected, add the "All" item too
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.any((o) => o.startsWith("All"))) {
+                                    tempSelected.add(allOptions.firstWhere((o) => o.startsWith("All")));
+                                  }
+                                }
+                              } else {
+                                if (isSpecialAll) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  // Remove the "All" item if any individual item is unchecked
+                                  tempSelected.removeWhere((item) => item.startsWith("All"));
+                                }
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
-              TextButton(child: const Text('CANCEL'), onPressed: () => Navigator.pop(context)),
+              TextButton(
+                child: const Text("Cancel"),
+                onPressed: () => Navigator.pop(context),
+              ),
               ElevatedButton(
-                child: const Text('OK'),
+                child: const Text("OK"),
                 onPressed: () {
-                  if (tempSelected.isEmpty && allOptions.isNotEmpty && allOptions.first.startsWith("All")) {
-                    tempSelected.add(allOptions.first);
-                  }
                   onConfirm(tempSelected);
                   Navigator.pop(context);
                 },

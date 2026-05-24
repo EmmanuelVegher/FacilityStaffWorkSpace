@@ -1175,43 +1175,96 @@ class _StateLevelEngagementReportPageState
     );
   }
 
-  Future<void> _showMultiSelectDialog({ required String title, required List<String> allOptions, required List<String> selectedOptions, required String allKeyword, required Function(List<String>) onConfirm }) async {
+  Future<void> _showMultiSelectDialog({
+    required String title,
+    required List<String> allOptions,
+    required List<String> selectedOptions,
+    required String allKeyword,
+    required Function(List<String>) onConfirm,
+  }) async {
     final tempSelected = List<String>.from(selectedOptions);
-    await showDialog(context: context, builder: (ctx) {
-      return StatefulBuilder(builder: (dialogContext, setStateDialog) {
-        return AlertDialog(
-          title: Text(title),
-          content: SizedBox(
-            width: 350,
-            child: ListView.builder(
-              shrinkWrap: true, itemCount: allOptions.length,
-              itemBuilder: (context, index) {
-                final option = allOptions[index];
-                final isAllOption = option == allKeyword;
-                return CheckboxListTile(
-                  title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
-                  value: tempSelected.contains(option),
-                  onChanged: (bool? value) {
-                    setStateDialog(() {
-                      if (value == true) {
-                        if (isAllOption) { tempSelected..clear()..add(allKeyword); } else { tempSelected.remove(allKeyword); tempSelected.add(option); }
-                      } else {
-                        tempSelected.remove(option);
-                        if (tempSelected.isEmpty && allOptions.contains(allKeyword)) { tempSelected.add(allKeyword); }
-                      }
-                    });
-                  },
-                );
-              },
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (dialogContext, setStateDialog) {
+          bool isAllSelected = tempSelected.length == allOptions.length;
+
+          return AlertDialog(
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 350,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Select All", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5C1A2E))),
+                    value: isAllSelected,
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        if (value == true) {
+                          tempSelected.clear();
+                          tempSelected.addAll(allOptions);
+                        } else {
+                          tempSelected.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: allOptions.length,
+                      itemBuilder: (context, index) {
+                        final option = allOptions[index];
+                        final isAllOption = option == allKeyword;
+
+                        return CheckboxListTile(
+                          title: Text(option, style: TextStyle(fontWeight: isAllOption ? FontWeight.bold : FontWeight.normal)),
+                          value: tempSelected.contains(option),
+                          onChanged: (bool? value) {
+                            setStateDialog(() {
+                              if (value == true) {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                  tempSelected.addAll(allOptions);
+                                } else {
+                                  tempSelected.add(option);
+                                  if (tempSelected.length == allOptions.length - 1 && !tempSelected.contains(allKeyword)) {
+                                    tempSelected.add(allKeyword);
+                                  }
+                                }
+                              } else {
+                                if (isAllOption) {
+                                  tempSelected.clear();
+                                } else {
+                                  tempSelected.remove(option);
+                                  tempSelected.remove(allKeyword);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () { onConfirm(tempSelected); Navigator.pop(context); }, child: const Text('Apply')),
-          ],
-        );
-      });
-    },
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white),
+                  onPressed: () {
+                    onConfirm(tempSelected);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply')),
+            ],
+          );
+        });
+      },
     );
   }
 }

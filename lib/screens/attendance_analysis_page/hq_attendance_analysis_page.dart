@@ -15,8 +15,9 @@ import 'package:geolocator/geolocator.dart';
 // import 'package:google_maps_flutter/google_maps_flutter.dart'; // COMMENTED OUT - Using OpenStreetMap instead
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
+import 'package:google_fonts/google_fonts.dart'; // Added
 import 'package:intl/intl.dart';
-import 'package:multi_select_flutter/multi_select_flutter.dart';
+import '../../widgets/global_multi_select_dropdown.dart'; // Added
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -208,10 +209,10 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   DateTime _endDate = DateTime.now();
 
   // Filter Options Constants
-  static const String _allStatesOption = "(All States)";
-  static const String _allFacilitiesOption = "(All Facilities)";
-  static const String _allDesignationsOption = "(All Designations)";
-  static const String _allStaffOption = "(All Staff)";
+  // static const String _allStatesOption = "(All States)"; // Removed - handled by GlobalMultiSelectDropdown
+  // static const String _allFacilitiesOption = "(All Facilities)"; // Removed
+  // static const String _allDesignationsOption = "(All Designations)"; // Removed
+  // static const String _allStaffOption = "(All Staff)"; // Removed
 
   // Available options for dropdowns
   List<String> _availableStates = [];
@@ -330,11 +331,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   Future<void> _onStateSelectionChange(List<String> results) async {
     setState(() {
       _isLoading = true;
-      if (results.contains(_allStatesOption)) {
-        _selectedStates = List<String>.from(_availableStates);
-      } else {
-        _selectedStates = results;
-      }
+      _selectedStates = results;
       _selectedFacilities = [];
       _availableFacilities = [];
       _selectedDesignations = [];
@@ -476,7 +473,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
                   staffId: staffId,
                   staffName: staffInfo.name,
                   assignedFacility: staffInfo.location,
-                  date: (data['timestamp'] as Timestamp).toDate(),
+                  date: data['timestamp'] is Timestamp ? (data['timestamp'] as Timestamp).toDate() : (data['timestamp'] is String ? DateTime.tryParse(data['timestamp'] as String) ?? DateTime.now() : DateTime.now()),
                   hoursWorked: (data['noOfHours'] as num? ?? 0.0).toDouble(),
                   clockInLocation: (data['clockInLatitude'] != null && data['clockInLongitude'] != null) ? GeoPoint((data['clockInLatitude'] as num).toDouble(), (data['clockInLongitude'] as num).toDouble()) : null,
                   clockOutLocation: (data['clockOutLatitude'] != null && data['clockOutLongitude'] != null) ? GeoPoint((data['clockOutLatitude'] as num).toDouble(), (data['clockOutLongitude'] as num).toDouble()) : null,
@@ -563,9 +560,18 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("HQ Attendance Analysis Dashboard", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("HQ Attendance Analysis Dashboard", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
         iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           if(_isExporting)
             const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white))
@@ -586,31 +592,33 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
         ],
       ),
       drawer: drawer3(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: Stack(
-              children: [
-                _buildDashboardBody(),
-                if (_isLoading) _buildLoadingOverlay(),
-                if (_errorMessage != null)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: Center(
-                      child: Card(
-                        margin: const EdgeInsets.all(24),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16)),
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildDashboardBody(),
+                  if (_isLoading) _buildLoadingOverlay(),
+                  if (_errorMessage != null)
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                      child: Center(
+                        child: Card(
+                          margin: const EdgeInsets.all(24),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Text(_errorMessage!, style: GoogleFonts.poppins(color: Colors.red, fontSize: 16)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -618,7 +626,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
   Widget _buildLoadingOverlay() {
     return Container(
       color: Colors.black.withOpacity(0.6),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -626,7 +634,7 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             SizedBox(height: 16),
             Text(
               "Please wait...",
-              style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
             ),
           ],
         ),
@@ -646,153 +654,72 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
-              label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
+              label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}', style: GoogleFonts.poppins()),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
 
             Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(_allStatesOption, _allStatesOption),
-                  ..._availableStates.map((s) => MultiSelectItem<String>(s, s)),
-                ],
-                initialValue: _selectedStates,
-                title: const Text("Select States"),
-                selectedColor: Colors.deepPurple,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.1),
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.deepPurple, width: 1),
-                ),
-                buttonIcon: const Icon(Icons.map_outlined, color: Colors.deepPurple),
-                buttonText: Text(
-                  _selectedStates.length == _availableStates.length && _availableStates.isNotEmpty
-                      ? "All States Selected"
-                      : _selectedStates.isEmpty
-                      ? "State"
-                      : "${_selectedStates.length} State${_selectedStates.length == 1 ? '' : 's'} selected",
-                  style: TextStyle(color: Colors.deepPurple[800], fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onConfirm: (results) {
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableStates,
+                selectedItems: _selectedStates,
+                title: "Select States",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   _onStateSelectionChange(results);
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
 
             Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(_allFacilitiesOption, _allFacilitiesOption),
-                  ..._availableFacilities.map((f) => MultiSelectItem<String>(f, f)),
-                ],
-                initialValue: _selectedFacilities,
-                title: const Text("Select Facilities"),
-                selectedColor: Colors.teal,
-                decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.teal, width: 1),
-                ),
-                buttonIcon: const Icon(Icons.location_city, color: Colors.teal),
-                buttonText: Text(
-                  _selectedFacilities.length == _availableFacilities.length && _availableFacilities.isNotEmpty
-                      ? "All Facilities Selected"
-                      : _selectedFacilities.isEmpty
-                      ? "Facility"
-                      : "${_selectedFacilities.length} Facilit${_selectedFacilities.length == 1 ? 'y' : 'ies'} selected",
-                  style: TextStyle(color: Colors.teal[800], fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onConfirm: (results) {
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableFacilities,
+                selectedItems: _selectedFacilities,
+                title: "Select Facilities",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() {
-                    if (results.contains(_allFacilitiesOption)) {
-                      _selectedFacilities = List<String>.from(_availableFacilities);
-                    } else {
-                      _selectedFacilities = results;
-                    }
+                    _selectedFacilities = results;
                     _selectedStaffIds = []; // Reset staff selection
                   });
-                  _updateStaffFilter(); // Update staff list based on new facility selection
+                  _updateStaffFilter();
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
 
             Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(_allDesignationsOption, _allDesignationsOption),
-                  ..._availableDesignations.map((d) => MultiSelectItem<String>(d, d)),
-                ],
-                initialValue: _selectedDesignations,
-                title: const Text("Select Designations"),
-                buttonIcon: Icon(Icons.work_outline, color: Colors.grey.shade700),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.grey.shade600, width: 1),
-                ),
-                buttonText: Text(
-                    _selectedDesignations.length == _availableDesignations.length && _availableDesignations.isNotEmpty
-                        ? "All Designations Selected"
-                        : _selectedDesignations.isEmpty
-                        ? "Designation"
-                        : "${_selectedDesignations.length} Selected",
-                    style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-                    overflow: TextOverflow.ellipsis
-                ),
-                onConfirm: (values) {
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableDesignations,
+                selectedItems: _selectedDesignations,
+                title: "Select Designations",
+                labelBuilder: (val) => val,
+                onChanged: (results) {
                   setState(() {
-                    if (values.contains(_allDesignationsOption)) {
-                      _selectedDesignations = List<String>.from(_availableDesignations);
-                    } else {
-                      _selectedDesignations = values;
-                    }
+                    _selectedDesignations = results;
                     _selectedStaffIds = []; // Reset staff selection
                   });
-                  _updateStaffFilter(); // Update staff list based on new designation selection
+                  _updateStaffFilter();
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
               ),
             ),
 
             Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: MultiSelectDialogField<String>(
-                items: [
-                  MultiSelectItem<String>(_allStaffOption, "All Staff"),
-                  ..._availableStaff.map((s) => MultiSelectItem<String>(s.id, s.name)),
-                ],
-                initialValue: _selectedStaffIds,
-                title: const Text("Select Staff"),
-                buttonIcon: Icon(Icons.person_outline, color: Colors.grey.shade700),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: Colors.grey.shade600, width: 1),
-                ),
-                buttonText: Text(
-                  _selectedStaffIds.length == _availableStaff.length && _availableStaff.isNotEmpty
-                      ? "All Staff Selected"
-                      : _selectedStaffIds.isEmpty
-                      ? "Staff"
-                      : "${_selectedStaffIds.length} Selected",
-                  style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onConfirm: (values) {
-                  setState(() {
-                    if (values.contains(_allStaffOption)) {
-                      _selectedStaffIds = _availableStaff.map((s) => s.id).toList();
-                    } else {
-                      _selectedStaffIds = values;
-                    }
-                  });
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: GlobalMultiSelectDropdown<String>(
+                items: _availableStaff.map((s) => s.id).toList(),
+                selectedItems: _selectedStaffIds,
+                title: "Select Staff",
+                labelBuilder: (id) {
+                     final staff = _availableStaff.firstWhere((s) => s.id == id, orElse: () => StaffInfo(id: id, name: "Unknown", location: "", designation: ""));
+                     return staff.name;
                 },
-                chipDisplay: MultiSelectChipDisplay.none(),
+                onChanged: (results) {
+                   setState(() {
+                     _selectedStaffIds = results;
+                   });
+                },
               ),
             ),
 
@@ -1312,6 +1239,47 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
+                                      FutureBuilder<List<String>>(
+                                        future: _getVerifiersForStaffAndDate(
+                                            recordForDay.staffId, date),
+                                        builder: (context, snapshot) {
+                                          final verifiers = snapshot.data ?? [];
+                                          if (verifiers.isNotEmpty) {
+                                            return Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons.verified_user,
+                                                      size: 16,
+                                                      color: Colors.blue),
+                                                  onPressed: () =>
+                                                      _showVerificationDialog(
+                                                          staffName,
+                                                          recordForDay.staffId,
+                                                          date),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  tooltip:
+                                                      'View verifiers for this day',
+                                                ),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  verifiers.length.toString(),
+                                                  style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.blue,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
+                                              ],
+                                            );
+                                          }
+                                          return const SizedBox(width: 20);
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
                                       if (statusIcon != null) Icon(statusIcon, size: 16, color: iconColor),
                                       if (statusIcon != null) const SizedBox(width: 4),
                                       Text(hours.toStringAsFixed(2)),
@@ -1595,6 +1563,107 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       html.Url.revokeObjectUrl(url);
     } else {
       throw UnsupportedError('Download not supported on this platform');
+    }
+  }
+
+  void _showVerificationDialog(
+      String staffName, String staffId, DateTime date) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Verifiers for $staffName'),
+          content: FutureBuilder<List<String>>(
+            future: _getVerifiersForStaffAndDate(staffId, date),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Text('Error loading verifiers: ${snapshot.error}');
+              }
+
+              final verifiers = snapshot.data ?? [];
+
+              if (verifiers.isEmpty) {
+                return const Text('No verifications found for this day.');
+              }
+
+              return SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM dd, yyyy').format(date),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Verified by:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...verifiers.map((verifier) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(verifier),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<List<String>> _getVerifiersForStaffAndDate(
+      String staffId, DateTime date) async {
+    try {
+      final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
+
+      final recordDoc = await _firestore
+          .collection('Staff')
+          .doc(staffId)
+          .collection('Record')
+          .doc(dateStr)
+          .get();
+
+      if (recordDoc.exists) {
+        final data = recordDoc.data();
+        final verifiedByUserNames =
+            List<String>.from(data?['verifiedByUserNames'] ?? []);
+        return verifiedByUserNames;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching verifiers: $e");
+      return [];
     }
   }
 }

@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
@@ -256,13 +257,13 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
       appBar: AppBar(
         title: Text(
             'Survey Analysis',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF722F37), Color(0xFFB34A5A)],
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -283,22 +284,24 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
         ],
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16))))
-                : !_hasLoadedData
-                ? Center(child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text("Please select filters and click 'Analyze Surveys' to view data.", style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center,),
-            ))
-                : _buildDashboardContent(),
-          ),
-        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16))))
+                  : !_hasLoadedData
+                  ? Center(child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text("Please select filters and click 'Analyze Surveys' to view data.", style: GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleMedium), textAlign: TextAlign.center,),
+              ))
+                  : _buildDashboardContent(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -345,9 +348,9 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
               ),
             ElevatedButton.icon(
               icon: const Icon(Icons.analytics_outlined),
-              label: const Text('Analyze Surveys'),
+              label: Text('Analyze Surveys', style: GoogleFonts.poppins()),
               onPressed: _isLoading ? null : _loadSurveyData,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF5C1A2E), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
             ),
           ],
         ),
@@ -577,14 +580,14 @@ class _PsychologicalSurveyAnalysisPageState extends State<PsychologicalSurveyAna
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
         padding: const EdgeInsets.all(16),
-        width: 500, // Constrain width for better layout in Wrap
+        width: MediaQuery.of(context).size.width > 600 ? 500 : MediaQuery.of(context).size.width - 32, // Responsive width
         height: 400,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

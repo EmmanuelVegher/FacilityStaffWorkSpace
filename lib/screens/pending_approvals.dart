@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/drawer2.dart';
 import 'activity_monitoring/activity_monitoring_page.dart';
@@ -77,6 +78,7 @@ class PendingApprovalsPage extends StatefulWidget {
 }
 
 class _PendingApprovalsPageState extends State<PendingApprovalsPage> with SingleTickerProviderStateMixin {
+  static const Color wineColor = Color(0xFF5C1A2E);
   String? selectedProjectName;
   String? selectedBioFirstName;
   String? selectedBioLastName;
@@ -101,30 +103,30 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
   int _tabIndex = 0; // To manage tab index
   final FirestoreService _firestoreService = FirestoreService(); // Instantiate FirestoreService
 
-  // Define wine color and gradients - Keep your existing styles
-  static const Color wineColor = Color(0xFF722F37); // Deep wine color
+  // Define maroon color and gradients - Standardized
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)], // Wine to lighter wine shade
+    colors: [maroonPrimary, Color(0xFF2E0215)], // Maroon to darker maroon
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFFF8EEDD), Colors.white], // Light beige to white
+    colors: [Color(0xFFFDFCFB), Colors.white], // Very light warm white
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient buttonGradientApprove = LinearGradient(
-    colors: [Colors.green, Color(0xFF66BB6A)],
+    colors: [Colors.green, Color(0xFF43A047)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient buttonGradientReject = LinearGradient(
-    colors: [Color(0xFFD32F2F), Colors.redAccent],
+    colors: [Color(0xFFC62828), Colors.redAccent],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient buttonGradientNavigate = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)],
+    colors: [maroonPrimary, Color(0xFF2E0215)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -472,7 +474,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Return Leave Request", style: TextStyle(color: wineColor, fontWeight: FontWeight.bold)),
+          title: Text("Return Leave Request", style: TextStyle(color: wineColor, fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -535,7 +537,7 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
                   );
                 }
               },
-              child: const Text("Returned", style: TextStyle(color: wineColor)),
+              child: Text("Returned", style: TextStyle(color: wineColor)),
             ),
           ],
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
@@ -1062,7 +1064,8 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(report.reportType ?? "Review Request", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: wineColor)),
+            Text(report.reportType ?? "Review Request", style: TextStyle(fontSize: 20,
+            fontWeight: FontWeight.bold, color: wineColor)),
             const SizedBox(height: 4),
             Text("Date: ${DateFormat('EEE, MMM d, yyyy').format(report.date!)}", style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic)),
             const Divider(height: 24),
@@ -1272,66 +1275,68 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
             )
           ],
         ),
-        body: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            return Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFFF8EEDD), Color(0xFFFAF0E6)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator(color: wineColor))
-                  : TabBarView(
-                physics: const NeverScrollableScrollPhysics(), // Disable swipe between tabs if needed
-                children: [
-                  // Leaves Tab - Existing Leave Tab Content
-                  // RefreshIndicator(
-                  //   color: wineColor,
-                  //   onRefresh: _fetchPendingApprovals,
-                  //   child: pendingLeaves.isNotEmpty
-                  //       ? ListView.builder(
-                  //     padding: EdgeInsets.all(constraints.maxWidth > 600 ? 24.0 : 16.0),
-                  //     itemCount: pendingLeaves.length,
-                  //     itemBuilder: (context, index) {
-                  //       return _buildLeaveCard(context, pendingLeaves[index]);
-                  //     },
-                  //   )
-                  //       : Center(
-                  //     child: Text("No pending leave approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
-                  //   ),
-                  // ),
-                  // // Timesheet Tab - Existing Timesheet Tab Content
-                  RefreshIndicator(
-                    color: wineColor,
-                    onRefresh: _fetchPendingApprovals,
-                    child: (selectedBioStaffCategory == "Facility Supervisor" && pendingTimesheetsFacilitySupervisor.isNotEmpty) ||
-                        ((selectedBioStaffCategory == "State Office Staff" || selectedBioStaffCategory == "HQ Staff") && pendingTimesheetsCaritasSupervisor.isNotEmpty)
-                        ? ListView.builder(
-                      padding: EdgeInsets.all(constraints.maxWidth > 600 ? 24.0 : 16.0),
-                      itemCount: selectedBioStaffCategory == "Facility Supervisor"
-                          ? pendingTimesheetsFacilitySupervisor.length
-                          : pendingTimesheetsCaritasSupervisor.length,
-                      itemBuilder: (context, index) {
-                        final timesheetDoc = selectedBioStaffCategory == "Facility Supervisor"
-                            ? pendingTimesheetsFacilitySupervisor[index]
-                            : pendingTimesheetsCaritasSupervisor[index];
-                        return _buildTimesheetCard(context, timesheetDoc);
-                      },
-                    )
-                        : Center(
-                      child: Text("No pending timesheet approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
-                    ),
+        body: SelectionArea(
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              return Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFFDFCFB), Color(0xFFF5F5F5)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
-                  // Reviews Tab - New Review List Tab Content
-                  // _tabIndex == 2 ? _buildReviewListTab() : const Center(child: Text("Review Tab Content Loading...")), // Conditionally load Review Tab
-                
-                ],
-              ),
-            );
-          },
+                ),
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator(color: maroonPrimary))
+                    : TabBarView(
+                  physics: const NeverScrollableScrollPhysics(), // Disable swipe between tabs if needed
+                  children: [
+                    // Leaves Tab - Existing Leave Tab Content
+                    // RefreshIndicator(
+                    //   color: maroonPrimary,
+                    //   onRefresh: _fetchPendingApprovals,
+                    //   child: pendingLeaves.isNotEmpty
+                    //       ? ListView.builder(
+                    //     padding: EdgeInsets.all(constraints.maxWidth > 600 ? 24.0 : 16.0),
+                    //     itemCount: pendingLeaves.length,
+                    //     itemBuilder: (context, index) {
+                    //       return _buildLeaveCard(context, pendingLeaves[index]);
+                    //     },
+                    //   )
+                    //       : Center(
+                    //     child: Text("No pending leave approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
+                    //   ),
+                    // ),
+                    // // Timesheet Tab - Existing Timesheet Tab Content
+                    RefreshIndicator(
+                      color: maroonPrimary,
+                      onRefresh: _fetchPendingApprovals,
+                      child: (selectedBioStaffCategory == "Facility Supervisor" && pendingTimesheetsFacilitySupervisor.isNotEmpty) ||
+                          ((selectedBioStaffCategory == "State Office Staff" || selectedBioStaffCategory == "HQ Staff") && pendingTimesheetsCaritasSupervisor.isNotEmpty)
+                          ? ListView.builder(
+                        padding: EdgeInsets.all(constraints.maxWidth > 600 ? 24.0 : 16.0),
+                        itemCount: selectedBioStaffCategory == "Facility Supervisor"
+                            ? pendingTimesheetsFacilitySupervisor.length
+                            : pendingTimesheetsCaritasSupervisor.length,
+                        itemBuilder: (context, index) {
+                          final timesheetDoc = selectedBioStaffCategory == "Facility Supervisor"
+                              ? pendingTimesheetsFacilitySupervisor[index]
+                              : pendingTimesheetsCaritasSupervisor[index];
+                          return _buildTimesheetCard(context, timesheetDoc);
+                        },
+                      )
+                          : Center(
+                        child: Text("No pending timesheet approvals", style: TextStyle(fontSize: constraints.maxWidth > 600 ? 20 : 18, color: Colors.black54)),
+                      ),
+                    ),
+                    // Reviews Tab - New Review List Tab Content
+                    // _tabIndex == 2 ? _buildReviewListTab() : const Center(child: Text("Review Tab Content Loading...")), // Conditionally load Review Tab
+                  
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

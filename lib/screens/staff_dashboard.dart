@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:google_fonts/google_fonts.dart'; // Added GoogleFonts
 import 'dart:typed_data';
 import '../api/attendance_api.dart';
 import '../models/attendance_record.dart';
@@ -21,6 +22,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'components/qr_scanner_page.dart';
 
 class UserDashboardApp extends StatelessWidget {
   const UserDashboardApp({super.key});
@@ -41,6 +43,12 @@ class UserDashboardPage extends StatefulWidget {
 }
 
 class _UserDashboardPageState extends State<UserDashboardPage> {
+  // --- Corporate Colors ---
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
+  static const Color goldAccent = Color(0xFFD4A03C);
+  static const Color textDark = Color(0xFF1A1A1A);
+  static const Color textGrey = Color(0xFF666666);
+
   //DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _endDate = DateTime.now();
@@ -384,7 +392,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     double gridSpacingFactor = max(0.8, min(1.2, screenWidth / 800));
     double appBarIconSizeFactor = max(0.8, min(1.2, screenWidth / 800));
     double chartLegendFontSizeFactor = max(0.8, min(1.2, screenWidth / 800));
-    double summaryCardHeightFactor = screenWidth > 800 ? 1.0 : screenWidth > 800 ? 1.0 : 0.8; // Reduced height for tablet and mobile
+    double summaryCardHeightFactor = screenWidth > 800 ? 1.0 : 0.8; 
     double otherCardHeightFactor = max(1.0, min(1.5, screenHeight / 800));
     double generateAnalyticsButtonPaddingFactor =
     max(0.8, min(1.2, screenWidth / 800));
@@ -393,10 +401,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     double cardHeightFactor = max(0.8, min(1.2, screenHeight / 800));
 
     int summaryGridCrossAxisCount = screenWidth > 1200 ? 6 : screenWidth > 800 ? 4 : 2;
-    double summaryGridChildAspectRatio = screenWidth > 1200 ? 2.5 / 1.2 : screenWidth > 800 ? 2.0 / 1.2 : 1.5 / 1.0; // Adjusted for better mobile view
+    double summaryGridChildAspectRatio = screenWidth > 1200 ? 1.6 / 1.2 : screenWidth > 800 ? 1.2 / 1.2 : 1.0 / 1.2; 
 
     int otherCardsGridCrossAxisCount = screenWidth > 1200 ? 3 : screenWidth > 800 ? 2 : 1;
-    double otherCardsGridChildAspectRatio = screenWidth > 1200 ? 1.0 / 1.1 : screenWidth > 800 ? 1.5 / 1.1 : 2.0 / 1.1;
+    double otherCardsGridChildAspectRatio = screenWidth > 1200 ? 1.0 / 1.2 : screenWidth > 800 ? 1.1 / 1.2 : 1.4 / 1.2;
 
     return Listener(
       onPointerDown: (_) => _resetLogoutTimer(),
@@ -409,31 +417,37 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         drawer: drawer(
           context,
         ),
-        backgroundColor: const Color(0xFFF5F5F5),
+        backgroundColor: Colors.grey[50], // Lighter, cleaner background
         appBar: AppBar(
           iconTheme: const IconThemeData(color: Colors.white),
           title: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Image.asset(
-                'assets/image/ccfn_logo.png',
-                fit: BoxFit.contain,
-                height: 40 * appBarHeightFactor,
+              Container(
+                 padding: const EdgeInsets.all(4),
+                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                 child: Image.asset(
+                  'assets/image/ccfn_logo.png',
+                  fit: BoxFit.contain,
+                  height: 32 * appBarHeightFactor,
+                ),
               ),
               Padding(
                 padding: EdgeInsets.only(left: 10 * cardMarginFactor),
                 child: Text(
-                  'CARITAS Nigeria Service Delivery Workspace',
-                   style: TextStyle(
+                  'Service Delivery Workspace',
+                   style: GoogleFonts.poppins( // Updated Font
                     color: Colors.white,
-                    fontSize: 20 * titleFontSizeFactor,
+                    fontSize: 18 * titleFontSizeFactor,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF800018),
+          backgroundColor: maroonPrimary, // Use Corporate Maroon
           toolbarHeight: 80 * appBarHeightFactor,
+          elevation: 0,
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(60 * appBarHeightFactor),
             child: Padding(
@@ -449,41 +463,39 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ),
           actions: [
             _isPDFLoading
-                ? const CircularProgressIndicator()
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                  )
                 : Row(
                 children:[
                   IconButton(
-                    icon: const Icon(Icons.download),
+                    icon: const Icon(Icons.download_rounded),
                     tooltip: 'Download PDF',
                     onPressed: () async {
                       await _generateDashboardPdf(context); // Call the PDF generation method
                       // Optionally add a success message after PDF generation
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('PDF Report generated and shared!')),
+                        SnackBar(
+                            content: Text('PDF Report generated and shared!', style: GoogleFonts.poppins()),
+                            backgroundColor: maroonPrimary,
+                        ),
                       );
                     },
                   ),
-                  //
-                  // IconButton(
-                  //   icon: const Icon(Icons.share),
-                  //   tooltip: 'Share PDF',
-                  //   onPressed: () async {
-                  //     await _generateAndShareDashboardPdf(context); // Call the PDF generation method
-                  //     // Sharing is already handled within _generateDashboardPdf, so no need to repeat here.
-                  //   },
-                  // ),
                 ]
             ),
 
           ],
         ),
-        body: Stack(
-          children: [
+        body: SelectionArea(
+          child: Stack(
+            children: [
             FutureBuilder<void>(
               future: _initialDataLoadingFuture,
               builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: maroonPrimary));
                 } else if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 } else {
@@ -495,21 +507,28 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
                           Container(
                             width: MediaQuery.of(context).size.width * 1,
-                            margin: const EdgeInsets.all(12.0),
+                            margin: const EdgeInsets.only(bottom: 24.0, left: 4, right: 4),
                             child: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
                                   colors: [
-                                    Colors.red,
-                                    Colors.black,
+                                    maroonPrimary,
+                                    Color(0xFF2E0215), // Darker Maroon
                                   ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(24),
-                                ),
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: maroonPrimary.withOpacity(0.3),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 8),
+                                  )
+                                ],
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  vertical: 12.0, horizontal: 8.0),
+                                  vertical: 24.0, horizontal: 20.0),
                               child: Column(
                                 children: [
                                   // Profile Section Added Here
@@ -519,11 +538,17 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                       children: [
                                         // Profile Image Container
                                         Container(
-                                          width: 60 * iconSizeFactor,
-                                          height: 60 * iconSizeFactor,
+                                          width: 70 * iconSizeFactor,
+                                          height: 70 * iconSizeFactor,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
+                                            border: Border.all(color: goldAccent, width: 3),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.2),
+                                                blurRadius: 10,
+                                              )
+                                            ]
                                           ),
                                           clipBehavior: Clip.antiAlias,
                                           child: _currentProfileImage != null && _currentProfileImage!.isNotEmpty
@@ -534,32 +559,52 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                           )
                                               : const Icon(Icons.person, color: Colors.white, size: 40), // Default person icon
                                         ),
-                                        SizedBox(width: 12 * cardMarginFactor),
+                                        SizedBox(width: 16 * cardMarginFactor),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 '$_currentFirstName $_currentLastName', // Display Full Name
-                                                style: TextStyle(
-                                                  fontSize: 16 * fontSizeFactor,
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 20 * fontSizeFactor,
                                                   fontWeight: FontWeight.bold,
                                                   color: Colors.white,
+                                                  height: 1.2
                                                 ),
                                               ),
-                                              Text(
-                                                _currentDesignation ?? 'Designation N/A', // Display Designation
-                                                style: TextStyle(
-                                                  fontSize: 12 * fontSizeFactor,
-                                                  color: Colors.white70,
+                                              const SizedBox(height: 4),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  _currentDesignation ?? 'Staff Member', // Display Designation
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12 * fontSizeFactor,
+                                                    color: goldAccent,
+                                                    fontWeight: FontWeight.w500
+                                                  ),
                                                 ),
                                               ),
-                                              Text(
-                                                _currentUserLocation ?? 'Location N/A', // Display Location
-                                                style: TextStyle(
-                                                  fontSize: 12 * fontSizeFactor,
-                                                  color: Colors.white70,
-                                                ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                   Icon(Icons.location_on, color: Colors.white70, size: 14 * fontSizeFactor),
+                                                   const SizedBox(width: 4),
+                                                   Flexible(
+                                                     child: Text(
+                                                      _currentUserLocation ?? 'Location N/A', // Display Location
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 12 * fontSizeFactor,
+                                                        color: Colors.white70,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                   ),
+                                                ],
                                               ),
                                             ],
                                           ),
@@ -567,26 +612,29 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                       ],
                                     ),
                                   ),
+                                  const Divider(color: Colors.white10, height: 30),
                                   Text(
-                                    "Attendance Summary",
+                                    "Attendance Overview",
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 15 * fontSizeFactor,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.white,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14 * fontSizeFactor,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white70,
+                                      letterSpacing: 1
                                     ),
                                   ),
                                   const SizedBox(
-                                    height: 12.0,
+                                    height: 16.0,
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.all(8.0),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
                                     child: Row(
                                       mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                      MainAxisAlignment.spaceEvenly,
                                       children: [
-                                        cardClockIn('$_totalClockIn',12 * fontSizeFactor,12 * fontSizeFactor,15 * iconSizeFactor),
-                                        cardClockOut('$_totalClockOut',12 * fontSizeFactor,12 * fontSizeFactor,15 * iconSizeFactor),
+                                        Expanded(child: cardClockIn('$_totalClockIn',12 * fontSizeFactor,20 * fontSizeFactor,20 * iconSizeFactor)), // Increased sizes
+                                        const SizedBox(width: 16),
+                                        Expanded(child: cardClockOut('$_totalClockOut',12 * fontSizeFactor,20 * fontSizeFactor,20 * iconSizeFactor)),
                                       ],
                                     ),
                                   )
@@ -649,7 +697,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                         SizedBox(height: 20 * cardMarginFactor),
                         Text(
                           'Please Wait...',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                               fontSize: 16 * fontSizeFactor,
                               color: Colors.black87),
                         ),
@@ -660,9 +708,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               ),
             ),
           ],
-        ),
-      ),
-    );
+        ), // Stack
+        ), // SelectionArea
+      ), // Scaffold
+    ); // Listener
   }
 
   Widget cardClockIn(String value,double fontsizeFactor,double fontsizeFactor2,iconSizeFactor) {
@@ -671,12 +720,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20.0),
+            shape: BoxShape.circle, // Circular shape
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              )
+            ]
           ),
-          padding: const EdgeInsets.all(6.0),
-          margin: const EdgeInsets.only(right: 8.0),
+          padding: const EdgeInsets.all(10.0),
+          margin: const EdgeInsets.only(right: 12.0),
           child: Icon(
-            Icons.arrow_downward,
+            Icons.access_time_filled, // Filled icon
             size: iconSizeFactor,
             color: Colors.green[700],
           ),
@@ -686,13 +742,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           children: [
             Text(
               "Clock-In Total",
-              style: TextStyle(fontSize: fontsizeFactor, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: fontsizeFactor, color: Colors.white70),
             ),
             Text(
               value,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: fontsizeFactor2,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.bold,
                   color: Colors.white),
             )
           ],
@@ -707,12 +763,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20.0),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              )
+            ]
           ),
-          padding: const EdgeInsets.all(6.0),
-          margin: const EdgeInsets.only(right: 8.0),
+          padding: const EdgeInsets.all(10.0),
+          margin: const EdgeInsets.only(right: 12.0),
           child: Icon(
-            Icons.arrow_upward,
+            Icons.timelapse_rounded,
             size: iconSizeFactor,
             color: Colors.red[700],
           ),
@@ -722,13 +785,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           children: [
             Text(
               "Clock-Out Total",
-              style: TextStyle(fontSize: fontSizeFactor, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: fontSizeFactor, color: Colors.white70),
             ),
             Text(
               value,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                   fontSize: fontSizeFactor2,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.bold,
                   color: Colors.white),
             )
           ],
@@ -747,8 +810,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double gridSpacingFactor,
       int crossAxisCount,
       double childAspectRatio,
-      double summaryCardHeightFactor // Receive summaryCardHeightFactor
-      ) {
+      double summaryCardHeightFactor) {
     return GridView.count(
       crossAxisCount: crossAxisCount,
       shrinkWrap: true,
@@ -762,7 +824,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             'Total Hours Worked',
             '$_totalWorkHours',
             Icons.timer,
-            Colors.blue,
+            maroonPrimary, // Maroon
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -773,8 +835,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             context,
             'Min Hours Worked',
             '$_minHoursWorked',
-            Icons.timer_off,
-            Colors.purple,
+            Icons.timer_off_outlined,
+            Colors.orange[800]!, // Orange
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -785,8 +847,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             context,
             'Max Hours Worked',
             '$_maxHoursWorked',
-            Icons.timer,
-            Colors.purple,
+            Icons.timer_outlined,
+            Colors.green[800]!, // Green
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -798,7 +860,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             'Avg Hours Worked',
             '$_averageHoursWorked',
             Icons.timelapse,
-            Colors.purple,
+            maroonPrimary, // Maroon
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -810,7 +872,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             'Holidays Filled',
             '$_noOfHolidaysFilled',
             Icons.holiday_village,
-            Colors.purple,
+            goldAccent, // Gold
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -822,7 +884,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             'Annual Leave Taken',
             '$_noOfAnnualLeaveTaken',
             Icons.beach_access,
-            Colors.purple,
+            goldAccent, // Gold
             cardPaddingFactor,
             cardMarginFactor,
             fontSizeFactor,
@@ -841,7 +903,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         children: [
           Text(
             "Best Team Player (Facility Collective Votes)",
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 16 * fontSizeFactor,
               fontWeight: FontWeight.bold,
             ),
@@ -966,12 +1028,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double summaryCardHeightFactor // Receive summaryCardHeightFactor
       ) {
     return Container(
-      padding: EdgeInsets.all(12 * cardPaddingFactor),
+      padding: EdgeInsets.all(16 * cardPaddingFactor),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
-      height: 140 * summaryCardHeightFactor, // Use summaryCardHeightFactor here
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -979,27 +1048,39 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.black54, size: 18 * iconSizeFactor),
-              SizedBox(width: 5 * cardMarginFactor),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cardColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: cardColor, size: 20 * iconSizeFactor),
+              ),
+              SizedBox(width: 8 * cardMarginFactor),
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.black87,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    color: textGrey,
                     fontWeight: FontWeight.w500,
-                    fontSize: 10 * fontSizeFactor,
-                    overflow: TextOverflow.visible,
+                    fontSize: 11 * fontSizeFactor,
                   ),
                 ),
               ),
             ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15 * fontSizeFactor,
-              fontWeight: FontWeight.bold,
-              color: cardColor,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 22 * fontSizeFactor,
+                fontWeight: FontWeight.bold,
+                color: textDark,
+              ),
             ),
           ),
         ],
@@ -1014,59 +1095,63 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double fontSizeFactor,
       double appBarHeightFactor,
       double generateAnalyticsButtonPaddingFactor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        SizedBox(width: 8 * cardMarginFactor),
-        _buildDatePickerInAppBar('Start Date', _startDate, (date) {
-          setState(() {
-            _startDate = date;
-            _resetLogoutTimer();
-          });
-        }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
-        SizedBox(width: 8 * cardMarginFactor),
-        _buildDatePickerInAppBar('End Date', _endDate, (date) {
-          setState(() {
-            _endDate = date;
-            formattedMonth = DateFormat('MMMM yyyy').format(_endDate);
-            _resetLogoutTimer();
-          });
-        }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
-        SizedBox(width: 12 * cardMarginFactor),
-        ElevatedButton(
-          onPressed: () {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          SizedBox(width: 8 * cardMarginFactor),
+          _buildDatePickerInAppBar('Start Date', _startDate, (date) {
             setState(() {
-              _isLoading = true;
+              _startDate = date;
+              _resetLogoutTimer();
             });
-            Future.wait([
-              _fetchAttendanceData(),
-              _loadBestPlayerDataForRange(_startDate, _endDate),
-            ]).then((_) {
-              setState(() {
-                _isLoading = false;
-              });
-            }).catchError((error) {
-              setState(() {
-                _isLoading = false;
-                _errorMessage = 'Error generating analytics: ${error.toString()}';
-              });
+          }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+          SizedBox(width: 8 * cardMarginFactor),
+          _buildDatePickerInAppBar('End Date', _endDate, (date) {
+            setState(() {
+              _endDate = date;
+              formattedMonth = DateFormat('MMMM yyyy').format(_endDate);
+              _resetLogoutTimer();
             });
-            _resetLogoutTimer();
-          },
-          style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(
-                horizontal:
-                15 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor,
-                vertical:
-                10 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor),
+          }, cardPaddingFactor, cardMarginFactor, fontSizeFactor),
+          SizedBox(width: 12 * cardMarginFactor),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+              });
+              Future.wait([
+                _fetchAttendanceData(),
+                _loadBestPlayerDataForRange(_startDate, _endDate),
+              ]).then((_) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }).catchError((error) {
+                setState(() {
+                  _isLoading = false;
+                  _errorMessage = 'Error generating analytics: ${error.toString()}';
+                });
+              });
+              _resetLogoutTimer();
+            },
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                  horizontal:
+                      15 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor,
+                  vertical:
+                      10 * cardPaddingFactor * generateAnalyticsButtonPaddingFactor),
+            ),
+            child: Text(
+              'Generate Analytics',
+              style: GoogleFonts.poppins(
+                  fontSize:
+                      12 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
+            ),
           ),
-          child: Text(
-            'Generate Analytics',
-            style: TextStyle(
-                fontSize: 12 * fontSizeFactor * generateAnalyticsButtonPaddingFactor),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1083,7 +1168,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           value: department,
           child: Text(
             department,
-            style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white),
+            style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.white),
           ))).toList(),
       onChanged: (String? newValue) {
         setState(() {
@@ -1091,9 +1176,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           _resetLogoutTimer();
         });
       },
-      dropdownColor: const Color(0xFF800018),
-      style: const TextStyle(color: Colors.white),
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+      dropdownColor: maroonPrimary,
+      style: GoogleFonts.poppins(color: Colors.white),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
       underline: Container(height: 1, color: Colors.white),
     );
   }
@@ -1106,7 +1191,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           value: month,
           child: Text(
             month,
-            style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white),
+            style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.white),
           ),
         );
       }).toList(),
@@ -1116,9 +1201,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           _resetLogoutTimer();
         });
       },
-      dropdownColor: const Color(0xFF800018),
-      style: const TextStyle(color: Colors.white),
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+      dropdownColor: maroonPrimary,
+      style: GoogleFonts.poppins(color: Colors.white),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
       underline: Container(height: 1, color: Colors.white),
     );
   }
@@ -1131,7 +1216,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           value: year,
           child: Text(
             year.toString(),
-            style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white),
+            style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.white),
           ))).toList(),
       onChanged: (int? newValue) {
         setState(() {
@@ -1139,9 +1224,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           _resetLogoutTimer();
         });
       },
-      dropdownColor: const Color(0xFF800018),
-      style: const TextStyle(color: Colors.white),
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+      dropdownColor: maroonPrimary,
+      style: GoogleFonts.poppins(color: Colors.white),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
       underline: Container(height: 1, color: Colors.white),
     );
   }
@@ -1157,11 +1242,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double chartCardVerticalPaddingFactor,
       double screenWidth // Receive screenWidth
       ) {
-    return Card(
-      elevation: 4,
-      color: Colors.white, // Set background color to white
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
@@ -1191,7 +1284,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       children: [
         Text(
           'Clock-In and Clock-Out Trends',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
               fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
@@ -1200,20 +1293,20 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             plotAreaBorderWidth: 0,
             primaryXAxis: CategoryAxis(
                 majorGridLines: const MajorGridLines(width: 0),
-                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Days of the Week',
-                  textStyle: TextStyle(
+                  textStyle: GoogleFonts.poppins(
                       fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             primaryYAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                labelStyle: GoogleFonts.poppins(fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Time of the Day',
-                  textStyle: TextStyle(
+                  textStyle: GoogleFonts.poppins(
                       fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 ),
@@ -1221,6 +1314,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             tooltipBehavior: TooltipBehavior(
               enable: true,
               format: 'Clock-In: point.yClockIn\nClock-Out: point.yClockOut',
+              textStyle: GoogleFonts.poppins(),
             ),
             series: <CartesianSeries<AttendanceRecord, String>>[
               LineSeries<AttendanceRecord, String>(
@@ -1240,7 +1334,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   builder: (data, point, series, pointIndex, seriesIndex) {
                     return Text(
                       timeFormat.format(timeFormat.parse(data.clockInTime)),
-                      style: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                      style: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                     );
                   },
                   labelAlignment: ChartDataLabelAlignment.top,
@@ -1268,7 +1362,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                     // Conditionally show data label only when clockOutTime is not "--/--"
                     return data.clockOutTime == '--/--' ? const Text('') : Text(
                       timeFormat.format(timeFormat.parse(data.clockOutTime)),
-                      style: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                      style: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                     );
                   },
                   labelAlignment: ChartDataLabelAlignment.bottom,
@@ -1292,11 +1386,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double chartCardVerticalPaddingFactor,
       double screenWidth // Receive screenWidth
       ) {
-    return Card(
-      elevation: 4,
-      color: Colors.white, // Set background color to white
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
@@ -1319,7 +1421,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       children: [
         Text(
           'Distribution of Hours Worked',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
               fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
@@ -1329,24 +1431,24 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             primaryXAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Duration of Hours Worked (Grouped By Hours)',
-                  textStyle: TextStyle(
+                  textStyle: GoogleFonts.poppins(
                       fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
             primaryYAxis: NumericAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Frequency',
-                  textStyle: TextStyle(
+                  textStyle: GoogleFonts.poppins(
                       fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
-            tooltipBehavior: TooltipBehavior(enable: true),
+            tooltipBehavior: TooltipBehavior(enable: true, textStyle: GoogleFonts.poppins()),
             series: <HistogramSeries<AttendanceRecord, double>>[
               HistogramSeries<AttendanceRecord, double>(
                 dataSource: _attendanceData,
@@ -1375,11 +1477,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double screenWidth // Receive screenWidth
       ) {
     List<LocationRecord> locationData1 = _getLocationData(_attendanceData);
-    return Card(
-      elevation: 4,
-      color: Colors.white, // Set background color to white
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
@@ -1400,7 +1510,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       children: [
         Text(
           'Attendance by Location',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
               fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
@@ -1410,7 +1520,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 isVisible: true,
                 position: LegendPosition.bottom,
                 orientation: LegendItemOrientation.horizontal,
-                textStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
+                textStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
             series: <CircularSeries>[
               DoughnutSeries<LocationRecord, String>(
                 dataSource: locationData1,
@@ -1451,11 +1561,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       };
     }).toList();
 
-    return Card(
-      elevation: 4,
-      color: Colors.white, // Set background color to white
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
@@ -1476,8 +1594,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Did You Clock In Early or Late? (Green = Early, Red = Late, 0 = On Time)',
-          style: TextStyle(
+          'Did You Clock In Early or Late?',
+          style: GoogleFonts.poppins(
               fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
@@ -1487,10 +1605,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             primaryXAxis: CategoryAxis(
                 majorGridLines: const MajorGridLines(width: 0),
                 axisLine: const AxisLine(width: 0),
-                labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                 title: AxisTitle(
                   text: 'Days Of the Week',
-                  textStyle: TextStyle(
+                  textStyle: GoogleFonts.poppins(
                       fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                       fontWeight: FontWeight.bold),
                 )),
@@ -1499,11 +1617,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               axisLine: const AxisLine(width: 0),
               title: AxisTitle(
                 text: 'Minutes Early/Late (vs 8:00 AM)',
-                textStyle: TextStyle(
+                textStyle: GoogleFonts.poppins(
                     fontSize: 10 * fontSizeFactor * chartTextScaleFactor, // Apply scale factor
                     fontWeight: FontWeight.bold),
               ),
-              labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+              labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
               minimum: chartData.isNotEmpty // Check if chartData is not empty
                   ? chartData
                   .map((data) => data['earlyLateMinutes'] as int)
@@ -1525,7 +1643,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   : null
                   : 0, // Default maximum if chartData is empty,
             ),
-            tooltipBehavior: TooltipBehavior(enable: true),
+            tooltipBehavior: TooltipBehavior(enable: true, textStyle: GoogleFonts.poppins()),
             series: <CartesianSeries<Map<String, dynamic>, String>>[
               ColumnSeries<Map<String, dynamic>, String>(
                 dataSource: chartData,
@@ -1587,7 +1705,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     return Row(
       children: [
         Text('$label: ',
-            style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white)),
+            style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.white)),
         TextButton(
           onPressed: () async {
             final selectedDate = await showDatePicker(
@@ -1602,7 +1720,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             }
           },
           child: Text(DateFormat('dd-MM-yyyy').format(initialDate),
-              style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.white)),
+              style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.white)),
         ),
       ],
     );
@@ -1806,11 +1924,19 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       double screenWidth, // Receive screenWidth
       int surveyCount // Receive surveyCount
       ) {
-    return Card(
-      elevation: 4,
-      color: Colors.white, // Set background color to white
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * cardMarginFactor)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: 16.0 * cardPaddingFactor * otherCardHeightFactor,
@@ -1833,21 +1959,21 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       children: [
         Text(
           'Team Player for the Current Month (Facility Votes)',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
               fontSize: 14 * fontSizeFactor * chartTextScaleFactor, fontWeight: FontWeight.bold), // Apply scale factor
         ),
         SizedBox(height: 8 * cardMarginFactor),
         _isLoadingBestPlayer
             ? SizedBox(
             height: 150 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
-            child: const Center(child: CircularProgressIndicator()))
+            child: const Center(child: CircularProgressIndicator(color: maroonPrimary)))
             : _bestPlayerOfWeek != null
             ? _buildRecognitionCardForDashboard(
             _bestPlayerOfWeek, fontSizeFactor, bestPlayerVoteCount, surveyCount) // Pass counts here
             : SizedBox(
             height: 50 * max(0.8, min(1.2, MediaQuery.of(context).size.height / 800)),
-            child: const Center(
-                child: Text("No data for this period"))),
+            child: Center(
+                child: Text("No data for this period", style: GoogleFonts.poppins()))),
         SizedBox(height: 8 * cardMarginFactor),
         Expanded(
           child: _isLoadingBestPlayer
@@ -1874,12 +2000,12 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             Icon(Icons.star, color: Colors.orange, size: 30 * fontSizeFactor),
             Text(
               bestPlayerOfWeek.name ?? "Unknown",
-              style: TextStyle(fontSize: 14 * fontSizeFactor),
+              style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             Text( // Added votes count display here
               '$bestPlayerCount/$surveyCount votes',
-              style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.grey),
+              style: GoogleFonts.poppins(fontSize: 12 * fontSizeFactor, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1900,13 +2026,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               plotAreaBorderWidth: 0,
               primaryXAxis: CategoryAxis(
                   majorGridLines: const MajorGridLines(width: 0),
-                  labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
+                  labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor)), // Apply scale factor
               primaryYAxis: NumericAxis(
                   majorGridLines: const MajorGridLines(width: 0),
                   axisLine: const AxisLine(width: 0),
-                  labelStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                  labelStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                   isVisible: false),
-              tooltipBehavior: TooltipBehavior(enable: true), // Enable tooltips
+              tooltipBehavior: TooltipBehavior(enable: true, textStyle: GoogleFonts.poppins()), // Enable tooltips
               series: <CartesianSeries>[
                 BarSeries<MapEntry<String, int>, String>(
                   dataSource: firestoreBestPlayerCounts.entries.toList(),
@@ -1914,7 +2040,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   yValueMapper: (entry, _) => entry.value,
                   dataLabelSettings: DataLabelSettings(
                       isVisible: true,
-                      textStyle: TextStyle(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                      textStyle: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                       builder: (data, point, series, pointIndex, seriesIndex) { // Custom builder for data labels
                         return Text('${data.value}/$surveyCount votes'); // Display count and survey count
                       }
@@ -1930,7 +2056,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               child: Center(
                 child: Text(
                   "No survey data available for the selected period to display the chart.",
-                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey, fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
+                  style: GoogleFonts.poppins(fontStyle: FontStyle.italic, color: Colors.grey, fontSize: 12 * fontSizeFactor * chartTextScaleFactor), // Apply scale factor
                   textAlign: TextAlign.center,
                 ),
               ))
@@ -2184,7 +2310,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
 
 // This corrected stream properly fetches the name from the parent 'Staff' collection.
-  Stream<List<Map<String, dynamic>>> _getCombinedLiveFeedStream() {
+  Stream<List<Map<String, dynamic>>> _facilityClockInDataStream() {
     if (_currentUserState == null || _currentUserLocation == null) {
       debugPrint("User state or location not available for live feed.");
       return Stream.value([]);
@@ -2269,6 +2395,14 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20 * cardMarginFactor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2277,35 +2411,39 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'All Facility Clock-In (Live Feed) - Today',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontSize: 14 * fontSizeFactor,
+              Expanded(
+                child: Text(
+                  'All Facility Clock-In (Live Feed) - Today',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                    fontSize: 14 * fontSizeFactor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
               ),
               IconButton(onPressed: () {}, icon: Icon(Icons.more_vert, size: 24 * iconSizeFactor)),
             ],
           ),
-          Divider(height: 10 * cardMarginFactor,),
+          Divider(height: 10 * cardMarginFactor, color: Colors.grey.withOpacity(0.2)),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 8.0 * cardPaddingFactor, vertical: 4.0 * cardPaddingFactor),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Name & Date", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
-                Text("Clock-In Time", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12 * fontSizeFactor)),
+                Expanded(child: Text("Name & Date", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black54, fontSize: 12 * fontSizeFactor))),
+                Text("Clock-In Time", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.black54, fontSize: 12 * fontSizeFactor)),
               ],
             ),
           ),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               // Use the new, combined stream here
-              stream: _getCombinedLiveFeedStream(),
+              stream: _facilityClockInDataStream(), // Updated to verify stream name
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: maroonPrimary));
                 }
                 if (snapshot.hasError) {
                   // It's helpful to log the error to the console during development
@@ -2313,7 +2451,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: Text("No Clock-Ins Today", style: TextStyle(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
+                  return Center(child: Text("No Clock-Ins Today", style: GoogleFonts.poppins(fontSize: 14 * fontSizeFactor, color: Colors.grey)));
                 }
 
                 final facilityClockInData = snapshot.data!;
@@ -2354,11 +2492,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 14 * fontSizeFactor),
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 14 * fontSizeFactor),
                 ),
                 Text(
                   date,
-                  style: TextStyle(color: Colors.black54, fontSize: 12 * fontSizeFactor),
+                  style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12 * fontSizeFactor),
                 ),
               ],
             ),
@@ -2369,7 +2507,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             children: [
               Text(
                 clockInTime,
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor), // Increased font size
+                style: GoogleFonts.poppins(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14 * fontSizeFactor), // Increased font size
               ),
               SizedBox(width: 5 * cardMarginFactor),
               if (clockInTime != 'N/A' && clockOutTime == '--/--')
@@ -2377,7 +2515,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   children: [
                     Icon(Icons.check, color: Colors.orange, size: 16 * fontSizeFactor),
                     SizedBox(width: 3 * cardMarginFactor),
-                    Text("Clocked-In,Yet to Clock Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.orange),)
+                    Text("Clocked-In,Yet to Clock Out", style: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor, color: Colors.orange),)
                   ],
                 )
               else if (clockInTime != 'N/A' && clockOutTime != '--/--')
@@ -2385,7 +2523,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   children: [
                     Icon(Icons.check_circle, color: Colors.green, size: 16 * fontSizeFactor),
                     SizedBox(width: 3 * cardMarginFactor),
-                    Text("Clocked-In and Clocked Out", style: TextStyle(fontSize: 12 * fontSizeFactor, color: Colors.green),)
+                    Text("Clocked-In and Clocked Out", style: GoogleFonts.poppins(fontSize: 10 * fontSizeFactor, color: Colors.green),)
                   ],
                 )
               else
@@ -2398,76 +2536,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   }
 
 
-  Stream<List<Map<String, dynamic>>> _facilityClockInDataStream() {
-    final currentUserUUID = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserUUID == null || _currentUserState == null || _currentUserLocation == null || _currentUserStaffCategory == null) {
-      print("Could not retrieve user info to load facility clock-in data stream.");
-      return Stream.value([]); // Return an empty stream if user info is missing
-    }
 
-    final currentDateFormatted = DateFormat('dd-MMMM-yyyy').format(DateTime.now());
-
-    // Create a stream builder for the current user's record
-    Stream<DocumentSnapshot> currentUserRecordStream = FirebaseFirestore.instance
-        .collection('Staff')
-        .doc(currentUserUUID)
-        .collection('Record')
-        .doc(currentDateFormatted)
-        .snapshots();
-
-    // Create a stream builder for other staff records in the facility
-    Stream<QuerySnapshot> facilityStaffRecordsStream = FirebaseFirestore.instance
-        .collection('Staff')
-        .where('state', isEqualTo: _currentUserState)
-        .where('location', isEqualTo: _currentUserLocation)
-        .snapshots();
-
-
-    return Rx.combineLatest2(
-      currentUserRecordStream,
-      facilityStaffRecordsStream,
-          (currentUserRecordSnapshot, facilityStaffSnapshot) async* {
-        List<Map<String, dynamic>> clockInData = [];
-
-        // Process current user's record
-        if (currentUserRecordSnapshot.exists) {
-          Map<String, dynamic> recordData = currentUserRecordSnapshot.data() as Map<String, dynamic>? ?? {};
-          DocumentSnapshot staffDataSnapshot = await FirebaseFirestore.instance.collection('Staff').doc(currentUserUUID).get();
-          Map<String, dynamic> staffData = staffDataSnapshot.data() as Map<String, dynamic>? ?? {};
-
-          clockInData.add({
-            'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
-            'date': recordData['date'] ?? 'N/A',
-            'clockIn': recordData['clockIn'] ?? 'N/A',
-            'clockOut': recordData['clockOut'] ?? '--/--', // Include clockOut
-          });
-        }
-
-        // Process other facility staff records
-        for (var staffDoc in facilityStaffSnapshot.docs) {
-          if (staffDoc.id == currentUserUUID) continue; // Skip current user as already added
-
-          DocumentSnapshot recordSnapshot = await staffDoc.reference
-              .collection('Record')
-              .doc(currentDateFormatted)
-              .get();
-
-          if (recordSnapshot.exists) {
-            Map<String, dynamic> recordData = recordSnapshot.data() as Map<String, dynamic>? ?? {};
-            Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>? ?? {};
-
-            clockInData.add({
-              'fullName': '${staffData['firstName'] ?? 'N/A'} ${staffData['lastName'] ?? 'N/A'}',
-              'date': recordData['date'] ?? 'N/A',
-              'clockIn': recordData['clockIn'] ?? 'N/A',
-              'clockOut': recordData['clockOut'] ?? '--/--', // Include clockOut
-            });
-          }
-        }
-        yield clockInData;
-      },
-    ).asyncMap((stream) async => await stream.first); // Convert combined stream to single stream of List<Map<String, dynamic>>
-  }
 }
 
 class LocationRecord {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/drawer2.dart';
 
@@ -72,125 +73,145 @@ class _ForgotPasswordPage2State extends State<ForgotPasswordPage2> with SingleTi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: drawer2(context,),
+      drawer: drawer2(context),
       appBar: AppBar(
-        title: const Text('Forgot Password', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white), // Makes the drawer icon white
+        title: Text('Forgot Password',
+            style: GoogleFonts.poppins(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(gradient: appBarGradient),
-        ),
-
-      ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Colors.red.shade600,
-                Colors.black87,
-                Colors.white,
-                Colors.yellow.shade600,
-              ],
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
-          child: Center(
-            child: SingleChildScrollView(
-              child: Container(
-                width: 400,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/image/caritaslogo1.png',
-                      height: 80,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Reset Your Password",
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+        ),
+      ),
+      body: SelectionArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Center(
+              child: SingleChildScrollView(
+                child: Container(
+                  width: 400,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFD4A03C), width: 1.5),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        offset: Offset(0, 8),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Enter your email address to receive a password reset link.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey.shade600,
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/image/caritaslogo1.png',
+                        height: 100,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: const Icon(Icons.email, color: Colors.black54),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 24),
+                      Text(
+                        "Reset Your Password",
+                        style: GoogleFonts.poppins(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF5C1A2E),
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 20),
-                    _errorMessage.isNotEmpty
-                        ? Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.red),
-                    )
-                        : const SizedBox.shrink(),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _resetPassword,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Enter your email address to receive a password reset link.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.grey.shade700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      TextField(
+                        controller: _emailController,
+                        style: GoogleFonts.poppins(),
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          labelStyle: GoogleFonts.poppins(color: const Color(0xFF5C1A2E)),
+                          prefixIcon: const Icon(Icons.email, color: Color(0xFFD4A03C)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFD4A03C), width: 2),
                           ),
                         ),
-                        child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                          'Send Reset Link',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 24),
+                      if (_errorMessage.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            _errorMessage,
+                            style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _resetPassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF5C1A2E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : Text(
+                                  'Send Reset Link',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Back to Login',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFF5C1A2E),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Back to Login',
-                        style: TextStyle(color: Colors.redAccent),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

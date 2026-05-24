@@ -2,15 +2,13 @@
 // Displays facility staff with attendance <95% in selected period
 
 import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart' as xls;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:service_delivery_workspace/widgets/drawer.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -79,8 +77,11 @@ class _FacilityLowAttendanceStaffPageState
         _selectedStates = List.from(_availableStates);
       } else {
         _selectedStates = _userState != null ? [_userState!] : [];
-        // For facility users, pre-select their specific location
-        if (userLocation != null && userLocation.isNotEmpty) {
+        // For facility-level users, pre-select their specific location
+        // For state-level users (e.g., State Office), leave empty so all facilities are loaded
+        if (userLocation != null &&
+            userLocation.isNotEmpty &&
+            !userLocation.toLowerCase().contains('state office')) {
           _selectedFacilities = [userLocation];
         }
       }
@@ -140,20 +141,23 @@ class _FacilityLowAttendanceStaffPageState
   }
 
   Future<List<String>> _getUniqueFieldValues(String field) async {
-    final snapshot = await _firestore
+    var query = _firestore
         .collection('Staff')
         .where('staffCategory', isEqualTo: 'Facility Staff')
-        .where('accountStatus', isEqualTo: 'Active')
-        .get();
+        .where('accountStatus', isEqualTo: 'Active');
+
+    // Filter by state in query if possible for better performance
+    if (_selectedStates.isNotEmpty && _selectedStates.length <= 30) {
+      query = query.where('state', whereIn: _selectedStates);
+    }
+
+    final snapshot = await query.get();
 
     final values = <String>{};
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      final state = data['state'] as String?;
-      if (state != null && _selectedStates.contains(state)) {
-        final value = data[field] as String?;
-        if (value != null && value.isNotEmpty) values.add(value);
-      }
+      final value = data[field] as String?;
+      if (value != null && value.isNotEmpty) values.add(value);
     }
     return values.toList();
   }
@@ -167,11 +171,15 @@ class _FacilityLowAttendanceStaffPageState
     });
 
     try {
-      // Get all facility staff - filter by states in code to avoid Firestore whereIn limits
+      // Get all facility staff for the selected states - filter by states in query
       var staffQuery = _firestore
           .collection('Staff')
           .where('staffCategory', isEqualTo: 'Facility Staff')
           .where('accountStatus', isEqualTo: 'Active');
+
+      if (_selectedStates.isNotEmpty && _selectedStates.length <= 30) {
+        staffQuery = staffQuery.where('state', whereIn: _selectedStates);
+      }
 
       if (_selectedDesignations.isNotEmpty &&
           _selectedDesignations.length <= 30) {
@@ -193,17 +201,11 @@ class _FacilityLowAttendanceStaffPageState
         };
       }).toList();
 
-      // Filter by selected states in code
-      final staffList = allStaff
-          .where((staff) => _selectedStates.contains(staff['state']))
-          .toList();
-
-      // Filter by facilities
-      final filteredStaff = _selectedFacilities.isEmpty
-          ? staffList
-          : staffList
-              .where((s) => _selectedFacilities.contains(s['facility']))
-              .toList();
+      // Filter by facilities (lenient: only filter by name if user has made a specific subset selection)
+      final bool isAllFacilitiesSelected = _selectedFacilities.length == _availableFacilities.length;
+      final filteredStaff = (isAllFacilitiesSelected || _selectedFacilities.isEmpty)
+          ? allStaff
+          : allStaff.where((s) => _selectedFacilities.contains(s['facility'])).toList();
 
       // Calculate expected days (weekdays)
       final expectedDays = _calculateExpectedDays(_startDate, _endDate);
@@ -215,19 +217,26 @@ class _FacilityLowAttendanceStaffPageState
           .where('timestamp', isLessThan: _endDate.add(const Duration(days: 1)))
           .get();
 
-      // Count actual attendance per staff
-      final attendanceCount = <String, int>{};
+      // Count unique attendance days per staff
+      final attendanceDays = <String, Set<String>>{};
       for (final record in recordsSnapshot.docs) {
         final staffId = record.reference.parent.parent!.id;
-        attendanceCount[staffId] = (attendanceCount[staffId] ?? 0) + 1;
+        final data = record.data();
+        final timestamp = data['timestamp'];
+        if (timestamp is Timestamp) {
+          final dateStr = DateFormat('yyyy-MM-dd').format(timestamp.toDate());
+          attendanceDays.putIfAbsent(staffId, () => {}).add(dateStr);
+        } else if (data['date'] != null) {
+          // Fallback to date string if timestamp is missing
+          attendanceDays.putIfAbsent(staffId, () => {}).add(data['date'] as String);
+        }
       }
 
       // Calculate low attendance staff
       final lowAttendance = <Map<String, dynamic>>[];
       for (final staff in filteredStaff) {
-        final actual = attendanceCount[staff['id']] ?? 0;
-        final percentage =
-            expectedDays > 0 ? (actual / expectedDays) * 100 : 0.0;
+        final actual = attendanceDays[staff['id']]?.length ?? 0;
+        final percentage = expectedDays > 0 ? (actual / expectedDays) * 100 : 0.0;
         if (percentage < _attendanceThreshold) {
           lowAttendance.add({
             ...staff,
@@ -412,6 +421,93 @@ class _FacilityLowAttendanceStaffPageState
     }
   }
 
+  void _showFilterDialog({
+    required String title,
+    required List<String> allItems,
+    required List<String> selectedItems,
+    required Function(List<String>) onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        List<String> tempSelectedItems = List.from(selectedItems);
+        bool isAllSelected = tempSelectedItems.length == allItems.length;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CheckboxListTile(
+                      title: Text("Select All", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                      value: isAllSelected,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          isAllSelected = value ?? false;
+                          if (isAllSelected) {
+                            tempSelectedItems = List.from(allItems);
+                          } else {
+                            tempSelectedItems.clear();
+                          }
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: allItems.length,
+                        itemBuilder: (context, index) {
+                          final item = allItems[index];
+                          final isSelected = tempSelectedItems.contains(item);
+                          return CheckboxListTile(
+                            title: Text(item, style: GoogleFonts.poppins()),
+                            value: isSelected,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelectedItems.add(item);
+                                } else {
+                                  tempSelectedItems.remove(item);
+                                }
+                                isAllSelected = tempSelectedItems.length == allItems.length;
+                              });
+                            },
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: EdgeInsets.zero,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    onConfirm(tempSelectedItems);
+                    Navigator.pop(context);
+                  },
+                  child: Text("Confirm", style: GoogleFonts.poppins(color: const Color(0xFF5C1A2E))),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDateRangePicker() {
     showDialog(
       context: context,
@@ -446,9 +542,9 @@ class _FacilityLowAttendanceStaffPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Low Attendance Staff",
-            style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text("Low Attendance Staff",
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: const Color(0xFF5C1A2E), // Corporate Maroon
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (_isExporting)
@@ -485,35 +581,38 @@ class _FacilityLowAttendanceStaffPageState
         ],
       ),
       drawer: drawer(context),
-      body: Column(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildFilters(),
-                if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(_errorMessage!,
-                        style: const TextStyle(color: Colors.red)),
-                  ),
-                if (_isLoading)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_lowAttendanceStaff.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(
-                        child: Text("No staff with low attendance found.")),
-                  ),
-              ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildFilters(),
+                  if (_errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(_errorMessage!,
+                          style: GoogleFonts.poppins(color: Colors.red)),
+                    ),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_lowAttendanceStaff.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                          child: Text("No staff with low attendance found.",
+                              style: GoogleFonts.poppins())),
+                    ),
+                ],
+              ),
             ),
-          ),
-          if (!_isLoading && _lowAttendanceStaff.isNotEmpty)
-            Expanded(child: _buildDataTable()),
-        ],
+            if (!_isLoading && _lowAttendanceStaff.isNotEmpty)
+              Expanded(child: _buildDataTable()),
+          ],
+        ),
       ),
     );
   }
@@ -526,79 +625,111 @@ class _FacilityLowAttendanceStaffPageState
         child: Wrap(
           spacing: 16,
           runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.center,
           children: [
             if (widget.isHqMode)
-              Container(
-                constraints: const BoxConstraints(maxWidth: 300),
-                child: MultiSelectDialogField(
-                  items: _availableStates
-                      .map((state) => MultiSelectItem<String>(state, state))
-                      .toList(),
-                  initialValue: _selectedStates,
-                  title: const Text("Select States"),
-                  buttonText: Text(_selectedStates.isEmpty
+              OutlinedButton.icon(
+                onPressed: () {
+                  _showFilterDialog(
+                    title: "Select States",
+                    allItems: _availableStates,
+                    selectedItems: _selectedStates,
+                    onConfirm: (List<String> newSelection) {
+                      setState(() => _selectedStates = newSelection);
+                      _loadFilters();
+                      _loadLowAttendanceData();
+                    },
+                  );
+                },
+                icon: Icon(Icons.map_outlined, color: Colors.grey.shade700),
+                label: Text(
+                  _selectedStates.isEmpty
                       ? "State"
-                      : "${_selectedStates.length} selected"),
-                  chipDisplay: MultiSelectChipDisplay.none(),
-                  onConfirm: (values) {
-                    setState(() => _selectedStates = values.cast<String>());
-                    _loadFilters();
-                    _loadLowAttendanceData();
-                  },
+                      : "${_selectedStates.length} selected",
+                  style: GoogleFonts.poppins(
+                      color: Colors.grey.shade800, fontSize: 16),
                 ),
+                style: OutlinedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
               ),
             OutlinedButton.icon(
               onPressed: _showDateRangePicker,
               icon: const Icon(Icons.date_range_outlined),
               label: Text(
-                  '${DateFormat("MMM d, yyyy").format(_startDate)} - ${DateFormat("MMM d, yyyy").format(_endDate)}'),
+                '${DateFormat("MMM d, yyyy").format(_startDate)} - ${DateFormat("MMM d, yyyy").format(_endDate)}',
+                style: GoogleFonts.poppins(),
+              ),
+              style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
             if (widget.isHqMode)
-              Container(
-                constraints: const BoxConstraints(maxWidth: 300),
-                child: MultiSelectDialogField(
-                  items: _availableFacilities
-                      .map((f) => MultiSelectItem<String>(f, f))
-                      .toList(),
-                  initialValue: _selectedFacilities,
-                  title: const Text("Select Facilities"),
-                  buttonText: Text(_selectedFacilities.isEmpty
+              OutlinedButton.icon(
+                onPressed: () {
+                  _showFilterDialog(
+                    title: "Select Facilities",
+                    allItems: _availableFacilities,
+                    selectedItems: _selectedFacilities,
+                    onConfirm: (List<String> newSelection) {
+                      setState(() => _selectedFacilities = newSelection);
+                      _loadLowAttendanceData();
+                    },
+                  );
+                },
+                icon:
+                    Icon(Icons.location_city_outlined, color: Colors.grey.shade700),
+                label: Text(
+                  _selectedFacilities.isEmpty
                       ? "Facility"
-                      : "${_selectedFacilities.length} selected"),
-                  chipDisplay: MultiSelectChipDisplay.none(),
-                  onConfirm: (values) {
-                    setState(() => _selectedFacilities = values.cast<String>());
+                      : "${_selectedFacilities.length} selected",
+                  style: GoogleFonts.poppins(
+                      color: Colors.grey.shade800, fontSize: 16),
+                ),
+                style: OutlinedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+              ),
+            OutlinedButton.icon(
+              onPressed: () {
+                _showFilterDialog(
+                  title: "Select Designations",
+                  allItems: _availableDesignations,
+                  selectedItems: _selectedDesignations,
+                  onConfirm: (List<String> newSelection) {
+                    setState(() => _selectedDesignations = newSelection);
                     _loadLowAttendanceData();
                   },
-                ),
-              ),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: MultiSelectDialogField(
-                items: _availableDesignations
-                    .map((d) => MultiSelectItem<String>(d, d))
-                    .toList(),
-                initialValue: _selectedDesignations,
-                title: const Text("Select Designations"),
-                buttonText: Text(_selectedDesignations.isEmpty
+                );
+              },
+              icon: Icon(Icons.work_outline, color: Colors.grey.shade700),
+              label: Text(
+                _selectedDesignations.isEmpty
                     ? "Designation"
-                    : "${_selectedDesignations.length} selected"),
-                chipDisplay: MultiSelectChipDisplay.none(),
-                onConfirm: (values) {
-                  setState(() => _selectedDesignations = values.cast<String>());
-                  _loadLowAttendanceData();
-                },
+                    : "${_selectedDesignations.length} selected",
+                style: GoogleFonts.poppins(
+                    color: Colors.grey.shade800, fontSize: 16),
               ),
+              style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
             ),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Threshold: "),
+                Text("Threshold: ", style: GoogleFonts.poppins()),
                 SizedBox(
                   width: 80,
                   child: TextField(
                     keyboardType: TextInputType.number,
                     controller: _thresholdController,
+                    style: GoogleFonts.poppins(),
+                    decoration: InputDecoration(
+                       isDense: true,
+                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                       border: OutlineInputBorder(),
+                    ),
                     onSubmitted: (value) {
                       final newThreshold = double.tryParse(value);
                       if (newThreshold != null &&
@@ -611,12 +742,17 @@ class _FacilityLowAttendanceStaffPageState
                     },
                   ),
                 ),
-                const Text("%"),
+                Text("%", style: GoogleFonts.poppins()),
               ],
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
+              label: Text('Refresh', style: GoogleFonts.poppins()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5C1A2E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)
+              ),
               onPressed: _isLoading ? null : _loadLowAttendanceData,
             ),
           ],
@@ -661,16 +797,18 @@ class _FacilityLowAttendanceStaffPageState
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
               child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Name')),
-                  DataColumn(label: Text('Designation')),
-                  DataColumn(label: Text('Facility')),
-                  DataColumn(label: Text('State')),
-                  DataColumn(label: Text('Email')),
-                  DataColumn(label: Text('Phone')),
-                  DataColumn(label: Text('Expected')),
-                  DataColumn(label: Text('Actual')),
-                  DataColumn(label: Text('Percentage')),
+                headingTextStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                dataTextStyle: GoogleFonts.poppins(),
+                columns: [
+                  DataColumn(label: Text('Name', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Designation', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Facility', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('State', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Email', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Phone', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Expected', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Actual', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Percentage', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                 ],
                 rows: _lowAttendanceStaff.map((staff) {
                   final percentage = staff['percentage'];
@@ -681,14 +819,14 @@ class _FacilityLowAttendanceStaffPageState
                           : Colors.yellow;
                   return DataRow(
                     cells: [
-                      DataCell(Text(staff['name'])),
-                      DataCell(Text(staff['designation'])),
-                      DataCell(Text(staff['facility'])),
-                      DataCell(Text(staff['state'] ?? '')),
-                      DataCell(Text(staff['email'])),
-                      DataCell(Text(staff['phone'] ?? '')),
-                      DataCell(Text(staff['expected'].toString())),
-                      DataCell(Text(staff['actual'].toString())),
+                      DataCell(Text(staff['name'], style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['designation'], style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['facility'], style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['state'] ?? '', style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['email'], style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['phone'] ?? '', style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['expected'].toString(), style: GoogleFonts.poppins())),
+                      DataCell(Text(staff['actual'].toString(), style: GoogleFonts.poppins())),
                       DataCell(
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -697,7 +835,9 @@ class _FacilityLowAttendanceStaffPageState
                             color: color.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text('${percentage.toStringAsFixed(1)}%'),
+                          child: Text('${percentage.toStringAsFixed(1)}%',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.black87, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

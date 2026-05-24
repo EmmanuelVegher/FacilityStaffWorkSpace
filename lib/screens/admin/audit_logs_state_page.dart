@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -143,8 +145,19 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
     if (_loadingState) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Audit Logs (State)', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF722F37),
+          title: Text('Audit Logs (State)',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF5C1A2E),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         drawer: drawer2(context),
@@ -155,8 +168,19 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
     if (_stateError != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Audit Logs (State)', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF722F37),
+          title: Text('Audit Logs (State)',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF5C1A2E),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         drawer: drawer2(context),
@@ -166,6 +190,7 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
             child: Text(
               'Error loading your state: $_stateError',
               textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(),
             ),
           ),
         ),
@@ -174,8 +199,19 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Audit Logs ($_userState)', style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF722F37),
+        title: Text('Audit Logs ($_userState)',
+            style: GoogleFonts.poppins(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF5C1A2E),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5C1A2E), Color(0xFF2E0215)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
@@ -191,67 +227,82 @@ class _AuditLogsStatePageState extends State<AuditLogsStatePage> {
         ],
       ),
       drawer: drawer2(context),
-      body: Column(
-        children: [
-          if (_showFilters) _buildFiltersCard(),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _buildQuery().snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  // Print to console so you can click to create the index if needed.
-                  debugPrint('AuditLogsStatePage stream error (likely missing index): ${snapshot.error}');
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text('Error loading audit logs: ${snapshot.error}'),
-                    ),
-                  );
-                }
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return const Center(child: Text('No logs found for your state and filters.'));
-                }
-                return ListView.separated(
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>? ?? {};
-                    final action = (data['action'] as String? ?? 'N/A');
-                    final targetCollection = (data['targetCollection'] as String? ?? 'N/A');
-                    final targetDocId = (data['targetDocId'] as String? ?? 'N/A');
-                    final actorEmail = (data['actorEmail'] as String? ?? '');
-                    final actorUid = (data['actorUid'] as String? ?? '');
-                    final ts = data['timestamp'];
-                    DateTime? timestamp;
-                    if (ts is Timestamp) timestamp = ts.toDate();
-                    if (ts is DateTime) timestamp = ts;
-
-                    return ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.indigo,
-                        child: Icon(Icons.history, color: Colors.white),
-                      ),
-                      title: Text(action, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Target: $targetCollection / $targetDocId'),
-                          if (actorEmail.isNotEmpty) Text('Actor: $actorEmail'),
-                          if (actorEmail.isEmpty && actorUid.isNotEmpty) Text('Actor UID: $actorUid'),
-                          if (timestamp != null) Text('Time: $timestamp'),
-                        ],
+      body: SelectionArea(
+        child: Column(
+          children: [
+            if (_showFilters) _buildFiltersCard(),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _buildQuery().snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    // Print to console so you can click to create the index if needed.
+                    debugPrint(
+                        'AuditLogsStatePage stream error (likely missing index): ${snapshot.error}');
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text('Error loading audit logs: ${snapshot.error}',
+                            style: GoogleFonts.poppins(color: Colors.red)),
                       ),
                     );
-                  },
-                );
-              },
+                  }
+                  final docs = snapshot.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return Center(
+                        child: Text('No logs found for your state and filters.',
+                            style: GoogleFonts.poppins()));
+                  }
+                  return ListView.separated(
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>? ?? {};
+                      final action = (data['action'] as String? ?? 'N/A');
+                      final targetCollection =
+                          (data['targetCollection'] as String? ?? 'N/A');
+                      final targetDocId = (data['targetDocId'] as String? ?? 'N/A');
+                      final actorEmail = (data['actorEmail'] as String? ?? '');
+                      final actorUid = (data['actorUid'] as String? ?? '');
+                      final ts = data['timestamp'];
+                      DateTime? timestamp;
+                      if (ts is Timestamp) timestamp = ts.toDate();
+                      if (ts is DateTime) timestamp = ts;
+  
+                      return ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFF5C1A2E),
+                          child: Icon(Icons.history, color: Colors.white),
+                        ),
+                        title: Text(action,
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Target: $targetCollection / $targetDocId',
+                                style: GoogleFonts.poppins()),
+                            if (actorEmail.isNotEmpty)
+                              Text('Actor: $actorEmail',
+                                  style: GoogleFonts.poppins()),
+                            if (actorEmail.isEmpty && actorUid.isNotEmpty)
+                              Text('Actor UID: $actorUid',
+                                  style: GoogleFonts.poppins()),
+                            if (timestamp != null)
+                              Text('Time: $timestamp',
+                                  style: GoogleFonts.poppins()),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

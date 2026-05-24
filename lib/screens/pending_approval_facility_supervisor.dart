@@ -2,6 +2,7 @@ import 'package:service_delivery_workspace/screens/timesheet/pending_timesheet_f
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 
 import '../widgets/drawer4.dart';
 
@@ -33,9 +34,9 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
   bool isNavigating = false;
 
   // Define wine color and gradients
-  static const Color wineColor = Color(0xFF722F37);
+  static const Color maroonPrimary = Color(0xFF5C1A2E);
   static const LinearGradient appBarGradient = LinearGradient(
-    colors: [wineColor, Color(0xFFB34A5A)],
+    colors: [maroonPrimary, Color(0xFF2E0215)], // Consistent Maroon/Gold gradient
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -194,7 +195,8 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
     return Scaffold(
       drawer: drawer4(context),
       appBar: AppBar(
-        title: const Text('Pending Timesheet Approvals', style: TextStyle(color: Colors.white)),
+        title: Text('Pending Timesheet Approvals', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: appBarGradient),
@@ -206,16 +208,18 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
           )
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: pageBackgroundGradient),
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator(color: wineColor))
-            : RefreshIndicator(
-          onRefresh: _fetchPendingTimesheets,
-          color: wineColor,
-          child: pendingTimesheets.isNotEmpty
-              ? _buildTimesheetList()
-              : _buildEmptyState(),
+      body: SelectionArea( // Wrapped in SelectionArea for copyable text
+        child: Container(
+          decoration: const BoxDecoration(gradient: pageBackgroundGradient),
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator(color: maroonPrimary))
+              : RefreshIndicator(
+            onRefresh: _fetchPendingTimesheets,
+            color: maroonPrimary,
+            child: pendingTimesheets.isNotEmpty
+                ? _buildTimesheetList()
+                : _buildEmptyState(),
+          ),
         ),
       ),
     );
@@ -240,16 +244,16 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_outline, size: 80, color: wineColor.withOpacity(0.7)),
+          Icon(Icons.check_circle_outline, size: 80, color: maroonPrimary.withOpacity(0.7)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             "No Pending Timesheets",
-            style: TextStyle(fontSize: 22, color: Colors.black54),
+            style: GoogleFonts.poppins(fontSize: 22, color: Colors.black54, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             "You are all caught up!",
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -257,7 +261,8 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
             label: const Text("Refresh"),
             style: ElevatedButton.styleFrom(
               foregroundColor: Colors.white,
-              backgroundColor: wineColor,
+              backgroundColor: maroonPrimary,
+              textStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
             ),
             onPressed: _fetchPendingTimesheets,
           )
@@ -295,16 +300,16 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
           children: [
             Text(
               staffName,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: isWideScreen ? 22.0 : 20.0,
                 fontWeight: FontWeight.bold,
-                color: wineColor,
+                color: maroonPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               "Timesheet for: $timesheetPeriod",
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: isWideScreen ? 16.0 : 14.0,
                 fontStyle: FontStyle.italic,
                 color: Colors.black54,
@@ -319,7 +324,7 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton.icon(
-                label: Text("Review & Approve", style: TextStyle(fontSize: isWideScreen ? 16 : 14)),
+                label: Text("Review & Approve", style: GoogleFonts.poppins(fontSize: isWideScreen ? 16 : 14, fontWeight: FontWeight.bold)),
                 icon: isNavigating
                     ? const SizedBox(
                   height: 20,
@@ -331,7 +336,7 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
                   foregroundColor: Colors.white,
-                  backgroundColor: wineColor,
+                  backgroundColor: maroonPrimary,
                 ),
                 onPressed: isNavigating ? null : () => _navigateToTimesheetDetails(doc),
               ),
@@ -347,7 +352,7 @@ class _PendingFacilitySupervisorApprovalsPageState extends State<PendingFacility
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: RichText(
         text: TextSpan(
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: isWide ? 16.0 : 14.0,
             color: Colors.black87,
             height: 1.4,
