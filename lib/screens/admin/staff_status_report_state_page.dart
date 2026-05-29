@@ -21,6 +21,9 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
 
   // User state lock
   String? _userState;
+  String? _userEmail;
+  String? _userStaffCategory;
+  bool _isFacilitySupervisor = false;
   bool _isLoadingState = true;
   String? _stateError;
 
@@ -86,6 +89,13 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
       baseQuery = baseQuery.where('state', isEqualTo: _userState);
     }
     
+    // Only show Facility Staff for this page as requested
+    baseQuery = baseQuery.where('staffCategory', isEqualTo: 'Facility Staff');
+
+    if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+      baseQuery = baseQuery.where('facilitySupervisorEmail', isEqualTo: _userEmail);
+    }
+    
     if (searchTerm.isEmpty) {
       // No search term, just use base query
       _searchQueries[status] = baseQuery.orderBy('state').limit(500);
@@ -124,11 +134,21 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
         throw Exception('User is not logged in.');
       }
       final doc = await _firestore.collection('Staff').doc(user.uid).get();
-      final state = (doc.data()?['state'] as String? ?? '').trim();
+      final data = doc.data() ?? {};
+      final state = (data['state'] as String? ?? '').trim();
+      final email = (data['emailAddress'] as String? ?? user.email ?? '').trim().toLowerCase();
+      final category = (data['staffCategory'] as String? ?? data['role'] as String? ?? '').trim();
+
       if (state.isEmpty) {
         throw Exception('State not set on your profile.');
       }
-      setState(() => _userState = state);
+      setState(() {
+        _userState = state;
+        _userEmail = email;
+        _userStaffCategory = category;
+        _isFacilitySupervisor = category.toLowerCase().contains('facility supervisor');
+        _onFilterChanged();
+      });
       await _loadCounts();
     } on FirebaseException catch (e, stack) {
       debugPrint('StaffStatusReportStatePage _loadUserState Firestore error: ${e.message}');
@@ -169,7 +189,13 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
       Query q = _firestore
           .collection('Staff')
           .where('accountStatus', isEqualTo: status)
-          .where('state', isEqualTo: _userState);
+          .where('state', isEqualTo: _userState)
+          .where('staffCategory', isEqualTo: 'Facility Staff');
+          
+      if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+        q = q.where('facilitySupervisorEmail', isEqualTo: _userEmail);
+      }
+      
       final agg = await q.count().get();
       return agg.count ?? 0;
     } on FirebaseException catch (e, stack) {
@@ -200,13 +226,18 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
   }
 
   Query _buildListQueryForStatus(String status) {
-    // Composite query: accountStatus == status AND state == _userState, ordered by lastName or state to stabilize
-    return _firestore
+    // Composite query
+    Query q = _firestore
         .collection('Staff')
         .where('accountStatus', isEqualTo: status)
         .where('state', isEqualTo: _userState)
-        .orderBy('state') // safe ordering; if index is required, error printed below in StreamBuilder
-        .limit(500);
+        .where('staffCategory', isEqualTo: 'Facility Staff');
+        
+    if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+      q = q.where('facilitySupervisorEmail', isEqualTo: _userEmail);
+    }
+    
+    return q.orderBy('state').limit(500);
   }
 
   Future<void> _exportCurrentTabToExcel() async {
@@ -216,7 +247,13 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
       Query q = _firestore
           .collection('Staff')
           .where('accountStatus', isEqualTo: status)
-          .where('state', isEqualTo: _userState);
+          .where('state', isEqualTo: _userState)
+          .where('staffCategory', isEqualTo: 'Facility Staff');
+          
+      if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+        q = q.where('facilitySupervisorEmail', isEqualTo: _userEmail);
+      }
+      
       final snap = await q.limit(2000).get();
 
       if (snap.docs.isEmpty) {

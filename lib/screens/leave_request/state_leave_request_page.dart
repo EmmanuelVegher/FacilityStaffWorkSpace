@@ -188,14 +188,16 @@ class _StateLeaveRequestManagementPageState extends State<StateLeaveRequestManag
 
       Query query = _firestore.collectionGroup('Leave Request').where('status', isEqualTo: 'Pending');
 
-      if (_userDepartment != 'Program Management') {
-        query = query.where('selectedSupervisorEmail', isEqualTo: userEmail);
-      }
-
       final snapshot = await query.get();
 
       if (mounted) {
         List<LeaveRequest> allFetchedRequests = snapshot.docs.map((doc) => LeaveRequest.fromFirestore(doc)).toList();
+
+        if (_userDepartment != 'Program Management') {
+          allFetchedRequests = allFetchedRequests.where((req) {
+            return req.supervisorEmail.toLowerCase() == userEmail;
+          }).toList();
+        }
 
         setState(() {
           _masterLeaveList = allFetchedRequests;

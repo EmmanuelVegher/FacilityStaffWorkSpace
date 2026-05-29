@@ -27,6 +27,7 @@ class Staff {
   final String sortCode;
   final String programManager; // <-- NEW
   final String programManagerEmail; // <-- NEW
+  final String accountStatus; // e.g. 'Active', 'Inactive', 'Resigned', 'Terminated'
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -55,6 +56,7 @@ class Staff {
     this.sortCode = '',
     this.programManager = '', // <-- NEW
     this.programManagerEmail = '', // <-- NEW
+    this.accountStatus = 'Active',
   });
 
   factory Staff.fromFirestore(DocumentSnapshot doc) {
@@ -84,6 +86,7 @@ class Staff {
       sortCode: data['sortCode'] ?? '',
       programManager: data['programManager'] ?? '', // <-- NEW (with null safety)
       programManagerEmail: data['programManagerEmail'] ?? '', // <-- NEW (with null safety)
+      accountStatus: data['accountStatus'] as String? ?? 'Active',
     );
   }
 

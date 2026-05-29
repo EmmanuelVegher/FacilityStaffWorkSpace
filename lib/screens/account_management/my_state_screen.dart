@@ -397,7 +397,8 @@ class _CategoryCard extends StatelessWidget {
               Icon(icons[category] ?? Icons.people_outline,
                   size: 48, color: const Color(0xFF5C1A2E)),
               const Spacer(),
-              Text('${staffList.length}',
+              Text(
+                  '${staffList.where((s) => s.accountStatus.toLowerCase() == 'active').length}',
                   style: GoogleFonts.poppins(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
