@@ -1942,7 +1942,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                         // --- NEW: PERMISSION CHECK ---
                         final staffDetails = _staffInfoByNameMap[staffName];
                         final bool canEdit =
-                            staffDetails?.supervisorEmail == _currentUserEmail;
+                            staffDetails?.supervisorEmail.toLowerCase() == _currentUserEmail?.toLowerCase();
 
                         return DataRow(cells: [
                           DataCell(Padding(

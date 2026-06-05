@@ -84,30 +84,39 @@ class _TimesheetDetailsScreen1State extends State<TimesheetDetailsScreen1> {
 
     try {
       final bioData = await _fetchBioDataFromFirestore(widget.staffId);
-      if (bioData == null) {
+      if (bioData == null || bioData['emailAddress'] == null) {
         setState(() {
           isLoading = false;
         });
         return;
       }
 
+      final userEmailLower = (bioData['emailAddress'] as String).toLowerCase();
+
       final caritasSupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
           .collectionGroup('TimeSheets')
-          .where('caritasSupervisorEmail', isEqualTo: bioData['emailAddress'])
           .where('caritasSupervisorSignatureStatus', isEqualTo: 'Pending')
           .where('facilitySupervisorSignatureStatus', isEqualTo: 'Approved')
           .get();
 
       final facilitySupervisorTimesheetsSnapshot = await FirebaseFirestore.instance
           .collectionGroup('TimeSheets')
-          .where('facilitySupervisorEmail', isEqualTo: bioData['emailAddress'])
           .where('facilitySupervisorSignatureStatus', isEqualTo: 'Pending')
           .get();
 
+      final filteredCaritas = caritasSupervisorTimesheetsSnapshot.docs.where((doc) {
+        final email = doc.data()['caritasSupervisorEmail'] as String?;
+        return email?.toLowerCase() == userEmailLower;
+      }).map((doc) => doc.data()).toList();
+
+      final filteredFacility = facilitySupervisorTimesheetsSnapshot.docs.where((doc) {
+        final email = doc.data()['facilitySupervisorEmail'] as String?;
+        return email?.toLowerCase() == userEmailLower;
+      }).map((doc) => doc.data()).toList();
 
       setState(() {
-        pendingTimesheetsFacilitySupervisor = facilitySupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
-        pendingTimesheetsCaritasSupervisor = caritasSupervisorTimesheetsSnapshot.docs.map((doc) => doc.data()).toList();
+        pendingTimesheetsFacilitySupervisor = filteredFacility;
+        pendingTimesheetsCaritasSupervisor = filteredCaritas;
         isLoading = false;
       });
     } catch (e) {

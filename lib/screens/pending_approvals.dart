@@ -419,8 +419,13 @@ class _PendingApprovalsPageState extends State<PendingApprovalsPage> with Single
           }).toList();
           // --- END OF CHANGE ---
 
-          // (Update other lists like pendingLeaves here if needed)
-          // ...
+          pendingLeaves = filteredLeavesDocs.map((doc) => doc.data()).toList();
+          pendingTimesheetsFacilitySupervisor = filteredFacilityTimesheetsDocs.map((doc) {
+            final data = doc.data();
+            data['docId'] = doc.id;
+            return data;
+          }).toList();
+          pendingReviews = reviews;
         });
       }
     } catch (e) {

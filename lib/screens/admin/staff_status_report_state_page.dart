@@ -91,10 +91,6 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
     
     // Only show Facility Staff for this page as requested
     baseQuery = baseQuery.where('staffCategory', isEqualTo: 'Facility Staff');
-
-    if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
-      baseQuery = baseQuery.where('facilitySupervisorEmail', isEqualTo: _userEmail);
-    }
     
     if (searchTerm.isEmpty) {
       // No search term, just use base query
@@ -192,12 +188,16 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
           .where('state', isEqualTo: _userState)
           .where('staffCategory', isEqualTo: 'Facility Staff');
           
+      final snap = await q.get();
       if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
-        q = q.where('facilitySupervisorEmail', isEqualTo: _userEmail);
+        final userEmailLower = _userEmail!.toLowerCase();
+        return snap.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          final supervisorEmail = data?['facilitySupervisorEmail'] as String?;
+          return supervisorEmail?.toLowerCase() == userEmailLower;
+        }).length;
       }
-      
-      final agg = await q.count().get();
-      return agg.count ?? 0;
+      return snap.docs.length;
     } on FirebaseException catch (e, stack) {
       debugPrint('StaffStatusReportStatePage _countForStatus index error: ${e.message}');
       // If Firestore requires an index, this console error usually includes a "Create index" link.
@@ -250,13 +250,18 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
           .where('state', isEqualTo: _userState)
           .where('staffCategory', isEqualTo: 'Facility Staff');
           
-      if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
-        q = q.where('facilitySupervisorEmail', isEqualTo: _userEmail);
-      }
-      
       final snap = await q.limit(2000).get();
-
-      if (snap.docs.isEmpty) {
+      var docs = snap.docs;
+      if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+        final userEmailLower = _userEmail!.toLowerCase();
+        docs = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          final supervisorEmail = data?['facilitySupervisorEmail'] as String?;
+          return supervisorEmail?.toLowerCase() == userEmailLower;
+        }).toList();
+      }
+ 
+      if (docs.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No staff found for $status in $_userState')),
@@ -279,7 +284,7 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
         excel.TextCellValue('Account Number'),
         excel.TextCellValue('Bank Name'),
       ]);
-      for (final d in snap.docs) {
+      for (final d in docs) {
         final data = d.data() as Map<String, dynamic>? ?? {};
         final fullName = '${(data['firstName'] ?? '').toString()} ${(data['lastName'] ?? '').toString()}'.trim();
         sheet.appendRow([
@@ -555,8 +560,18 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _searchQueries[status]!.snapshots(),
+          child: StreamBuilder<List<QueryDocumentSnapshot>>(
+            stream: _searchQueries[status]!.snapshots().map((snapshot) {
+              if (_isFacilitySupervisor && _userEmail != null && _userEmail!.isNotEmpty) {
+                final userEmailLower = _userEmail!.toLowerCase();
+                return snapshot.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>?;
+                  final supervisorEmail = data?['facilitySupervisorEmail'] as String?;
+                  return supervisorEmail?.toLowerCase() == userEmailLower;
+                }).toList();
+              }
+              return snapshot.docs;
+            }),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -566,7 +581,7 @@ class _StaffStatusReportStatePageState extends State<StaffStatusReportStatePage>
                 debugPrint('StaffStatusReportStatePage list stream error (likely missing index): ${snapshot.error}');
                 return Center(child: Text('Error: ${snapshot.error}'));
               }
-              final docs = snapshot.data?.docs ?? [];
+              final docs = snapshot.data ?? [];
               if (docs.isEmpty) {
                 return Center(child: Text('No $status staff in $_userState.'));
               }
