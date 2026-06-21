@@ -259,9 +259,24 @@ class _StateLevelEngagementReportPageState
         return;
       }
 
+      List<String> statesToQuery = _selectedStates.contains('All States')
+          ? _availableStates.where((s) => s != 'All States').toList()
+          : _selectedStates;
+
+      Query<Map<String, dynamic>> recordsQuery = _firestore.collectionGroup('Record')
+          .where('timestamp', isGreaterThanOrEqualTo: _startDate)
+          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)));
+
+      Query<Map<String, dynamic>> leaveQuery = _firestore.collectionGroup('Leave Request');
+
+      if (statesToQuery.isNotEmpty && statesToQuery.length <= 30) {
+        recordsQuery = recordsQuery.where('state', whereIn: statesToQuery);
+        leaveQuery = leaveQuery.where('staffState', whereIn: statesToQuery);
+      }
+
       final futures = [
-        _firestore.collectionGroup('Record').get(),
-        _firestore.collectionGroup('Leave Request').get(),
+        recordsQuery.get(),
+        leaveQuery.get(),
         _firestore.collection('CallLogs').where('dateTracked', isGreaterThanOrEqualTo: _startDate).where('dateTracked', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1))).get(),
         _firestore.collection('EacCallLogs').where('dateTracked', isGreaterThanOrEqualTo: _startDate).where('dateTracked', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1))).get(),
         _firestore.collection('VlCallLogs').where('callDateTime', isGreaterThanOrEqualTo: _startDate).where('callDateTime', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1))).get(),

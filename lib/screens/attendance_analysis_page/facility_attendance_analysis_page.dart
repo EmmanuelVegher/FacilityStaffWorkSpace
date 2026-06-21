@@ -441,9 +441,9 @@ class _FacilityAttendanceAnalysisPageState
       // 2. Fetch attendance records using the same efficient collectionGroup query.
       final recordsSnapshot = await _firestore
           .collectionGroup('Record')
+          .where('location', isEqualTo: _userFacility)
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
-          .where('timestamp',
-              isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
+          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
           .get();
 
       List<AttendanceRecord> allRecords = [];

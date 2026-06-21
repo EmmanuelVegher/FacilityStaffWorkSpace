@@ -576,12 +576,15 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
       final filteredStaffIds = staffList.map((s) => s.id).toSet();
       final staffInfoMap = {for (var s in staffList) s.id: s};
 
-      final recordsSnapshot = await _firestore
-          .collectionGroup('Record')
+      Query<Map<String, dynamic>> recordsQuery = _firestore.collectionGroup('Record');
+      if (_userState != null) {
+        recordsQuery = recordsQuery.where('state', isEqualTo: _userState);
+      }
+      recordsQuery = recordsQuery
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
-          .where('timestamp',
-              isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
-          .get();
+          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)));
+
+      final recordsSnapshot = await recordsQuery.get();
 
       List<AttendanceRecord> allRecords = [];
 
@@ -1328,22 +1331,45 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             ),
           if (_userDepartment?.toLowerCase() == 'program management')
             PopupMenuButton<String>(
-              icon: const Icon(Icons.admin_panel_settings_outlined, color: Colors.amber),
-              tooltip: "Program Management Tools",
+              tooltip: "Create Holiday",
               onSelected: (value) {
                 if (value == 'apply_holiday') _showApplyHolidayDialog();
                 if (value == 'sync_holiday') _showSyncHolidaysDialog();
                 if (value == 'cleanup') _showDataCleanupDialog();
                 if (value == 'backfill_state') _showBackfillStateDialog();
               },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white.withOpacity(0.6)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.holiday_village_outlined, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Create Holiday',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: 'apply_holiday',
                   child: ListTile(
                     leading: Icon(Icons.holiday_village_outlined, color: Colors.blue),
-                    title: Text("Apply Batch Holiday"),
+                    title: Text("Create Holiday"),
                   ),
                 ),
+                /*
                 const PopupMenuItem(
                   value: 'sync_holiday',
                   child: ListTile(
@@ -1365,6 +1391,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                     title: Text("Backfill State (Optimization)"),
                   ),
                 ),
+                */
               ],
             ),
         ],
@@ -1584,8 +1611,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             _buildRecommendationsLogSection(),
             const SizedBox(height: 24),
             _buildLocationMapCard(),
-            const SizedBox(height: 24),
-            _buildOutlierAnalysisSection(),
+            // const SizedBox(height: 24),
+            // _buildOutlierAnalysisSection(),
             const SizedBox(height: 24),
             _buildChartCard(
                 "Top 15 Facilities by Hours",
@@ -2636,19 +2663,21 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     DateTime? diagStartDate;
     DateTime? diagEndDate;
     String holidayName = '';
-    List<String> selectedStaffIdsForHoliday = _availableStaff.map((s) => s.id).toList();
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('Apply Batch Holiday',
+          title: Text('Create Holiday',
               style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("This will create attendance records for selected staff on the selected dates (excluding weekends)."),
+                Text(
+                  "This will create attendance records for ALL active Facility Staff in ${_userState ?? 'your state'} on the selected dates (excluding weekends).",
+                  style: GoogleFonts.poppins(fontSize: 13),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   decoration: const InputDecoration(
@@ -2659,7 +2688,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   onChanged: (val) => holidayName = val,
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
+                 OutlinedButton.icon(
                   onPressed: () async {
                     final PickerDateRange? range = await showDialog<PickerDateRange>(
                       context: context,
@@ -2690,23 +2719,16 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                       ? "Select Date Range"
                       : "${DateFormat('dd/MM/yy').format(diagStartDate!)} - ${DateFormat('dd/MM/yy').format(diagEndDate!)}"),
                 ),
-                const SizedBox(height: 16),
-                GlobalMultiSelectDropdown<String>(
-                  items: _availableStaff.map((s) => s.id).toList(),
-                  selectedItems: selectedStaffIdsForHoliday,
-                  title: "Select Staff",
-                  labelBuilder: (id) {
-                    final staff = _availableStaff.firstWhere((s) => s.id == id,
-                        orElse: () => StaffInfo(
-                            id: id, name: "Unknown", location: "", designation: "", firstName: "", lastName: "", supervisorEmail: "", state: "", department: "", mobile: "", email: "", staffCategory: ""));
-                    return staff.name;
-                  },
-                  onChanged: (results) {
-                    setDialogState(() {
-                      selectedStaffIdsForHoliday = results;
-                    });
-                  },
-                ),
+                const SizedBox(height: 12),
+                if (diagStartDate == null)
+                  Text(
+                    "Please select a date range.",
+                    style: GoogleFonts.poppins(
+                      color: Colors.red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -2716,16 +2738,18 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               child: const Text('CANCEL'),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (holidayName.isEmpty || diagStartDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please provide a name and date range.")),
-                  );
-                  return;
-                }
-                Navigator.pop(context);
-                _applyBatchHoliday(diagStartDate!, diagEndDate!, holidayName, selectedStaffIdsForHoliday);
-              },
+              onPressed: diagStartDate == null
+                  ? null
+                  : () {
+                      if (holidayName.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Please provide a holiday name.")),
+                        );
+                        return;
+                      }
+                      Navigator.pop(context);
+                      _applyBatchHoliday(diagStartDate!, diagEndDate!, holidayName);
+                    },
               child: const Text('APPLY'),
             ),
           ],
@@ -2738,7 +2762,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     DateTime? diagStartDate;
     DateTime? diagEndDate;
     String holidayName = '';
-    List<String> selectedStaffIdsForHoliday = _availableStaff.map((s) => s.id).toList();
 
     showDialog(
       context: context,
@@ -2750,7 +2773,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("This will check existing records and submitted timesheets. It will add missing holidays or overwrite normal clock-ins to 'Holiday' status."),
+                Text(
+                  "This will create or overwrite records with Holiday status for ALL active Facility Staff in ${_userState ?? 'your state'} on the selected dates (excluding weekends).",
+                  style: GoogleFonts.poppins(fontSize: 13),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   decoration: const InputDecoration(
@@ -2791,23 +2817,6 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                   label: Text(diagStartDate == null
                       ? "Select Date Range"
                       : "${DateFormat('dd/MM/yy').format(diagStartDate!)} - ${DateFormat('dd/MM/yy').format(diagEndDate!)}"),
-                ),
-                const SizedBox(height: 16),
-                GlobalMultiSelectDropdown<String>(
-                  items: _availableStaff.map((s) => s.id).toList(),
-                  selectedItems: selectedStaffIdsForHoliday,
-                  title: "Select Staff",
-                  labelBuilder: (id) {
-                    final staff = _availableStaff.firstWhere((s) => s.id == id,
-                        orElse: () => StaffInfo(
-                            id: id, name: "Unknown", location: "", designation: "", firstName: "", lastName: "", supervisorEmail: "", state: "", department: "", mobile: "", email: "", staffCategory: ""));
-                    return staff.name;
-                  },
-                  onChanged: (results) {
-                    setDialogState(() {
-                      selectedStaffIdsForHoliday = results;
-                    });
-                  },
                 ),
               ],
             ),
@@ -2822,12 +2831,12 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               onPressed: () {
                 if (holidayName.isEmpty || diagStartDate == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please provide a name and date range.")),
+                    const SnackBar(content: Text("Please provide a holiday name and a date range.")),
                   );
                   return;
                 }
                 Navigator.pop(context);
-                _syncHolidays(diagStartDate!, diagEndDate!, holidayName, selectedStaffIdsForHoliday);
+                _syncHolidays(diagStartDate!, diagEndDate!, holidayName);
               },
               child: const Text('SYNC NOW', style: TextStyle(color: Colors.white)),
             ),
@@ -2862,19 +2871,100 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
     );
   }
 
+  Map<String, String> _getTimesheetIdentifiers(DateTime date) {
+    if (date.month == 8 && date.day >= 20) {
+      return {
+        'docId': 'September_${date.year}_part1',
+        'monthField': '8_${date.year}_part1'
+      };
+    } else if (date.month == 9 && date.day <= 19) {
+      return {
+        'docId': 'September_${date.year}_part1',
+        'monthField': '8_${date.year}_part1'
+      };
+    } else if (date.month == 9 && date.day >= 20) {
+      return {
+        'docId': 'September_${date.year}_part2',
+        'monthField': '8_${date.year}_part2'
+      };
+    } else if (date.month == 10 && date.day <= 19) {
+      return {
+        'docId': 'October_${date.year}',
+        'monthField': '9_${date.year}'
+      };
+    }
+
+    DateTime targetMonthDate;
+    if (date.day >= 20) {
+      targetMonthDate = DateTime(date.year, date.month + 1);
+    } else {
+      targetMonthDate = DateTime(date.year, date.month);
+    }
+
+    final monthName = DateFormat('MMMM').format(targetMonthDate);
+    final year = targetMonthDate.year;
+    final monthIndex = targetMonthDate.month - 1; // 0-indexed
+
+    return {
+      'docId': '${monthName}_$year',
+      'monthField': '${monthIndex}_$year'
+    };
+  }
+
   Future<void> _applyBatchHoliday(
-      DateTime start, DateTime end, String holidayName, List<String> staffIds) async {
+      DateTime start, DateTime end, String holidayName) async {
     if (!mounted) return;
+    if (_userState == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Cannot apply holiday: your state could not be determined.")),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     int recordsCreated = 0;
     try {
-      final WriteBatch batch = _firestore.batch();
+      // Fetch all active Facility Staff in the logged-in user's state
+      final staffSnapshot = await _firestore
+          .collection('Staff')
+          .where('state', isEqualTo: _userState)
+          .where('staffCategory', isEqualTo: 'Facility Staff')
+          .where('accountStatus', isEqualTo: 'Active')
+          .get();
+
+      if (staffSnapshot.docs.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("No active Facility Staff found in $_userState.")),
+          );
+        }
+        return;
+      }
+
       final dateRange = List.generate(
           end.difference(start).inDays + 1, (i) => start.add(Duration(days: i)));
 
+      // Show progress snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Applying holiday to ${staffSnapshot.docs.length} staff members..."),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      WriteBatch batch = _firestore.batch();
       int batchCount = 0;
-      for (String staffId in staffIds) {
-        final staff = _availableStaff.firstWhere((s) => s.id == staffId);
+
+      for (final staffDoc in staffSnapshot.docs) {
+        final data = staffDoc.data();
+        final staffId = staffDoc.id;
+        final firstName = data['firstName'] as String? ?? '';
+        final lastName = data['lastName'] as String? ?? '';
+        final staffName = '$firstName $lastName'.trim();
+        final location = data['location'] as String? ?? '';
+        final designation = data['designation'] as String? ?? '';
+
         for (DateTime date in dateRange) {
           // Skip weekends
           if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
@@ -2883,49 +2973,131 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
           final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
           final monthStr = DateFormat('MMMM yyyy').format(date);
-          final docRef = _firestore.collection('Staff').doc(staffId).collection('Record').doc(dateStr);
+          final docRef = _firestore
+              .collection('Staff')
+              .doc(staffId)
+              .collection('Record')
+              .doc(dateStr);
 
-          // PERFORMANCE FIX: We use set with merge: true to avoid the expensive 'get()' check.
-          // This allows the holiday to be applied whether or not a record exists.
-          // If we want to strictly avoid overwriting clock-ins, we'd need another strategy, 
-          // but for holidays, we typically want them to be the primary record.
           batch.set(docRef, {
-            "clockIn": "08:00 AM",
-            "clockInLatitude": 0,
-            "clockInLocation": staff.location,
-            "clockInLongitude": 0,
-            "clockOut": "05:00 PM",
-            "clockOutLatitude": 0,
-            "clockOutLocation": staff.location,
-            "clockOutLongitude": 0,
-            "comments": "Holiday: $holidayName",
-            "date": dateStr,
-            "durationWorked": holidayName,
-            "isSynced": true,
-            "isUpdated": true,
-            "month": monthStr,
-            "noOfHours": 8,
-            "offDay": true,
-            "timestamp": DateTime(date.year, date.month, date.day, 1, 0, 0),
-            "voided": false,
-            "state": _userState, // Optimization: add state field for easier collectionGroup filtering later
+            'Offline_DB_id': 1,
+            'clockIn': '08:00 AM',
+            'date': dateStr,
+            'clockInLatitude': 0.0,
+            'clockInLocation': location,
+            'clockInLongitude': 0.0,
+            'clockOut': '05:00 PM',
+            'clockOutLatitude': 0.0,
+            'clockOutLocation': location,
+            'clockOutLongitude': 0.0,
+            'comments': holidayName,
+            'isSynced': true,
+            'voided': false,
+            'isUpdated': true,
+            'offDay': true,
+            'durationWorked': 'Holiday',
+            'noOfHours': 8.0,
+            'month': monthStr,
+            'timestamp': DateTime(date.year, date.month, date.day, 1, 0, 0),
+            // Denormalized fields for dashboard filtering
+            'state': _userState,
+            'location': location,
+            'designation': designation,
+            'staffName': staffName,
           }, SetOptions(merge: true));
-          
+
           recordsCreated++;
           batchCount++;
-          
+
           if (batchCount >= 400) {
             await batch.commit();
+            batch = _firestore.batch();
             batchCount = 0;
           }
         }
       }
 
+      // Now update corresponding Timesheets if they exist
+      for (final staffDoc in staffSnapshot.docs) {
+        final staffId = staffDoc.id;
+
+        // Group the dates in dateRange by their timesheetDocId to fetch each timesheet only once
+        final Map<String, List<DateTime>> datesByTimesheet = {};
+        for (DateTime date in dateRange) {
+          if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+            continue;
+          }
+          final idents = _getTimesheetIdentifiers(date);
+          final docId = idents['docId']!;
+          datesByTimesheet.putIfAbsent(docId, () => []).add(date);
+        }
+
+        for (final entry in datesByTimesheet.entries) {
+          final timesheetDocId = entry.key;
+          final dates = entry.value;
+
+          final timesheetRef = _firestore
+              .collection('Staff')
+              .doc(staffId)
+              .collection('TimeSheets')
+              .doc(timesheetDocId);
+
+          final docSnapshot = await timesheetRef.get();
+          if (docSnapshot.exists) {
+            final timesheetData = docSnapshot.data() as Map<String, dynamic>;
+            final List<dynamic> entries = List.from(timesheetData['timesheetEntries'] ?? []);
+
+            for (final date in dates) {
+              final dateStrYyyyMmDd = DateFormat('yyyy-MM-dd').format(date);
+              final int entryIndex = entries.indexWhere((e) => e is Map && e['date'] == dateStrYyyyMmDd);
+
+              if (entryIndex == -1) {
+                // If it does not exist, add it to the array
+                entries.add({
+                  'date': dateStrYyyyMmDd,
+                  'noOfHours': 8.0,
+                  'projectName': timesheetData['projectName'] ?? 'Access Project',
+                  'offDay': true,
+                  'durationWorked': 'Holiday',
+                  'deductionStatus': null,
+                  'evidenceImageUrl': null,
+                  'recommendation': null,
+                });
+              } else {
+                // If it exists, update it with the Holiday as durationWorked
+                final existingEntry = Map<String, dynamic>.from(entries[entryIndex] as Map);
+                existingEntry['durationWorked'] = 'Holiday';
+                existingEntry['noOfHours'] = 8.0;
+                existingEntry['offDay'] = true;
+                existingEntry['deductionStatus'] = null;
+                existingEntry['evidenceImageUrl'] = null;
+                existingEntry['recommendation'] = null;
+                entries[entryIndex] = existingEntry;
+              }
+            }
+
+            batch.update(timesheetRef, {
+              'timesheetEntries': entries,
+            });
+            batchCount++;
+
+            if (batchCount >= 400) {
+              await batch.commit();
+              batch = _firestore.batch();
+              batchCount = 0;
+            }
+          }
+        }
+      }
+
       if (batchCount > 0) await batch.commit();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Batch Applied Successfully! $recordsCreated records processed.")),
+          SnackBar(
+            content: Text("Holiday '$holidayName' applied successfully! $recordsCreated records created for ${staffSnapshot.docs.length} staff."),
+            duration: const Duration(seconds: 4),
+          ),
         );
         _loadDashboardData();
       }
@@ -2942,17 +3114,57 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
   }
 
   Future<void> _syncHolidays(
-      DateTime start, DateTime end, String holidayName, List<String> staffIds) async {
+      DateTime start, DateTime end, String holidayName) async {
     if (!mounted) return;
+    if (_userState == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Cannot sync holiday: your state could not be determined.")),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     int recordsUpdated = 0;
     try {
+      // Fetch all active Facility Staff in the logged-in user's state
+      final staffSnapshot = await _firestore
+          .collection('Staff')
+          .where('state', isEqualTo: _userState)
+          .where('staffCategory', isEqualTo: 'Facility Staff')
+          .where('accountStatus', isEqualTo: 'Active')
+          .get();
+
+      if (staffSnapshot.docs.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("No active Facility Staff found in $_userState.")),
+          );
+        }
+        return;
+      }
+
       final dateRange = List.generate(
           end.difference(start).inDays + 1, (i) => start.add(Duration(days: i)));
 
-      for (String staffId in staffIds) {
-        final staff = _availableStaff.firstWhere((s) => s.id == staffId);
-        final WriteBatch batch = _firestore.batch();
+      // Show progress snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Syncing holiday for ${staffSnapshot.docs.length} staff members..."),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      for (final staffDoc in staffSnapshot.docs) {
+        final data = staffDoc.data();
+        final staffId = staffDoc.id;
+        final firstName = data['firstName'] as String? ?? '';
+        final lastName = data['lastName'] as String? ?? '';
+        final staffName = '$firstName $lastName'.trim();
+        final location = data['location'] as String? ?? '';
+        final designation = data['designation'] as String? ?? '';
+
+        WriteBatch batch = _firestore.batch();
         int batchCount = 0;
 
         for (DateTime date in dateRange) {
@@ -2962,35 +3174,45 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
           final dateStr = DateFormat('dd-MMMM-yyyy').format(date);
           final monthStr = DateFormat('MMMM yyyy').format(date);
-          final docRef = _firestore.collection('Staff').doc(staffId).collection('Record').doc(dateStr);
+          final docRef = _firestore
+              .collection('Staff')
+              .doc(staffId)
+              .collection('Record')
+              .doc(dateStr);
 
           batch.set(docRef, {
-            "clockIn": "08:00 AM",
-            "clockInLatitude": 0,
-            "clockInLocation": staff.location,
-            "clockInLongitude": 0,
-            "clockOut": "05:00 PM",
-            "clockOutLatitude": 0,
-            "clockOutLocation": staff.location,
-            "clockOutLongitude": 0,
-            "comments": "Holiday: $holidayName",
-            "date": dateStr,
-            "durationWorked": holidayName,
-            "isSynced": true,
-            "isUpdated": true,
-            "month": monthStr,
-            "noOfHours": 8,
-            "offDay": true,
-            "timestamp": DateTime(date.year, date.month, date.day, 1, 0, 0),
-            "voided": false,
-            "state": _userState,
+            'Offline_DB_id': 1,
+            'clockIn': '08:00 AM',
+            'date': dateStr,
+            'clockInLatitude': 0.0,
+            'clockInLocation': location,
+            'clockInLongitude': 0.0,
+            'clockOut': '05:00 PM',
+            'clockOutLatitude': 0.0,
+            'clockOutLocation': location,
+            'clockOutLongitude': 0.0,
+            'comments': holidayName,
+            'isSynced': true,
+            'voided': false,
+            'isUpdated': true,
+            'offDay': true,
+            'durationWorked': 'Holiday',
+            'noOfHours': 8.0,
+            'month': monthStr,
+            'timestamp': DateTime(date.year, date.month, date.day, 1, 0, 0),
+            // Denormalized fields for dashboard filtering
+            'state': _userState,
+            'location': location,
+            'designation': designation,
+            'staffName': staffName,
           }, SetOptions(merge: true));
-          
+
           recordsUpdated++;
           batchCount++;
 
-          if (batchCount >= 400) { // Safety for batch limit
+          if (batchCount >= 400) {
             await batch.commit();
+            batch = _firestore.batch();
             batchCount = 0;
           }
         }
@@ -2999,7 +3221,10 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Sync Completed! $recordsUpdated days set to Holiday status.")),
+          SnackBar(
+            content: Text("Sync Completed! '$holidayName' applied to $recordsUpdated records for ${staffSnapshot.docs.length} staff."),
+            duration: const Duration(seconds: 4),
+          ),
         );
         _loadDashboardData();
       }

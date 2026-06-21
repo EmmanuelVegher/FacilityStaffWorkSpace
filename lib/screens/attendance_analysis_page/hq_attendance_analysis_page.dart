@@ -450,10 +450,15 @@ class _HQAttendanceAnalysisPageState extends State<HQAttendanceAnalysisPage> {
       final filteredStaffIds = staffToQuery.map((s) => s.id).toSet();
       final staffInfoMap = {for (var s in staffToQuery) s.id: s};
 
-      final recordsSnapshot = await _firestore.collectionGroup('Record')
+      Query<Map<String, dynamic>> recordsQuery = _firestore.collectionGroup('Record');
+      if (_selectedStates.isNotEmpty && _selectedStates.length <= 30) {
+        recordsQuery = recordsQuery.where('state', whereIn: _selectedStates);
+      }
+      recordsQuery = recordsQuery
           .where('timestamp', isGreaterThanOrEqualTo: _startDate)
-          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
-          .get();
+          .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)));
+
+      final recordsSnapshot = await recordsQuery.get();
 
       List<AttendanceRecord> allRecords = [];
       for (final recordDoc in recordsSnapshot.docs) {

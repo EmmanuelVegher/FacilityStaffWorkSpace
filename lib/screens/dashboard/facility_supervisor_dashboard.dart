@@ -247,9 +247,9 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
       final staffMap = {for (var staff in staffList) staff.id: staff};
       final lateCutoff = DateTime(dateRange.start.year, dateRange.start.month, dateRange.start.day, 8, 0, 1);
 
-      // QUERY 4: Get all attendance records within the date range.
-      // We can't filter collectionGroup by a parent's field, so we fetch all and filter client-side.
+      // QUERY 4: Get attendance records for the facility within the date range.
       Query recordsQuery = _firestore.collectionGroup('Record')
+          .where('location', isEqualTo: _currentUserFacility)
           .where('timestamp', isGreaterThanOrEqualTo: dateRange.start)
           .where('timestamp', isLessThan: dateRange.end.add(const Duration(days: 1)));
 
@@ -592,8 +592,8 @@ class FacilitySupervisorDashboardState extends State<FacilitySupervisorDashboard
           widget: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text("${presentIds.length}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              Text("Clocked In /\n${data.staffList.length} Total", textAlign: TextAlign.center),
+              Text("${presentIds.length}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("Clocked In / ${data.staffList.length} Total", textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
             ],
           ),
         ),

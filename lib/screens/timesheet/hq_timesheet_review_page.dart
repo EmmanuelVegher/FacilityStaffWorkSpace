@@ -702,7 +702,7 @@ class _TimesheetReviewPageHqState extends State<TimesheetReviewPageHq> with Sing
                 PopupMenuItem(
                     value: 'bulk_pdf',
                     enabled: !_isLoading && _allTimesheetsMaster.isNotEmpty,
-                    child: const ListTile(leading: Icon(Icons.picture_as_pdf), title: Text("Download Details (PDF)"))
+                    child: const ListTile(leading: Icon(Icons.picture_as_pdf), title: Text("Download All Timesheet (PDF)"))
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(

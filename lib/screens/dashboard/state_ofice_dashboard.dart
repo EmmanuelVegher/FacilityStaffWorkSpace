@@ -528,8 +528,8 @@ class DashboardScreenState extends State<DashboardScreen> {
           widget: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text("${presentIds.length}", style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
-              Text("Clocked In /\n${data.staffList.length} Staff", textAlign: TextAlign.center, style: GoogleFonts.poppins()),
+              Text("${presentIds.length}", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("Clocked In / ${data.staffList.length} Staff", textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 10)),
             ],
           ),
         ),

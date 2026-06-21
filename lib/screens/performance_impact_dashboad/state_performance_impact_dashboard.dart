@@ -337,12 +337,14 @@ class _StatePerformanceImpactDashboardPageState
       }
 
       final futures = [
-        // ** FIX START **
-        // Fetch ALL records and leave requests, then filter in-app.
-        // The original `.where('state', ...)` query was incorrect as the `state` field is not on these sub-collection documents.
-        _firestore.collectionGroup('Record').get(),
-        _firestore.collectionGroup('Leave Request').get(),
-        // ** FIX END **
+        _firestore.collectionGroup('Record')
+            .where('state', isEqualTo: _currentState)
+            .where('timestamp', isGreaterThanOrEqualTo: _startDate)
+            .where('timestamp', isLessThanOrEqualTo: _endDate.add(const Duration(days: 1)))
+            .get(),
+        _firestore.collectionGroup('Leave Request')
+            .where('staffState', isEqualTo: _currentState)
+            .get(),
         _firestore
             .collection('CallLogs')
             .where('trackerFacilityState', isEqualTo: _currentState)
