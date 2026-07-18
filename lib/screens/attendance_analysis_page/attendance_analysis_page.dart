@@ -127,6 +127,7 @@ class AttendanceRecord {
   final String? clockInLocationString;
   final String? clockOutLocationString;
   final String? durationWorked;
+  final List<String> verifiedByUserNames;
 
   AttendanceRecord({
     required this.recordId,
@@ -145,6 +146,7 @@ class AttendanceRecord {
     this.clockInLocationString,
     this.clockOutLocationString,
     this.durationWorked,
+    this.verifiedByUserNames = const [],
   });
 }
 
@@ -500,6 +502,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
                 clockInLocationString: data['clockInLocation'] as String?,
                 clockOutLocationString: data['clockOutLocation'] as String?,
                 durationWorked: data['durationWorked'] as String?,
+                verifiedByUserNames: List<String>.from(data['verifiedByUserNames'] ?? []),
               ));
             }
           }));
@@ -668,6 +671,7 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
             clockInLocationString: data['clockInLocation'] as String?,
             clockOutLocationString: data['clockOutLocation'] as String?,
             durationWorked: data['durationWorked'] as String?,
+            verifiedByUserNames: List<String>.from(data['verifiedByUserNames'] ?? []),
           ));
         }
       }
@@ -791,7 +795,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         'Clock Out Longitude',
         'Deduction Status',
         'Comments/Reason',
-        'Recommended By'
+        'Recommended By',
+        'Verified By'
       ]);
 
       // Create a sorted list of records for a clean report
@@ -830,7 +835,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
           record.clockOutLocation?.longitude ?? '',
           record.deductionStatus,
           record.recommendation?.notes ?? '',
-          record.recommendation?.recommenderName ?? ''
+          record.recommendation?.recommenderName ?? '',
+          record.verifiedByUserNames.join(', ')
         ]);
       }
 
@@ -903,7 +909,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
         'Clock Out Longitude',
         'Deduction Status',
         'Comments/Reason',
-        'Recommended By'
+        'Recommended By',
+        'Verified By'
       ];
 
       // 4. Apply headers and their style to the first row
@@ -954,7 +961,8 @@ class _AttendanceAnalysisPageState extends State<AttendanceAnalysisPage> {
               record.clockOutLocation?.longitude.toString() ?? ''),
           xls.TextCellValue(record.deductionStatus),
           xls.TextCellValue(record.recommendation?.notes ?? ''),
-          xls.TextCellValue(record.recommendation?.recommenderName ?? '')
+          xls.TextCellValue(record.recommendation?.recommenderName ?? ''),
+          xls.TextCellValue(record.verifiedByUserNames.join(', '))
         ];
 
         // Add the row data to the sheet
