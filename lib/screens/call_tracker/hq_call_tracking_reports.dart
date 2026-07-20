@@ -62,7 +62,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   List<String> _selectedCallStatuses = [];
 
   // --- UI State for Expandable Sections ---
-  List<ScrollController> _logTableControllers = [];
+  final Map<int, ScrollController> _logTableControllers = {};
   int _currentlyExpandedDateIndex = -1;
   bool _isClientSummaryExpanded = false;
   final ScrollController _clientSummaryScrollController = ScrollController();
@@ -86,11 +86,20 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
     _initializeStateFilter();
   }
 
-  @override
-  void dispose() {
-    for (final controller in _logTableControllers) {
+  void _clearLogTableControllers() {
+    for (final controller in _logTableControllers.values) {
       controller.dispose();
     }
+    _logTableControllers.clear();
+  }
+
+  ScrollController _getLogTableController(int index) {
+    return _logTableControllers.putIfAbsent(index, () => ScrollController());
+  }
+
+  @override
+  void dispose() {
+    _clearLogTableControllers();
     _clientSummaryScrollController.dispose();
     super.dispose();
   }
@@ -274,11 +283,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
 
       _prepareChartData();
 
-      for (final controller in _logTableControllers) {
-        controller.dispose();
-      }
-      final dateGroups = _groupContactsByDate();
-      _logTableControllers = List.generate(dateGroups.length, (_) => ScrollController());
+      _clearLogTableControllers();
       _currentlyExpandedDateIndex = _filteredContactList.isNotEmpty ? 0 : -1;
     });
   }
@@ -323,13 +328,11 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
         ),
       ),
       drawer: drawer3(context),
-      body: SelectionArea(
-        child: Column(
-          children: [
-            _buildFilterBar(),
-            Expanded(child: bodyContent),
-          ],
-        ),
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(child: bodyContent),
+        ],
       ),
     );
   }
@@ -1256,7 +1259,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
           children: [
             Expanded(
               child: Text(
-                'Summary of Calls per Client',
+                'Summary of Calls per Client (${clientSummaryMap.length})',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
@@ -1286,37 +1289,38 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
         initiallyExpanded: _isClientSummaryExpanded,
         onExpansionChanged: (isExpanded) => setState(() => _isClientSummaryExpanded = isExpanded),
         children: [
-          SingleChildScrollView(
-            controller: _clientSummaryScrollController,
-            scrollDirection: Axis.horizontal,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: DataTable(
-                columnSpacing: 15.0,
-                headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
-                columns: const [
-                  DataColumn(label: Text('Client ART ID')),
-                  DataColumn(label: Text('Client Name')),
-                  DataColumn(label: Text('Client Phone')),
-                  DataColumn(label: Text('Total Calls')),
-                  DataColumn(label: Text('Call Status Summary')),
-                ],
-                rows: clientSummaryMap.values.map((summary) {
-                  final statusSummary = summary.statusCounts.entries
-                      .map((e) => '${e.key}: ${e.value}')
-                      .join(', ');
+          if (_isClientSummaryExpanded)
+            SingleChildScrollView(
+              controller: _clientSummaryScrollController,
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: DataTable(
+                  columnSpacing: 15.0,
+                  headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
+                  columns: const [
+                    DataColumn(label: Text('Client ART ID')),
+                    DataColumn(label: Text('Client Name')),
+                    DataColumn(label: Text('Client Phone')),
+                    DataColumn(label: Text('Total Calls')),
+                    DataColumn(label: Text('Call Status Summary')),
+                  ],
+                  rows: clientSummaryMap.values.take(500).map((summary) {
+                    final statusSummary = summary.statusCounts.entries
+                        .map((e) => '${e.key}: ${e.value}')
+                        .join(', ');
 
-                  return DataRow(cells: [
-                    DataCell(Text(_maskClientName(summary.clientId))),
-                    DataCell(Text(_maskClientName(summary.clientName))),
-                    DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))),
-                    DataCell(Text(summary.totalCalls.toString())),
-                    DataCell(Text(statusSummary)),
-                  ]);
-                }).toList(),
+                    return DataRow(cells: [
+                      DataCell(Text(_maskClientName(summary.clientId))),
+                      DataCell(Text(_maskClientName(summary.clientName))),
+                      DataCell(Text(_maskPhoneNumber(summary.clientPhoneNumber))),
+                      DataCell(Text(summary.totalCalls.toString())),
+                      DataCell(Text(statusSummary)),
+                    ]);
+                  }).toList(),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1345,7 +1349,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
             return ListTile(
               title: Row(
                 children: [
-                  Expanded(child: Text(dateKey, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text('$dateKey (${dailyContactList.length} calls)', style: const TextStyle(fontWeight: FontWeight.bold))),
                   Visibility(
                     visible: isExpanded,
                     maintainSize: true,
@@ -1356,12 +1360,12 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
                         IconButton(
                           icon: const Icon(Icons.arrow_back),
                           tooltip: 'Scroll Left',
-                          onPressed: () => _logTableControllers[index].animateTo(_logTableControllers[index].offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                          onPressed: () => _getLogTableController(index).animateTo(_getLogTableController(index).offset - 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
                         ),
                         IconButton(
                           icon: const Icon(Icons.arrow_forward),
                           tooltip: 'Scroll Right',
-                          onPressed: () => _logTableControllers[index].animateTo(_logTableControllers[index].offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                          onPressed: () => _getLogTableController(index).animateTo(_getLogTableController(index).offset + 350, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
                         ),
                       ],
                     ),
@@ -1370,41 +1374,43 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
               ),
             );
           },
-          body: SingleChildScrollView(
-            controller: _logTableControllers[index],
-            scrollDirection: Axis.horizontal,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
-                  DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
-                  DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('Call Status')),
-                  DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')), DataColumn(label: Text("Tracker's Designation")),
-                  DataColumn(label: Text("Tracker's Facility")), DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
-                ],
-                rows: dailyContactList.map((contact) {
-                  return DataRow(cells: [
-                    DataCell(Text(_maskClientName(contact.name))),
-                    DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
-                    DataCell(Text(contact.artStatus ?? 'N/A')),
-                    DataCell(Text(contact.facilityName ?? 'N/A')),
-                    DataCell(Text(contact.state ?? 'N/A')),
-                    DataCell(Text(_maskClientName(contact.uniqueID))),
-                    DataCell(Text(contact.datimCode ?? 'N/A')),
-                    DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
-                    DataCell(_buildStatusCell(contact.callStatus)),
-                    DataCell(Text(formatDuration(contact.callDuration ?? 0))),
-                    DataCell(Text(contact.trackedBy ?? 'N/A')),
-                    DataCell(Text(contact.designation ?? 'N/A')),
-                    DataCell(Text(contact.trackerFacilityLocation ?? 'N/A')),
-                    DataCell(Text(contact.supervisorName ?? 'N/A')),
-                    DataCell(Text(contact.supervisorEmail ?? 'N/A')),
-                  ]);
-                }).toList(),
-              ),
-            ),
-          ),
+          body: isExpanded
+              ? SingleChildScrollView(
+                  controller: _getLogTableController(index),
+                  scrollDirection: Axis.horizontal,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Client Name')), DataColumn(label: Text('Client PhoneNo')), DataColumn(label: Text('Client ART Status')),
+                        DataColumn(label: Text("Client's Facility")), DataColumn(label: Text('Client State')), DataColumn(label: Text('Client ART ID')),
+                        DataColumn(label: Text('DatimCode')), DataColumn(label: Text('Time Tracked')), DataColumn(label: Text('Call Status')),
+                        DataColumn(label: Text('Duration')), DataColumn(label: Text('Tracked By')), DataColumn(label: Text("Tracker's Designation")),
+                        DataColumn(label: Text("Tracker's Facility")), DataColumn(label: Text("Tracker's Supervisor")), DataColumn(label: Text("Tracker's Supervisor Email")),
+                      ],
+                      rows: dailyContactList.map((contact) {
+                        return DataRow(cells: [
+                          DataCell(Text(_maskClientName(contact.name))),
+                          DataCell(Text(_maskPhoneNumber(contact.phoneNumber))),
+                          DataCell(Text(contact.artStatus ?? 'N/A')),
+                          DataCell(Text(contact.facilityName ?? 'N/A')),
+                          DataCell(Text(contact.state ?? 'N/A')),
+                          DataCell(Text(_maskClientName(contact.uniqueID))),
+                          DataCell(Text(contact.datimCode ?? 'N/A')),
+                          DataCell(Text(contact.dateTracked != null ? DateFormat('HH:mm').format(contact.dateTracked!) : 'N/A')),
+                          DataCell(_buildStatusCell(contact.callStatus)),
+                          DataCell(Text(formatDuration(contact.callDuration ?? 0))),
+                          DataCell(Text(contact.trackedBy ?? 'N/A')),
+                          DataCell(Text(contact.designation ?? 'N/A')),
+                          DataCell(Text(contact.trackerFacilityLocation ?? 'N/A')),
+                          DataCell(Text(contact.supervisorName ?? 'N/A')),
+                          DataCell(Text(contact.supervisorEmail ?? 'N/A')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
         );
       }).toList(),
     );
