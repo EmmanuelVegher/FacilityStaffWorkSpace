@@ -113,7 +113,7 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   }
 
   Future<void> _initializeStateFilter() async {
-    // This method now handles the complete initial setup and data load.
+    // Fetch available states and let the user choose before loading data.
     setState(() => isLoading = true);
     try {
       final snapshot = await _firestore.collection('Location').get();
@@ -121,27 +121,22 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
 
       if (!mounted) return;
 
-      // Set the default state filter.
+      // Set the default state filter. Leave _selectedStates empty so the user
+      // picks a state before data is loaded – avoids fetching everything at once.
       setState(() {
         _availableStates = states..sort();
         _selectedStates = [];
+        _isInitialState = true; // Show the "select filters" prompt immediately.
+        isLoading = false;       // Stop spinner; the page is ready for user input.
       });
-
-      // After setting the default filters, immediately load the corresponding reports.
-      // _loadReports() has its own `try/catch/finally` and will manage the `isLoading` state.
-      await _loadReports();
-
     } catch (e) {
       if (mounted) {
         setState(() {
           _errorMessage = "Error during initial page load: $e";
-          // Ensure loading is turned off if the initial state fetch fails.
           isLoading = false;
         });
       }
     }
-    // The `finally` block is removed from this method. The `finally` block within
-    // the called `_loadReports()` will handle setting `isLoading` to false upon completion.
   }
 
 
@@ -194,10 +189,13 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
   Future<void> _loadReports() async {
     if (_selectedStates.isEmpty) {
       _showSnackBar("Please select at least one state to generate a report.");
+      // Ensure the spinner is off even on early return.
+      if (mounted) setState(() => isLoading = false);
       return;
     }
     if (startDate == null || endDate == null) {
       _showSnackBar("Please select a valid date range.");
+      if (mounted) setState(() => isLoading = false);
       return;
     }
 
@@ -1202,11 +1200,11 @@ class _HQCallTrackerReportsPageState extends State<HQCallTrackerReportsPage> {
         _buildChartCard(title: 'Call Status Distribution', chartKey: _callStatusChartKey, chart: SfCircularChart(
             annotations: (callStatusChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
             legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
-            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: callStatusChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
+            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: callStatusChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.inside))])),
         _buildChartCard(title: 'ART Status Distribution', chartKey: _artStatusChartKey, chart: SfCircularChart(
             annotations: (artStatusChartData.isEmpty) ? [const CircularChartAnnotation(widget: Text("No data"))] : null,
             legend: const Legend(isVisible: true, position: LegendPosition.bottom, overflowMode: LegendItemOverflowMode.wrap),
-            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: artStatusChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.outside))])),
+            series: <CircularSeries>[PieSeries<MapEntry<String, int>, String>(dataSource: artStatusChartData, xValueMapper: (d, _) => d.key, yValueMapper: (d, _) => d.value, dataLabelSettings: const DataLabelSettings(isVisible: true, labelPosition: ChartDataLabelPosition.inside))])),
         _buildChartCard(isWide: true, title: 'Average Call Duration Trend (Daily)', chartKey: _callDurationChartKey, chart: SfCartesianChart(
             annotations: (callDurationTrendData.isEmpty) ? [const CartesianChartAnnotation(widget: Text("No data"), coordinateUnit: CoordinateUnit.point, region: AnnotationRegion.chart, x: '50%', y: '50%')] : null,
             primaryXAxis: const CategoryAxis(labelRotation: -45, title: AxisTitle(text: 'Date Tracked')),

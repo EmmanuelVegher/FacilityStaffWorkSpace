@@ -526,17 +526,16 @@ class HQDashboardScreenState extends State<HQDashboardScreen> {
                     dataSource: displayData, xValueMapper: (data, _) => data.category, yValueMapper: (data, _) => data.value, pointColorMapper: (data, _) => data.color,
                     radius: '100%', innerRadius: '65%', explode: true, explodeGesture: ActivationMode.singleTap,
                     dataLabelSettings: DataLabelSettings(
-                      isVisible: true, labelPosition: ChartDataLabelPosition.outside,
+                      isVisible: true, labelPosition: ChartDataLabelPosition.inside,
                       builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
                         final chartData = data as ChartData;
                         final percentage = totalExpected > 0 ? (chartData.value / totalExpected * 100) : 0;
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.15), blurRadius: 3, offset: const Offset(1,1)) ]),
-                          child: Text('${chartData.category}\n${chartData.value} (${percentage.toStringAsFixed(1)}%)', textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(4), boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.15), blurRadius: 3, offset: const Offset(1,1)) ]),
+                          child: Text('${chartData.category}\n${chartData.value} (${percentage.toStringAsFixed(1)}%)', textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 11)),
                         );
                       },
-                      connectorLineSettings: const ConnectorLineSettings( type: ConnectorType.curve, length: '20%'),
                     ),
                   )
                 ],
