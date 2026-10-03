@@ -36,6 +36,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showErrorDialog("Please enter both email and password.");
+      return;
+    }
+
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -43,8 +51,8 @@ class _LoginPageState extends State<LoginPage> {
     });
     try {
       await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
       if (mounted) {
         Navigator.pushReplacement(
@@ -52,8 +60,11 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        // Show dialog instead of setting _errorMessage state for inline display
         _showErrorDialog(e.message ?? "An unknown error occurred.");
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog("Authentication error: ${e.toString()}");
       }
     } finally {
       if (mounted) {

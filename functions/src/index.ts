@@ -156,56 +156,92 @@ export const deleteUser = functions.https.onCall(
     }
   });
 
-// --- Scheduled Function to Reset Annual Leave Balances ---
+// --- Helper to Reset Annual Leave Balances Safely in Batches ---
+async function performAnnualLeaveReset(): Promise<{ totalReset: number }> {
+  const db = admin.firestore();
+  const staffCollection = db.collection('Staff');
+  const staffSnapshot = await staffCollection.get();
+
+  let batch = db.batch();
+  let batchCount = 0;
+  let resetCount = 0;
+
+  for (const staffDoc of staffSnapshot.docs) {
+    const staffData = staffDoc.data();
+    const gender = staffData['gender'] as string;
+    const staffId = staffDoc.id;
+
+    // Determine leave balances based on gender
+    const annualLeave = 10;
+    const maternityLeave = (gender === 'Female') ? 30 : 0;
+    const paternityLeave = 0;
+    const holidayLeave = 0;
+
+    // Reference to RemainingLeave document
+    const remainingLeaveRef = staffCollection.doc(staffId).collection('RemainingLeave').doc('remainingLeaveDoc');
+
+    // Update the document
+    batch.set(remainingLeaveRef, {
+      staffId: staffId,
+      annualLeaveBalance: annualLeave,
+      maternityLeaveBalance: maternityLeave,
+      paternityLeaveBalance: paternityLeave,
+      holidayLeaveBalance: holidayLeave,
+      dateUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    batchCount++;
+    resetCount++;
+
+    // Commit every 400 operations to safely stay below Firestore's 500 limit
+    if (batchCount >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      batchCount = 0;
+    }
+  }
+
+  // Commit any remaining operations
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+
+  return { totalReset: resetCount };
+}
+
+// --- Scheduled Function to Reset Annual Leave Balances (Every Oct 1st) ---
 export const resetAnnualLeave = onSchedule({
   schedule: "0 0 1 10 *",
-  timeZone: "Africa/Lagos"
+  timeZone: "Africa/Lagos",
+  timeoutSeconds: 540,
+  memory: "512MiB",
 }, async (event) => {
-  console.log("Starting annual leave reset for all staff on October 1st.");
-
+  console.log("Starting scheduled annual leave reset for all staff on October 1st.");
   try {
-    // Get all staff documents
-    const staffCollection = admin.firestore().collection('Staff');
-    const staffSnapshot = await staffCollection.get();
-
-    const batch = admin.firestore().batch();
-    let resetCount = 0;
-
-    for (const staffDoc of staffSnapshot.docs) {
-      const staffData = staffDoc.data();
-      const gender = staffData['gender'] as string;
-      const staffId = staffDoc.id;
-
-      // Determine leave balances based on gender
-      const annualLeave = 10;
-      const maternityLeave = (gender === 'Female') ? 30 : 0;
-      const paternityLeave = 0; // Not used as per code
-      const holidayLeave = 0;
-
-      // Reference to RemainingLeave document
-      const remainingLeaveRef = staffCollection.doc(staffId).collection('RemainingLeave').doc('remainingLeaveDoc');
-
-      // Update the document
-      batch.set(remainingLeaveRef, {
-        staffId: staffId,
-        annualLeaveBalance: annualLeave,
-        maternityLeaveBalance: maternityLeave,
-        paternityLeaveBalance: paternityLeave,
-        holidayLeaveBalance: holidayLeave,
-        dateUpdated: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      resetCount++;
-      console.log(`Prepared reset for staff: ${staffId} (${gender})`);
-    }
-
-    // Commit the batch
-    await batch.commit();
-
-    console.log(`Annual leave reset completed for ${resetCount} staff members.`);
+    const { totalReset } = await performAnnualLeaveReset();
+    console.log(`Annual leave reset completed for ${totalReset} staff members.`);
   } catch (error) {
     console.error("Error resetting annual leave:", error);
     throw new Error("Failed to reset annual leave balances.");
+  }
+});
+
+// --- On-Demand Callable Function to Manually Trigger Reset Anytime ---
+export const manualResetAnnualLeave = functions.https.onCall({
+  timeoutSeconds: 540,
+  memory: "512MiB",
+}, async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Auth required.");
+  }
+
+  console.log(`Manual annual leave reset triggered by UID: ${request.auth.uid}`);
+  try {
+    const { totalReset } = await performAnnualLeaveReset();
+    return { success: true, message: `Successfully reset leave for ${totalReset} staff members.` };
+  } catch (error) {
+    console.error("Error in manual annual leave reset:", error);
+    throw new functions.https.HttpsError("internal", "Failed to reset annual leave balances.");
   }
 });
 // --- Attendance Optimization Tools ---

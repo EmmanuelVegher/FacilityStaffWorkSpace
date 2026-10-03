@@ -3735,8 +3735,13 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
   Future<void> _resetAnnualLeaveForAllStaff() async {
     try {
       // Get all staff documents
-      final staffCollection = FirebaseFirestore.instance.collection('Staff');
+      final db = FirebaseFirestore.instance;
+      final staffCollection = db.collection('Staff');
       final staffSnapshot = await staffCollection.get();
+
+      WriteBatch batch = db.batch();
+      int batchCount = 0;
+      int resetCount = 0;
 
       for (var staffDoc in staffSnapshot.docs) {
         final staffData = staffDoc.data();
@@ -3757,7 +3762,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
             .doc(staffId)
             .collection('RemainingLeave')
             .doc('remainingLeaveDoc');
-        await remainingLeaveRef.set({
+
+        batch.set(remainingLeaveRef, {
           'staffId': staffId,
           'annualLeaveBalance': annualLeave,
           'maternityLeaveBalance': maternityLeave,
@@ -3766,15 +3772,28 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           'dateUpdated': DateTime.now(),
         }, SetOptions(merge: true));
 
-        print('Reset leave for staff: $staffId');
+        batchCount++;
+        resetCount++;
+
+        // Commit every 400 operations to stay below Firestore's 500-operation limit
+        if (batchCount >= 400) {
+          await batch.commit();
+          batch = db.batch();
+          batchCount = 0;
+        }
+      }
+
+      // Commit any remaining operations
+      if (batchCount > 0) {
+        await batch.commit();
       }
 
       Fluttertoast.showToast(
-        msg: "Annual leave reset completed for all staff.",
+        msg: "Annual leave reset completed for $resetCount staff members.",
         toastLength: Toast.LENGTH_LONG,
         backgroundColor: Colors.green,
         gravity: ToastGravity.BOTTOM,
-        timeInSecForIosWeb: 1,
+        timeInSecForIosWeb: 2,
         textColor: Colors.white,
         fontSize: 16.0,
       );
@@ -3785,7 +3804,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         toastLength: Toast.LENGTH_LONG,
         backgroundColor: Colors.red,
         gravity: ToastGravity.BOTTOM,
-        timeInSecForIosWeb: 1,
+        timeInSecForIosWeb: 2,
         textColor: Colors.white,
         fontSize: 16.0,
       );
