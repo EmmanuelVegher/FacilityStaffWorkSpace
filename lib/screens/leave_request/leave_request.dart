@@ -281,6 +281,11 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1>
   bool isHTML = false;
   String? _currentUserId;
 
+  bool get _isFemale {
+    final g = _bioInfo.value?.gender ?? selectedGender ?? '';
+    return g.trim().toLowerCase() == 'female';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -400,6 +405,7 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1>
 
       _bioInfo.value = await _fetchBioInfo();
       _leaveRequests.bindStream(_streamLeaveRequests());
+      _remainingLeaves.bindStream(_streamRemainingLeave());
 
       // _updateRemainingLeavesAndDate(); // Commented out to prevent recalculation of balances from requests
 
@@ -407,6 +413,34 @@ class _LeaveRequestsPage1State extends State<LeaveRequestsPage1>
     } catch (e) {
       print("Error during _init: $e");
     }
+  }
+
+  Stream<RemainingLeaveModel?> _streamRemainingLeave() async* {
+    if (_currentUserId == null) yield null;
+    final remainingLeaveRef = FirebaseFirestore.instance
+        .collection('Staff')
+        .doc(_currentUserId)
+        .collection('RemainingLeave')
+        .doc('remainingLeaveDoc');
+
+    yield* remainingLeaveRef.snapshots().map((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final model = RemainingLeaveModel.fromJson(snapshot.data()!);
+        _remainingPaternityLeaveBalance.value =
+            model.paternityLeaveBalance ?? 0;
+        _remainingMaternityLeaveBalance.value =
+            model.maternityLeaveBalance ?? 0;
+        _remainingAnnualLeaveBalance.value = model.annualLeaveBalance ?? 0;
+        _usedPaternityLeaves.value = _totalPaternityLeaves.value -
+            _remainingPaternityLeaveBalance.value;
+        _usedMaternityLeaves.value = _totalMaternityLeaves.value -
+            _remainingMaternityLeaveBalance.value;
+        _usedAnnualLeaves.value =
+            _totalAnnualLeaves.value - _remainingAnnualLeaveBalance.value;
+        return model;
+      }
+      return null;
+    });
   }
 
   Stream<List<LeaveRequestModel>> _streamLeaveRequests() async* {
@@ -577,7 +611,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
     <td style="$tdStyle">${_remainingLeaves.value?.annualLeaveBalance ?? 0}</td>
   </tr>
 
-  ${_bioInfo.value?.gender == 'Female' ? """
+  ${_isFemale ? """
     <tr>
       <td style="$tdStyle">Maternity Leave</td>
       <td style="$tdStyle">$_totalMaternityLeaves</td>
@@ -1421,8 +1455,9 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
       Map<String, dynamic> staffData = staffDoc.data() as Map<String, dynamic>;
 
       // Ensure gender and maritalStatus exist
-      String gender = staffData['gender'] ?? "Male";
-      String maritalStatus = staffData['maritalStatus'] ?? "Single";
+      String gender = (staffData['gender'] as String?) ?? "Male";
+      String maritalStatus = (staffData['maritalStatus'] as String?) ?? "Single";
+      bool isFemaleStaff = gender.trim().toLowerCase() == 'female';
 
       // If missing, update Firestore
       if (!staffData.containsKey('gender') ||
@@ -1453,11 +1488,11 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           holidayLeaveBalance: _totalHolidayLeaves.value,
           dateUpdated: DateTime.now(),
           paternityLeaveBalance:
-              (gender == 'Male' && maritalStatus == 'Married')
+              (gender.trim().toLowerCase() == 'male' && maritalStatus.trim().toLowerCase() == 'married')
                   ? _totalPaternityLeaves.value
                   : 0,
           maternityLeaveBalance:
-              (gender == 'Female') ? _totalMaternityLeaves.value : 0,
+              isFemaleStaff ? _totalMaternityLeaves.value : 0,
         );
 
         await remainingLeaveRef.set(remainingLeave.toJson());
@@ -1902,7 +1937,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
         fontSizeFactor,
         paddingFactor));
 
-    if (selectedGender == 'Female') {
+    if (_isFemale) {
       leaveSummaryItems.add(
         _buildLeaveSummaryItem(
             "Maternity",
@@ -2078,14 +2113,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                           paddingFactor,
                         ),
 
-                        if (selectedGender == 'Female') ...[
-                          // if (selectedGender == 'Female')
-                          //   _buildLeaveSummaryItem("Maternity", _totalMaternityLeaves.value - (_remainingLeaves.value?.maternityLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor)
-                          // if (selectedGender == 'Female')
-                          //    _buildLeaveSummaryItem("Maternity", _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0)
-                          //        == _totalAnnualLeaves.value? _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0):
-                          //    _totalAnnualLeaves.value - (_remainingLeaves.value?.annualLeaveBalance ?? 0), _totalMaternityLeaves.value, fontSizeFactor, paddingFactor),
-
+                        if (_isFemale) ...[
                           _buildLeaveSummaryItem(
                               "Maternity",
                               _totalMaternityLeaves.value -
@@ -2158,14 +2186,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return StatefulBuilder(builder: (context, setState) {
             List<Widget> leaveTypeButtons = [];
 
-            //if (_bioInfo.value?.maritalStatus == 'Married') {
-            // if (_bioInfo.value?.gender == 'Male') {
-            //   leaveTypeButtons.addAll([
-            //     _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, buttonPaddingFactor),
-            //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, buttonPaddingFactor),
-            //   ]);
-            // } else
-            if (selectedGender == 'Female') {
+            if (_isFemale) {
               leaveTypeButtons.addAll([
                 _leaveTypeButton(setState, 'Maternity', 'Maternity Leave',
                     fontSizeFactor, buttonPaddingFactor),
@@ -2173,7 +2194,6 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
                     fontSizeFactor, buttonPaddingFactor),
               ]);
             }
-            // }
             else {
               leaveTypeButtons.add(_leaveTypeButton(setState, 'Annual',
                   'Annual Leave', fontSizeFactor, buttonPaddingFactor));
@@ -2399,15 +2419,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
     totalLeaves.bindStream(
       (() async* {
-        if (selectedGender == 'Male') {
-          //  if (selectedGender == 'Male') {
-          //    yield remainingAnnual + 0;
-          //  } else
-          //
-          // {
-          //
-          //    yield remainingMaternity;
-          //  }
+        if (!_isFemale) {
           yield remainingAnnual + 0;
         } else {
           yield remainingAnnual + remainingMaternity;
@@ -2417,14 +2429,8 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
 
     usedLeaves.bindStream(
       (() async* {
-        if (selectedGender == 'Female') {
-          // if (_bioInfo.value?.gender == 'Male') {
-          //   yield usedAnnual + usedPaternity;
-          // } else
-          //  if (selectedGender == 'Female') {
-
+        if (_isFemale) {
           yield (usedMaternity + usedAnnual);
-          //}
         } else {
           yield usedAnnual;
         }
@@ -2704,19 +2710,7 @@ ${leaveRequest.firstName} ${leaveRequest.lastName}.
           return StatefulBuilder(builder: (context, setState) {
             List<Widget> leaveTypeButtons = [];
 
-            if (_bioInfo.value?.gender == 'Female') {
-              // if (_bioInfo.value?.gender == 'Male') {
-              //   leaveTypeButtons.addAll([
-              //     _leaveTypeButton(setState, 'Paternity', 'Paternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide  / 600))),
-              //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-              //   ]);
-              // } else {
-              //   leaveTypeButtons.addAll([
-              //     _leaveTypeButton(setState, 'Maternity', 'Maternity Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-              //     _leaveTypeButton(setState, 'Annual', 'Annual Leave', fontSizeFactor, max(0.8, min(1.2, MediaQuery.of(context).size.shortestSide / 600))),
-              //   ]);
-              // }
-
+            if (_isFemale) {
               leaveTypeButtons.addAll([
                 _leaveTypeButton(
                     setState,
@@ -3842,6 +3836,8 @@ class BioModel {
       {this.id,
       this.firstName,
       this.lastName,
+      this.maritalStatus,
+      this.gender,
       this.staffCategory,
       this.designation,
       this.password,
@@ -3867,6 +3863,8 @@ class BioModel {
         id: json['id'], // Get ID from json
         firstName: json['firstName'],
         lastName: json['lastName'],
+        maritalStatus: json['maritalStatus'],
+        gender: json['gender'],
         staffCategory: json['staffCategory'],
         designation: json['designation'],
         password: json['password'],
@@ -3885,7 +3883,11 @@ class BioModel {
         isRemoteDelete: json['isRemoteDelete'],
         isRemoteUpdate: json['isRemoteUpdate'],
         lastUpdateDate: json['lastUpdateDate'] != null
-            ? (json['lastUpdateDate'] as Timestamp).toDate()
+            ? (json['lastUpdateDate'] is Timestamp
+                ? (json['lastUpdateDate'] as Timestamp).toDate()
+                : (json['lastUpdateDate'] is String
+                    ? DateTime.tryParse(json['lastUpdateDate'] as String)
+                    : null))
             : null,
         signatureLink: json['signatureLink']);
   }
@@ -3895,6 +3897,8 @@ class BioModel {
       "id": id,
       'firstName': firstName,
       'lastName': lastName,
+      'maritalStatus': maritalStatus,
+      'gender': gender,
       'staffCategory': staffCategory,
       'designation': designation,
       'password': password,
@@ -4071,16 +4075,24 @@ class RemainingLeaveModel {
   });
 
   factory RemainingLeaveModel.fromJson(Map<String, dynamic> json) {
+    DateTime? parsedDate;
+    if (json['dateUpdated'] != null) {
+      if (json['dateUpdated'] is Timestamp) {
+        parsedDate = (json['dateUpdated'] as Timestamp).toDate();
+      } else if (json['dateUpdated'] is String) {
+        parsedDate = DateTime.tryParse(json['dateUpdated'] as String);
+      } else if (json['dateUpdated'] is int) {
+        parsedDate = DateTime.fromMillisecondsSinceEpoch(json['dateUpdated'] as int);
+      }
+    }
     return RemainingLeaveModel(
-      id: json['id'] ?? 'remainingLeaveDoc', // Get ID from json or default
-      staffId: json['staffId'],
-      paternityLeaveBalance: json['paternityLeaveBalance'],
-      maternityLeaveBalance: json['maternityLeaveBalance'],
-      annualLeaveBalance: json['annualLeaveBalance'],
-      holidayLeaveBalance: json['holidayLeaveBalance'],
-      dateUpdated: json['dateUpdated'] != null
-          ? (json['dateUpdated'] as Timestamp).toDate()
-          : null,
+      id: json['id'] as String? ?? 'remainingLeaveDoc',
+      staffId: json['staffId'] as String?,
+      paternityLeaveBalance: (json['paternityLeaveBalance'] as num?)?.toInt() ?? 0,
+      maternityLeaveBalance: (json['maternityLeaveBalance'] as num?)?.toInt() ?? 0,
+      annualLeaveBalance: (json['annualLeaveBalance'] as num?)?.toInt() ?? 10,
+      holidayLeaveBalance: (json['holidayLeaveBalance'] as num?)?.toInt() ?? 0,
+      dateUpdated: parsedDate,
     );
   }
 
